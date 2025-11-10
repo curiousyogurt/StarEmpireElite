@@ -3,8 +3,8 @@
             [com.star-empire-elite.middleware :as mid]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.settings :as settings]
-            [com.star-empire-elite.pages.main.start :as start]
-            [com.star-empire-elite.pages.main.about :as about]))
+            [com.star-empire-elite.pages.main.home :as main-home]
+            [com.star-empire-elite.pages.main.about :as main-about]))
 
 (def email-disabled-notice
   [:.text-sm.mt-3.bg-blue-100.rounded.p-2
@@ -72,7 +72,7 @@
       [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors.inline-block
        {:href "/signin"} "Sign In"]
       [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors.inline-block
-       {:href "/" :hx-boost "true"} "Back to Home"]]]
+       {:href "/" :hx-boost "true"} "Home"]]]
     
     ;; :: recaptcha disclosure
     [:.text-xs.text-green-400.text-opacity-75.mt-8
@@ -174,7 +174,7 @@
       [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors.inline-block
        {:href "/signup"} "Sign Up"]
       [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors.inline-block
-       {:href "/" :hx-boost "true"} "Back to Home"]]]
+       {:href "/" :hx-boost "true"} "Home"]]]
     
     ;; :: recaptcha disclosure
     [:.text-xs.text-green-400.text-opacity-75.mt-8
@@ -247,8 +247,8 @@
 
 (def module
   {:routes [["" 
-             ["/" {:get start/home}]
-             ["/about" {:get about/about}]]
+             ["/" {:get main-home/home}]
+             ["/about" {:get main-about/about}]]
             ["" {:middleware [mid/wrap-redirect-signed-in]}
              ["/link-sent" {:get link-sent}]
              ["/verify-link" {:get verify-email-page}]

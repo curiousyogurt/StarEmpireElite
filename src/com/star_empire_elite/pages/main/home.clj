@@ -1,4 +1,4 @@
-(ns com.star-empire-elite.pages.main.start
+(ns com.star-empire-elite.pages.main.home
   (:require [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]))
 

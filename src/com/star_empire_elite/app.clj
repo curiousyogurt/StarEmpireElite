@@ -1,153 +1,60 @@
 (ns com.star-empire-elite.app
-  (:require [com.biffweb :as biff :refer [q]]
+  (:require [com.biffweb :as biff]
             [com.star-empire-elite.middleware :as mid]
-            [com.star-empire-elite.ui :as ui]
-            [com.star-empire-elite.settings :as settings]
-            [rum.core :as rum]
-            [xtdb.api :as xt]
-            [ring.websocket :as ws]
-            [cheshire.core :as cheshire]))
+            [com.star-empire-elite.pages.app.dashboard :as dashboard]))
 
-(defn set-foo [{:keys [session params] :as ctx}]
-  (biff/submit-tx ctx
-    [{:db/op :update
-      :db/doc-type :user
-      :xt/id (:uid session)
-      :user/foo (:foo params)}])
-  {:status 303
-   :headers {"location" "/app"}})
-
-(defn bar-form [{:keys [value]}]
-  (biff/form
-   {:hx-post "/app/set-bar"
-    :hx-swap "outerHTML"}
-   [:label.block {:for "bar"} "Bar: "
-    [:span.font-mono (pr-str value)]]
-   [:.h-1]
-   [:.flex
-    [:input.w-full#bar {:type "text" :name "bar" :value value}]
-    [:.w-3]
-    [:button.btn {:type "submit"} "Update"]]
-   [:.h-1]
-   [:.text-sm.text-gray-600
-    "This demonstrates updating a value with HTMX."]))
-
-(defn set-bar [{:keys [session params] :as ctx}]
-  (biff/submit-tx ctx
-    [{:db/op :update
-      :db/doc-type :user
-      :xt/id (:uid session)
-      :user/bar (:bar params)}])
-  (biff/render (bar-form {:value (:bar params)})))
-
-(defn message [{:msg/keys [text sent-at]}]
-  [:.mt-3 {:_ "init send newMessage to #message-header"}
-   [:.text-gray-600 (biff/format-date sent-at "dd MMM yyyy HH:mm:ss")]
-   [:div text]])
-
-(defn notify-clients [{:keys [com.star-empire-elite/chat-clients]} tx]
-  (doseq [[op & args] (::xt/tx-ops tx)
-          :when (= op ::xt/put)
-          :let [[doc] args]
-          :when (contains? doc :msg/text)
-          :let [html (rum/render-static-markup
-                      [:div#messages {:hx-swap-oob "afterbegin"}
-                       (message doc)])]
-          ws @chat-clients]
-    (ws/send ws html)))
-
-(defn send-message [{:keys [session] :as ctx} {:keys [text]}]
-  (let [{:keys [text]} (cheshire/parse-string text true)]
-    (biff/submit-tx ctx
-      [{:db/doc-type :msg
-        :msg/user (:uid session)
-        :msg/text text
-        :msg/sent-at :db/now}])))
-
-(defn chat [{:keys [biff/db]}]
-  (let [messages (q db
-                    '{:find (pull msg [*])
-                      :in [t0]
-                      :where [[msg :msg/sent-at t]
-                              [(<= t0 t)]]}
-                    (biff/add-seconds (java.util.Date.) (* -60 10)))]
-    [:div {:hx-ext "ws" :ws-connect "/app/chat"}
-     [:form.mb-0 {:ws-send true
-                  :_ "on submit set value of #message to ''"}
-      [:label.block {:for "message"} "Write a message"]
-      [:.h-1]
-      [:textarea.w-full#message {:name "text"}]
-      [:.h-1]
-      [:.text-sm.text-gray-600
-       "Sign in with an incognito window to have a conversation with yourself."]
-      [:.h-2]
-      [:div [:button.btn {:type "submit"} "Send message"]]]
-     [:.h-6]
-     [:div#message-header
-      {:_ "on newMessage put 'Messages sent in the past 10 minutes:' into me"}
-      (if (empty? messages)
-        "No messages yet."
-        "Messages sent in the past 10 minutes:")]
-     [:div#messages
-      (map message (sort-by :msg/sent-at #(compare %2 %1) messages))]]))
-
+;; :: main app dashboard showing all player games
 (defn app [{:keys [session biff/db] :as ctx}]
-  (let [{:user/keys [email foo bar]} (xt/entity db (:uid session))]
-    (ui/page
-     {}
-     [:div "Signed in as " email ". "
-      (biff/form
-       {:action "/auth/signout"
-        :class "inline"}
-       [:button.text-blue-500.hover:text-blue-800 {:type "submit"}
-        "Sign out"])
-      "."]
-     [:.h-6]
-     (biff/form
-      {:action "/app/set-foo"}
-      [:label.block {:for "foo"} "Foo: "
-       [:span.font-mono (pr-str foo)]]
-      [:.h-1]
-      [:.flex
-       [:input.w-full#foo {:type "text" :name "foo" :value foo}]
-       [:.w-3]
-       [:button.btn {:type "submit"} "Update"]]
-      [:.h-1]
-      [:.text-sm.text-gray-600
-       "This demonstrates updating a value with a plain old form."])
-     [:.h-6]
-     (bar-form {:value bar})
-     [:.h-6]
-     (chat ctx))))
+  (dashboard/dashboard ctx))
 
-(defn ws-handler [{:keys [com.star-empire-elite/chat-clients] :as ctx}]
-  {:status 101
-   :headers {"upgrade" "websocket"
-             "connection" "upgrade"}
-   ::ws/listener {:on-open (fn [ws]
-                             (swap! chat-clients conj ws))
-                  :on-message (fn [ws text-message]
-                                (send-message ctx {:ws ws :text text-message}))
-                  :on-close (fn [ws status-code reason]
-                              (swap! chat-clients disj ws))}})
-
-; (def about-page
-;   (ui/page
-;    {:base/title (str "About " settings/app-name)}
-;    [:p "This app was made with "
-;     [:a.link {:href "https://biffweb.com"} "Biff"] "."]))
-
-(defn echo [{:keys [params]}]
-  {:status 200
-   :headers {"content-type" "application/json"}
-   :body params})
+;; :: create a test game and player for the current user
+(defn create-test-game [{:keys [session biff/db] :as ctx}]
+  (let [game-id (java.util.UUID/randomUUID)
+        player-id (java.util.UUID/randomUUID)
+        now (java.util.Date.)
+        end-date (java.util.Date. (+ (.getTime now) (* 30 24 60 60 1000)))]
+    (biff/submit-tx ctx
+      [{:db/doc-type :game
+        :xt/id game-id
+        :game/name "Test Game"
+        :game/created-at now
+        :game/scheduled-end-at end-date
+        :game/status 0
+        :game/turns-per-day 6
+        :game/rounds-per-day 4}
+       {:db/doc-type :player
+        :xt/id player-id
+        :player/user (:uid session)
+        :player/game game-id
+        :player/empire-name "Test Empire"
+        :player/credits 10000
+        :player/food 5000
+        :player/fuel 3000
+        :player/galaxars 1000
+        :player/military-planets 2
+        :player/food-planets 3
+        :player/ore-planets 1
+        :player/population 1000000
+        :player/stability 75
+        :player/status 0
+        :player/score 0
+        :player/current-turn 1
+        :player/current-round 1
+        :player/current-phase 0
+        :player/turns-used 0
+        :player/generals 5
+        :player/admirals 3
+        :player/soldiers 1000
+        :player/transports 10
+        :player/defence-stations 5
+        :player/carriers 2
+        :player/fighters 50
+        :player/command-ships 1
+        :player/agents 10}])
+    {:status 303
+     :headers {"location" "/app"}}))
 
 (def module
-  ;{:static {"/about/" about-page}
   {:routes ["/app" {:middleware [mid/wrap-signed-in]}
             ["" {:get app}]
-            ["/set-foo" {:post set-foo}]
-            ["/set-bar" {:post set-bar}]
-            ["/chat" {:get ws-handler}]]
-   :api-routes [["/api/echo" {:post echo}]]
-   :on-tx notify-clients})
+            ["/create-test-game" {:post create-test-game}]]})

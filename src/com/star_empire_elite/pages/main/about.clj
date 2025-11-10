@@ -53,5 +53,5 @@
       [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
        {:href "/signin"} "Sign In"]
       [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-       {:href "/" :hx-boost "true"} "Back to Home"]]]))
+       {:href "/" :hx-boost "true"} "Home"]]]))
  

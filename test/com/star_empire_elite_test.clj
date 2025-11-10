@@ -17,29 +17,103 @@
    :biff/db         (xt/db node)
    :biff/malli-opts #'main/malli-opts})
 
-(deftest send-message-test
+(deftest create-game-and-player-test
   (with-open [node (test-xtdb-node [])]
-    (let [message (mg/generate :string)
-          user    (mg/generate :user main/malli-opts)
-          ctx     (assoc (get-context node) :session {:uid (:xt/id user)})
-          _       (app/send-message ctx {:text (cheshire/generate-string {:text message})})
-          db      (xt/db node) ; get a fresh db value so it contains any transactions
-                               ; that send-message submitted.
-          doc     (biff/lookup db :msg/text message)]
-      (is (some? doc))
-      (is (= (:msg/user doc) (:xt/id user))))))
+    (let [user (mg/generate :user main/malli-opts)
+          game-id (java.util.UUID/randomUUID)
+          player-id (java.util.UUID/randomUUID)
+          now (java.util.Date.)
+          end-date (java.util.Date. (+ (.getTime now) (* 30 24 60 60 1000)))
+          ctx (assoc (get-context node) :session {:uid (:xt/id user)})
+          _ (biff/submit-tx ctx
+              [{:db/doc-type :game
+                :xt/id game-id
+                :game/name "Test Game"
+                :game/created-at now
+                :game/scheduled-end-at end-date
+                :game/status 0
+                :game/turns-per-day 6
+                :game/rounds-per-day 4}
+               {:db/doc-type :player
+                :xt/id player-id
+                :player/user (:xt/id user)
+                :player/game game-id
+                :player/empire-name "Test Empire"
+                :player/credits 10000
+                :player/food 5000
+                :player/fuel 3000
+                :player/galaxars 1000
+                :player/military-planets 2
+                :player/food-planets 3
+                :player/ore-planets 1
+                :player/population 1000000
+                :player/stability 75
+                :player/status 0
+                :player/score 0
+                :player/current-turn 1
+                :player/current-round 1
+                :player/current-phase 0
+                :player/turns-used 0
+                :player/generals 5
+                :player/admirals 3
+                :player/soldiers 1000
+                :player/transports 10
+                :player/defence-stations 5
+                :player/carriers 2
+                :player/fighters 50
+                :player/command-ships 1
+                :player/agents 10}])
+          db (xt/db node)
+          game (xt/entity db game-id)
+          player (xt/entity db player-id)]
+      (is (some? game))
+      (is (= (:game/name game) "Test Game"))
+      (is (some? player))
+      (is (= (:player/empire-name player) "Test Empire"))
+      (is (= (:player/credits player) 10000)))))
 
-(deftest chat-test
-  (let [n-messages (+ 3 (rand-int 10))
-        now        (java.util.Date.)
-        messages   (for [doc (mg/sample :msg (assoc main/malli-opts :size n-messages))]
-                     (assoc doc :msg/sent-at now))]
-    (with-open [node (test-xtdb-node messages)]
-      (let [response (app/chat {:biff/db (xt/db node)})
-            html     (rum/render-html response)]
-        (is (str/includes? html "Messages sent in the past 10 minutes:"))
-        (is (not (str/includes? html "No messages yet.")))
-        ;; If you add Jsoup to your dependencies, you can use DOM selectors instead of just regexes:
-        ;(is (= n-messages (count (.select (Jsoup/parse html) "#messages > *"))))
-        (is (= n-messages (count (re-seq #"init send newMessage to #message-header" html))))
-        (is (every? #(str/includes? html (:msg/text %)) messages))))))
+(defn create-test-game [{:keys [session biff/db] :as ctx}]
+  (let [game-id (java.util.UUID/randomUUID)
+        player-id (java.util.UUID/randomUUID)
+        now (java.util.Date.)
+        end-date (java.util.Date. (+ (.getTime now) (* 30 24 60 60 1000)))]
+    (biff/submit-tx ctx
+      [{:db/doc-type :game
+        :xt/id game-id
+        :game/name "Test Game"
+        :game/created-at now
+        :game/scheduled-end-at end-date
+        :game/status 0
+        :game/turns-per-day 6
+        :game/rounds-per-day 4}
+       {:db/doc-type :player
+        :xt/id player-id
+        :player/user (:uid session)
+        :player/game game-id
+        :player/empire-name "Test Empire"
+        :player/credits 10000
+        :player/food 5000
+        :player/fuel 3000
+        :player/galaxars 1000
+        :player/military-planets 2
+        :player/food-planets 3
+        :player/ore-planets 1
+        :player/population 1000000
+        :player/stability 75
+        :player/status 0
+        :player/score 0
+        :player/current-turn 1
+        :player/current-round 1
+        :player/current-phase 0
+        :player/turns-used 0
+        :player/generals 5
+        :player/admirals 3
+        :player/soldiers 1000
+        :player/transports 10
+        :player/defence-stations 5
+        :player/carriers 2
+        :player/fighters 50
+        :player/command-ships 1
+        :player/agents 10}])
+    {:status 303
+     :headers {"location" "/app"}}))
