@@ -96,7 +96,7 @@
         (merge #:base{:title settings/app-name
                       :lang "en-US"
                       :icon "/img/glider.png"
-                      :description (str settings/app-name " Description")
+                      :description "Shape destiny. Write history. Become legend."
                       :image "https://clojure.org/images/clojure-logo-120b.png"})
         (update :base/head (fn [head]
                              (concat [[:link {:rel "stylesheet" :href (static-path "/css/main.css")}]

@@ -47,8 +47,11 @@
       [:span.font-bold "Clojure"] ", a powerful Lisp dialect very much like "
       [:span.font-bold "Racket"] ", using a purely functional approach with modern web technologies."]
      
-     [:div.flex.gap-4
-      [:a.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
-       {:href "/" :hx-boost "true"} "Back to Home"]
+     [:div.flex.gap-4.mt-4
       [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-       {:href "/game"} "Start Playing"]]]))
+       {:href "/signup"} "Sign Up"]
+      [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+       {:href "/signin"} "Sign In"]
+      [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+       {:href "/" :hx-boost "true"} "Back to Home"]]]))
+ 
