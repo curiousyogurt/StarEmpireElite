@@ -5,9 +5,17 @@
             [com.star-empire-elite.pages.app.game :as game]
             [com.star-empire-elite.pages.app.income :as income]
             [com.star-empire-elite.pages.app.expenses :as expenses]
+            [com.star-empire-elite.pages.app.building :as building]
             [com.star-empire-elite.constants :as const]
             [xtdb.api :as xt]
             ))
+
+;; :: check if player is in the correct phase for the requested page
+;; If not, redirect to the correct phase page
+(defn validate-phase [player-id current-phase required-phase]
+  (when (not= current-phase required-phase)
+    {:status 303
+     :headers {"location" (game/get-phase-url player-id current-phase)}}))
 
 ;; :: main app dashboard showing all player games
 (defn app [{:keys [session biff/db] :as ctx}]
@@ -89,7 +97,9 @@
     (if (nil? player)
       {:status 404
        :body "Player not found"}
-      (income/income-page {:player player :game game}))))
+      ;; validate that player is in phase 1 (income phase)
+      (or (validate-phase player-id (:player/current-phase player) 1)
+          (income/income-page {:player player :game game})))))
 
 (defn expenses-handler [{:keys [path-params biff/db] :as ctx}]
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
@@ -98,7 +108,20 @@
     (if (nil? player)
       {:status 404
        :body "Player not found"}
-      (expenses/expenses-page {:player player :game game}))))
+      ;; validate that player is in phase 2 (expenses phase)
+      (or (validate-phase player-id (:player/current-phase player) 2)
+          (expenses/expenses-page {:player player :game game})))))
+
+(defn building-handler [{:keys [path-params biff/db] :as ctx}]
+  (let [player-id (java.util.UUID/fromString (:player-id path-params))
+        player (xt/entity db player-id)
+        game (xt/entity db (:player/game player))]
+    (if (nil? player)
+      {:status 404
+       :body "Player not found"}
+      ;; validate that player is in phase 3 (building phase)
+      (or (validate-phase player-id (:player/current-phase player) 3)
+          (building/building-page {:player player :game game})))))
 
 (defn calculate-expenses [{:keys [path-params params biff/db] :as ctx}]
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
@@ -159,5 +182,7 @@
             ["/game/:player-id/play" {:get income-handler}]
             ["/game/:player-id/apply-income" {:post income/apply-income}]
             ["/game/:player-id/expenses" {:get expenses-handler}]
+            ["/game/:player-id/apply-expenses" {:post expenses/apply-expenses}]
+            ["/game/:player-id/building" {:get building-handler}]
             ["/game/:player-id/calculate-expenses" {:post calculate-expenses}]
             ]})

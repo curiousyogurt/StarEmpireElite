@@ -3,6 +3,15 @@
             [com.star-empire-elite.ui :as ui]
             [xtdb.api :as xt]))
 
+;; :: helper function to get the correct URL for a player's current phase
+(defn get-phase-url [player-id current-phase]
+  (case current-phase
+    1 (str "/app/game/" player-id "/play")
+    2 (str "/app/game/" player-id "/expenses")
+    3 (str "/app/game/" player-id "/building")
+    ;; default to game overview if phase is invalid
+    (str "/app/game/" player-id)))
+
 ;; :: game header showing key resources and status
 (defn game-header [{:keys [player]}]
   [:div.grid.grid-cols-3.md:grid-cols-5.lg:grid-cols-9.gap-2.mb-6.pb-4.border-b.border-green-400
@@ -90,7 +99,7 @@
         [:.h-6]
         [:div.flex.gap-4
          [:a.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
-          {:href (str "/app/game/" (:xt/id player) "/play")} "Play"]
+          {:href (get-phase-url (:xt/id player) (:player/current-phase player))} "Play"]
          [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
           {:href "/app"} "Back"]
          ]]))))

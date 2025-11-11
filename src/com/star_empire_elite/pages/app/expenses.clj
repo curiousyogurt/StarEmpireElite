@@ -1,6 +1,50 @@
 (ns com.star-empire-elite.pages.app.expenses
-  (:require [com.star-empire-elite.ui :as ui]
+  (:require [com.biffweb :as biff]
+            [com.star-empire-elite.ui :as ui]
             [xtdb.api :as xt]))
+
+;; :: apply expenses - save expenses to database and advance to phase 3
+(defn apply-expenses [{:keys [path-params params biff/db] :as ctx}]
+  (let [player-id (java.util.UUID/fromString (:player-id path-params))
+        player (xt/entity db player-id)]
+    (if (nil? player)
+      {:status 404
+       :body "Player not found"}
+      ;; only allow expense application if player is in phase 2
+      (if (not= (:player/current-phase player) 2)
+        {:status 303
+         :headers {"location" (str "/app/game/" player-id)}}
+        (let [;; parse expense input values, default to 0 if not provided
+              planets-pay (parse-long (or (:planets-pay params) "0"))
+              planets-food (parse-long (or (:planets-food params) "0"))
+              soldiers-credits (parse-long (or (:soldiers-credits params) "0"))
+              soldiers-food (parse-long (or (:soldiers-food params) "0"))
+              fighters-credits (parse-long (or (:fighters-credits params) "0"))
+              fighters-fuel (parse-long (or (:fighters-fuel params) "0"))
+              stations-credits (parse-long (or (:stations-credits params) "0"))
+              stations-fuel (parse-long (or (:stations-fuel params) "0"))
+              agents-credits (parse-long (or (:agents-credits params) "0"))
+              agents-food (parse-long (or (:agents-food params) "0"))
+              population-credits (parse-long (or (:population-credits params) "0"))
+              population-food (parse-long (or (:population-food params) "0"))
+              
+              ;; calculate new resource totals after expenses
+              new-credits (- (:player/credits player) planets-pay soldiers-credits 
+                             fighters-credits stations-credits agents-credits population-credits)
+              new-food (- (:player/food player) planets-food soldiers-food agents-food population-food)
+              new-fuel (- (:player/fuel player) fighters-fuel stations-fuel)]
+          ;; submit transaction to update player resources and advance phase
+          (biff/submit-tx ctx
+            [{:db/doc-type :player
+              :db/op :update
+              :xt/id player-id
+              :player/credits new-credits
+              :player/food new-food
+              :player/fuel new-fuel
+              :player/current-phase 3}])
+          ;; redirect to building page (when it exists)
+          {:status 303
+           :headers {"location" (str "/app/game/" player-id "/building")}})))))
 
 ;; :: helper function for expense input fields with reset button
 (defn expense-input [name value player-id hx-include]
@@ -83,8 +127,12 @@
          [:p.font-mono (:player/agents player)]]]]
       
       ;; :: expenses form
-      [:h3.font-bold.mb-4 "Expenses This Round"]
-      [:div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-3.gap-4.mb-8
+      (biff/form
+       {:action (str "/app/game/" player-id "/apply-expenses")
+        :method "post"}
+       
+       [:h3.font-bold.mb-4 "Expenses This Round"]
+       [:div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-3.gap-4.mb-8
        
        ;; :: planets expense
        [:div.border.border-green-400.p-4
@@ -205,38 +253,40 @@
           (expense-input "population-food" population-food-cost player-id hx-include)]]]
        ]
       
-      ;; :: resources after expenses
-      [:div#resources-after.border.border-green-400.p-4.mb-8.bg-green-100.bg-opacity-5
-       [:h3.font-bold.mb-4 "Resources After Expenses"]
-       [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
-        [:div
-         [:p.text-xs "Credits"]
-         [:p.font-mono (:player/credits player)]]
-        [:div
-         [:p.text-xs "Food"]
-         [:p.font-mono (:player/food player)]]
-        [:div
-         [:p.text-xs "Fuel"]
-         [:p.font-mono (:player/fuel player)]]
-        [:div
-         [:p.text-xs "Galaxars"]
-         [:p.font-mono (:player/galaxars player)]]
-        [:div
-         [:p.text-xs "Soldiers"]
-         [:p.font-mono (:player/soldiers player)]]
-        [:div
-         [:p.text-xs "Fighters"]
-         [:p.font-mono (:player/fighters player)]]
-        [:div
-         [:p.text-xs "Stations"]
-         [:p.font-mono (:player/defence-stations player)]]
-        [:div
-         [:p.text-xs "Agents"]
-         [:p.font-mono (:player/agents player)]]]]
+       ;; :: resources after expenses
+       [:div#resources-after.border.border-green-400.p-4.mb-8.bg-green-100.bg-opacity-5
+        [:h3.font-bold.mb-4 "Resources After Expenses"]
+        [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
+         [:div
+          [:p.text-xs "Credits"]
+          [:p.font-mono (:player/credits player)]]
+         [:div
+          [:p.text-xs "Food"]
+          [:p.font-mono (:player/food player)]]
+         [:div
+          [:p.text-xs "Fuel"]
+          [:p.font-mono (:player/fuel player)]]
+         [:div
+          [:p.text-xs "Galaxars"]
+          [:p.font-mono (:player/galaxars player)]]
+         [:div
+          [:p.text-xs "Soldiers"]
+          [:p.font-mono (:player/soldiers player)]]
+         [:div
+          [:p.text-xs "Fighters"]
+          [:p.font-mono (:player/fighters player)]]
+         [:div
+          [:p.text-xs "Stations"]
+          [:p.font-mono (:player/defence-stations player)]]
+         [:div
+          [:p.text-xs "Agents"]
+          [:p.font-mono (:player/agents player)]]]]
 
-      [:.h-6]
-      [:div.flex.gap-4
-       [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-        {:href (str "/app/game/" player-id)} "Back to Game"]
-       [:a.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
-        {:href (str "/app/game/" player-id "/building")} "Continue to Building"]]])))
+       [:.h-6]
+       [:div.flex.gap-4
+        [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+         {:href (str "/app/game/" player-id)} "Back to Game"]
+        [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
+         {:type "submit"}
+         "Continue to Building"]])
+      ]))) ;; end of biff/form

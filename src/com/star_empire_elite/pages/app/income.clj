@@ -11,32 +11,36 @@
     (if (nil? player)
       {:status 404
        :body "Player not found"}
-      (let [;; calculate income from each planet type
-            ore-credits (* (:player/ore-planets player) (:game/ore-planet-credits game))
-            ore-fuel (* (:player/ore-planets player) (:game/ore-planet-fuel game))
-            ore-galaxars (* (:player/ore-planets player) (:game/ore-planet-galaxars game))
-            food-food (* (:player/food-planets player) (:game/food-planet-food game))
-            mil-soldiers (* (:player/military-planets player) (:game/military-planet-soldiers game))
-            mil-fighters (* (:player/military-planets player) (:game/military-planet-fighters game))
-            mil-stations (* (:player/military-planets player) (:game/military-planet-stations game))
-            mil-agents (* (:player/military-planets player) (:game/military-planet-agents game))]
-        ;; submit transaction to update player resources and advance phase
-        (biff/submit-tx ctx
-          [{:db/doc-type :player
-            :db/op :update
-            :xt/id player-id
-            :player/credits (+ (:player/credits player) ore-credits)
-            :player/food (+ (:player/food player) food-food)
-            :player/fuel (+ (:player/fuel player) ore-fuel)
-            :player/galaxars (+ (:player/galaxars player) ore-galaxars)
-            :player/soldiers (+ (:player/soldiers player) mil-soldiers)
-            :player/fighters (+ (:player/fighters player) mil-fighters)
-            :player/defence-stations (+ (:player/defence-stations player) mil-stations)
-            :player/agents (+ (:player/agents player) mil-agents)
-            :player/current-phase 2}])
-        ;; redirect to expenses page
+      ;; only allow income application if player is in phase 1
+      (if (not= (:player/current-phase player) 1)
         {:status 303
-         :headers {"location" (str "/app/game/" player-id "/expenses")}}))))
+         :headers {"location" (str "/app/game/" player-id)}}
+        (let [;; calculate income from each planet type
+              ore-credits (* (:player/ore-planets player) (:game/ore-planet-credits game))
+              ore-fuel (* (:player/ore-planets player) (:game/ore-planet-fuel game))
+              ore-galaxars (* (:player/ore-planets player) (:game/ore-planet-galaxars game))
+              food-food (* (:player/food-planets player) (:game/food-planet-food game))
+              mil-soldiers (* (:player/military-planets player) (:game/military-planet-soldiers game))
+              mil-fighters (* (:player/military-planets player) (:game/military-planet-fighters game))
+              mil-stations (* (:player/military-planets player) (:game/military-planet-stations game))
+              mil-agents (* (:player/military-planets player) (:game/military-planet-agents game))]
+          ;; submit transaction to update player resources and advance phase
+          (biff/submit-tx ctx
+            [{:db/doc-type :player
+              :db/op :update
+              :xt/id player-id
+              :player/credits (+ (:player/credits player) ore-credits)
+              :player/food (+ (:player/food player) food-food)
+              :player/fuel (+ (:player/fuel player) ore-fuel)
+              :player/galaxars (+ (:player/galaxars player) ore-galaxars)
+              :player/soldiers (+ (:player/soldiers player) mil-soldiers)
+              :player/fighters (+ (:player/fighters player) mil-fighters)
+              :player/defence-stations (+ (:player/defence-stations player) mil-stations)
+              :player/agents (+ (:player/agents player) mil-agents)
+              :player/current-phase 2}])
+          ;; redirect to expenses page
+          {:status 303
+           :headers {"location" (str "/app/game/" player-id "/expenses")}})))))
 
 ;; :: income page - informational phase showing resource generation
 (defn income-page [{:keys [player game]}]
@@ -162,4 +166,4 @@
         :method "post"}
        [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
         {:type "submit"}
-        "Expenses"])])))
+        "Continue to Expenses"])])))
