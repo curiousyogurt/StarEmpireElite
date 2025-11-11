@@ -55,6 +55,16 @@
      font-family: 'IBM Plex Mono', 'Menlo', 'Courier', monospace;
    }
    
+   /* Hide number input spinners */
+   input[type=\"number\"] {
+     -moz-appearance: textfield;
+   }
+   input[type=\"number\"]::-webkit-outer-spin-button,
+   input[type=\"number\"]::-webkit-inner-spin-button {
+     -webkit-appearance: none;
+     margin: 0;
+   }
+   
   @media (max-width: 439px) {
     .border-green-400 {
       border: none !important;
