@@ -157,6 +157,7 @@
             ["/create-test-game" {:post create-test-game}]
             ["/game/:player-id" {:get game/game-view}]
             ["/game/:player-id/play" {:get income-handler}]
+            ["/game/:player-id/apply-income" {:post income/apply-income}]
             ["/game/:player-id/expenses" {:get expenses-handler}]
             ["/game/:player-id/calculate-expenses" {:post calculate-expenses}]
             ]})
