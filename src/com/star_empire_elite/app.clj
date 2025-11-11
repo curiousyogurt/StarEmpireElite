@@ -6,6 +6,9 @@
             [com.star-empire-elite.pages.app.income :as income]
             [com.star-empire-elite.pages.app.expenses :as expenses]
             [com.star-empire-elite.pages.app.building :as building]
+            [com.star-empire-elite.pages.app.action :as action]
+            [com.star-empire-elite.pages.app.espionage :as espionage]
+            [com.star-empire-elite.pages.app.outcomes :as outcomes]
             [com.star-empire-elite.constants :as const]
             [xtdb.api :as xt]
             ))
@@ -123,6 +126,39 @@
       (or (validate-phase player-id (:player/current-phase player) 3)
           (building/building-page {:player player :game game})))))
 
+(defn action-handler [{:keys [path-params biff/db] :as ctx}]
+  (let [player-id (java.util.UUID/fromString (:player-id path-params))
+        player (xt/entity db player-id)
+        game (xt/entity db (:player/game player))]
+    (if (nil? player)
+      {:status 404
+       :body "Player not found"}
+      ;; validate that player is in phase 4 (action phase)
+      (or (validate-phase player-id (:player/current-phase player) 4)
+          (action/action-page {:player player :game game})))))
+
+(defn espionage-handler [{:keys [path-params biff/db] :as ctx}]
+  (let [player-id (java.util.UUID/fromString (:player-id path-params))
+        player (xt/entity db player-id)
+        game (xt/entity db (:player/game player))]
+    (if (nil? player)
+      {:status 404
+       :body "Player not found"}
+      ;; validate that player is in phase 5 (espionage phase)
+      (or (validate-phase player-id (:player/current-phase player) 5)
+          (espionage/espionage-page {:player player :game game})))))
+
+(defn outcomes-handler [{:keys [path-params biff/db] :as ctx}]
+  (let [player-id (java.util.UUID/fromString (:player-id path-params))
+        player (xt/entity db player-id)
+        game (xt/entity db (:player/game player))]
+    (if (nil? player)
+      {:status 404
+       :body "Player not found"}
+      ;; validate that player is in phase 6 (outcomes phase)
+      (or (validate-phase player-id (:player/current-phase player) 6)
+          (outcomes/outcomes-page {:player player :game game})))))
+
 (defn calculate-expenses [{:keys [path-params params biff/db] :as ctx}]
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
         player (xt/entity db player-id)
@@ -184,5 +220,12 @@
             ["/game/:player-id/expenses" {:get expenses-handler}]
             ["/game/:player-id/apply-expenses" {:post expenses/apply-expenses}]
             ["/game/:player-id/building" {:get building-handler}]
+            ["/game/:player-id/apply-building" {:post building/apply-building}]
+            ["/game/:player-id/action" {:get action-handler}]
+            ["/game/:player-id/apply-action" {:post action/apply-action}]
+            ["/game/:player-id/espionage" {:get espionage-handler}]
+            ["/game/:player-id/apply-espionage" {:post espionage/apply-espionage}]
+            ["/game/:player-id/outcomes" {:get outcomes-handler}]
+            ["/game/:player-id/apply-outcomes" {:post outcomes/apply-outcomes}]
             ["/game/:player-id/calculate-expenses" {:post calculate-expenses}]
             ]})

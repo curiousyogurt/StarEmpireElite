@@ -9,6 +9,9 @@
     1 (str "/app/game/" player-id "/play")
     2 (str "/app/game/" player-id "/expenses")
     3 (str "/app/game/" player-id "/building")
+    4 (str "/app/game/" player-id "/action")
+    5 (str "/app/game/" player-id "/espionage")
+    6 (str "/app/game/" player-id "/outcomes")
     ;; default to game overview if phase is invalid
     (str "/app/game/" player-id)))
 
