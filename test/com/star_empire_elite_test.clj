@@ -85,7 +85,29 @@
         :game/scheduled-end-at end-date
         :game/status 0
         :game/turns-per-day 6
-        :game/rounds-per-day 4}
+        :game/rounds-per-day 4
+        ;; Income generation constants
+        :game/ore-planet-credits const/ore-planet-credits
+        :game/ore-planet-fuel const/ore-planet-fuel
+        :game/ore-planet-galaxars const/ore-planet-galaxars
+        :game/food-planet-food const/food-planet-food
+        :game/military-planet-soldiers const/military-planet-soldiers
+        :game/military-planet-fighters const/military-planet-fighters
+        :game/military-planet-stations const/military-planet-stations
+        :game/military-planet-agents const/military-planet-agents
+        ;; Upkeep/expense constants
+        :game/planet-upkeep-credits const/planet-upkeep-credits
+        :game/planet-upkeep-food const/planet-upkeep-food
+        :game/soldier-upkeep-credits const/soldier-upkeep-credits
+        :game/soldier-upkeep-food const/soldier-upkeep-food
+        :game/fighter-upkeep-credits const/fighter-upkeep-credits
+        :game/fighter-upkeep-fuel const/fighter-upkeep-fuel
+        :game/station-upkeep-credits const/station-upkeep-credits
+        :game/station-upkeep-fuel const/station-upkeep-fuel
+        :game/agent-upkeep-credits const/agent-upkeep-credits
+        :game/agent-upkeep-food const/agent-upkeep-food
+        :game/population-upkeep-credits const/population-upkeep-credits
+        :game/population-upkeep-food const/population-upkeep-food}
        {:db/doc-type :player
         :xt/id player-id
         :player/user (:uid session)
@@ -113,7 +135,7 @@
         :player/defence-stations 5
         :player/carriers 2
         :player/fighters 50
-        :player/command-ships 1
+        :command-ships 1
         :player/agents 10}])
     {:status 303
      :headers {"location" "/app"}}))

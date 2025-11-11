@@ -5,6 +5,7 @@
             [com.star-empire-elite.pages.app.game :as game]
             [com.star-empire-elite.pages.app.income :as income]
             [com.star-empire-elite.pages.app.expenses :as expenses]
+            [com.star-empire-elite.constants :as const]
             [xtdb.api :as xt]
             ))
 
@@ -26,7 +27,29 @@
         :game/scheduled-end-at end-date
         :game/status 0
         :game/turns-per-day 6
-        :game/rounds-per-day 4}
+        :game/rounds-per-day 4
+        ;; Income generation constants
+        :game/ore-planet-credits const/ore-planet-credits
+        :game/ore-planet-fuel const/ore-planet-fuel
+        :game/ore-planet-galaxars const/ore-planet-galaxars
+        :game/food-planet-food const/food-planet-food
+        :game/military-planet-soldiers const/military-planet-soldiers
+        :game/military-planet-fighters const/military-planet-fighters
+        :game/military-planet-stations const/military-planet-stations
+        :game/military-planet-agents const/military-planet-agents
+        ;; Upkeep/expense constants
+        :game/planet-upkeep-credits const/planet-upkeep-credits
+        :game/planet-upkeep-food const/planet-upkeep-food
+        :game/soldier-upkeep-credits const/soldier-upkeep-credits
+        :game/soldier-upkeep-food const/soldier-upkeep-food
+        :game/fighter-upkeep-credits const/fighter-upkeep-credits
+        :game/fighter-upkeep-fuel const/fighter-upkeep-fuel
+        :game/station-upkeep-credits const/station-upkeep-credits
+        :game/station-upkeep-fuel const/station-upkeep-fuel
+        :game/agent-upkeep-credits const/agent-upkeep-credits
+        :game/agent-upkeep-food const/agent-upkeep-food
+        :game/population-upkeep-credits const/population-upkeep-credits
+        :game/population-upkeep-food const/population-upkeep-food}
        {:db/doc-type :player
         :xt/id player-id
         :player/user (:uid session)
@@ -61,19 +84,21 @@
 
 (defn income-handler [{:keys [path-params biff/db] :as ctx}]
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player (xt/entity db player-id)]
+        player (xt/entity db player-id)
+        game (xt/entity db (:player/game player))]
     (if (nil? player)
       {:status 404
        :body "Player not found"}
-      (income/income-page {:player player}))))
+      (income/income-page {:player player :game game}))))
 
 (defn expenses-handler [{:keys [path-params biff/db] :as ctx}]
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player (xt/entity db player-id)]
+        player (xt/entity db player-id)
+        game (xt/entity db (:player/game player))]
     (if (nil? player)
       {:status 404
        :body "Player not found"}
-      (expenses/expenses-page {:player player}))))
+      (expenses/expenses-page {:player player :game game}))))
 
 (defn calculate-expenses [{:keys [path-params params biff/db] :as ctx}]
   (let [player-id (java.util.UUID/fromString (:player-id path-params))

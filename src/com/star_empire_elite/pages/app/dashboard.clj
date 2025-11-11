@@ -99,20 +99,33 @@
 
 ;; :: dashboard page showing all games
 (defn dashboard [{:keys [session biff/db] :as ctx}]
-  (let [games (get-user-games db (:uid session))]
+  (let [games (get-user-games db (:uid session))
+        user (xt/entity db (:uid session))]
     (ui/page
      {}
      [:div.text-green-400.font-mono
-      [:h1.text-3xl.font-bold.mb-6 "Your Games"]
+      ;; :: header with user info and sign out
+      [:div.flex.justify-between.items-center.mb-6
+       [:h1.text-3xl.font-bold "Your Games"]
+       [:div.flex.items-center.gap-4
+        [:span.text-sm (:user/email user)]
+        (biff/form
+         {:action "/auth/signout"
+          :method "post"}
+         [:button.border.border-green-400.px-4.py-2.text-sm.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+          {:type "submit"}
+          "Sign Out"])]]
+      
+      ;; :: games list or empty message
       (if (empty? games)
-        [:p "You are not currently in any games."]
-        [:div
-         (map game-card games)
-         [:.h-6]
-         (biff/form
-          {:action "/app/create-test-game"
-           :method "post"}
-          [:button.bg-green-400.text-black.px-4.py-2.font-bold.hover:bg-green-300.transition-colors
-           {:type "submit"}
-           "Create Test Game"])])])))
-
+        [:p.mb-6 "You are not currently in any games."]
+        [:div.mb-6
+         (map game-card games)])
+      
+      ;; :: create test game button (always visible)
+      (biff/form
+       {:action "/app/create-test-game"
+        :method "post"}
+       [:button.bg-green-400.text-black.px-4.py-2.font-bold.hover:bg-green-300.transition-colors
+        {:type "submit"}
+        "Create Test Game"])])))

@@ -3,15 +3,15 @@
             [xtdb.api :as xt]))
 
 ;; :: income page - informational phase showing resource generation
-(defn income-page [{:keys [player]}]
-  (let [ore-credits (* (:player/ore-planets player) 500)
-        ore-fuel (* (:player/ore-planets player) 200)
-        ore-galaxars (* (:player/ore-planets player) 100)
-        food-food (* (:player/food-planets player) 1000)
-        mil-soldiers (* (:player/military-planets player) 50)
-        mil-fighters (* (:player/military-planets player) 25)
-        mil-stations (* (:player/military-planets player) 10)
-        mil-agents (* (:player/military-planets player) 5)]
+(defn income-page [{:keys [player game]}]
+  (let [ore-credits (* (:player/ore-planets player) (:game/ore-planet-credits game))
+        ore-fuel (* (:player/ore-planets player) (:game/ore-planet-fuel game))
+        ore-galaxars (* (:player/ore-planets player) (:game/ore-planet-galaxars game))
+        food-food (* (:player/food-planets player) (:game/food-planet-food game))
+        mil-soldiers (* (:player/military-planets player) (:game/military-planet-soldiers game))
+        mil-fighters (* (:player/military-planets player) (:game/military-planet-fighters game))
+        mil-stations (* (:player/military-planets player) (:game/military-planet-stations game))
+        mil-agents (* (:player/military-planets player) (:game/military-planet-agents game))]
     (ui/page
      {}
      [:div.text-green-400.font-mono

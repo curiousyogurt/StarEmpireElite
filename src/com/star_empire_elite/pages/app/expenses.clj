@@ -18,24 +18,31 @@
      :onclick (str "document.querySelector('[name=\"" name "\"]').value = " value "; "
                    "document.querySelector('[name=\"" name "\"]').dispatchEvent(new Event('change', {bubbles: true}))")
      :title "Reset"}
-    "↻"]])
+    "\u21bb"]])
 
 ;; :: expenses page - players pay for upkeep of their empire
-(defn expenses-page [{:keys [player]}]
-  (let [;; calculate costs
-        planet-cost-per (* (+ (:player/military-planets player)
-                              (:player/food-planets player)
-                              (:player/ore-planets player)) 10)
-        soldiers-credit-cost (Math/round (/ (:player/soldiers player) 1000.0))
-        soldiers-food-cost (Math/round (/ (:player/soldiers player) 1000.0))
-        fighters-credit-cost (* (:player/fighters player) 2)
-        fighters-fuel-cost (* (:player/fighters player) 2)
-        stations-credit-cost (* (:player/defence-stations player) 3)
-        stations-fuel-cost (* (:player/defence-stations player) 3)
-        agents-credit-cost (* (:player/agents player) 2)
-        agents-food-cost (Math/round (/ (:player/agents player) 1000.0))
-        population-credit-cost (Math/round (/ (:player/population player) 1000.0))
-        population-food-cost (Math/round (/ (:player/population player) 1000.0))
+(defn expenses-page [{:keys [player game]}]
+  (let [;; calculate costs using game constants
+        planet-count (+ (:player/military-planets player)
+                        (:player/food-planets player)
+                        (:player/ore-planets player))
+        planet-cost-per (* planet-count (:game/planet-upkeep-credits game))
+        planet-food-cost planet-count ; since food cost is 1 per planet
+        
+        soldiers-credit-cost (Math/round (/ (* (:player/soldiers player) (:game/soldier-upkeep-credits game)) 1000.0))
+        soldiers-food-cost (Math/round (/ (* (:player/soldiers player) (:game/soldier-upkeep-food game)) 1000.0))
+        
+        fighters-credit-cost (* (:player/fighters player) (:game/fighter-upkeep-credits game))
+        fighters-fuel-cost (* (:player/fighters player) (:game/fighter-upkeep-fuel game))
+        
+        stations-credit-cost (* (:player/defence-stations player) (:game/station-upkeep-credits game))
+        stations-fuel-cost (* (:player/defence-stations player) (:game/station-upkeep-fuel game))
+        
+        agents-credit-cost (* (:player/agents player) (:game/agent-upkeep-credits game))
+        agents-food-cost (Math/round (/ (* (:player/agents player) (:game/agent-upkeep-food game)) 1000.0))
+        
+        population-credit-cost (Math/round (/ (* (:player/population player) (:game/population-upkeep-credits game)) 1000.0))
+        population-food-cost (Math/round (/ (* (:player/population player) (:game/population-upkeep-food game)) 1000.0))
         
         player-id (:xt/id player)
         hx-include "[name='planets-pay'],[name='planets-food'],[name='soldiers-credits'],[name='soldiers-food'],[name='fighters-credits'],[name='fighters-fuel'],[name='stations-credits'],[name='stations-fuel'],[name='agents-credits'],[name='agents-food'],[name='population-credits'],[name='population-food']"]
@@ -84,25 +91,20 @@
         [:h4.font-bold.mb-3 "Planets Upkeep"]
         [:div.space-y-2
          [:div
-          [:p.text-xs "Planets: " (+ (:player/military-planets player)
-                                      (:player/food-planets player)
-                                      (:player/ore-planets player))]]
+          [:p.text-xs "Planets: " planet-count]]
          [:div
           [:p.text-xs "Cost per Planet"]
-          [:p.font-mono "10 credits, 1 food"]]
+          [:p.font-mono (str (:game/planet-upkeep-credits game) " credits, " 
+                             (:game/planet-upkeep-food game) " food")]]
          [:div
           [:p.text-xs "Total Required"]
-          [:p.font-mono (str planet-cost-per " credits, " (+ (:player/military-planets player)
-                                                                    (:player/food-planets player)
-                                                                    (:player/ore-planets player)) " food")]]
+          [:p.font-mono (str planet-cost-per " credits, " planet-food-cost " food")]]
          [:div
           [:label.text-xs "Pay Credits"]
           (expense-input "planets-pay" planet-cost-per player-id hx-include)]
          [:div
           [:label.text-xs "Pay Food"]
-          (expense-input "planets-food" (+ (:player/military-planets player)
-                                           (:player/food-planets player)
-                                           (:player/ore-planets player)) player-id hx-include)]]]
+          (expense-input "planets-food" planet-food-cost player-id hx-include)]]]
        
        ;; :: soldiers expense
        [:div.border.border-green-400.p-4
@@ -112,7 +114,8 @@
           [:p.text-xs "Soldiers: " (:player/soldiers player)]]
          [:div
           [:p.text-xs "Cost per 1000"]
-          [:p.font-mono "1 credit, 1 food"]]
+          [:p.font-mono (str (:game/soldier-upkeep-credits game) " credit, " 
+                             (:game/soldier-upkeep-food game) " food")]]
          [:div
           [:p.text-xs "Total Required"]
           [:p.font-mono (str soldiers-credit-cost " credits, " soldiers-food-cost " food")]]
@@ -131,7 +134,8 @@
           [:p.text-xs "Fighters: " (:player/fighters player)]]
          [:div
           [:p.text-xs "Cost per Fighter"]
-          [:p.font-mono "2 credits, 2 fuel"]]
+          [:p.font-mono (str (:game/fighter-upkeep-credits game) " credits, " 
+                             (:game/fighter-upkeep-fuel game) " fuel")]]
          [:div
           [:p.text-xs "Total Required"]
           [:p.font-mono (str fighters-credit-cost " credits, " fighters-fuel-cost " fuel")]]
@@ -150,7 +154,8 @@
           [:p.text-xs "Stations: " (:player/defence-stations player)]]
          [:div
           [:p.text-xs "Cost per Station"]
-          [:p.font-mono "3 credits, 3 fuel"]]
+          [:p.font-mono (str (:game/station-upkeep-credits game) " credits, " 
+                             (:game/station-upkeep-fuel game) " fuel")]]
          [:div
           [:p.text-xs "Total Required"]
           [:p.font-mono (str stations-credit-cost " credits, " stations-fuel-cost " fuel")]]
@@ -168,8 +173,8 @@
          [:div
           [:p.text-xs "Agents: " (:player/agents player)]]
          [:div
-          [:p.text-xs "Cost per Agent"]
-          [:p.font-mono "2 credits, 0.001 food"]]
+          [:p.text-xs "Cost per 1000 Agents"]
+          [:p.font-mono (str (:game/agent-upkeep-credits game) " credits, " (:game/agent-upkeep-food game) " food")]]
          [:div
           [:p.text-xs "Total Required"]
           [:p.font-mono (str agents-credit-cost " credits, " agents-food-cost " food")]]
@@ -188,7 +193,7 @@
           [:p.text-xs "Population: " (:player/population player)]]
          [:div
           [:p.text-xs "Cost per 1000"]
-          [:p.font-mono "1 credit, 1 food"]]
+          [:p.font-mono (str (:game/population-upkeep-credits game) " credit, " (:game/population-upkeep-food game) " food")]]
          [:div
           [:p.text-xs "Total Required"]
           [:p.font-mono (str population-credit-cost " credits, " population-food-cost " food")]]
