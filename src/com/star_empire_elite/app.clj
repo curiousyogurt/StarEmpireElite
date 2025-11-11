@@ -26,55 +26,7 @@
         :game/scheduled-end-at end-date
         :game/status 0
         :game/turns-per-day 6
-        :game/rounds-per-day 4
-        
-        ;; Planet income constants (per planet per round)
-        :game/ore-credits-per-planet 500
-        :game/ore-fuel-per-planet 200
-        :game/ore-galaxars-per-planet 100
-        :game/food-per-planet 1000
-        :game/mil-soldiers-per-planet 50
-        :game/mil-fighters-per-planet 25
-        :game/mil-stations-per-planet 10
-        :game/mil-agents-per-planet 5
-        
-        ;; Expense constants (per unit/planet per round)
-        :game/planet-credit-cost 10
-        :game/planet-food-cost 1
-        :game/soldier-credit-cost-per-k 1
-        :game/soldier-food-cost-per-k 1
-        :game/fighter-credit-cost 2
-        :game/fighter-fuel-cost 2
-        :game/station-credit-cost 3
-        :game/station-fuel-cost 3
-        :game/agent-credit-cost 2
-        :game/agent-food-cost-per-k 1
-        :game/pop-credit-cost-per-k 1
-        :game/pop-food-cost-per-k 1
-        
-        ;; Starting resources
-        :game/starting-credits 10000
-        :game/starting-food 5000
-        :game/starting-fuel 3000
-        :game/starting-galaxars 1000
-        :game/starting-population 1000000
-        :game/starting-stability 75
-        
-        ;; Starting planets
-        :game/starting-military-planets 2
-        :game/starting-food-planets 3
-        :game/starting-ore-planets 1
-        
-        ;; Starting units
-        :game/starting-generals 5
-        :game/starting-admirals 3
-        :game/starting-soldiers 1000
-        :game/starting-transports 10
-        :game/starting-defence-stations 5
-        :game/starting-carriers 2
-        :game/starting-fighters 50
-        :game/starting-command-ships 1
-        :game/starting-agents 10}
+        :game/rounds-per-day 4}
        {:db/doc-type :player
         :xt/id player-id
         :player/user (:uid session)
@@ -128,6 +80,7 @@
         player (xt/entity db player-id)
         ;; parse input values, default to 0 if not provided
         planets-pay (parse-long (or (:planets-pay params) "0"))
+        planets-food (parse-long (or (:planets-food params) "0"))
         soldiers-credits (parse-long (or (:soldiers-credits params) "0"))
         soldiers-food (parse-long (or (:soldiers-food params) "0"))
         fighters-credits (parse-long (or (:fighters-credits params) "0"))
@@ -142,7 +95,7 @@
         ;; calculate remaining resources
         credits-after (- (:player/credits player) planets-pay soldiers-credits 
                          fighters-credits stations-credits agents-credits population-credits)
-        food-after (- (:player/food player) soldiers-food agents-food population-food)
+        food-after (- (:player/food player) planets-food soldiers-food agents-food population-food)
         fuel-after (- (:player/fuel player) fighters-fuel stations-fuel)]
     (biff/render
      [:div#resources-after.border.border-green-400.p-4.mb-8.bg-green-100.bg-opacity-5

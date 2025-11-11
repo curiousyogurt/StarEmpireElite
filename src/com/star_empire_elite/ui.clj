@@ -1,147 +1,229 @@
-(ns com.star-empire-elite.ui
-  (:require [cheshire.core :as cheshire]
-            [clojure.java.io :as io]
-            [com.star-empire-elite.settings :as settings]
-            [com.biffweb :as biff]
-            [ring.middleware.anti-forgery :as csrf]
-            [ring.util.response :as ring-response]
-            [rum.core :as rum]))
+(ns com.star-empire-elite.pages.app.expenses
+  (:require [com.star-empire-elite.ui :as ui]
+            [xtdb.api :as xt]))
 
-(defn static-path [path]
-  (if-some [last-modified (some-> (io/resource (str "public" path))
-                                  ring-response/resource-data
-                                  :last-modified
-                                  (.getTime))]
-    (str path "?t=" last-modified)
-    path))
+;; :: helper function for expense input fields with reset button
+(defn expense-input [name value player-id hx-include]
+  [:div.relative.mt-1
+   [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.pr-6.font-mono
+    {:type "number" :name name :value value
+     :hx-post (str "/app/game/" player-id "/calculate-expenses")
+     :hx-target "#resources-after" :hx-swap "outerHTML"
+     :hx-trigger "change"
+     :hx-include hx-include}]
+   [:button
+    {:type "button"
+     :class "absolute right-2 top-1/2 -translate-y-1/2 text-green-400 hover:text-green-300 transition-colors text-lg font-bold p-0 bg-none border-none cursor-pointer"
+     :onclick (str "document.querySelector('[name=\"" name "\"]').value = " value "; "
+                   "document.querySelector('[name=\"" name "\"]').dispatchEvent(new Event('change', {bubbles: true}))")
+     :title "Reset"}
+    "↻"]])
 
-(defn starfield-style []
-  [:style "
-   body {
-     background-color: #111;
-     background-image: 
-       radial-gradient(2px 2px at  5%  8%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 12% 15%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 18% 22%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 25% 30%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 32% 38%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 38% 45%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 45% 52%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 52% 60%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 58% 68%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 65% 75%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 72% 82%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 78% 90%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 85% 12%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 92% 35%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at  8% 42%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 15% 58%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 22% 70%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 35% 18%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 42% 88%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 55% 25%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 62% 48%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 68% 12%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 75% 62%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 88% 55%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at  3% 95%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 28%  5%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 48% 78%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 82% 38%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 18% 82%, #fff, rgba(0,0,0,0)),
-       radial-gradient(2px 2px at 72% 28%, #fff, rgba(0,0,0,0));
-     background-size: 100% 100%;
-     background-attachment: fixed;
-     font-family: 'IBM Plex Mono', 'Menlo', 'Courier', monospace;
-   }
-   
-   /* Hide number input spinners */
-   input[type=\"number\"] {
-     -moz-appearance: textfield;
-   }
-   input[type=\"number\"]::-webkit-outer-spin-button,
-   input[type=\"number\"]::-webkit-inner-spin-button {
-     -webkit-appearance: none;
-     margin: 0;
-   }
-   
-  @media (max-width: 439px) {
-    .border-green-400 {
-      border: none !important;
-      background-color: transparent !important;
-    }
-    body {
-      font-size: 0.75rem;
-    }
-    h1 {
-      font-size: 1.5rem;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-    }
-    h2 {
-      font-size: 1.125rem;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-    }
-    h3 {
-      font-size: 1rem;
-    }
-    p {
-      font-size: 0.75rem;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-      padding: 0 4px;
-    }
-    div {
-      padding: 4px !important;
-      margin: 2px !important;
-    }
-  }
-  "])
+;; :: expenses page - players pay for upkeep of their empire
+(defn expenses-page [{:keys [player]}]
+  (let [;; calculate costs
+        planet-cost-per (* (+ (:player/military-planets player)
+                              (:player/food-planets player)
+                              (:player/ore-planets player)) 10)
+        soldiers-credit-cost (Math/round (/ (:player/soldiers player) 1000.0))
+        soldiers-food-cost (Math/round (/ (:player/soldiers player) 1000.0))
+        fighters-credit-cost (* (:player/fighters player) 2)
+        fighters-fuel-cost (* (:player/fighters player) 2)
+        stations-credit-cost (* (:player/defence-stations player) 3)
+        stations-fuel-cost (* (:player/defence-stations player) 3)
+        agents-credit-cost (* (:player/agents player) 2)
+        agents-food-cost (Math/round (/ (:player/agents player) 1000.0))
+        population-credit-cost (Math/round (/ (:player/population player) 1000.0))
+        population-food-cost (Math/round (/ (:player/population player) 1000.0))
+        
+        player-id (:xt/id player)
+        hx-include "[name='planets-pay'],[name='soldiers-credits'],[name='soldiers-food'],[name='fighters-credits'],[name='fighters-fuel'],[name='stations-credits'],[name='stations-fuel'],[name='agents-credits'],[name='agents-food'],[name='population-credits'],[name='population-food']"]
+    (ui/page
+     {}
+     [:div.text-green-400.font-mono
+      [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
+      
+      [:h2.text-xl.font-bold.mb-6 "PHASE 2: EXPENSES"]
+      
+      ;; :: resources before expenses
+      [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
+       [:h3.font-bold.mb-4 "Resources Before Expenses"]
+       [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
+        [:div
+         [:p.text-xs "Credits"]
+         [:p.font-mono (:player/credits player)]]
+        [:div
+         [:p.text-xs "Food"]
+         [:p.font-mono (:player/food player)]]
+        [:div
+         [:p.text-xs "Fuel"]
+         [:p.font-mono (:player/fuel player)]]
+        [:div
+         [:p.text-xs "Galaxars"]
+         [:p.font-mono (:player/galaxars player)]]
+        [:div
+         [:p.text-xs "Soldiers"]
+         [:p.font-mono (:player/soldiers player)]]
+        [:div
+         [:p.text-xs "Fighters"]
+         [:p.font-mono (:player/fighters player)]]
+        [:div
+         [:p.text-xs "Stations"]
+         [:p.font-mono (:player/defence-stations player)]]
+        [:div
+         [:p.text-xs "Agents"]
+         [:p.font-mono (:player/agents player)]]]]
+      
+      ;; :: expenses form
+      [:h3.font-bold.mb-4 "Expenses This Round"]
+      [:div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-3.gap-4.mb-8
+       
+       ;; :: planets expense
+       [:div.border.border-green-400.p-4
+        [:h4.font-bold.mb-3 "Planets Upkeep"]
+        [:div.space-y-2
+         [:div
+          [:p.text-xs "Planets: " (+ (:player/military-planets player)
+                                      (:player/food-planets player)
+                                      (:player/ore-planets player))]]
+         [:div
+          [:p.text-xs "Cost per Planet"]
+          [:p.font-mono "10 credits"]]
+         [:div
+          [:p.text-xs "Total Required"]
+          [:p.font-mono (str "- " planet-cost-per " credits")]]
+         [:div
+          [:label.text-xs "Pay Amount (credits)"]
+          (expense-input "planets-pay" planet-cost-per player-id hx-include)]]]
+       
+       ;; :: soldiers expense
+       [:div.border.border-green-400.p-4
+        [:h4.font-bold.mb-3 "Soldiers Upkeep"]
+        [:div.space-y-2
+         [:div
+          [:p.text-xs "Soldiers: " (:player/soldiers player)]]
+         [:div
+          [:p.text-xs "Cost per 1000"]
+          [:p.font-mono "1 credit, 1 food"]]
+         [:div
+          [:p.text-xs "Total Required"]
+          [:p.font-mono (str "- " soldiers-credit-cost " credits, " soldiers-food-cost " food")]]
+         [:div
+          [:label.text-xs "Pay Credits"]
+          (expense-input "soldiers-credits" soldiers-credit-cost player-id hx-include)]
+         [:div
+          [:label.text-xs "Pay Food"]
+          (expense-input "soldiers-food" soldiers-food-cost player-id hx-include)]]]
+       
+       ;; :: fighters expense
+       [:div.border.border-green-400.p-4
+        [:h4.font-bold.mb-3 "Fighters Upkeep"]
+        [:div.space-y-2
+         [:div
+          [:p.text-xs "Fighters: " (:player/fighters player)]]
+         [:div
+          [:p.text-xs "Cost per Fighter"]
+          [:p.font-mono "2 credits, 2 fuel"]]
+         [:div
+          [:p.text-xs "Total Required"]
+          [:p.font-mono (str "- " fighters-credit-cost " credits, " fighters-fuel-cost " fuel")]]
+         [:div
+          [:label.text-xs "Pay Credits"]
+          (expense-input "fighters-credits" fighters-credit-cost player-id hx-include)]
+         [:div
+          [:label.text-xs "Pay Fuel"]
+          (expense-input "fighters-fuel" fighters-fuel-cost player-id hx-include)]]]
+       
+       ;; :: stations expense
+       [:div.border.border-green-400.p-4
+        [:h4.font-bold.mb-3 "Stations Upkeep"]
+        [:div.space-y-2
+         [:div
+          [:p.text-xs "Stations: " (:player/defence-stations player)]]
+         [:div
+          [:p.text-xs "Cost per Station"]
+          [:p.font-mono "3 credits, 3 fuel"]]
+         [:div
+          [:p.text-xs "Total Required"]
+          [:p.font-mono (str "- " stations-credit-cost " credits, " stations-fuel-cost " fuel")]]
+         [:div
+          [:label.text-xs "Pay Credits"]
+          (expense-input "stations-credits" stations-credit-cost player-id hx-include)]
+         [:div
+          [:label.text-xs "Pay Fuel"]
+          (expense-input "stations-fuel" stations-fuel-cost player-id hx-include)]]]
+       
+       ;; :: agents expense
+       [:div.border.border-green-400.p-4
+        [:h4.font-bold.mb-3 "Agents Upkeep"]
+        [:div.space-y-2
+         [:div
+          [:p.text-xs "Agents: " (:player/agents player)]]
+         [:div
+          [:p.text-xs "Cost per Agent"]
+          [:p.font-mono "2 credits, 0.001 food"]]
+         [:div
+          [:p.text-xs "Total Required"]
+          [:p.font-mono (str "- " agents-credit-cost " credits, " agents-food-cost " food")]]
+         [:div
+          [:label.text-xs "Pay Credits"]
+          (expense-input "agents-credits" agents-credit-cost player-id hx-include)]
+         [:div
+          [:label.text-xs "Pay Food"]
+          (expense-input "agents-food" agents-food-cost player-id hx-include)]]]
+       
+       ;; :: population expense
+       [:div.border.border-green-400.p-4
+        [:h4.font-bold.mb-3 "Population Upkeep"]
+        [:div.space-y-2
+         [:div
+          [:p.text-xs "Population: " (:player/population player)]]
+         [:div
+          [:p.text-xs "Cost per 1000"]
+          [:p.font-mono "1 credit, 1 food"]]
+         [:div
+          [:p.text-xs "Total Required"]
+          [:p.font-mono (str "- " population-credit-cost " credits, " population-food-cost " food")]]
+         [:div
+          [:label.text-xs "Pay Credits"]
+          (expense-input "population-credits" population-credit-cost player-id hx-include)]
+         [:div
+          [:label.text-xs "Pay Food"]
+          (expense-input "population-food" population-food-cost player-id hx-include)]]]
+       ]
+      
+      ;; :: resources after expenses
+      [:div#resources-after.border.border-green-400.p-4.mb-8.bg-green-100.bg-opacity-5
+       [:h3.font-bold.mb-4 "Resources After Expenses"]
+       [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
+        [:div
+         [:p.text-xs "Credits"]
+         [:p.font-mono (:player/credits player)]]
+        [:div
+         [:p.text-xs "Food"]
+         [:p.font-mono (:player/food player)]]
+        [:div
+         [:p.text-xs "Fuel"]
+         [:p.font-mono (:player/fuel player)]]
+        [:div
+         [:p.text-xs "Galaxars"]
+         [:p.font-mono (:player/galaxars player)]]
+        [:div
+         [:p.text-xs "Soldiers"]
+         [:p.font-mono (:player/soldiers player)]]
+        [:div
+         [:p.text-xs "Fighters"]
+         [:p.font-mono (:player/fighters player)]]
+        [:div
+         [:p.text-xs "Stations"]
+         [:p.font-mono (:player/defence-stations player)]]
+        [:div
+         [:p.text-xs "Agents"]
+         [:p.font-mono (:player/agents player)]]]]
 
-(defn base [{:keys [::recaptcha] :as ctx} & body]
-  (apply
-    biff/base-html
-    (-> ctx
-        (merge #:base{:title settings/app-name
-                      :lang "en-US"
-                      :icon "/img/glider.png"
-                      :description "Shape destiny. Write history. Become legend."
-                      :image "https://clojure.org/images/clojure-logo-120b.png"})
-        (update :base/head (fn [head]
-                             (concat [[:link {:rel "stylesheet" :href (static-path "/css/main.css")}]
-                                      (starfield-style)
-                                      [:script {:src (static-path "/js/main.js")}]
-                                      [:script {:src "https://unpkg.com/htmx.org@2.0.7"}]
-                                      [:script {:src "https://unpkg.com/htmx-ext-ws@2.0.2/ws.js"}]
-                                      [:script {:src "https://unpkg.com/hyperscript.org@0.9.14"}]
-                                      (when recaptcha
-                                        [:script {:src "https://www.google.com/recaptcha/api.js"
-                                                  :async "async" :defer "defer"}])]
-                                     head))))
-    body))
-
-(defn page [ctx & body]
-  (base
-    ctx
-    [:.flex-grow]
-    [:div.min-h-screen.flex.flex-col.items-center.justify-center.mx-auto.bg-black.bg-opacity-10.text-green-400.font-mono.p-4.border-8.border-green-400.rounded-lg
-     (merge
-       {:class "m-2 w-full sm:m-4 md:m-10 md:w-11/12"}
-       (when (bound? #'csrf/*anti-forgery-token*)
-         {:hx-headers (cheshire/generate-string
-                        {:x-csrf-token csrf/*anti-forgery-token*})}))
-     body]
-    [:.flex-grow]
-    [:.flex-grow]))
-
-(defn on-error [{:keys [status ex] :as ctx}]
-  {:status status
-   :headers {"content-type" "text/html"}
-   :body (rum/render-static-markup
-           (page
-             ctx
-             [:h1.text-lg.font-bold
-              (if (= status 404)
-                "Page not found."
-                "Something went wrong.")]))})
+      [:.h-6]
+      [:div.flex.gap-4
+       [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+        {:href (str "/app/game/" player-id)} "Back to Game"]
+       [:a.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
+        {:href (str "/app/game/" player-id "/building")} "Continue to Building"]]])))
