@@ -7,6 +7,7 @@
 ;;; stage of gameplay (income, expenses, building, etc.) with its own dedicated page.
 (defn get-phase-url [player-id current-phase]
   (case current-phase
+    0 (str "/app/game/" player-id "/income")
     1 (str "/app/game/" player-id "/income")
     2 (str "/app/game/" player-id "/expenses")
     3 (str "/app/game/" player-id "/building")

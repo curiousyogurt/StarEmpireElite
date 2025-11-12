@@ -99,6 +99,38 @@
   }
   "])
 
+;;; Phase progress indicator showing current position in the 6-phase turn cycle. Uses filled circles
+;;; for completed phases, a highlighted circle for current phase, and empty circles for future phases.
+(defn phase-indicator [current-phase]
+  [:div.flex.items-center.gap-2
+   ;; Phase progress circles
+   (for [phase (range 1 7)]
+     [:div.flex.items-center.gap-1 {:key phase}
+      ;; Circle indicator with larger numbers
+      [:div.w-5.h-5.rounded-full.border.border-green-400.flex.items-center.justify-center
+       {:class (if (= phase current-phase) 
+                 "bg-green-400 ring-2 ring-green-300"            ; Current phase only
+                 "bg-transparent")}                               ; All other phases
+       ;; Larger, non-bold phase number inside circle
+       [:span.text-base
+        {:class (if (= phase current-phase) "text-black" "text-green-400")}
+        phase]]
+      ;; Arrow between phases (except after last phase)
+      (when (< phase 6)
+        [:span.text-green-400.text-xs.ml-1 "→"])])])
+        ;;[:span.text-green-400.text-xs.ml-2.mr-1 "→"])])])
+        ;;[:div.flex.items-center.justify-center.w-4.text-green-400.text-xs "→"])])])
+        ;;[:span.text-green-400.text-xs.px-1 "→"])])])
+
+;;; Complete phase header with title on the left and progress indicator on the right. Takes current 
+;;; phase number and phase name string to generate the full header with progress visualization.
+(defn phase-header [current-phase phase-name]
+  [:div.flex.items-center.justify-between.mb-6
+   ;; Phase title on the left
+   [:h2.text-xl.font-bold (str "PHASE " current-phase ": " phase-name)]
+   ;; Phase indicator on the right
+   (phase-indicator current-phase)])
+
 (defn base [{:keys [::recaptcha] :as ctx} & body]
   (apply
     biff/base-html

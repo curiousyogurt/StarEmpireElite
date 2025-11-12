@@ -32,7 +32,7 @@
    [:div.text-green-400.font-mono
     [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
     
-    [:h2.text-xl.font-bold.mb-6 "PHASE 5: ESPIONAGE"]
+    (ui/phase-header (:player/current-phase player) "ESPIONAGE")
     
     [:p.mb-4 "This phase is not yet implemented."]
     [:p.mb-4 "In this phase, you will be able to:"]

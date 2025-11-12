@@ -41,9 +41,9 @@
               :player/current-phase 1
               :player/last-turn-at (java.util.Date.)}])
           
-          ;; redirect back to game overview
+          ;; redirect to income page
           {:status 303
-           :headers {"location" (str "/app/game/" player-id)}})))))
+           :headers {"location" (str "/app/game/" player-id "/income")}})))))
 
 ;; :: outcomes page - review turn results and advance to next turn
 (defn outcomes-page [{:keys [player game]}]
@@ -57,7 +57,7 @@
      [:div.text-green-400.font-mono
       [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
       
-      [:h2.text-xl.font-bold.mb-6 "PHASE 6: OUTCOMES"]
+      (ui/phase-header (:player/current-phase player) "OUTCOMES")
       
       [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
        [:h3.font-bold.mb-4 "Turn Summary"]
