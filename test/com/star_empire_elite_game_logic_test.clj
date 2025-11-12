@@ -19,35 +19,47 @@
         now (java.util.Date.)
         end-date (java.util.Date. (+ (.getTime now) (* 30 24 60 60 1000)))
         
-        base-game {:db/doc-type :game
-                   :xt/id game-id
-                   :game/name "Test Game"
-                   :game/created-at now
-                   :game/scheduled-end-at end-date
-                   :game/status 0
-                   :game/turns-per-day 6
-                   :game/rounds-per-day 4
-                   :game/ore-planet-credits const/ore-planet-credits
-                   :game/ore-planet-fuel const/ore-planet-fuel
-                   :game/ore-planet-galaxars const/ore-planet-galaxars
-                   :game/food-planet-food const/food-planet-food
-                   :game/military-planet-soldiers const/military-planet-soldiers
-                   :game/military-planet-fighters const/military-planet-fighters
-                   :game/military-planet-stations const/military-planet-stations
-                   :game/military-planet-agents const/military-planet-agents
-                   :game/planet-upkeep-credits const/planet-upkeep-credits
-                   :game/planet-upkeep-food const/planet-upkeep-food
-                   :game/soldier-upkeep-credits const/soldier-upkeep-credits
-                   :game/soldier-upkeep-food const/soldier-upkeep-food
-                   :game/fighter-upkeep-credits const/fighter-upkeep-credits
-                   :game/fighter-upkeep-fuel const/fighter-upkeep-fuel
-                   :game/station-upkeep-credits const/station-upkeep-credits
-                   :game/station-upkeep-fuel const/station-upkeep-fuel
-                   :game/agent-upkeep-credits const/agent-upkeep-credits
-                   :game/agent-upkeep-food const/agent-upkeep-food
-                   :game/population-upkeep-credits const/population-upkeep-credits
-                   :game/population-upkeep-food const/population-upkeep-food}
-        
+base-game {:db/doc-type :game
+           :xt/id game-id
+           :game/name "Test Game"
+           :game/created-at now
+           :game/scheduled-end-at end-date
+           :game/status 0
+           :game/turns-per-day 6
+           :game/rounds-per-day 4
+           :game/ore-planet-credits const/ore-planet-credits
+           :game/ore-planet-fuel const/ore-planet-fuel
+           :game/ore-planet-galaxars const/ore-planet-galaxars
+           :game/food-planet-food const/food-planet-food
+           :game/military-planet-soldiers const/military-planet-soldiers
+           :game/military-planet-fighters const/military-planet-fighters
+           :game/military-planet-stations const/military-planet-stations
+           :game/military-planet-agents const/military-planet-agents
+           :game/planet-upkeep-credits const/planet-upkeep-credits
+           :game/planet-upkeep-food const/planet-upkeep-food
+           :game/soldier-upkeep-credits const/soldier-upkeep-credits
+           :game/soldier-upkeep-food const/soldier-upkeep-food
+           :game/fighter-upkeep-credits const/fighter-upkeep-credits
+           :game/fighter-upkeep-fuel const/fighter-upkeep-fuel
+           :game/station-upkeep-credits const/station-upkeep-credits
+           :game/station-upkeep-fuel const/station-upkeep-fuel
+           :game/agent-upkeep-credits const/agent-upkeep-credits
+           :game/agent-upkeep-food const/agent-upkeep-food
+           :game/population-upkeep-credits const/population-upkeep-credits
+           :game/population-upkeep-food const/population-upkeep-food
+           ;; Building cost constants
+           :game/soldier-cost const/soldier-cost
+           :game/transport-cost const/transport-cost
+           :game/general-cost const/general-cost
+           :game/carrier-cost const/carrier-cost
+           :game/fighter-cost const/fighter-cost
+           :game/admiral-cost const/admiral-cost
+           :game/station-cost const/station-cost
+           :game/command-ship-cost const/command-ship-cost
+           :game/military-planet-cost const/military-planet-cost
+           :game/food-planet-cost const/food-planet-cost
+           :game/ore-planet-cost const/ore-planet-cost}
+
         base-player {:db/doc-type :player
                      :xt/id player-id
                      :player/user user-id
