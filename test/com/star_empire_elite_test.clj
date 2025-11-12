@@ -85,7 +85,7 @@
             :game/agent-upkeep-credits const/agent-upkeep-credits
             :game/agent-upkeep-food const/agent-upkeep-food
             :game/population-upkeep-credits const/population-upkeep-credits
-            :game/population-upkeep-food const/population-upkeep-food}])
+            :game/population-upkeep-food const/population-upkeep-food
             ;; Building/purchase cost constants
             :game/soldier-cost const/soldier-cost
             :game/transport-cost const/transport-cost
@@ -97,7 +97,7 @@
             :game/command-ship-cost const/command-ship-cost
             :game/military-planet-cost const/military-planet-cost
             :game/food-planet-cost const/food-planet-cost
-            :game/ore-planet-cost const/ore-planet-cost
+            :game/ore-planet-cost const/ore-planet-cost}])
 
         (let [db (xt/db node)
               game (xt/entity db game-id)]
