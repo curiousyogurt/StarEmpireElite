@@ -91,7 +91,7 @@
         :player/score 0
         :player/current-turn 1
         :player/current-round 1
-        :player/current-phase 0
+        :player/current-phase 1
         :player/turns-used 0
         :player/generals 5
         :player/admirals 3
