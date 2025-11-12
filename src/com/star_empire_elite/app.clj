@@ -60,7 +60,19 @@
         :game/agent-upkeep-credits const/agent-upkeep-credits
         :game/agent-upkeep-food const/agent-upkeep-food
         :game/population-upkeep-credits const/population-upkeep-credits
-        :game/population-upkeep-food const/population-upkeep-food}
+        :game/population-upkeep-food const/population-upkeep-food
+        ;; Building cost constants
+        :game/soldier-cost const/soldier-cost
+        :game/transport-cost const/transport-cost
+        :game/general-cost const/general-cost
+        :game/carrier-cost const/carrier-cost
+        :game/fighter-cost const/fighter-cost
+        :game/admiral-cost const/admiral-cost
+        :game/station-cost const/station-cost
+        :game/command-ship-cost const/command-ship-cost
+        :game/military-planet-cost const/military-planet-cost
+        :game/food-planet-cost const/food-planet-cost
+        :game/ore-planet-cost const/ore-planet-cost}
        {:db/doc-type :player
         :xt/id player-id
         :player/user (:uid session)

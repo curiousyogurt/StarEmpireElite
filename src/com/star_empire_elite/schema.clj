@@ -42,7 +42,20 @@
           [:game/agent-upkeep-credits      :int]
           [:game/agent-upkeep-food         :int]
           [:game/population-upkeep-credits :int]
-          [:game/population-upkeep-food    :int]]
+          [:game/population-upkeep-food    :int]
+ 
+          ;; Building/purchase cost constants (add these to your :game schema)
+          [:game/soldier-cost            :int]
+          [:game/transport-cost          :int]
+          [:game/general-cost            :int]
+          [:game/carrier-cost            :int]
+          [:game/fighter-cost            :int]
+          [:game/admiral-cost            :int]
+          [:game/station-cost            :int]
+          [:game/command-ship-cost       :int]
+          [:game/military-planet-cost    :int]
+          [:game/food-planet-cost        :int]
+          [:game/ore-planet-cost         :int]]
 
    :player/id :uuid
    :player [:map {:closed true}

@@ -15,33 +15,33 @@
         {:status 303
          :headers {"location" (str "/app/game/" player-id)}}
         (let [;; parse purchase input values, default to 0 if not provided
-              soldiers (parse-long (or (:soldiers params) "0"))
-              transports (parse-long (or (:transports params) "0"))
-              generals (parse-long (or (:generals params) "0"))
-              carriers (parse-long (or (:carriers params) "0"))
-              fighters (parse-long (or (:fighters params) "0"))
-              admirals (parse-long (or (:admirals params) "0"))
-              defence-stations (parse-long (or (:defence-stations params) "0"))
-              command-ships (parse-long (or (:command-ships params) "0"))
-              military-planets (parse-long (or (:military-planets params) "0"))
-              food-planets (parse-long (or (:food-planets params) "0"))
-              ore-planets (parse-long (or (:ore-planets params) "0"))
+              soldiers (max 0 (parse-long (or (:soldiers params) "0")))
+              transports (max 0 (parse-long (or (:transports params) "0")))
+              generals (max 0 (parse-long (or (:generals params) "0")))
+              carriers (max 0 (parse-long (or (:carriers params) "0")))
+              fighters (max 0 (parse-long (or (:fighters params) "0")))
+              admirals (max 0 (parse-long (or (:admirals params) "0")))
+              defence-stations (max 0 (parse-long (or (:defence-stations params) "0")))
+              command-ships (max 0 (parse-long (or (:command-ships params) "0")))
+              military-planets (max 0 (parse-long (or (:military-planets params) "0")))
+              food-planets (max 0 (parse-long (or (:food-planets params) "0")))
+              ore-planets (max 0 (parse-long (or (:ore-planets params) "0")))
               
               ;; get game constants for costs
               game (xt/entity db (:player/game player))
               
-              ;; calculate total cost
-              total-cost (+ (* soldiers (:game/soldier-cost game))
-                           (* transports (:game/transport-cost game))
-                           (* generals (:game/general-cost game))
-                           (* carriers (:game/carrier-cost game))
-                           (* fighters (:game/fighter-cost game))
-                           (* admirals (:game/admiral-cost game))
-                           (* defence-stations (:game/station-cost game))
-                           (* command-ships (:game/command-ship-cost game))
-                           (* military-planets (:game/military-planet-cost game))
-                           (* food-planets (:game/food-planet-cost game))
-                           (* ore-planets (:game/ore-planet-cost game)))
+              ;; calculate total cost with null safety
+              total-cost (+ (* soldiers (or (:game/soldier-cost game) 0))
+                           (* transports (or (:game/transport-cost game) 0))
+                           (* generals (or (:game/general-cost game) 0))
+                           (* carriers (or (:game/carrier-cost game) 0))
+                           (* fighters (or (:game/fighter-cost game) 0))
+                           (* admirals (or (:game/admiral-cost game) 0))
+                           (* defence-stations (or (:game/station-cost game) 0))
+                           (* command-ships (or (:game/command-ship-cost game) 0))
+                           (* military-planets (or (:game/military-planet-cost game) 0))
+                           (* food-planets (or (:game/food-planet-cost game) 0))
+                           (* ore-planets (or (:game/ore-planet-cost game) 0)))
               
               ;; calculate new totals
               new-credits (- (:player/credits player) total-cost)
@@ -57,28 +57,33 @@
               new-food-planets (+ (:player/food-planets player) food-planets)
               new-ore-planets (+ (:player/ore-planets player) ore-planets)]
           
-          ;; submit transaction to update player resources and advance phase
-          (biff/submit-tx ctx
-            [{:db/doc-type :player
-              :db/op :update
-              :xt/id player-id
-              :player/credits new-credits
-              :player/soldiers new-soldiers
-              :player/transports new-transports
-              :player/generals new-generals
-              :player/carriers new-carriers
-              :player/fighters new-fighters
-              :player/admirals new-admirals
-              :player/defence-stations new-defence-stations
-              :player/command-ships new-command-ships
-              :player/military-planets new-military-planets
-              :player/food-planets new-food-planets
-              :player/ore-planets new-ore-planets
-              :player/current-phase 4}])
-          
-          ;; redirect to action page
-          {:status 303
-           :headers {"location" (str "/app/game/" player-id "/action")}})))))
+          ;; only allow purchase if they have enough credits
+          (if (< new-credits 0)
+            {:status 400
+             :body "Insufficient credits for purchase"}
+            ;; submit transaction to update player resources and advance phase
+            (do
+              (biff/submit-tx ctx
+                [{:db/doc-type :player
+                  :db/op :update
+                  :xt/id player-id
+                  :player/credits new-credits
+                  :player/soldiers new-soldiers
+                  :player/transports new-transports
+                  :player/generals new-generals
+                  :player/carriers new-carriers
+                  :player/fighters new-fighters
+                  :player/admirals new-admirals
+                  :player/defence-stations new-defence-stations
+                  :player/command-ships new-command-ships
+                  :player/military-planets new-military-planets
+                  :player/food-planets new-food-planets
+                  :player/ore-planets new-ore-planets
+                  :player/current-phase 4}])
+              
+              ;; redirect to action page
+              {:status 303
+               :headers {"location" (str "/app/game/" player-id "/action")}})))))))
 
 ;; :: calculate building costs dynamically for HTMX updates
 (defn calculate-building [{:keys [path-params params biff/db] :as ctx}]
@@ -86,31 +91,31 @@
         player (xt/entity db player-id)
         game (xt/entity db (:player/game player))
         
-        ;; parse purchase quantities, default to 0
-        soldiers (parse-long (or (:soldiers params) "0"))
-        transports (parse-long (or (:transports params) "0"))
-        generals (parse-long (or (:generals params) "0"))
-        carriers (parse-long (or (:carriers params) "0"))
-        fighters (parse-long (or (:fighters params) "0"))
-        admirals (parse-long (or (:admirals params) "0"))
-        defence-stations (parse-long (or (:defence-stations params) "0"))
-        command-ships (parse-long (or (:command-ships params) "0"))
-        military-planets (parse-long (or (:military-planets params) "0"))
-        food-planets (parse-long (or (:food-planets params) "0"))
-        ore-planets (parse-long (or (:ore-planets params) "0"))
+        ;; parse purchase quantities, default to 0, ensure non-negative
+        soldiers (max 0 (parse-long (or (:soldiers params) "0")))
+        transports (max 0 (parse-long (or (:transports params) "0")))
+        generals (max 0 (parse-long (or (:generals params) "0")))
+        carriers (max 0 (parse-long (or (:carriers params) "0")))
+        fighters (max 0 (parse-long (or (:fighters params) "0")))
+        admirals (max 0 (parse-long (or (:admirals params) "0")))
+        defence-stations (max 0 (parse-long (or (:defence-stations params) "0")))
+        command-ships (max 0 (parse-long (or (:command-ships params) "0")))
+        military-planets (max 0 (parse-long (or (:military-planets params) "0")))
+        food-planets (max 0 (parse-long (or (:food-planets params) "0")))
+        ore-planets (max 0 (parse-long (or (:ore-planets params) "0")))
         
-        ;; calculate total cost
-        total-cost (+ (* soldiers (:game/soldier-cost game))
-                     (* transports (:game/transport-cost game))
-                     (* generals (:game/general-cost game))
-                     (* carriers (:game/carrier-cost game))
-                     (* fighters (:game/fighter-cost game))
-                     (* admirals (:game/admiral-cost game))
-                     (* defence-stations (:game/station-cost game))
-                     (* command-ships (:game/command-ship-cost game))
-                     (* military-planets (:game/military-planet-cost game))
-                     (* food-planets (:game/food-planet-cost game))
-                     (* ore-planets (:game/ore-planet-cost game)))
+        ;; calculate total cost with null safety
+        total-cost (+ (* soldiers (or (:game/soldier-cost game) 0))
+                     (* transports (or (:game/transport-cost game) 0))
+                     (* generals (or (:game/general-cost game) 0))
+                     (* carriers (or (:game/carrier-cost game) 0))
+                     (* fighters (or (:game/fighter-cost game) 0))
+                     (* admirals (or (:game/admiral-cost game) 0))
+                     (* defence-stations (or (:game/station-cost game) 0))
+                     (* command-ships (or (:game/command-ship-cost game) 0))
+                     (* military-planets (or (:game/military-planet-cost game) 0))
+                     (* food-planets (or (:game/food-planet-cost game) 0))
+                     (* ore-planets (or (:game/ore-planet-cost game) 0)))
         
         ;; calculate remaining resources and new totals
         credits-after (- (:player/credits player) total-cost)
@@ -132,7 +137,7 @@
       [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
        [:div
         [:p.text-xs "Credits"]
-        [:p.font-mono credits-after]]
+        [:p.font-mono {:class (when (< credits-after 0) "text-red-400")} credits-after]]
        [:div
         [:p.text-xs "Food"]
         [:p.font-mono (:player/food player)]]
@@ -146,11 +151,35 @@
         [:p.text-xs "Soldiers"]
         [:p.font-mono soldiers-after]]
        [:div
+        [:p.text-xs "Transports"]
+        [:p.font-mono transports-after]]
+       [:div
+        [:p.text-xs "Generals"]
+        [:p.font-mono generals-after]]
+       [:div
+        [:p.text-xs "Carriers"]
+        [:p.font-mono carriers-after]]
+       [:div
         [:p.text-xs "Fighters"]
         [:p.font-mono fighters-after]]
        [:div
+        [:p.text-xs "Admirals"]
+        [:p.font-mono admirals-after]]
+       [:div
         [:p.text-xs "Stations"]
         [:p.font-mono defence-stations-after]]
+       [:div
+        [:p.text-xs "Command Ships"]
+        [:p.font-mono command-ships-after]]
+       [:div
+        [:p.text-xs "Military Planets"]
+        [:p.font-mono military-planets-after]]
+       [:div
+        [:p.text-xs "Food Planets"]
+        [:p.font-mono food-planets-after]]
+       [:div
+        [:p.text-xs "Ore Planets"]
+        [:p.font-mono ore-planets-after]]
        [:div
         [:p.text-xs "Agents"]
         [:p.font-mono (:player/agents player)]]]])))
@@ -177,12 +206,13 @@
 (defn building-page [{:keys [player game]}]
   (let [player-id (:xt/id player)
         hx-include "[name='soldiers'],[name='transports'],[name='generals'],[name='carriers'],[name='fighters'],[name='admirals'],[name='defence-stations'],[name='command-ships'],[name='military-planets'],[name='food-planets'],[name='ore-planets']"]
+    
     (ui/page
      {}
      [:div.text-green-400.font-mono
       [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
       
-      (ui/phase-header (:player/current-phase player) "BUILDING")
+      [:h2.text-xl.font-bold.mb-6 "PHASE 3: BUILDING"]
       
       ;; :: resources before building
       [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
@@ -227,7 +257,7 @@
         [:div.space-y-2
          [:div
           [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (:game/soldier-cost game) " credits")]]
+          [:p.font-mono (str (or (:game/soldier-cost game) 0) " credits")]]
          [:div
           [:label.text-xs "Purchase Quantity"]
           (purchase-input "soldiers" 0 player-id hx-include)]]]
@@ -238,7 +268,7 @@
         [:div.space-y-2
          [:div
           [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (:game/transport-cost game) " credits")]]
+          [:p.font-mono (str (or (:game/transport-cost game) 0) " credits")]]
          [:div
           [:label.text-xs "Purchase Quantity"]
           (purchase-input "transports" 0 player-id hx-include)]]]
@@ -249,7 +279,7 @@
         [:div.space-y-2
          [:div
           [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (:game/general-cost game) " credits")]]
+          [:p.font-mono (str (or (:game/general-cost game) 0) " credits")]]
          [:div
           [:label.text-xs "Purchase Quantity"]
           (purchase-input "generals" 0 player-id hx-include)]]]
@@ -260,7 +290,7 @@
         [:div.space-y-2
          [:div
           [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (:game/carrier-cost game) " credits")]]
+          [:p.font-mono (str (or (:game/carrier-cost game) 0) " credits")]]
          [:div
           [:label.text-xs "Purchase Quantity"]
           (purchase-input "carriers" 0 player-id hx-include)]]]
@@ -271,7 +301,7 @@
         [:div.space-y-2
          [:div
           [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (:game/fighter-cost game) " credits")]]
+          [:p.font-mono (str (or (:game/fighter-cost game) 0) " credits")]]
          [:div
           [:label.text-xs "Purchase Quantity"]
           (purchase-input "fighters" 0 player-id hx-include)]]]
@@ -282,7 +312,7 @@
         [:div.space-y-2
          [:div
           [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (:game/admiral-cost game) " credits")]]
+          [:p.font-mono (str (or (:game/admiral-cost game) 0) " credits")]]
          [:div
           [:label.text-xs "Purchase Quantity"]
           (purchase-input "admirals" 0 player-id hx-include)]]]
@@ -293,7 +323,7 @@
         [:div.space-y-2
          [:div
           [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (:game/station-cost game) " credits")]]
+          [:p.font-mono (str (or (:game/station-cost game) 0) " credits")]]
          [:div
           [:label.text-xs "Purchase Quantity"]
           (purchase-input "defence-stations" 0 player-id hx-include)]]]
@@ -304,7 +334,7 @@
         [:div.space-y-2
          [:div
           [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (:game/command-ship-cost game) " credits")]]
+          [:p.font-mono (str (or (:game/command-ship-cost game) 0) " credits")]]
          [:div
           [:label.text-xs "Purchase Quantity"]
           (purchase-input "command-ships" 0 player-id hx-include)]]]
@@ -315,7 +345,7 @@
         [:div.space-y-2
          [:div
           [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (:game/military-planet-cost game) " credits")]]
+          [:p.font-mono (str (or (:game/military-planet-cost game) 0) " credits")]]
          [:div
           [:label.text-xs "Purchase Quantity"]
           (purchase-input "military-planets" 0 player-id hx-include)]]]
@@ -326,7 +356,7 @@
         [:div.space-y-2
          [:div
           [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (:game/food-planet-cost game) " credits")]]
+          [:p.font-mono (str (or (:game/food-planet-cost game) 0) " credits")]]
          [:div
           [:label.text-xs "Purchase Quantity"]
           (purchase-input "food-planets" 0 player-id hx-include)]]]
@@ -337,7 +367,7 @@
         [:div.space-y-2
          [:div
           [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (:game/ore-planet-cost game) " credits")]]
+          [:p.font-mono (str (or (:game/ore-planet-cost game) 0) " credits")]]
          [:div
           [:label.text-xs "Purchase Quantity"]
           (purchase-input "ore-planets" 0 player-id hx-include)]]]

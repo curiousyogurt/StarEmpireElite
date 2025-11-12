@@ -40,3 +40,18 @@
 
 (def population-upkeep-credits 1)
 (def population-upkeep-food 1)
+
+;; :: Building/Purchase Cost Defaults
+;; Cost to purchase new units, ships, and planets
+
+(def soldier-cost 10)
+(def transport-cost 100)
+(def general-cost 500)
+(def carrier-cost 1000)
+(def fighter-cost 50)
+(def admiral-cost 750)
+(def station-cost 200)
+(def command-ship-cost 2000)
+(def military-planet-cost 5000)
+(def food-planet-cost 4000)
+(def ore-planet-cost 6000)
