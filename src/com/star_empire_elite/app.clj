@@ -215,7 +215,7 @@
             ["" {:get app}]
             ["/create-test-game" {:post create-test-game}]
             ["/game/:player-id" {:get game/game-view}]
-            ["/game/:player-id/play" {:get income-handler}]
+            ["/game/:player-id/income" {:get income-handler}]
             ["/game/:player-id/apply-income" {:post income/apply-income}]
             ["/game/:player-id/expenses" {:get expenses-handler}]
             ["/game/:player-id/apply-expenses" {:post expenses/apply-expenses}]
