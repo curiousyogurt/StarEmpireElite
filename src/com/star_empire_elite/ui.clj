@@ -65,50 +65,49 @@
      margin: 0;
    }
 
-/* Green focus styles for input elements - bright but not overwhelming */
-input:focus,
-textarea:focus,
-select:focus {
-  outline: none !important;
-  border-color: #22c55e !important;  /* green-500 - bright but balanced */
-  border-width: 2px !important;      /* thicker border */
-  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.5), 
-              0 0 10px rgba(34, 197, 94, 0.3) !important;  /* dual glow effect */
-  background-color: rgba(34, 197, 94, 0.03) !important;  /* very subtle green background tint */
-}
+   /* Green focus styles for input elements - bright but not overwhelming */
+   input:focus,
+   textarea:focus,
+   select:focus {
+     outline: none !important;
+     border-color: rgba(34, 197, 94, 1.0) !important;
+     box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.75), 
+                 0 0 10px rgba(34, 197, 94, 0.3) !important;  /* dual glow effect */
+     background-color: rgba(34, 197, 94, 0.03) !important;  /* very subtle green background tint */
+   }
 
-  @media (max-width: 439px) {
-    .border-green-400 {
-      border: none !important;
-      background-color: transparent !important;
-    }
-    body {
-      font-size: 0.75rem;
-    }
-    h1 {
-      font-size: 1.5rem;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-    }
-    h2 {
-      font-size: 1.125rem;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-    }
-    h3 {
-      font-size: 1rem;
-    }
-    p {
-      font-size: 0.75rem;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-      padding: 0 4px;
-    }
-    div {
-      padding: 4px !important;
-      margin: 2px !important;
-    }
-  }
+   @media (max-width: 439px) {
+     .border-green-400 {
+       border: none !important;
+       background-color: transparent !important;
+     }
+     body {
+       font-size: 0.75rem;
+     }
+     h1 {
+       font-size: 1.5rem;
+       word-wrap: break-word;
+       overflow-wrap: break-word;
+     }
+     h2 {
+       font-size: 1.125rem;
+       word-wrap: break-word;
+       overflow-wrap: break-word;
+     }
+     h3 {
+       font-size: 1rem;
+     }
+     p {
+       font-size: 0.75rem;
+       word-wrap: break-word;
+       overflow-wrap: break-word;
+       padding: 0 4px;
+     }
+     div {
+       padding: 4px !important;
+       margin: 2px !important;
+     }
+   }
   "])
 
 ;;; Phase progress indicator showing current position in the 6-phase turn cycle. Uses filled circles

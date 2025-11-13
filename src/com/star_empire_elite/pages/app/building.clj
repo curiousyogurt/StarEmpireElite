@@ -209,8 +209,7 @@
      :onblur (str "let val = this.value.replace(/[^0-9]/g, ''); "
                   "if (val === '' || val === '0') { val = '0'; } "
                   "else { val = String(parseInt(val, 10)); } "
-                  "this.value = val; "
-                  "this.dispatchEvent(new Event('input', {bubbles: true}))")}]
+                  "this.value = val;")}]
    [:button
     {:type "button"
      :tabindex "-1"
