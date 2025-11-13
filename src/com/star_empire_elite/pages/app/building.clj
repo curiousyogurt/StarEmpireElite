@@ -227,11 +227,11 @@
      [:div.text-green-400.font-mono
       [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
       
-      [:h2.text-xl.font-bold.mb-6 "PHASE 3: BUILDING"]
+      (ui/phase-header (:player/current-phase player) "BUILDING")
       
-      ;; :: resources before building
+      ;; :: resources before building (simplified to match other pages)
       [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
-       [:h3.font-bold.mb-4 "Resources Before Building"]
+       [:h3.font-bold.mb-4 "Current Resources"]
        [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
         [:div
          [:p.text-xs "Credits"]
@@ -258,136 +258,66 @@
          [:p.text-xs "Agents"]
          [:p.font-mono (:player/agents player)]]]]
       
-      ;; :: building form
+      ;; :: building form with vertical layout like other pages
       (biff/form
        {:action (str "/app/game/" player-id "/apply-building")
         :method "post"}
        
-       [:h3.font-bold.mb-4 "Building This Round"]
-       [:div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-3.gap-4.mb-8
+       [:h3.font-bold.mb-4 "Purchase Units and Planets"]
        
-       ;; :: soldiers purchase
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Soldiers"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (or (:game/soldier-cost game) 0) " credits")]]
-         [:div
-          [:label.text-xs "Purchase Quantity"]
-          (purchase-input "soldiers" 0 player-id hx-include)]]]
-       
-       ;; :: transports purchase
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Transports"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (or (:game/transport-cost game) 0) " credits")]]
-         [:div
-          [:label.text-xs "Purchase Quantity"]
+       ;; Military Units Section
+       [:div.border.border-green-400.p-4.mb-4
+        [:h4.font-bold.mb-3 "Military Units"]
+        [:div.space-y-3
+         [:div.flex.justify-between.items-center
+          [:span "Soldiers (" (str (or (:game/soldier-cost game) 0) " credits)")]
+          (purchase-input "soldiers" 0 player-id hx-include)]
+         [:div.flex.justify-between.items-center
+          [:span "Generals (" (str (or (:game/general-cost game) 0) " credits)")]
+          (purchase-input "generals" 0 player-id hx-include)]
+         [:div.flex.justify-between.items-center
+          [:span "Transports (" (str (or (:game/transport-cost game) 0) " credits)")]
           (purchase-input "transports" 0 player-id hx-include)]]]
        
-       ;; :: generals purchase
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Generals"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (or (:game/general-cost game) 0) " credits")]]
-         [:div
-          [:label.text-xs "Purchase Quantity"]
-          (purchase-input "generals" 0 player-id hx-include)]]]
-       
-       ;; :: carriers purchase
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Carriers"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (or (:game/carrier-cost game) 0) " credits")]]
-         [:div
-          [:label.text-xs "Purchase Quantity"]
-          (purchase-input "carriers" 0 player-id hx-include)]]]
-       
-       ;; :: fighters purchase
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Fighters"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (or (:game/fighter-cost game) 0) " credits")]]
-         [:div
-          [:label.text-xs "Purchase Quantity"]
-          (purchase-input "fighters" 0 player-id hx-include)]]]
-       
-       ;; :: admirals purchase
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Admirals"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (or (:game/admiral-cost game) 0) " credits")]]
-         [:div
-          [:label.text-xs "Purchase Quantity"]
-          (purchase-input "admirals" 0 player-id hx-include)]]]
-       
-       ;; :: defence stations purchase
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Defence Stations"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (or (:game/station-cost game) 0) " credits")]]
-         [:div
-          [:label.text-xs "Purchase Quantity"]
-          (purchase-input "defence-stations" 0 player-id hx-include)]]]
-       
-       ;; :: command ships purchase
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Command Ships"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (or (:game/command-ship-cost game) 0) " credits")]]
-         [:div
-          [:label.text-xs "Purchase Quantity"]
+       ;; Space Fleet Section
+       [:div.border.border-green-400.p-4.mb-4
+        [:h4.font-bold.mb-3 "Space Fleet"]
+        [:div.space-y-3
+         [:div.flex.justify-between.items-center
+          [:span "Fighters (" (str (or (:game/fighter-cost game) 0) " credits)")]
+          (purchase-input "fighters" 0 player-id hx-include)]
+         [:div.flex.justify-between.items-center
+          [:span "Carriers (" (str (or (:game/carrier-cost game) 0) " credits)")]
+          (purchase-input "carriers" 0 player-id hx-include)]
+         [:div.flex.justify-between.items-center
+          [:span "Admirals (" (str (or (:game/admiral-cost game) 0) " credits)")]
+          (purchase-input "admirals" 0 player-id hx-include)]
+         [:div.flex.justify-between.items-center
+          [:span "Command Ships (" (str (or (:game/command-ship-cost game) 0) " credits)")]
           (purchase-input "command-ships" 0 player-id hx-include)]]]
        
-       ;; :: military planets purchase
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Military Planets"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (or (:game/military-planet-cost game) 0) " credits")]]
-         [:div
-          [:label.text-xs "Purchase Quantity"]
-          (purchase-input "military-planets" 0 player-id hx-include)]]]
+       ;; Infrastructure Section
+       [:div.border.border-green-400.p-4.mb-4
+        [:h4.font-bold.mb-3 "Infrastructure"]
+        [:div.space-y-3
+         [:div.flex.justify-between.items-center
+          [:span "Defence Stations (" (str (or (:game/station-cost game) 0) " credits)")]
+          (purchase-input "defence-stations" 0 player-id hx-include)]]]
        
-       ;; :: food planets purchase
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Food Planets"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (or (:game/food-planet-cost game) 0) " credits")]]
-         [:div
-          [:label.text-xs "Purchase Quantity"]
-          (purchase-input "food-planets" 0 player-id hx-include)]]]
-       
-       ;; :: ore planets purchase
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Ore Planets"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Cost per Unit"]
-          [:p.font-mono (str (or (:game/ore-planet-cost game) 0) " credits")]]
-         [:div
-          [:label.text-xs "Purchase Quantity"]
+       ;; Planets Section
+       [:div.border.border-green-400.p-4.mb-4
+        [:h4.font-bold.mb-3 "Planets"]
+        [:div.space-y-3
+         [:div.flex.justify-between.items-center
+          [:span "Military Planets (" (str (or (:game/military-planet-cost game) 0) " credits)")]
+          (purchase-input "military-planets" 0 player-id hx-include)]
+         [:div.flex.justify-between.items-center
+          [:span "Food Planets (" (str (or (:game/food-planet-cost game) 0) " credits)")]
+          (purchase-input "food-planets" 0 player-id hx-include)]
+         [:div.flex.justify-between.items-center
+          [:span "Ore Planets (" (str (or (:game/ore-planet-cost game) 0) " credits)")]
           (purchase-input "ore-planets" 0 player-id hx-include)]]]
-       ]
-      
+       
        ;; :: resources after building
        [:div#resources-after.border.border-green-400.p-4.mb-8.bg-green-100.bg-opacity-5
         [:h3.font-bold.mb-4 "Resources After Building"]
