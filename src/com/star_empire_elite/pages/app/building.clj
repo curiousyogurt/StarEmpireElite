@@ -91,19 +91,22 @@
         player (xt/entity db player-id)
         game (xt/entity db (:player/game player))
         
-        ;; parse purchase quantities, default to 0, ensure non-negative
-        soldiers (max 0 (parse-long (or (:soldiers params) "0")))
-        transports (max 0 (parse-long (or (:transports params) "0")))
-        generals (max 0 (parse-long (or (:generals params) "0")))
-        carriers (max 0 (parse-long (or (:carriers params) "0")))
-        fighters (max 0 (parse-long (or (:fighters params) "0")))
-        admirals (max 0 (parse-long (or (:admirals params) "0")))
-        defence-stations (max 0 (parse-long (or (:defence-stations params) "0")))
-        command-ships (max 0 (parse-long (or (:command-ships params) "0")))
-        military-planets (max 0 (parse-long (or (:military-planets params) "0")))
-        food-planets (max 0 (parse-long (or (:food-planets params) "0")))
-        ore-planets (max 0 (parse-long (or (:ore-planets params) "0")))
+        ;; helper function to safely parse numbers, treating empty/nil as 0
+        safe-parse (fn [val] (max 0 (or (parse-long (if (empty? (str val)) "0" (str val))) 0)))
         
+        ;; parse purchase quantities, default to 0, ensure non-negative
+        soldiers (safe-parse (:soldiers params))
+        transports (safe-parse (:transports params))
+        generals (safe-parse (:generals params))
+        carriers (safe-parse (:carriers params))
+        fighters (safe-parse (:fighters params))
+        admirals (safe-parse (:admirals params))
+        defence-stations (safe-parse (:defence-stations params))
+        command-ships (safe-parse (:command-ships params))
+        military-planets (safe-parse (:military-planets params))
+        food-planets (safe-parse (:food-planets params))
+        ore-planets (safe-parse (:ore-planets params))
+
         ;; calculate total cost with null safety
         total-cost (+ (* soldiers (or (:game/soldier-cost game) 0))
                      (* transports (or (:game/transport-cost game) 0))
@@ -188,19 +191,28 @@
 (defn purchase-input [name value player-id hx-include]
   [:div.relative.mt-1
    [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.pr-6.font-mono
-    {:type "text" :name name :value value
+    {:type "text" 
+     :name name 
+     :value value
+     :autocomplete "off"           ; Disable autocomplete
+     :autocapitalize "off"         ; Disable auto-capitalization
+     :autocorrect "off"            ; Disable auto-correction
+     :spellcheck "false"           ; Disable spellcheck
+     :data-lpignore "true"         ; Ignore LastPass
+     :data-form-type "other"       ; Tell browsers this isn't a standard form
      :hx-post (str "/app/game/" player-id "/calculate-building")
-     :hx-target "#resources-after" :hx-swap "outerHTML"
-     :hx-trigger "load, change"
+     :hx-target "#resources-after" 
+     :hx-swap "outerHTML"
+     :hx-trigger "load, input"
      :hx-include hx-include}]
    [:button
     {:type "button"
      :tabindex "-1"
      :class "absolute right-2 top-1/2 -translate-y-1/2 text-green-400 hover:text-green-300 transition-colors text-2xl font-bold p-0 bg-none border-none cursor-pointer"
      :onclick (str "document.querySelector('[name=\"" name "\"]').value = 0; "
-                   "document.querySelector('[name=\"" name "\"]').dispatchEvent(new Event('change', {bubbles: true}))")
+                   "document.querySelector('[name=\"" name "\"]').dispatchEvent(new Event('input', {bubbles: true}))")
      :title "Reset"}
-    "\u2022"]])
+    "\u25e6"]])
 
 ;; :: building page - players purchase units, ships, and planets
 (defn building-page [{:keys [player game]}]

@@ -64,7 +64,19 @@
      -webkit-appearance: none;
      margin: 0;
    }
-   
+
+/* Green focus styles for input elements - bright but not overwhelming */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none !important;
+  border-color: #22c55e !important;  /* green-500 - bright but balanced */
+  border-width: 2px !important;      /* thicker border */
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.5), 
+              0 0 10px rgba(34, 197, 94, 0.3) !important;  /* dual glow effect */
+  background-color: rgba(34, 197, 94, 0.03) !important;  /* very subtle green background tint */
+}
+
   @media (max-width: 439px) {
     .border-green-400 {
       border: none !important;
@@ -118,9 +130,6 @@
       ;; Arrow between phases (except after last phase)
       (when (< phase 6)
         [:span.text-green-400.text-xs.ml-1 "→"])])])
-        ;;[:span.text-green-400.text-xs.ml-2.mr-1 "→"])])])
-        ;;[:div.flex.items-center.justify-center.w-4.text-green-400.text-xs "→"])])])
-        ;;[:span.text-green-400.text-xs.px-1 "→"])])])
 
 ;;; Complete phase header with title on the left and progress indicator on the right. Takes current 
 ;;; phase number and phase name string to generate the full header with progress visualization.

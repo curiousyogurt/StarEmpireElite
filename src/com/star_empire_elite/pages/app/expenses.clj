@@ -49,19 +49,22 @@
 (defn calculate-expenses [{:keys [path-params params biff/db] :as ctx}]
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
         player (xt/entity db player-id)
-        ;; parse input values, default to 0 if not provided
-        planets-pay (parse-long (or (:planets-pay params) "0"))
-        planets-food (parse-long (or (:planets-food params) "0"))
-        soldiers-credits (parse-long (or (:soldiers-credits params) "0"))
-        soldiers-food (parse-long (or (:soldiers-food params) "0"))
-        fighters-credits (parse-long (or (:fighters-credits params) "0"))
-        fighters-fuel (parse-long (or (:fighters-fuel params) "0"))
-        stations-credits (parse-long (or (:stations-credits params) "0"))
-        stations-fuel (parse-long (or (:stations-fuel params) "0"))
-        agents-credits (parse-long (or (:agents-credits params) "0"))
-        agents-food (parse-long (or (:agents-food params) "0"))
-        population-credits (parse-long (or (:population-credits params) "0"))
-        population-food (parse-long (or (:population-food params) "0"))
+        ;; helper function to parse values, treating empty/nil as 0
+        parse-value (fn [v] (or (parse-long (if (empty? v) "0" v)) 0))
+        
+        ;; parse input values, default to 0 if not provided or empty
+        planets-pay (parse-value (:planets-pay params))
+        planets-food (parse-value (:planets-food params))
+        soldiers-credits (parse-value (:soldiers-credits params))
+        soldiers-food (parse-value (:soldiers-food params))
+        fighters-credits (parse-value (:fighters-credits params))
+        fighters-fuel (parse-value (:fighters-fuel params))
+        stations-credits (parse-value (:stations-credits params))
+        stations-fuel (parse-value (:stations-fuel params))
+        agents-credits (parse-value (:agents-credits params))
+        agents-food (parse-value (:agents-food params))
+        population-credits (parse-value (:population-credits params))
+        population-food (parse-value (:population-food params))
         
         ;; calculate remaining resources
         credits-after (- (:player/credits player) planets-pay soldiers-credits 
@@ -101,17 +104,26 @@
 (defn expense-input [name value player-id hx-include]
   [:div.relative.mt-1
    [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.pr-6.font-mono
-    {:type "text" :name name :value value
+    {:type "text" 
+     :name name 
+     :value value
+     :autocomplete "off"           ; Disable autocomplete
+     :autocapitalize "off"         ; Disable auto-capitalization
+     :autocorrect "off"            ; Disable auto-correction
+     :spellcheck "false"           ; Disable spellcheck
+     :data-lpignore "true"         ; Ignore LastPass
+     :data-form-type "other"       ; Tell browsers this isn't a standard form
      :hx-post (str "/app/game/" player-id "/calculate-expenses")
-     :hx-target "#resources-after" :hx-swap "outerHTML"
-     :hx-trigger "load, change"
+     :hx-target "#resources-after" 
+     :hx-swap "outerHTML"
+     :hx-trigger "load, input"
      :hx-include hx-include}]
    [:button
     {:type "button"
      :tabindex "-1"
      :class "absolute right-2 top-1/2 -translate-y-1/2 text-green-400 hover:text-green-300 transition-colors text-2xl font-bold p-0 bg-none border-none cursor-pointer"
      :onclick (str "document.querySelector('[name=\"" name "\"]').value = " value "; "
-                   "document.querySelector('[name=\"" name "\"]').dispatchEvent(new Event('change', {bubbles: true}))")
+                   "document.querySelector('[name=\"" name "\"]').dispatchEvent(new Event('input', {bubbles: true}))")
      :title "Reset"}
     "\u25e6"]])
 
