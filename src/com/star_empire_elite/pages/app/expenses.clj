@@ -52,8 +52,19 @@
 (defn calculate-expenses [{:keys [path-params params biff/db] :as ctx}]
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
         player (xt/entity db player-id)
-        ;; helper function to parse values, treating empty/nil as 0
-        parse-value (fn [v] (or (parse-long (if (empty? v) "0" v)) 0))
+        ;; helper function to parse values, stripping non-numeric chars before parsing, treating empty/nil as 0
+        parse-value (fn [v] 
+                      (try
+                        (let [s (str v)
+                              _ (println "Original value:" v "Type:" (type v))
+                              cleaned (clojure.string/replace s #"[^0-9]" "")
+                              _ (println "Cleaned value:" cleaned)]
+                          (if (empty? cleaned)
+                            0
+                            (parse-long cleaned)))
+                        (catch Exception e
+                          (println "Parse error for value:" v "Exception:" e)
+                          0)))
         
         ;; parse input values, default to 0 if not provided or empty
         planets-pay (parse-value (:planets-pay params))
@@ -73,20 +84,24 @@
         credits-after (- (:player/credits player) planets-pay soldiers-credits 
                          fighters-credits stations-credits agents-credits population-credits)
         food-after (- (:player/food player) planets-food soldiers-food agents-food population-food)
-        fuel-after (- (:player/fuel player) fighters-fuel stations-fuel)]
+        fuel-after (- (:player/fuel player) fighters-fuel stations-fuel)
+        
+        ;; check if player can afford all expenses
+        can-afford? (and (>= credits-after 0) (>= food-after 0) (>= fuel-after 0))]
     (biff/render
-     [:div#resources-after.border.border-green-400.p-4.mb-8.bg-green-100.bg-opacity-5
+     [:div
+      [:div#resources-after.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
       [:h3.font-bold.mb-4 "Resources After Expenses"]
       [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
        [:div
         [:p.text-xs "Credits"]
-        [:p.font-mono credits-after]]
+        [:p.font-mono {:class (when (< credits-after 0) "text-red-400")} credits-after]]
        [:div
         [:p.text-xs "Food"]
-        [:p.font-mono food-after]]
+        [:p.font-mono {:class (when (< food-after 0) "text-red-400")} food-after]]
        [:div
         [:p.text-xs "Fuel"]
-        [:p.font-mono fuel-after]]
+        [:p.font-mono {:class (when (< fuel-after 0) "text-red-400")} fuel-after]]
        [:div
         [:p.text-xs "Galaxars"]
         [:p.font-mono (:player/galaxars player)]]
@@ -101,7 +116,17 @@
         [:p.font-mono (:player/defence-stations player)]]
        [:div
         [:p.text-xs "Agents"]
-        [:p.font-mono (:player/agents player)]]]])))
+        [:p.font-mono (:player/agents player)]]]]
+      [:div#expense-warning.h-8.flex.items-center
+       {:hx-swap-oob "true"}
+       (when (not can-afford?)
+         [:p.text-yellow-400.font-bold "⚠ Insufficient resources to pay expenses!"])]
+      [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
+       {:type "submit"
+        :disabled (not can-afford?)
+        :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"
+        :hx-swap-oob "true"}
+       "Continue to Building"]])))
 
 ;; :: helper function for expense input fields with reset button
 (defn expense-input [name value player-id hx-include]
@@ -120,7 +145,12 @@
      :hx-target "#resources-after" 
      :hx-swap "outerHTML"
      :hx-trigger "load, input"
-     :hx-include hx-include}]
+     :hx-include hx-include
+     :onblur (str "let val = this.value.replace(/[^0-9]/g, ''); "
+                  "if (val === '' || val === '0') { val = '0'; } "
+                  "else { val = String(parseInt(val, 10)); } "
+                  "this.value = val; "
+                  "this.dispatchEvent(new Event('input', {bubbles: true}))")}]
    [:button
     {:type "button"
      :tabindex "-1"
@@ -320,7 +350,7 @@
        ]
       
        ;; :: resources after expenses
-       [:div#resources-after.border.border-green-400.p-4.mb-8.bg-green-100.bg-opacity-5
+       [:div#resources-after.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
         [:h3.font-bold.mb-4 "Resources After Expenses"]
         [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
          [:div
@@ -348,11 +378,13 @@
           [:p.text-xs "Agents"]
           [:p.font-mono (:player/agents player)]]]]
 
-       [:.h-6]
+       [:div#expense-warning.h-8.flex.items-center]
        [:div.flex.gap-4
         [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
          {:href (str "/app/game/" player-id)} "Back to Game"]
-        [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
-         {:type "submit"}
+        [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
+         {:type "submit"
+          :disabled true
+          :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"}
          "Continue to Building"]])
       ]))) ;; end of biff/form
