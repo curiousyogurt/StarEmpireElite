@@ -14,22 +14,25 @@
       (if (not= (:player/current-phase player) 3)
         {:status 303
          :headers {"location" (str "/app/game/" player-id)}}
-        (let [;; parse purchase input values, default to 0 if not provided
-              soldiers (max 0 (parse-long (or (:soldiers params) "0")))
-              transports (max 0 (parse-long (or (:transports params) "0")))
-              generals (max 0 (parse-long (or (:generals params) "0")))
-              carriers (max 0 (parse-long (or (:carriers params) "0")))
-              fighters (max 0 (parse-long (or (:fighters params) "0")))
-              admirals (max 0 (parse-long (or (:admirals params) "0")))
-              defence-stations (max 0 (parse-long (or (:defence-stations params) "0")))
-              command-ships (max 0 (parse-long (or (:command-ships params) "0")))
-              military-planets (max 0 (parse-long (or (:military-planets params) "0")))
-              food-planets (max 0 (parse-long (or (:food-planets params) "0")))
-              ore-planets (max 0 (parse-long (or (:ore-planets params) "0")))
-              
+        (let [;; helper function to safely parse numbers, treating empty/nil as 0
+              safe-parse (fn [val] (max 0 (or (parse-long (if (empty? (str val)) "0" (str val))) 0)))
+
+              ;; parse purchase input values, default to 0 if not provided or empty
+              soldiers (safe-parse (:soldiers params))
+              transports (safe-parse (:transports params))
+              generals (safe-parse (:generals params))
+              carriers (safe-parse (:carriers params))
+              fighters (safe-parse (:fighters params))
+              admirals (safe-parse (:admirals params))
+              defence-stations (safe-parse (:defence-stations params))
+              command-ships (safe-parse (:command-ships params))
+              military-planets (safe-parse (:military-planets params))
+              food-planets (safe-parse (:food-planets params))
+              ore-planets (safe-parse (:ore-planets params))
+
               ;; get game constants for costs
               game (xt/entity db (:player/game player))
-              
+
               ;; calculate total cost with null safety
               total-cost (+ (* soldiers (or (:game/soldier-cost game) 0))
                            (* transports (or (:game/transport-cost game) 0))

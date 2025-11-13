@@ -14,20 +14,23 @@
       (if (not= (:player/current-phase player) 2)
         {:status 303
          :headers {"location" (str "/app/game/" player-id)}}
-        (let [;; parse expense input values, default to 0 if not provided
-              planets-pay (parse-long (or (:planets-pay params) "0"))
-              planets-food (parse-long (or (:planets-food params) "0"))
-              soldiers-credits (parse-long (or (:soldiers-credits params) "0"))
-              soldiers-food (parse-long (or (:soldiers-food params) "0"))
-              fighters-credits (parse-long (or (:fighters-credits params) "0"))
-              fighters-fuel (parse-long (or (:fighters-fuel params) "0"))
-              stations-credits (parse-long (or (:stations-credits params) "0"))
-              stations-fuel (parse-long (or (:stations-fuel params) "0"))
-              agents-credits (parse-long (or (:agents-credits params) "0"))
-              agents-food (parse-long (or (:agents-food params) "0"))
-              population-credits (parse-long (or (:population-credits params) "0"))
-              population-food (parse-long (or (:population-food params) "0"))
-              
+        (let [;; helper function to safely parse numbers, treating empty/nil as 0
+              safe-parse (fn [val] (or (parse-long (if (empty? (str val)) "0" (str val))) 0))
+
+              ;; parse expense input values, default to 0 if not provided or empty
+              planets-pay (safe-parse (:planets-pay params))
+              planets-food (safe-parse (:planets-food params))
+              soldiers-credits (safe-parse (:soldiers-credits params))
+              soldiers-food (safe-parse (:soldiers-food params))
+              fighters-credits (safe-parse (:fighters-credits params))
+              fighters-fuel (safe-parse (:fighters-fuel params))
+              stations-credits (safe-parse (:stations-credits params))
+              stations-fuel (safe-parse (:stations-fuel params))
+              agents-credits (safe-parse (:agents-credits params))
+              agents-food (safe-parse (:agents-food params))
+              population-credits (safe-parse (:population-credits params))
+              population-food (safe-parse (:population-food params))              
+ 
               ;; calculate new resource totals after expenses
               new-credits (- (:player/credits player) planets-pay soldiers-credits 
                              fighters-credits stations-credits agents-credits population-credits)
