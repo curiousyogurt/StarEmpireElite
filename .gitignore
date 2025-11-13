@@ -1,16 +1,66 @@
-/.cpcache
-/.nrepl-port
-/bin
-/config.edn
-/config.sh
-/config.env
-/node_modules
-/secrets.env
-/storage/
-/tailwindcss
-/target
-.calva/
+# === Secrets ===
+# Your Biff secrets file. DO NOT COMMIT.
+config.edn
+# Other common secret file names
+config.sh
+config.env
+secrets.env
+
+# === Biff Data ===
+# Default Biff local database
+xtdb-data/
+# Default Biff local file storage
+storage/
+
+# === Dependencies ===
+node_modules/
+
+# === Build Artifacts ===
+# Compiled Java/Clojure
+target/
+classes/
+*.jar
+*.class
+pom.xml
+pom.xml.asc
+
+# Compiled frontend/CSS assets
+public/js/main.js
+public/js/main.js.map
+public/css/main.css
+
+# Downloaded binaries (e.g., tailwindcss)
+tailwindcss
+
+# === Logs ===
+logs/
+*.log
+
+# === Clojure / REPL / Caches ===
+.cpcache/
+.shadow-cljs/
+.nrepl-port
+
+# === Editor & Tooling ===
+# Vim swap/temp files
+*.swp
+*.swo
+
+# Clojure Linter/LSP caches (used by Vim)
 .clj-kondo/
 .lsp/
+
+# Data visualizer
 .portal/
-.shadow-cljs/
+
+# Metals build server
+.bloop/
+
+# === macOS System Files ===
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Icon\r
