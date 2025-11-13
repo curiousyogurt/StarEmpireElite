@@ -56,14 +56,11 @@
         parse-value (fn [v] 
                       (try
                         (let [s (str v)
-                              _ (println "Original value:" v "Type:" (type v))
-                              cleaned (clojure.string/replace s #"[^0-9]" "")
-                              _ (println "Cleaned value:" cleaned)]
+                              cleaned (clojure.string/replace s #"[^0-9]" "")]
                           (if (empty? cleaned)
                             0
                             (parse-long cleaned)))
                         (catch Exception e
-                          (println "Parse error for value:" v "Exception:" e)
                           0)))
         
         ;; parse input values, default to 0 if not provided or empty
@@ -118,47 +115,47 @@
         [:p.text-xs "Agents"]
         [:p.font-mono (:player/agents player)]]]]
       [:div#expense-warning.h-8.flex.items-center
-       {:hx-swap-oob "true"}
        (when (not can-afford?)
          [:p.text-yellow-400.font-bold "⚠ Insufficient resources to pay expenses!"])]
-      [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
-       {:type "submit"
-        :disabled (not can-afford?)
-        :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"
-        :hx-swap-oob "true"}
-       "Continue to Building"]])))
+      ;; CRITICAL FIX: Remove hx-swap-oob to prevent button replacement
+      [:div#submit-container
+       [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
+        {:type "submit"
+         :disabled (not can-afford?)
+         :class (if can-afford?
+                  "hover:bg-green-300"
+                  "opacity-50 cursor-not-allowed bg-gray-600 hover:bg-gray-600")}
+        "Continue to Building"]]])))
 
-;; :: helper function for expense input fields with reset button
+;; :: helper function for expense input fields - REMOVED ALL JAVASCRIPT
 (defn expense-input [name value player-id hx-include]
   [:div.relative.mt-1
-   [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.pr-6.font-mono
-    {:type "text" 
+   [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.pr-8.font-mono
+    {:type "number" 
      :name name 
      :value value
-     :autocomplete "off"           ; Disable autocomplete
-     :autocapitalize "off"         ; Disable auto-capitalization
-     :autocorrect "off"            ; Disable auto-correction
-     :spellcheck "false"           ; Disable spellcheck
-     :data-lpignore "true"         ; Ignore LastPass
-     :data-form-type "other"       ; Tell browsers this isn't a standard form
+     :min "0"
+     :autocomplete "off"
+     :autocapitalize "off"
+     :autocorrect "off" 
+     :spellcheck "false"
+     :data-lpignore "true"
+     :data-form-type "other"
      :hx-post (str "/app/game/" player-id "/calculate-expenses")
      :hx-target "#resources-after" 
      :hx-swap "outerHTML"
-     :hx-trigger "load, input"
-     :hx-include hx-include
-     :onblur (str "let val = this.value.replace(/[^0-9]/g, ''); "
-                  "if (val === '' || val === '0') { val = '0'; } "
-                  "else { val = String(parseInt(val, 10)); } "
-                  "this.value = val; "
-                  "this.dispatchEvent(new Event('input', {bubbles: true}))")}]
-   [:button
+     ;; CRITICAL FIX: Use debounced input trigger only
+     :hx-trigger "input delay:500ms, change"
+     :hx-include hx-include}]
+   [:button.absolute.right-2.top-1/2.-translate-y-1/2.text-green-400.hover:text-green-300.transition-colors.text-xl.font-bold.p-1
     {:type "button"
      :tabindex "-1"
-     :class "absolute right-2 top-1/2 -translate-y-1/2 text-green-400 hover:text-green-300 transition-colors text-2xl font-bold p-0 bg-none border-none cursor-pointer"
-     :onclick (str "document.querySelector('[name=\"" name "\"]').value = " value "; "
-                   "document.querySelector('[name=\"" name "\"]').dispatchEvent(new Event('input', {bubbles: true}))")
+     ;; CRITICAL FIX: Use HTMX to reset field instead of JavaScript
+     :hx-get (str "/app/game/" player-id "/expenses")
+     :hx-target "closest form"
+     :hx-swap "outerHTML"
      :title "Reset"}
-    "\u25e6"]])
+    "↻"]])
 
 ;; :: expenses page - players pay for upkeep of their empire
 (defn expenses-page [{:keys [player game]}]
@@ -347,7 +344,7 @@
          [:div
           [:label.text-xs "Pay Food"]
           (expense-input "population-food" population-food-cost player-id hx-include)]]]
-       ]
+        ]
       
        ;; :: resources after expenses
        [:div#resources-after.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
@@ -382,9 +379,8 @@
        [:div.flex.gap-4
         [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
          {:href (str "/app/game/" player-id)} "Back to Game"]
-        [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
-         {:type "submit"
-          :disabled true
-          :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"}
+        ;; CRITICAL FIX: Static button that doesn't get replaced
+        [:button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors.hover:bg-green-300
+         {:type "submit"}
          "Continue to Building"]])
-      ]))) ;; end of biff/form
+      ])))
