@@ -30,7 +30,7 @@
               agents-food (safe-parse (:agents-food params))
               population-credits (safe-parse (:population-credits params))
               population-food (safe-parse (:population-food params))              
- 
+
               ;; calculate new resource totals after expenses
               new-credits (- (:player/credits player) planets-pay soldiers-credits 
                              fighters-credits stations-credits agents-credits population-credits)
@@ -38,13 +38,13 @@
               new-fuel (- (:player/fuel player) fighters-fuel stations-fuel)]
           ;; submit transaction to update player resources and advance phase
           (biff/submit-tx ctx
-            [{:db/doc-type :player
-              :db/op :update
-              :xt/id player-id
-              :player/credits new-credits
-              :player/food new-food
-              :player/fuel new-fuel
-              :player/current-phase 3}])
+                          [{:db/doc-type :player
+                            :db/op :update
+                            :xt/id player-id
+                            :player/credits new-credits
+                            :player/food new-food
+                            :player/fuel new-fuel
+                            :player/current-phase 3}])
           ;; redirect to building page (when it exists)
           {:status 303
            :headers {"location" (str "/app/game/" player-id "/building")}})))))
@@ -65,7 +65,7 @@
                         (catch Exception e
                           (println "Parse error for value:" v "Exception:" e)
                           0)))
-        
+
         ;; parse input values, default to 0 if not provided or empty
         planets-pay (parse-value (:planets-pay params))
         planets-food (parse-value (:planets-food params))
@@ -79,54 +79,54 @@
         agents-food (parse-value (:agents-food params))
         population-credits (parse-value (:population-credits params))
         population-food (parse-value (:population-food params))
-        
+
         ;; calculate remaining resources
         credits-after (- (:player/credits player) planets-pay soldiers-credits 
                          fighters-credits stations-credits agents-credits population-credits)
         food-after (- (:player/food player) planets-food soldiers-food agents-food population-food)
         fuel-after (- (:player/fuel player) fighters-fuel stations-fuel)
-        
+
         ;; check if player can afford all expenses
         can-afford? (and (>= credits-after 0) (>= food-after 0) (>= fuel-after 0))]
     (biff/render
-     [:div
-      [:div#resources-after.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
-      [:h3.font-bold.mb-4 "Resources After Expenses"]
-      [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
-       [:div
-        [:p.text-xs "Credits"]
-        [:p.font-mono {:class (when (< credits-after 0) "text-red-400")} credits-after]]
-       [:div
-        [:p.text-xs "Food"]
-        [:p.font-mono {:class (when (< food-after 0) "text-red-400")} food-after]]
-       [:div
-        [:p.text-xs "Fuel"]
-        [:p.font-mono {:class (when (< fuel-after 0) "text-red-400")} fuel-after]]
-       [:div
-        [:p.text-xs "Galaxars"]
-        [:p.font-mono (:player/galaxars player)]]
-       [:div
-        [:p.text-xs "Soldiers"]
-        [:p.font-mono (:player/soldiers player)]]
-       [:div
-        [:p.text-xs "Fighters"]
-        [:p.font-mono (:player/fighters player)]]
-       [:div
-        [:p.text-xs "Stations"]
-        [:p.font-mono (:player/defence-stations player)]]
-       [:div
-        [:p.text-xs "Agents"]
-        [:p.font-mono (:player/agents player)]]]]
-      [:div#expense-warning.h-8.flex.items-center
-       {:hx-swap-oob "true"}
-       (when (not can-afford?)
-         [:p.text-yellow-400.font-bold "⚠ Insufficient resources to pay expenses!"])]
-      [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
-       {:type "submit"
-        :disabled (not can-afford?)
-        :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"
-        :hx-swap-oob "true"}
-       "Continue to Building"]])))
+      [:div
+       [:div#resources-after.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
+        [:h3.font-bold.mb-4 "Resources After Expenses"]
+        [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
+         [:div
+          [:p.text-xs "Credits"]
+          [:p.font-mono {:class (when (< credits-after 0) "text-red-400")} credits-after]]
+         [:div
+          [:p.text-xs "Food"]
+          [:p.font-mono {:class (when (< food-after 0) "text-red-400")} food-after]]
+         [:div
+          [:p.text-xs "Fuel"]
+          [:p.font-mono {:class (when (< fuel-after 0) "text-red-400")} fuel-after]]
+         [:div
+          [:p.text-xs "Galaxars"]
+          [:p.font-mono (:player/galaxars player)]]
+         [:div
+          [:p.text-xs "Soldiers"]
+          [:p.font-mono (:player/soldiers player)]]
+         [:div
+          [:p.text-xs "Fighters"]
+          [:p.font-mono (:player/fighters player)]]
+         [:div
+          [:p.text-xs "Stations"]
+          [:p.font-mono (:player/defence-stations player)]]
+         [:div
+          [:p.text-xs "Agents"]
+          [:p.font-mono (:player/agents player)]]]]
+       [:div#expense-warning.h-8.flex.items-center
+        {:hx-swap-oob "true"}
+        (when (not can-afford?)
+          [:p.text-yellow-400.font-bold "⚠ Insufficient resources to pay expenses!"])]
+       [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
+        {:type "submit"
+         :disabled (not can-afford?)
+         :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"
+         :hx-swap-oob "true"}
+        "Continue to Building"]])))
 
 ;; :: helper function for expense input fields with reset button
 (defn expense-input [name value player-id hx-include]
@@ -147,9 +147,9 @@
      :hx-trigger "load, input"
      :hx-include hx-include
      :onblur (str "let val = this.value.replace(/[^0-9]/g, ''); "
-             "if (val === '' || val === '0') { val = '0'; } "
-             "else { val = String(parseInt(val, 10)); } "
-             "this.value = val;")}]
+                  "if (val === '' || val === '0') { val = '0'; } "
+                  "else { val = String(parseInt(val, 10)); } "
+                  "this.value = val;")}]
    [:button
     {:type "button"
      :tabindex "-1"
@@ -167,190 +167,34 @@
                         (:player/ore-planets player))
         planet-cost-per (* planet-count (:game/planet-upkeep-credits game))
         planet-food-cost planet-count ; since food cost is 1 per planet
-        
+
         soldiers-credit-cost (Math/round (/ (* (:player/soldiers player) (:game/soldier-upkeep-credits game)) 1000.0))
         soldiers-food-cost (Math/round (/ (* (:player/soldiers player) (:game/soldier-upkeep-food game)) 1000.0))
-        
+
         fighters-credit-cost (* (:player/fighters player) (:game/fighter-upkeep-credits game))
         fighters-fuel-cost (* (:player/fighters player) (:game/fighter-upkeep-fuel game))
-        
+
         stations-credit-cost (* (:player/defence-stations player) (:game/station-upkeep-credits game))
         stations-fuel-cost (* (:player/defence-stations player) (:game/station-upkeep-fuel game))
-        
+
         agents-credit-cost (* (:player/agents player) (:game/agent-upkeep-credits game))
         agents-food-cost (Math/round (/ (* (:player/agents player) (:game/agent-upkeep-food game)) 1000.0))
-        
+
         population-credit-cost (Math/round (/ (* (:player/population player) (:game/population-upkeep-credits game)) 1000.0))
         population-food-cost (Math/round (/ (* (:player/population player) (:game/population-upkeep-food game)) 1000.0))
-        
+
         player-id (:xt/id player)
         hx-include "[name='planets-pay'],[name='planets-food'],[name='soldiers-credits'],[name='soldiers-food'],[name='fighters-credits'],[name='fighters-fuel'],[name='stations-credits'],[name='stations-fuel'],[name='agents-credits'],[name='agents-food'],[name='population-credits'],[name='population-food']"]
     (ui/page
-     {}
-     [:div.text-green-400.font-mono
-      [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
-      
-      (ui/phase-header (:player/current-phase player) "EXPENSES")
-      
-      ;; :: resources before expenses
-      [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
-       [:h3.font-bold.mb-4 "Resources Before Expenses"]
-       [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
-        [:div
-         [:p.text-xs "Credits"]
-         [:p.font-mono (:player/credits player)]]
-        [:div
-         [:p.text-xs "Food"]
-         [:p.font-mono (:player/food player)]]
-        [:div
-         [:p.text-xs "Fuel"]
-         [:p.font-mono (:player/fuel player)]]
-        [:div
-         [:p.text-xs "Galaxars"]
-         [:p.font-mono (:player/galaxars player)]]
-        [:div
-         [:p.text-xs "Soldiers"]
-         [:p.font-mono (:player/soldiers player)]]
-        [:div
-         [:p.text-xs "Fighters"]
-         [:p.font-mono (:player/fighters player)]]
-        [:div
-         [:p.text-xs "Stations"]
-         [:p.font-mono (:player/defence-stations player)]]
-        [:div
-         [:p.text-xs "Agents"]
-         [:p.font-mono (:player/agents player)]]]]
-      
-      ;; :: expenses form
-      (biff/form
-       {:action (str "/app/game/" player-id "/apply-expenses")
-        :method "post"}
-       
-       [:h3.font-bold.mb-4 "Expenses This Round"]
-       [:div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-3.gap-4.mb-8
-       
-       ;; :: planets expense
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Planets Upkeep"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Planets: " planet-count]]
-         [:div
-          [:p.text-xs "Cost per Planet"]
-          [:p.font-mono (str (:game/planet-upkeep-credits game) " credits, " 
-                             (:game/planet-upkeep-food game) " food")]]
-         [:div
-          [:p.text-xs "Total Required"]
-          [:p.font-mono (str planet-cost-per " credits, " planet-food-cost " food")]]
-         [:div
-          [:label.text-xs "Pay Credits"]
-          (expense-input "planets-pay" planet-cost-per player-id hx-include)]
-         [:div
-          [:label.text-xs "Pay Food"]
-          (expense-input "planets-food" planet-food-cost player-id hx-include)]]]
-       
-       ;; :: soldiers expense
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Soldiers Upkeep"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Soldiers: " (:player/soldiers player)]]
-         [:div
-          [:p.text-xs "Cost per 1000"]
-          [:p.font-mono (str (:game/soldier-upkeep-credits game) " credit, " 
-                             (:game/soldier-upkeep-food game) " food")]]
-         [:div
-          [:p.text-xs "Total Required"]
-          [:p.font-mono (str soldiers-credit-cost " credits, " soldiers-food-cost " food")]]
-         [:div
-          [:label.text-xs "Pay Credits"]
-          (expense-input "soldiers-credits" soldiers-credit-cost player-id hx-include)]
-         [:div
-          [:label.text-xs "Pay Food"]
-          (expense-input "soldiers-food" soldiers-food-cost player-id hx-include)]]]
-       
-       ;; :: fighters expense
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Fighters Upkeep"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Fighters: " (:player/fighters player)]]
-         [:div
-          [:p.text-xs "Cost per Fighter"]
-          [:p.font-mono (str (:game/fighter-upkeep-credits game) " credits, " 
-                             (:game/fighter-upkeep-fuel game) " fuel")]]
-         [:div
-          [:p.text-xs "Total Required"]
-          [:p.font-mono (str fighters-credit-cost " credits, " fighters-fuel-cost " fuel")]]
-         [:div
-          [:label.text-xs "Pay Credits"]
-          (expense-input "fighters-credits" fighters-credit-cost player-id hx-include)]
-         [:div
-          [:label.text-xs "Pay Fuel"]
-          (expense-input "fighters-fuel" fighters-fuel-cost player-id hx-include)]]]
-       
-       ;; :: stations expense
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Defence Stations Upkeep"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Stations: " (:player/defence-stations player)]]
-         [:div
-          [:p.text-xs "Cost per Station"]
-          [:p.font-mono (str (:game/station-upkeep-credits game) " credits, " 
-                             (:game/station-upkeep-fuel game) " fuel")]]
-         [:div
-          [:p.text-xs "Total Required"]
-          [:p.font-mono (str stations-credit-cost " credits, " stations-fuel-cost " fuel")]]
-         [:div
-          [:label.text-xs "Pay Credits"]
-          (expense-input "stations-credits" stations-credit-cost player-id hx-include)]
-         [:div
-          [:label.text-xs "Pay Fuel"]
-          (expense-input "stations-fuel" stations-fuel-cost player-id hx-include)]]]
-       
-       ;; :: agents expense
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Agents Upkeep"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Agents: " (:player/agents player)]]
-         [:div
-          [:p.text-xs "Cost per 1000 Agents"]
-          [:p.font-mono (str (:game/agent-upkeep-credits game) " credits, " (:game/agent-upkeep-food game) " food")]]
-         [:div
-          [:p.text-xs "Total Required"]
-          [:p.font-mono (str agents-credit-cost " credits, " agents-food-cost " food")]]
-         [:div
-          [:label.text-xs "Pay Credits"]
-          (expense-input "agents-credits" agents-credit-cost player-id hx-include)]
-         [:div
-          [:label.text-xs "Pay Food"]
-          (expense-input "agents-food" agents-food-cost player-id hx-include)]]]
-       
-       ;; :: population expense
-       [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 "Population Upkeep"]
-        [:div.space-y-2
-         [:div
-          [:p.text-xs "Population: " (:player/population player)]]
-         [:div
-          [:p.text-xs "Cost per 1000"]
-          [:p.font-mono (str (:game/population-upkeep-credits game) " credit, " (:game/population-upkeep-food game) " food")]]
-         [:div
-          [:p.text-xs "Total Required"]
-          [:p.font-mono (str population-credit-cost " credits, " population-food-cost " food")]]
-         [:div
-          [:label.text-xs "Pay Credits"]
-          (expense-input "population-credits" population-credit-cost player-id hx-include)]
-         [:div
-          [:label.text-xs "Pay Food"]
-          (expense-input "population-food" population-food-cost player-id hx-include)]]]
-       ]
-      
-       ;; :: resources after expenses
-       [:div#resources-after.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
-        [:h3.font-bold.mb-4 "Resources After Expenses"]
+      {}
+      [:div.text-green-400.font-mono
+       [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
+
+       (ui/phase-header (:player/current-phase player) "EXPENSES")
+
+       ;; :: resources before expenses
+       [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
+        [:h3.font-bold.mb-4 "Resources Before Expenses"]
         [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
          [:div
           [:p.text-xs "Credits"]
@@ -377,13 +221,169 @@
           [:p.text-xs "Agents"]
           [:p.font-mono (:player/agents player)]]]]
 
-       [:div#expense-warning.h-8.flex.items-center]
-       [:div.flex.gap-4
-        [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-         {:href (str "/app/game/" player-id)} "Back to Game"]
-        [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
-         {:type "submit"
-          :disabled true
-          :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"}
-         "Continue to Building"]])
-      ]))) ;; end of biff/form
+       ;; :: expenses form
+       (biff/form
+         {:action (str "/app/game/" player-id "/apply-expenses")
+          :method "post"}
+
+         [:h3.font-bold.mb-4 "Expenses This Round"]
+         [:div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-3.gap-4.mb-8
+
+          ;; :: planets expense
+          [:div.border.border-green-400.p-4
+           [:h4.font-bold.mb-3 "Planets Upkeep"]
+           [:div.space-y-2
+            [:div
+             [:p.text-xs "Planets: " planet-count]]
+            [:div
+             [:p.text-xs "Cost per Planet"]
+             [:p.font-mono (str (:game/planet-upkeep-credits game) " credits, " 
+                                (:game/planet-upkeep-food game) " food")]]
+            [:div
+             [:p.text-xs "Total Required"]
+             [:p.font-mono (str planet-cost-per " credits, " planet-food-cost " food")]]
+            [:div
+             [:label.text-xs "Pay Credits"]
+             (expense-input "planets-pay" planet-cost-per player-id hx-include)]
+            [:div
+             [:label.text-xs "Pay Food"]
+             (expense-input "planets-food" planet-food-cost player-id hx-include)]]]
+
+          ;; :: soldiers expense
+          [:div.border.border-green-400.p-4
+           [:h4.font-bold.mb-3 "Soldiers Upkeep"]
+           [:div.space-y-2
+            [:div
+             [:p.text-xs "Soldiers: " (:player/soldiers player)]]
+            [:div
+             [:p.text-xs "Cost per 1000"]
+             [:p.font-mono (str (:game/soldier-upkeep-credits game) " credit, " 
+                                (:game/soldier-upkeep-food game) " food")]]
+            [:div
+             [:p.text-xs "Total Required"]
+             [:p.font-mono (str soldiers-credit-cost " credits, " soldiers-food-cost " food")]]
+            [:div
+             [:label.text-xs "Pay Credits"]
+             (expense-input "soldiers-credits" soldiers-credit-cost player-id hx-include)]
+            [:div
+             [:label.text-xs "Pay Food"]
+             (expense-input "soldiers-food" soldiers-food-cost player-id hx-include)]]]
+
+          ;; :: fighters expense
+          [:div.border.border-green-400.p-4
+           [:h4.font-bold.mb-3 "Fighters Upkeep"]
+           [:div.space-y-2
+            [:div
+             [:p.text-xs "Fighters: " (:player/fighters player)]]
+            [:div
+             [:p.text-xs "Cost per Fighter"]
+             [:p.font-mono (str (:game/fighter-upkeep-credits game) " credits, " 
+                                (:game/fighter-upkeep-fuel game) " fuel")]]
+            [:div
+             [:p.text-xs "Total Required"]
+             [:p.font-mono (str fighters-credit-cost " credits, " fighters-fuel-cost " fuel")]]
+            [:div
+             [:label.text-xs "Pay Credits"]
+             (expense-input "fighters-credits" fighters-credit-cost player-id hx-include)]
+            [:div
+             [:label.text-xs "Pay Fuel"]
+             (expense-input "fighters-fuel" fighters-fuel-cost player-id hx-include)]]]
+
+          ;; :: stations expense
+          [:div.border.border-green-400.p-4
+           [:h4.font-bold.mb-3 "Defence Stations Upkeep"]
+           [:div.space-y-2
+            [:div
+             [:p.text-xs "Stations: " (:player/defence-stations player)]]
+            [:div
+             [:p.text-xs "Cost per Station"]
+             [:p.font-mono (str (:game/station-upkeep-credits game) " credits, " 
+                                (:game/station-upkeep-fuel game) " fuel")]]
+            [:div
+             [:p.text-xs "Total Required"]
+             [:p.font-mono (str stations-credit-cost " credits, " stations-fuel-cost " fuel")]]
+            [:div
+             [:label.text-xs "Pay Credits"]
+             (expense-input "stations-credits" stations-credit-cost player-id hx-include)]
+            [:div
+             [:label.text-xs "Pay Fuel"]
+             (expense-input "stations-fuel" stations-fuel-cost player-id hx-include)]]]
+
+          ;; :: agents expense
+          [:div.border.border-green-400.p-4
+           [:h4.font-bold.mb-3 "Agents Upkeep"]
+           [:div.space-y-2
+            [:div
+             [:p.text-xs "Agents: " (:player/agents player)]]
+            [:div
+             [:p.text-xs "Cost per 1000 Agents"]
+             [:p.font-mono (str (:game/agent-upkeep-credits game) " credits, " (:game/agent-upkeep-food game) " food")]]
+            [:div
+             [:p.text-xs "Total Required"]
+             [:p.font-mono (str agents-credit-cost " credits, " agents-food-cost " food")]]
+            [:div
+             [:label.text-xs "Pay Credits"]
+             (expense-input "agents-credits" agents-credit-cost player-id hx-include)]
+            [:div
+             [:label.text-xs "Pay Food"]
+             (expense-input "agents-food" agents-food-cost player-id hx-include)]]]
+
+          ;; :: population expense
+          [:div.border.border-green-400.p-4
+           [:h4.font-bold.mb-3 "Population Upkeep"]
+           [:div.space-y-2
+            [:div
+             [:p.text-xs "Population: " (:player/population player)]]
+            [:div
+             [:p.text-xs "Cost per 1000"]
+             [:p.font-mono (str (:game/population-upkeep-credits game) " credit, " (:game/population-upkeep-food game) " food")]]
+            [:div
+             [:p.text-xs "Total Required"]
+             [:p.font-mono (str population-credit-cost " credits, " population-food-cost " food")]]
+            [:div
+             [:label.text-xs "Pay Credits"]
+             (expense-input "population-credits" population-credit-cost player-id hx-include)]
+            [:div
+             [:label.text-xs "Pay Food"]
+             (expense-input "population-food" population-food-cost player-id hx-include)]]]
+          ]
+
+         ;; :: resources after expenses
+         [:div#resources-after.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
+          [:h3.font-bold.mb-4 "Resources After Expenses"]
+          [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
+           [:div
+            [:p.text-xs "Credits"]
+            [:p.font-mono (:player/credits player)]]
+           [:div
+            [:p.text-xs "Food"]
+            [:p.font-mono (:player/food player)]]
+           [:div
+            [:p.text-xs "Fuel"]
+            [:p.font-mono (:player/fuel player)]]
+           [:div
+            [:p.text-xs "Galaxars"]
+            [:p.font-mono (:player/galaxars player)]]
+           [:div
+            [:p.text-xs "Soldiers"]
+            [:p.font-mono (:player/soldiers player)]]
+           [:div
+            [:p.text-xs "Fighters"]
+            [:p.font-mono (:player/fighters player)]]
+           [:div
+            [:p.text-xs "Stations"]
+            [:p.font-mono (:player/defence-stations player)]]
+           [:div
+            [:p.text-xs "Agents"]
+            [:p.font-mono (:player/agents player)]]]]
+
+         [:div#expense-warning.h-8.flex.items-center]
+         [:div.flex.gap-4
+          [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+           {:href (str "/app/game/" player-id)} "Back to Game"]
+          [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
+           {:type "submit"
+            :disabled true
+            :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"}
+           "Continue to Building"]])
+       ]))) ;; end of biff/form
