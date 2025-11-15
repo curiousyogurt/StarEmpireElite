@@ -1,3 +1,14 @@
+;;; Development Notes
+;;; In order to add a new page <p>, the followin changes must be made to app.clj:
+;;;  - Import the <p> module at the top rquire with :as alias
+;;;    - This corresponds to a <p>.clj file in the 
+;;;  - Create a handler functino <p>-handler that:
+;;;    - Extracts the player-id from URL params
+;;;    - Fetches the player and game from database
+;;;    - Validates the player is in the right phase
+;;;    - Calls the page function from the module
+;;;  - Add a route that maps a URL to the handler
+
 (ns com.star-empire-elite.app
   (:require [com.biffweb :as biff]
             [com.star-empire-elite.middleware :as mid]
@@ -5,6 +16,7 @@
             [com.star-empire-elite.pages.app.game :as game]
             [com.star-empire-elite.pages.app.income :as income]
             [com.star-empire-elite.pages.app.expenses :as expenses]
+            [com.star-empire-elite.pages.app.exchange :as exchange]
             [com.star-empire-elite.pages.app.building :as building]
             [com.star-empire-elite.pages.app.action :as action]
             [com.star-empire-elite.pages.app.espionage :as espionage]
@@ -127,6 +139,17 @@
       (or (validate-phase player-id (:player/current-phase player) 2)
           (expenses/expenses-page {:player player :game game})))))
 
+(defn exchange-handler [{:keys [path-params biff/db] :as ctx}]
+  (let [player-id (java.util.UUID/fromString (:player-id path-params))
+        player (xt/entity db player-id)
+        game (xt/entity db (:player/game player))]
+    (if (nil? player)
+      {:status 404
+       :body "Player not found"}
+      ;; validate that player is in phase 2 (exchange is a sub-phase of expenses)
+      (or (validate-phase player-id (:player/current-phase player) 2)
+          (exchange/exchange-page {:player player :game game})))))
+
 (defn building-handler [{:keys [path-params biff/db] :as ctx}]
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
         player (xt/entity db player-id)
@@ -181,6 +204,7 @@
             ["/game/:player-id/expenses" {:get expenses-handler}]
             ["/game/:player-id/apply-expenses" {:post expenses/apply-expenses}]
             ["/game/:player-id/calculate-expenses" {:post expenses/calculate-expenses}]
+            ["/game/:player-id/exchange" {:get exchange-handler}]
             ["/game/:player-id/building" {:get building-handler}]
             ["/game/:player-id/apply-building" {:post building/apply-building}]
             ["/game/:player-id/calculate-building" {:post building/calculate-building}]
