@@ -205,6 +205,8 @@
             ["/game/:player-id/apply-expenses" {:post expenses/apply-expenses}]
             ["/game/:player-id/calculate-expenses" {:post expenses/calculate-expenses}]
             ["/game/:player-id/exchange" {:get exchange-handler}]
+            ["/game/:player-id/apply-exchange" {:post exchange/apply-exchange}]
+            ["/game/:player-id/calculate-exchange" {:post exchange/calculate-exchange}]
             ["/game/:player-id/building" {:get building-handler}]
             ["/game/:player-id/apply-building" {:post building/apply-building}]
             ["/game/:player-id/calculate-building" {:post building/calculate-building}]

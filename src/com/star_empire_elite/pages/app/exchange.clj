@@ -3,7 +3,7 @@
             [com.star-empire-elite.ui :as ui]
             [xtdb.api :as xt]))
 
-;; :: apply exchange - save trades to database and advance to phase 3
+;; :: apply exchange - save exchanges to database and stay on exchange page
 (defn apply-exchange [{:keys [path-params params biff/db] :as ctx}]
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
         player (xt/entity db player-id)]
@@ -17,7 +17,7 @@
         (let [;; helper function to safely parse numbers, treating empty/nil as 0
               safe-parse (fn [val] (or (parse-long (if (empty? (str val)) "0" (str val))) 0))
 
-              ;; parse trade input values
+              ;; parse exchange input values
               soldiers-sold (safe-parse (:soldiers-sold params))
               fighters-sold (safe-parse (:fighters-sold params))
               stations-sold (safe-parse (:stations-sold params))
@@ -50,13 +50,13 @@
                                     (* ore-planets-sold ore-planet-sell-rate))
 
               ;; calculate credits from buying/selling resources
-              credits-from-resource-trades (- (* food-bought food-buy-rate)
-                                              (* food-sold food-sell-rate)
-                                              (* fuel-bought fuel-buy-rate)
-                                              (* fuel-sold fuel-sell-rate))
+              credits-from-exchanges (- (+ (* food-sold food-sell-rate)
+                                           (* fuel-sold fuel-sell-rate))
+                                        (+ (* food-bought food-buy-rate)
+                                           (* fuel-bought fuel-buy-rate)))
 
               ;; calculate new totals
-              new-credits (+ (:player/credits player) credits-from-sales credits-from-resource-trades)
+              new-credits (+ (:player/credits player) credits-from-sales credits-from-exchanges)
               new-soldiers (- (:player/soldiers player) soldiers-sold)
               new-fighters (- (:player/fighters player) fighters-sold)
               new-stations (- (:player/defence-stations player) stations-sold)
@@ -66,7 +66,7 @@
               new-food (+ (:player/food player) food-bought (- food-sold))
               new-fuel (+ (:player/fuel player) fuel-bought (- fuel-sold))]
 
-          ;; submit transaction to update player resources and advance phase
+          ;; submit transaction to update player resources (stay in phase 2)
           (biff/submit-tx ctx
             [{:db/doc-type :player
               :db/op :update
@@ -79,16 +79,19 @@
               :player/food-planets new-food-planets
               :player/ore-planets new-ore-planets
               :player/food new-food
-              :player/fuel new-fuel
-              :player/current-phase 3}])
-          ;; redirect to building page
+              :player/fuel new-fuel}])
+          ;; redirect back to expenses page
           {:status 303
-           :headers {"location" (str "/app/game/" player-id "/building")}})))))
+           :headers {"location" (str "/app/game/" player-id "/expenses")}})))))
 
 ;; :: calculate exchange preview dynamically for HTMX updates
 (defn calculate-exchange [{:keys [path-params params biff/db] :as ctx}]
+  (println "=== calculate-exchange called ===")
+  (println "path-params:" path-params)
+  (println "params:" params)
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
         player (xt/entity db player-id)
+        _ (println "player found:" (boolean player))
 
         ;; helper function to safely parse numbers
         safe-parse (fn [val] 
@@ -98,7 +101,7 @@
                          0
                          (parse-long cleaned))))
 
-        ;; parse trade quantities
+        ;; parse exchange quantities
         soldiers-sold (safe-parse (:soldiers-sold params))
         fighters-sold (safe-parse (:fighters-sold params))
         stations-sold (safe-parse (:stations-sold params))
@@ -122,7 +125,7 @@
         fuel-buy-rate 15
         fuel-sell-rate (quot fuel-buy-rate 2)
 
-        ;; calculate credits from trades
+        ;; calculate credits from exchanges
         credits-from-sales (+ (* soldiers-sold soldier-sell-rate)
                               (* fighters-sold fighter-sell-rate)
                               (* stations-sold station-sell-rate)
@@ -130,13 +133,13 @@
                               (* food-planets-sold food-planet-sell-rate)
                               (* ore-planets-sold ore-planet-sell-rate))
 
-        credits-from-resource-trades (- (* food-bought food-buy-rate)
-                                        (* food-sold food-sell-rate)
-                                        (* fuel-bought fuel-buy-rate)
-                                        (* fuel-sold fuel-sell-rate))
+        credits-from-exchanges (- (+ (* food-sold food-sell-rate)
+                                     (* fuel-sold fuel-sell-rate))
+                                  (+ (* food-bought food-buy-rate)
+                                     (* fuel-bought fuel-buy-rate)))
 
         ;; calculate new totals
-        credits-after (+ (:player/credits player) credits-from-sales credits-from-resource-trades)
+        credits-after (+ (:player/credits player) credits-from-sales credits-from-exchanges)
         soldiers-after (- (:player/soldiers player) soldiers-sold)
         fighters-after (- (:player/fighters player) fighters-sold)
         stations-after (- (:player/defence-stations player) stations-sold)
@@ -146,7 +149,7 @@
         food-after (+ (:player/food player) food-bought (- food-sold))
         fuel-after (+ (:player/fuel player) fuel-bought (- fuel-sold))
 
-        ;; validate trades are possible
+        ;; validate exchanges are valid
         can-execute? (and (>= soldiers-after 0)
                           (>= fighters-after 0)
                           (>= stations-after 0)
@@ -154,7 +157,31 @@
                           (>= food-planets-after 0)
                           (>= ore-planets-after 0)
                           (>= food-after 0)
-                          (>= fuel-after 0))]
+                          (>= fuel-after 0))
+        
+        ;; track which specific exchanges are invalid
+        invalid-soldier-sale? (< soldiers-after 0)
+        invalid-fighter-sale? (< fighters-after 0)
+        invalid-station-sale? (< stations-after 0)
+        invalid-mil-planet-sale? (< mil-planets-after 0)
+        invalid-food-planet-sale? (< food-planets-after 0)
+        invalid-ore-planet-sale? (< ore-planets-after 0)
+        invalid-food-sale? (and (> food-sold 0) (< food-after 0))
+        invalid-fuel-sale? (and (> fuel-sold 0) (< fuel-after 0))
+        invalid-food-purchase? (and (> food-bought 0) (< credits-after 0))
+        invalid-fuel-purchase? (and (> fuel-bought 0) (< credits-after 0))
+        
+        ;; any invalid sale or purchase involving credits
+        invalid-credits-transaction? (or invalid-soldier-sale?
+                                          invalid-fighter-sale?
+                                          invalid-station-sale?
+                                          invalid-mil-planet-sale?
+                                          invalid-food-planet-sale?
+                                          invalid-ore-planet-sale?
+                                          invalid-food-sale?
+                                          invalid-fuel-sale?
+                                          invalid-food-purchase?
+                                          invalid-fuel-purchase?)]
 
     (biff/render
       [:div
@@ -163,44 +190,44 @@
         [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
          [:div
           [:p.text-xs "Credits"]
-          [:p.font-mono credits-after]]
+          [:p.font-mono {:class (when invalid-credits-transaction? "text-red-400")} credits-after]]
          [:div
           [:p.text-xs "Food"]
-          [:p.font-mono {:class (when (< food-after 0) "text-red-400")} food-after]]
+          [:p.font-mono {:class (when (or invalid-food-sale? invalid-food-purchase?) "text-red-400")} food-after]]
          [:div
           [:p.text-xs "Fuel"]
-          [:p.font-mono {:class (when (< fuel-after 0) "text-red-400")} fuel-after]]
+          [:p.font-mono {:class (when (or invalid-fuel-sale? invalid-fuel-purchase?) "text-red-400")} fuel-after]]
          [:div
           [:p.text-xs "Galaxars"]
           [:p.font-mono (:player/galaxars player)]]
          [:div
           [:p.text-xs "Soldiers"]
-          [:p.font-mono {:class (when (< soldiers-after 0) "text-red-400")} soldiers-after]]
+          [:p.font-mono {:class (when invalid-soldier-sale? "text-red-400")} soldiers-after]]
          [:div
           [:p.text-xs "Fighters"]
-          [:p.font-mono {:class (when (< fighters-after 0) "text-red-400")} fighters-after]]
+          [:p.font-mono {:class (when invalid-fighter-sale? "text-red-400")} fighters-after]]
          [:div
           [:p.text-xs "Stations"]
-          [:p.font-mono {:class (when (< stations-after 0) "text-red-400")} stations-after]]
+          [:p.font-mono {:class (when invalid-station-sale? "text-red-400")} stations-after]]
          [:div
           [:p.text-xs "Mil Plts"]
-          [:p.font-mono {:class (when (< mil-planets-after 0) "text-red-400")} mil-planets-after]]
+          [:p.font-mono {:class (when invalid-mil-planet-sale? "text-red-400")} mil-planets-after]]
          [:div
           [:p.text-xs "Food Plts"]
-          [:p.font-mono {:class (when (< food-planets-after 0) "text-red-400")} food-planets-after]]
+          [:p.font-mono {:class (when invalid-food-planet-sale? "text-red-400")} food-planets-after]]
          [:div
           [:p.text-xs "Ore Plts"]
-          [:p.font-mono {:class (when (< ore-planets-after 0) "text-red-400")} ore-planets-after]]]]
+          [:p.font-mono {:class (when invalid-ore-planet-sale? "text-red-400")} ore-planets-after]]]]
        [:div#exchange-warning.h-8.flex.items-center
         {:hx-swap-oob "true"}
         (when (not can-execute?)
-          [:p.text-yellow-400.font-bold "⚠ Invalid trades! You cannot sell more than you own."])]
+          [:p.text-yellow-400.font-bold "⚠ Invalid exchanges! You cannot sell more than you own."])]
        [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
         {:type "submit"
          :disabled (not can-execute?)
          :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"
          :hx-swap-oob "true"}
-        "Continue to Building"]])))
+        "Make Exchange"]])))
 
 ;; :: helper function for exchange input fields with reset button
 (defn exchange-input [name value player-id hx-include]
@@ -231,7 +258,7 @@
      :onclick (str "document.querySelector('[name=\"" name "\"]').value = 0; "
                    "document.querySelector('[name=\"" name "\"]').dispatchEvent(new Event('input', {bubbles: true}))")
      :title "Reset"}
-    "◦"]])
+    "\u25e6"]])
 
 ;; :: exchange page - players buy/sell resources and units to manage their economy
 (defn exchange-page [{:keys [player game]}]
@@ -288,68 +315,148 @@
          [:h3.font-bold.mb-4 "Exchanges This Round"]
          [:div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-3.gap-4.mb-8
 
-          ;; :: sell military units
+          ;; :: sell soldiers
           [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Sell Military Units"]
+           [:h4.font-bold.mb-3 "Sell Soldiers"]
            [:div.space-y-2
             [:div
-             [:p.text-xs "Soldiers (50 cr each): " (:player/soldiers player) " available"]
-             [:label.text-xs "Sell Quantity"]
-             (exchange-input "soldiers-sold" 0 player-id hx-include)]
+             [:p.text-xs "Price per Unit"]
+             [:p.font-mono "50 credits"]]
             [:div
-             [:p.text-xs "Fighters (100 cr each): " (:player/fighters player) " available"]
-             [:label.text-xs "Sell Quantity"]
-             (exchange-input "fighters-sold" 0 player-id hx-include)]
+             [:p.text-xs "Max Available"]
+             [:p.font-mono (:player/soldiers player)]]
             [:div
-             [:p.text-xs "Stations (150 cr each): " (:player/defence-stations player) " available"]
+             [:label.text-xs "Sell Quantity"]
+             (exchange-input "soldiers-sold" 0 player-id hx-include)]]]
+
+          ;; :: sell fighters
+          [:div.border.border-green-400.p-4
+           [:h4.font-bold.mb-3 "Sell Fighters"]
+           [:div.space-y-2
+            [:div
+             [:p.text-xs "Price per Unit"]
+             [:p.font-mono "100 credits"]]
+            [:div
+             [:p.text-xs "Max Available"]
+             [:p.font-mono (:player/fighters player)]]
+            [:div
+             [:label.text-xs "Sell Quantity"]
+             (exchange-input "fighters-sold" 0 player-id hx-include)]]]
+
+          ;; :: sell stations
+          [:div.border.border-green-400.p-4
+           [:h4.font-bold.mb-3 "Sell Stations"]
+           [:div.space-y-2
+            [:div
+             [:p.text-xs "Price per Unit"]
+             [:p.font-mono "150 credits"]]
+            [:div
+             [:p.text-xs "Max Available"]
+             [:p.font-mono (:player/defence-stations player)]]
+            [:div
              [:label.text-xs "Sell Quantity"]
              (exchange-input "stations-sold" 0 player-id hx-include)]]]
 
-          ;; :: sell planets
+          ;; :: sell ore planets
           [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Sell Planets"]
+           [:h4.font-bold.mb-3 "Sell Ore Planets"]
            [:div.space-y-2
             [:div
-             [:p.text-xs "Military Planets (500 cr each): " (:player/military-planets player) " available"]
-             [:label.text-xs "Sell Quantity"]
-             (exchange-input "military-planets-sold" 0 player-id hx-include)]
+             [:p.text-xs "Price per Unit"]
+             [:p.font-mono "500 credits"]]
             [:div
-             [:p.text-xs "Food Planets (500 cr each): " (:player/food-planets player) " available"]
-             [:label.text-xs "Sell Quantity"]
-             (exchange-input "food-planets-sold" 0 player-id hx-include)]
+             [:p.text-xs "Max Available"]
+             [:p.font-mono (:player/ore-planets player)]]
             [:div
-             [:p.text-xs "Ore Planets (500 cr each): " (:player/ore-planets player) " available"]
              [:label.text-xs "Sell Quantity"]
              (exchange-input "ore-planets-sold" 0 player-id hx-include)]]]
 
-          ;; :: buy/sell food
+          ;; :: sell food planets
           [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Food Trading"]
+           [:h4.font-bold.mb-3 "Sell Food Planets"]
            [:div.space-y-2
             [:div
-             [:p.text-xs "Current: " (:player/food player)]
-             [:p.text-xs.mb-2 "Buy Food (10 cr each)"]
-             [:label.text-xs "Buy Quantity"]
-             (exchange-input "food-bought" 0 player-id hx-include)]
+             [:p.text-xs "Price per Unit"]
+             [:p.font-mono "500 credits"]]
             [:div
-             [:p.text-xs.mb-2 "Sell Food (5 cr each)"]
+             [:p.text-xs "Max Available"]
+             [:p.font-mono (:player/food-planets player)]]
+            [:div
+             [:label.text-xs "Sell Quantity"]
+             (exchange-input "food-planets-sold" 0 player-id hx-include)]]]
+
+          ;; :: sell military planets
+          [:div.border.border-green-400.p-4
+           [:h4.font-bold.mb-3 "Sell Military Planets"]
+           [:div.space-y-2
+            [:div
+             [:p.text-xs "Price per Unit"]
+             [:p.font-mono "500 credits"]]
+            [:div
+             [:p.text-xs "Max Available"]
+             [:p.font-mono (:player/military-planets player)]]
+            [:div
+             [:label.text-xs "Sell Quantity"]
+             (exchange-input "military-planets-sold" 0 player-id hx-include)]]]
+
+          ;; :: sell food
+          [:div.border.border-green-400.p-4
+           [:h4.font-bold.mb-3 "Sell Food"]
+           [:div.space-y-2
+            [:div
+             [:p.text-xs "Price per Unit"]
+             [:p.font-mono "5 credits"]]
+            [:div
+             [:p.text-xs "Max Available"]
+             [:p.font-mono (:player/food player)]]
+            [:div
              [:label.text-xs "Sell Quantity"]
              (exchange-input "food-sold" 0 player-id hx-include)]]]
 
-          ;; :: buy/sell fuel
+          ;; :: sell fuel
           [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Fuel Trading"]
+           [:h4.font-bold.mb-3 "Sell Fuel"]
            [:div.space-y-2
             [:div
-             [:p.text-xs "Current: " (:player/fuel player)]
-             [:p.text-xs.mb-2 "Buy Fuel (15 cr each)"]
-             [:label.text-xs "Buy Quantity"]
-             (exchange-input "fuel-bought" 0 player-id hx-include)]
+             [:p.text-xs "Price per Unit"]
+             [:p.font-mono "7 credits"]]
             [:div
-             [:p.text-xs.mb-2 "Sell Fuel (7 cr each)"]
+             [:p.text-xs "Max Available"]
+             [:p.font-mono (:player/fuel player)]]
+            [:div
              [:label.text-xs "Sell Quantity"]
              (exchange-input "fuel-sold" 0 player-id hx-include)]]]
-          ]
+
+         ;; :: invisible placeholder for grid alignment (only visible on lg screens)
+          [:div.hidden.lg:block.invisible.border.border-green-400.p-4]
+
+
+          ;; :: buy food
+          [:div.border.border-green-400.p-4
+           [:h4.font-bold.mb-3 "Buy Food"]
+           [:div.space-y-2
+            [:div
+             [:p.text-xs "Price per Unit"]
+             [:p.font-mono "10 credits"]]
+            [:div
+             [:label.text-xs "Buy Quantity"]
+             (exchange-input "food-bought" 0 player-id hx-include)]]]
+
+          ;; :: buy fuel
+          [:div.border.border-green-400.p-4
+           [:h4.font-bold.mb-3 "Buy Fuel"]
+           [:div.space-y-2
+            [:div
+             [:p.text-xs "Price per Unit"]
+             [:p.font-mono "15 credits"]]
+            [:div
+             [:label.text-xs "Buy Quantity"]
+             (exchange-input "fuel-bought" 0 player-id hx-include)]]]
+
+          ;; :: invisible placeholder for grid alignment (only visible on lg screens)
+          [:div.hidden.lg:block.invisible.border.border-green-400.p-4]
+  
+           ]
 
          ;; :: resources after exchange
          [:div#resources-after.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
@@ -389,10 +496,10 @@
          [:div#exchange-warning.h-8.flex.items-center]
          [:div.flex.gap-4
           [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-           {:href (str "/app/game/" player-id "/expenses")} "Back to Expenses"]
+           {:href (str "/app/game/" player-id "/expenses")} "Cancel Exchange"]
           [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
            {:type "submit"
             :disabled true
             :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"}
-           "Continue to Building"]])
+           "Make Exchange"]])
        ]))) ;; end of biff/form
