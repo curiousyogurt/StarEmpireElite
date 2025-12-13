@@ -6,7 +6,7 @@
 ;;;;; building web applications on top of libraries such as Ring, Reitit (routing), XTDB (database),
 ;;;;; and others.
 ;;;;;
-;;;;; For newcomers to Biff: This framework emphasizes a system-based architecture where components
+;;;;; For newcomers to Biff: This framework emphasises a system-based architecture where components
 ;;;;; are started in order and configured through a central system map. The modular approach makes
 ;;;;; applications easier to understand and test.
 ;;;;;
@@ -34,14 +34,31 @@
   (:gen-class))
 
 ;;;;
+;;;; Key Biff Concepts:
+;;;;
+;;;; 1. Modules: Self-contained units with routes, middleware, schemas, etc.
+;;;;    They make applications modular and easier to understand.
+;;;;
+;;;; 2. Components: Infrastructure services (database, web server, etc.)
+;;;;    that start in order and can depend on each other.
+;;;;
+;;;; 3. System Map: A single map containing all application state and config.
+;;;;    This makes applications easier to test and reason about.
+;;;;
+;;;; 4. Hot Reloading: Code changes are reflected immediately without restart,
+;;;;    which significantly speeds up the development workflow.
+;;;;
+;;;; 5. XTDB: A document database that stores immutable data with time travel
+;;;;    capabilities, perfect for audit trails and complex queries.
+;;;;
+
+;;;;
 ;;;; Module Configuration
 ;;;; 
 ;;;; Modules are maps that contain routing, middleware, and other configuration. They're the main way
 ;;;; to organize functionality into self-contained units that can be composed together.
 ;;;;
 
-;;; Modules define the core functionality of the application. Each module can contribute routes,
-;;; middleware, schemas, and other configuration.
 (def modules
   [app/module                           ; Main application routes and logic
    (biff/authentication-module {})      ; Built-in Biff auth (login/logout/signup)
@@ -52,14 +69,14 @@
 ;;;;
 ;;;; Routing Configuration
 ;;;;
-;;;; Biff uses Reitit for routing. This creates two main route groups: site routes for HTML pages and
-;;;; API routes for JSON endpoints.
+;;;; Biff uses Reitit for routing. This creates two main route groups: site routes for html pages, and
+;;;; API routes for json endpoints.
 ;;;;
 
-;;; Route definition combining all module routes with appropriate middleware. The structure separates
-;;; site routes (HTML) from API routes (JSON).
+;;; Route definition combining all module routes with appropriate middleware. This structure separates
+;;; site routes (html) from API routes (json).
 (def routes [["" {:middleware [mid/wrap-site-defaults]}
-              ;; Extract :routes key from each module and combine them 'keep' removes nil values if a
+              ;; Extract :routes key from each module and combine them. 'keep' removes nil values if a
               ;; module doesn't have routes
               (keep :routes modules)]
              ["" {:middleware [mid/wrap-api-defaults]}
@@ -67,12 +84,13 @@
               (keep :api-routes modules)]])
 
 ;;; Main Ring handler that processes all HTTP requests. Biff's reitit-handler converts the route
-;;; structure into a Ring handler, and wrap-base-defaults adds common middleware like security headers.
+;;; structure into a Ring handler, and wrap-base-defaults adds common middleware like security
+;;; headers.
 (def handler (-> (biff/reitit-handler {:routes routes})
                  mid/wrap-base-defaults))
 
-;;; Pre-generated HTML pages that don't require server processing. These are useful for performance
-;;; since pages can be served directly by a CDN. biff/safe-merge combines maps, throwing an error if
+;;; Pre-generated html pages that don't require server processing. These are useful for performance
+;;; since pages can be served directly by a cdn. biff/safe-merge combines maps, throwing an error if
 ;;; keys conflict.
 (def static-pages (apply biff/safe-merge (map :static modules)))
 
@@ -85,9 +103,9 @@
 
 ;;; Converts dynamic content to static files for better performance
 (defn generate-assets! [ctx]
-  ;; Export Rum components (Biff's HTML templating) to static HTML files
+  ;; Export Rum components (Biff's html templating) to static html files
   (biff/export-rum static-pages "target/resources/public")
-  ;; Clean up old HTML files to prevent stale content
+  ;; Clean up old html files to prevent stale content
   (biff/delete-old-files {:dir "target/resources/public"
                           :exts [".html"]}))
 
@@ -118,38 +136,40 @@
               ;; Custom schemas from application modules
               (apply biff/safe-merge (keep :schema modules)))})
 
+;;;;
 ;;;; System Configuration
 ;;;;
 ;;;; The system map is the heart of a Biff application. It contains all configuration and state,
 ;;;; making the application easier to test and reason about.
+;;;;
 
 ;;; Initial system configuration defining how Biff should set up the application. The #' creates var
 ;;; references, allowing hot-reloading during development.
 (def initial-system
-  {:biff/modules #'modules              ; Application modules
-   :biff/send-email #'email/send-email  ; Email sending function
-   :biff/handler #'handler              ; Main HTTP handler
-   :biff/malli-opts #'malli-opts        ; Data validation config
-   :biff.beholder/on-save #'on-save     ; File watch callback for development
+  {:biff/modules #'modules                 ; Application modules
+   :biff/send-email #'email/send-email     ; Email sending function
+   :biff/handler #'handler                 ; Main HTTP handler
+   :biff/malli-opts #'malli-opts           ; Data validation config
+   :biff.beholder/on-save #'on-save        ; File watch callback for development
    :biff.middleware/on-error #'ui/on-error ; Error page rendering
-   :biff.xtdb/tx-fns biff/tx-fns        ; Database transaction functions
+   :biff.xtdb/tx-fns biff/tx-fns           ; Database transaction functions
    ;; Application-specific state - WebSocket clients for real-time features
    :com.star-empire-elite/chat-clients (atom #{})})
 
 ;;; Global system state holder. defonce ensures this atom is created only once, preserving state
-;;; during REPL sessions and hot reloads.
+;;; during repl sessions and hot reloads.
 (defonce system (atom {}))
 
 ;;;;
 ;;;; Component Configuration
 ;;;;
 ;;;; Components are Biff's way of managing infrastructure services like databases,
-;;;; web servers, and background job processors. They start in order and can
+;;;; web servers, and background job processors. They start in a specific order and can
 ;;;; depend on each other.
 ;;;;
 
-;;; System components that provide infrastructure services. Each component is a function that takes the
-;;; system map and adds functionality to it.
+;;; System components that provide infrastructure services. Each component is a function that takes
+;;; the system map and adds functionality to it.
 (def components
   [biff/use-aero-config        ; Configuration file loading (config.edn)
    biff/use-xtdb               ; XTDB database setup and connection
@@ -194,7 +214,7 @@
     (apply nrepl-cmd/-main args)))
 
 ;;; Development helper that restarts the system with code changes; this is typically called from the
-;;; REPL during development sessions
+;;; repl during development sessions
 (defn refresh []
   ;; Stop all running components gracefully by calling their cleanup functions
   ;; :biff/stop contains cleanup functions added by components during startup
@@ -206,19 +226,3 @@
   (tn-repl/refresh :after `start)
   :done)
 
-;;;; Key Biff Concepts:
-;;;;
-;;;; 1. Modules: Self-contained units with routes, middleware, schemas, etc.
-;;;;    They make applications modular and easier to understand.
-;;;;
-;;;; 2. Components: Infrastructure services (database, web server, etc.)
-;;;;    that start in order and can depend on each other.
-;;;;
-;;;; 3. System Map: A single map containing all application state and config.
-;;;;    This makes applications easier to test and reason about.
-;;;;
-;;;; 4. Hot Reloading: Code changes are reflected immediately without restart,
-;;;;    which significantly speeds up the development workflow.
-;;;;
-;;;; 5. XTDB: A document database that stores immutable data with time travel
-;;;;    capabilities, perfect for audit trails and complex queries.
