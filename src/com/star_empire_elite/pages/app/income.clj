@@ -1,7 +1,7 @@
 ;;;;;
 ;;;;; Income Phase - Resource Generation
 ;;;;;
-;;;;; The income phase is the first phase of each turn where players collect resources from their
+;;;;; The income phase is the first phase of each round where players collect resources from their
 ;;;;; planets and any other sources. Unlike later phases (expenses, exchange, building), the income
 ;;;;; phase requires no player decisions; it's purely informational, showing what resources will be
 ;;;;; generated before the player advances to the next phase.

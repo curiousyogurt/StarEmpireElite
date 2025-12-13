@@ -1,107 +1,193 @@
+;;;;;
+;;;;; Expenses Phase - Empire Upkeep
+;;;;;
+;;;;; The expenses phase is the second phase of each round where players pay upkeep costs for their
+;;;;; planets, military units, and population. Unlike the income phase, expenses require player
+;;;;; decisions, and they can choose how much to pay for each category, with underpayment resulting 
+;;;;; in various penalties.
+;;;;;
+;;;;; This webpage uses htmx for dynamic validation, showing players in real-time whether they can
+;;;;; afford their selected expense amounts before submitting.
+;;;;;
+
 (ns com.star-empire-elite.pages.app.expenses
   (:require [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]
             [xtdb.api :as xt]))
 
-;; :: apply expenses - save expenses to database and advance to phase 3
+;;;;
+;;;; Calculations
+;;;;
+
+;;; Parse user expense input safely, treating empty/nil/negative as 0
+(defn parse-expense-value 
+  "Parse user input to a non-negative integer, stripping non-numeric chars and treating empty/nil as 0"
+  [val]
+  (let [s (str val)
+        cleaned (clojure.string/replace s #"[^0-9]" "")]
+    (if (empty? cleaned)
+      0
+      (parse-long cleaned))))
+
+;;; Calculate required upkeep costs for all empire assets using game constants
+(defn calculate-required-expenses 
+  "Calculate total required upkeep costs based on player's assets and game constants.
+  Returns map with expense categories and their costs."
+  [player game]
+  (let [planet-count (+ (:player/military-planets player)
+                        (:player/food-planets player)
+                        (:player/ore-planets player))]
+    {:planets-credits   (* planet-count (:game/planet-upkeep-credits game))
+     :planets-food      planet-count
+     :soldiers-credits  (Math/round (/ (* (:player/soldiers player) 
+                                          (:game/soldier-upkeep-credits game)) 
+                                       1000.0))
+     :soldiers-food     (Math/round (/ (* (:player/soldiers player) 
+                                          (:game/soldier-upkeep-food game)) 
+                                       1000.0))
+     :fighters-credits  (* (:player/fighters player) 
+                           (:game/fighter-upkeep-credits game))
+     :fighters-fuel     (* (:player/fighters player) 
+                           (:game/fighter-upkeep-fuel game))
+     :stations-credits  (* (:player/defence-stations player) 
+                           (:game/station-upkeep-credits game))
+     :stations-fuel     (* (:player/defence-stations player) 
+                           (:game/station-upkeep-fuel game))
+     :agents-credits    (* (:player/agents player) 
+                           (:game/agent-upkeep-credits game))
+     :agents-food       (Math/round (/ (* (:player/agents player) 
+                                          (:game/agent-upkeep-food game)) 
+                                       1000.0))
+     :population-credit (Math/round (/ (* (:player/population player) 
+                                          (:game/population-upkeep-credits game)) 
+                                       1000.0))
+     :population-food   (Math/round (/ (* (:player/population player) 
+                                          (:game/population-upkeep-food game)) 
+                                       1000.0))}))
+
+;;; Calculate resources after paying specified expenses
+(defn calculate-resources-after-expenses 
+  "Calculate player resources after deducting expense payments.
+  Returns map of {:credits :food :fuel} after expenses."
+  [player payments]
+  {:credits (- (:player/credits player)
+               (:planets-pay payments)
+               (:soldiers-credits payments)
+               (:fighters-credits payments)
+               (:stations-credits payments)
+               (:agents-credits payments)
+               (:population-credits payments))
+   :food    (- (:player/food player)
+               (:planets-food payments)
+               (:soldiers-food payments)
+               (:agents-food payments)
+               (:population-food payments))
+   :fuel    (- (:player/fuel player)
+               (:fighters-fuel payments)
+               (:stations-fuel payments))})
+
+;;; Check if player can afford the expenses
+(defn can-afford-expenses? 
+  "Returns true if all resource values are non-negative"
+  [resources-after]
+  (and (>= (:credits resources-after) 0)
+       (>= (:food resources-after) 0)
+       (>= (:fuel resources-after) 0)))
+
+;;;;
+;;;; Actions
+;;;;
+;;;; There are three parts to the actions for this phase: (i) expenses-page, which shows the
+;;;; costs and input fields, (ii) calculate-expenses which provides htmx dynamic updates as the user 
+;;;; changes values, and (iii) apply-expenses which commits the payments to the database and advances 
+;;;; to the next phase.
+;;;;
+
+;;; Applies expense payments and advances to the next phase. Uses calculations to determine resource 
+;;; changes, then commits them in a single transaction.
 (defn apply-expenses [{:keys [path-params params biff/db] :as ctx}]
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
         player (xt/entity db player-id)]
     (if (nil? player)
       {:status 404
        :body "Player not found"}
-      ;; only allow expense application if player is in phase 2
+      ;; Phase validation prevents players from applying expenses multiple times or out of order
       (if (not= (:player/current-phase player) 2)
         {:status 303
          :headers {"location" (str "/app/game/" player-id)}}
-        (let [;; helper function to safely parse numbers, treating empty/nil as 0
-              safe-parse (fn [val] (or (parse-long (if (empty? (str val)) "0" (str val))) 0))
+        (let [;; Parse all expense payment inputs using calculations
+              payments {:planets-pay         (parse-expense-value (:planets-pay params))
+                        :planets-food        (parse-expense-value (:planets-food params))
+                        :soldiers-credits    (parse-expense-value (:soldiers-credits params))
+                        :soldiers-food       (parse-expense-value (:soldiers-food params))
+                        :fighters-credits    (parse-expense-value (:fighters-credits params))
+                        :fighters-fuel       (parse-expense-value (:fighters-fuel params))
+                        :stations-credits    (parse-expense-value (:stations-credits params))
+                        :stations-fuel       (parse-expense-value (:stations-fuel params))
+                        :agents-credits      (parse-expense-value (:agents-credits params))
+                        :agents-food         (parse-expense-value (:agents-food params))
+                        :population-credits  (parse-expense-value (:population-credits params))
+                        :population-food     (parse-expense-value (:population-food params))}
 
-              ;; parse expense input values, default to 0 if not provided or empty
-              planets-pay (safe-parse (:planets-pay params))
-              planets-food (safe-parse (:planets-food params))
-              soldiers-credits (safe-parse (:soldiers-credits params))
-              soldiers-food (safe-parse (:soldiers-food params))
-              fighters-credits (safe-parse (:fighters-credits params))
-              fighters-fuel (safe-parse (:fighters-fuel params))
-              stations-credits (safe-parse (:stations-credits params))
-              stations-fuel (safe-parse (:stations-fuel params))
-              agents-credits (safe-parse (:agents-credits params))
-              agents-food (safe-parse (:agents-food params))
-              population-credits (safe-parse (:population-credits params))
-              population-food (safe-parse (:population-food params))              
+              ;; Use calculations to determine final resource values
+              resources-after (calculate-resources-after-expenses player payments)]
 
-              ;; calculate new resource totals after expenses
-              new-credits (- (:player/credits player) planets-pay soldiers-credits 
-                             fighters-credits stations-credits agents-credits population-credits)
-              new-food (- (:player/food player) planets-food soldiers-food agents-food population-food)
-              new-fuel (- (:player/fuel player) fighters-fuel stations-fuel)]
-          ;; submit transaction to update player resources and advance phase
+          ;; Single atomic transaction updates resources and advances phase together
+          ;; This prevents partial updates if something fails midway through
           (biff/submit-tx ctx
                           [{:db/doc-type :player
                             :db/op :update
                             :xt/id player-id
-                            :player/credits new-credits
-                            :player/food new-food
-                            :player/fuel new-fuel
+                            :player/credits (:credits resources-after)
+                            :player/food (:food resources-after)
+                            :player/fuel (:fuel resources-after)
                             :player/current-phase 3}])
-          ;; redirect to building page (when it exists)
           {:status 303
            :headers {"location" (str "/app/game/" player-id "/building")}})))))
 
+;;; Provides htmx dynamic updates showing resources after expenses as user changes input values.
+;;; This gives immediate feedback on whether the player can afford their selected expenses.
 (defn calculate-expenses [{:keys [path-params params biff/db] :as ctx}]
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
         player (xt/entity db player-id)
-        ;; helper function to parse values, stripping non-numeric chars before parsing, treating empty/nil as 0
-        parse-value (fn [v] 
-                      (try
-                        (let [s (str v)
-                              _ (println "Original value:" v "Type:" (type v))
-                              cleaned (clojure.string/replace s #"[^0-9]" "")
-                              _ (println "Cleaned value:" cleaned)]
-                          (if (empty? cleaned)
-                            0
-                            (parse-long cleaned)))
-                        (catch Exception e
-                          (println "Parse error for value:" v "Exception:" e)
-                          0)))
 
-        ;; parse input values, default to 0 if not provided or empty
-        planets-pay (parse-value (:planets-pay params))
-        planets-food (parse-value (:planets-food params))
-        soldiers-credits (parse-value (:soldiers-credits params))
-        soldiers-food (parse-value (:soldiers-food params))
-        fighters-credits (parse-value (:fighters-credits params))
-        fighters-fuel (parse-value (:fighters-fuel params))
-        stations-credits (parse-value (:stations-credits params))
-        stations-fuel (parse-value (:stations-fuel params))
-        agents-credits (parse-value (:agents-credits params))
-        agents-food (parse-value (:agents-food params))
-        population-credits (parse-value (:population-credits params))
-        population-food (parse-value (:population-food params))
+        ;; Parse expense payment inputs
+        payments {:planets-pay         (parse-expense-value (:planets-pay params))
+                  :planets-food        (parse-expense-value (:planets-food params))
+                  :soldiers-credits    (parse-expense-value (:soldiers-credits params))
+                  :soldiers-food       (parse-expense-value (:soldiers-food params))
+                  :fighters-credits    (parse-expense-value (:fighters-credits params))
+                  :fighters-fuel       (parse-expense-value (:fighters-fuel params))
+                  :stations-credits    (parse-expense-value (:stations-credits params))
+                  :stations-fuel       (parse-expense-value (:stations-fuel params))
+                  :agents-credits      (parse-expense-value (:agents-credits params))
+                  :agents-food         (parse-expense-value (:agents-food params))
+                  :population-credits  (parse-expense-value (:population-credits params))
+                  :population-food     (parse-expense-value (:population-food params))}
 
-        ;; calculate remaining resources
-        credits-after (- (:player/credits player) planets-pay soldiers-credits 
-                         fighters-credits stations-credits agents-credits population-credits)
-        food-after (- (:player/food player) planets-food soldiers-food agents-food population-food)
-        fuel-after (- (:player/fuel player) fighters-fuel stations-fuel)
+        ;; Calculate resulting resources and whether affordable
+        resources-after (calculate-resources-after-expenses player payments)
+        affordable? (can-afford-expenses? resources-after)]
 
-        ;; check if player can afford all expenses
-        can-afford? (and (>= credits-after 0) (>= food-after 0) (>= fuel-after 0))]
+    ;; Render htmx response fragments that replace specific page elements
     (biff/render
       [:div
+       ;; Resources display with red highlighting for negative values
        [:div#resources-after.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
         [:h3.font-bold.mb-4 "Resources After Expenses"]
         [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
          [:div
           [:p.text-xs "Credits"]
-          [:p.font-mono {:class (when (< credits-after 0) "text-red-400")} credits-after]]
+          [:p.font-mono {:class (when (< (:credits resources-after) 0) "text-red-400")} 
+           (:credits resources-after)]]
          [:div
           [:p.text-xs "Food"]
-          [:p.font-mono {:class (when (< food-after 0) "text-red-400")} food-after]]
+          [:p.font-mono {:class (when (< (:food resources-after) 0) "text-red-400")} 
+           (:food resources-after)]]
          [:div
           [:p.text-xs "Fuel"]
-          [:p.font-mono {:class (when (< fuel-after 0) "text-red-400")} fuel-after]]
+          [:p.font-mono {:class (when (< (:fuel resources-after) 0) "text-red-400")} 
+           (:fuel resources-after)]]
          [:div
           [:p.text-xs "Galaxars"]
           [:p.font-mono (:player/galaxars player)]]
@@ -117,71 +203,29 @@
          [:div
           [:p.text-xs "Agents"]
           [:p.font-mono (:player/agents player)]]]]
+
+       ;; Warning message if expenses exceed available resources
        [:div#expense-warning.h-8.flex.items-center
         {:hx-swap-oob "true"}
-        (when (not can-afford?)
+        (when (not affordable?)
           [:p.text-yellow-400.font-bold "⚠ Insufficient resources to pay expenses!"])]
+
+       ;; Submit button - disabled if player can't afford expenses
        [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
         {:type "submit"
-         :disabled (not can-afford?)
+         :disabled (not affordable?)
          :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"
          :hx-swap-oob "true"}
         "Continue to Building"]])))
 
-;; :: helper function for expense input fields with reset button
+;;; Helper function for expense input fields - delegates to shared numeric-input component
 (defn expense-input [name value player-id hx-include]
-  [:div.relative.mt-1
-   [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.pr-6.font-mono
-    {:type "text" 
-     :name name 
-     :value value
-     :autocomplete "off"           ; Disable autocomplete
-     :autocapitalize "off"         ; Disable auto-capitalization
-     :autocorrect "off"            ; Disable auto-correction
-     :spellcheck "false"           ; Disable spellcheck
-     :data-lpignore "true"         ; Ignore LastPass
-     :data-form-type "other"       ; Tell browsers this isn't a standard form
-     :hx-post (str "/app/game/" player-id "/calculate-expenses")
-     :hx-target "#resources-after" 
-     :hx-swap "outerHTML"
-     :hx-trigger "load, input"
-     :hx-include hx-include
-     :onblur (str "let val = this.value.replace(/[^0-9]/g, ''); "
-                  "if (val === '' || val === '0') { val = '0'; } "
-                  "else { val = String(parseInt(val, 10)); } "
-                  "this.value = val;")}]
-   [:button
-    {:type "button"
-     :tabindex "-1"
-     :class "absolute right-2 top-1/2 -translate-y-1/2 text-green-400 hover:text-green-300 transition-colors text-2xl font-bold p-0 bg-none border-none cursor-pointer"
-     :onclick (str "document.querySelector('[name=\"" name "\"]').value = " value "; "
-                   "document.querySelector('[name=\"" name "\"]').dispatchEvent(new Event('input', {bubbles: true}))")
-     :title "Reset"}
-    "\u25e6"]])
+  (ui/numeric-input name value player-id "/calculate-expenses" hx-include))
 
-;; :: expenses page - players pay for upkeep of their empire
+;;; Shows expense requirements and input fields for player to choose how much to pay
 (defn expenses-page [{:keys [player game]}]
-  (let [;; calculate costs using game constants
-        planet-count (+ (:player/military-planets player)
-                        (:player/food-planets player)
-                        (:player/ore-planets player))
-        planet-cost-per (* planet-count (:game/planet-upkeep-credits game))
-        planet-food-cost planet-count ; since food cost is 1 per planet
-
-        soldiers-credit-cost (Math/round (/ (* (:player/soldiers player) (:game/soldier-upkeep-credits game)) 1000.0))
-        soldiers-food-cost (Math/round (/ (* (:player/soldiers player) (:game/soldier-upkeep-food game)) 1000.0))
-
-        fighters-credit-cost (* (:player/fighters player) (:game/fighter-upkeep-credits game))
-        fighters-fuel-cost (* (:player/fighters player) (:game/fighter-upkeep-fuel game))
-
-        stations-credit-cost (* (:player/defence-stations player) (:game/station-upkeep-credits game))
-        stations-fuel-cost (* (:player/defence-stations player) (:game/station-upkeep-fuel game))
-
-        agents-credit-cost (* (:player/agents player) (:game/agent-upkeep-credits game))
-        agents-food-cost (Math/round (/ (* (:player/agents player) (:game/agent-upkeep-food game)) 1000.0))
-
-        population-credit-cost (Math/round (/ (* (:player/population player) (:game/population-upkeep-credits game)) 1000.0))
-        population-food-cost (Math/round (/ (* (:player/population player) (:game/population-upkeep-food game)) 1000.0))
+  (let [;; Use calculations to get required expense amounts
+        required (calculate-required-expenses player game)
 
         player-id (:xt/id player)
         hx-include "[name='planets-pay'],[name='planets-food'],[name='soldiers-credits'],[name='soldiers-food'],[name='fighters-credits'],[name='fighters-fuel'],[name='stations-credits'],[name='stations-fuel'],[name='agents-credits'],[name='agents-food'],[name='population-credits'],[name='population-food']"]
@@ -192,7 +236,9 @@
 
        (ui/phase-header (:player/current-phase player) "EXPENSES")
 
-       ;; :: resources before expenses
+       ;;; Current Resources Display:
+       ;;; Shows starting position before expenses are paid, helping players understand what they have 
+       ;;; available to spend.
        [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
         [:h3.font-bold.mb-4 "Resources Before Expenses"]
         [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
@@ -221,7 +267,9 @@
           [:p.text-xs "Agents"]
           [:p.font-mono (:player/agents player)]]]]
 
-       ;; :: expenses form
+       ;;; Expense Input Form:
+       ;;; Player chooses how much to pay for each category. Using htmx provides real-time feedback on 
+       ;;; whether they can afford the total expenses.
        (biff/form
          {:action (str "/app/game/" player-id "/apply-expenses")
           :method "post"}
@@ -229,27 +277,30 @@
          [:h3.font-bold.mb-4 "Expenses This Round"]
          [:div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-3.gap-4.mb-8
 
-          ;; :: planets expense
+          ;; Planets upkeep - costs credits and food
           [:div.border.border-green-400.p-4
            [:h4.font-bold.mb-3 "Planets Upkeep"]
            [:div.space-y-2
             [:div
-             [:p.text-xs "Planets: " planet-count]]
+             [:p.text-xs "Planets: " (+ (:player/military-planets player)
+                                        (:player/food-planets player)
+                                        (:player/ore-planets player))]]
             [:div
              [:p.text-xs "Cost per Planet"]
              [:p.font-mono (str (:game/planet-upkeep-credits game) " credits, " 
                                 (:game/planet-upkeep-food game) " food")]]
             [:div
              [:p.text-xs "Total Required"]
-             [:p.font-mono (str planet-cost-per " credits, " planet-food-cost " food")]]
+             [:p.font-mono (str (:planets-credits required) " credits, " 
+                                (:planets-food required) " food")]]
             [:div
              [:label.text-xs "Pay Credits"]
-             (expense-input "planets-pay" planet-cost-per player-id hx-include)]
+             (expense-input "planets-pay" (:planets-credits required) player-id hx-include)]
             [:div
              [:label.text-xs "Pay Food"]
-             (expense-input "planets-food" planet-food-cost player-id hx-include)]]]
+             (expense-input "planets-food" (:planets-food required) player-id hx-include)]]]
 
-          ;; :: soldiers expense
+          ;; Soldiers upkeep - costs credits and food per 1000 soldiers
           [:div.border.border-green-400.p-4
            [:h4.font-bold.mb-3 "Soldiers Upkeep"]
            [:div.space-y-2
@@ -261,15 +312,16 @@
                                 (:game/soldier-upkeep-food game) " food")]]
             [:div
              [:p.text-xs "Total Required"]
-             [:p.font-mono (str soldiers-credit-cost " credits, " soldiers-food-cost " food")]]
+             [:p.font-mono (str (:soldiers-credits required) " credits, " 
+                                (:soldiers-food required) " food")]]
             [:div
              [:label.text-xs "Pay Credits"]
-             (expense-input "soldiers-credits" soldiers-credit-cost player-id hx-include)]
+             (expense-input "soldiers-credits" (:soldiers-credits required) player-id hx-include)]
             [:div
              [:label.text-xs "Pay Food"]
-             (expense-input "soldiers-food" soldiers-food-cost player-id hx-include)]]]
+             (expense-input "soldiers-food" (:soldiers-food required) player-id hx-include)]]]
 
-          ;; :: fighters expense
+          ;; Fighters upkeep - costs credits and fuel per fighter
           [:div.border.border-green-400.p-4
            [:h4.font-bold.mb-3 "Fighters Upkeep"]
            [:div.space-y-2
@@ -281,15 +333,16 @@
                                 (:game/fighter-upkeep-fuel game) " fuel")]]
             [:div
              [:p.text-xs "Total Required"]
-             [:p.font-mono (str fighters-credit-cost " credits, " fighters-fuel-cost " fuel")]]
+             [:p.font-mono (str (:fighters-credits required) " credits, " 
+                                (:fighters-fuel required) " fuel")]]
             [:div
              [:label.text-xs "Pay Credits"]
-             (expense-input "fighters-credits" fighters-credit-cost player-id hx-include)]
+             (expense-input "fighters-credits" (:fighters-credits required) player-id hx-include)]
             [:div
              [:label.text-xs "Pay Fuel"]
-             (expense-input "fighters-fuel" fighters-fuel-cost player-id hx-include)]]]
+             (expense-input "fighters-fuel" (:fighters-fuel required) player-id hx-include)]]]
 
-          ;; :: stations expense
+          ;; Defence stations upkeep - costs credits and fuel per station
           [:div.border.border-green-400.p-4
            [:h4.font-bold.mb-3 "Defence Stations Upkeep"]
            [:div.space-y-2
@@ -301,15 +354,16 @@
                                 (:game/station-upkeep-fuel game) " fuel")]]
             [:div
              [:p.text-xs "Total Required"]
-             [:p.font-mono (str stations-credit-cost " credits, " stations-fuel-cost " fuel")]]
+             [:p.font-mono (str (:stations-credits required) " credits, " 
+                                (:stations-fuel required) " fuel")]]
             [:div
              [:label.text-xs "Pay Credits"]
-             (expense-input "stations-credits" stations-credit-cost player-id hx-include)]
+             (expense-input "stations-credits" (:stations-credits required) player-id hx-include)]
             [:div
              [:label.text-xs "Pay Fuel"]
-             (expense-input "stations-fuel" stations-fuel-cost player-id hx-include)]]]
+             (expense-input "stations-fuel" (:stations-fuel required) player-id hx-include)]]]
 
-          ;; :: agents expense
+          ;; Agents upkeep - costs credits and food per 1000 agents
           [:div.border.border-green-400.p-4
            [:h4.font-bold.mb-3 "Agents Upkeep"]
            [:div.space-y-2
@@ -317,18 +371,20 @@
              [:p.text-xs "Agents: " (:player/agents player)]]
             [:div
              [:p.text-xs "Cost per 1000 Agents"]
-             [:p.font-mono (str (:game/agent-upkeep-credits game) " credits, " (:game/agent-upkeep-food game) " food")]]
+             [:p.font-mono (str (:game/agent-upkeep-credits game) " credits, " 
+                                (:game/agent-upkeep-food game) " food")]]
             [:div
              [:p.text-xs "Total Required"]
-             [:p.font-mono (str agents-credit-cost " credits, " agents-food-cost " food")]]
+             [:p.font-mono (str (:agents-credits required) " credits, " 
+                                (:agents-food required) " food")]]
             [:div
              [:label.text-xs "Pay Credits"]
-             (expense-input "agents-credits" agents-credit-cost player-id hx-include)]
+             (expense-input "agents-credits" (:agents-credits required) player-id hx-include)]
             [:div
              [:label.text-xs "Pay Food"]
-             (expense-input "agents-food" agents-food-cost player-id hx-include)]]]
+             (expense-input "agents-food" (:agents-food required) player-id hx-include)]]]
 
-          ;; :: population expense
+          ;; Population upkeep - costs credits and food per 1000 population
           [:div.border.border-green-400.p-4
            [:h4.font-bold.mb-3 "Population Upkeep"]
            [:div.space-y-2
@@ -336,19 +392,22 @@
              [:p.text-xs "Population: " (:player/population player)]]
             [:div
              [:p.text-xs "Cost per 1000"]
-             [:p.font-mono (str (:game/population-upkeep-credits game) " credit, " (:game/population-upkeep-food game) " food")]]
+             [:p.font-mono (str (:game/population-upkeep-credits game) " credit, " 
+                                (:game/population-upkeep-food game) " food")]]
             [:div
              [:p.text-xs "Total Required"]
-             [:p.font-mono (str population-credit-cost " credits, " population-food-cost " food")]]
+             [:p.font-mono (str (:population-credits required) " credits, " 
+                                (:population-food required) " food")]]
             [:div
              [:label.text-xs "Pay Credits"]
-             (expense-input "population-credits" population-credit-cost player-id hx-include)]
+             (expense-input "population-credits" (:population-credits required) player-id hx-include)]
             [:div
              [:label.text-xs "Pay Food"]
-             (expense-input "population-food" population-food-cost player-id hx-include)]]]
-          ]
+             (expense-input "population-food" (:population-food required) player-id hx-include)]]]]
 
-         ;; :: resources after expenses
+         ;;; Resources After Expenses:
+         ;;; This section is dynamically updated by htmx as the user changes input values.
+         ;;; Initially shows current resources (no expenses applied yet).
          [:div#resources-after.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
           [:h3.font-bold.mb-4 "Resources After Expenses"]
           [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
@@ -375,17 +434,20 @@
             [:p.font-mono (:player/defence-stations player)]]
            [:div
             [:p.text-xs "Agents"]
-            [:p.font-mono (:player/agents player)]]]]
+            [:p.font-mono (:player/players player)]]]]
 
+         ;; Warning message area - populated by htmx if player can't afford expenses
          [:div#expense-warning.h-8.flex.items-center]
+
+         ;; Navigation and submit buttons
          [:div.flex.gap-4
           [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
            {:href (str "/app/game/" player-id)} "Back to Game"]
           [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-           {:href (str "/app/game/" player-id "/exchange")} "Enter Exchange"]
+           {:href (str "/app/game/" player-id "/exchange")} "Continue to Exchange"]
           [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
            {:type "submit"
             :disabled true
             :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"}
            "Continue to Building"]])
-       ]))) ;; end of biff/form
+       ])))

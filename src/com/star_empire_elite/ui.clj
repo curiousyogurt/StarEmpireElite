@@ -90,3 +90,54 @@
               (if (= status 404)
                 "Page not found."
                 "Something went wrong.")]))})
+
+;;; Numeric input field that only allows digits. Strips non-numeric characters as user types and
+;;; provides htmx integration for dynamic updates. Includes a reset button to restore default value.
+(defn numeric-input 
+  "Creates a numeric-only input field with HTMX integration and reset button.
+   
+   Args:
+     name - input field name
+     value - default/initial value
+     player-id - player UUID for HTMX endpoint
+     hx-post-path - relative path for HTMX post (e.g. '/calculate-expenses')
+     hx-include - selector string for fields to include in HTMX request"
+  [name value player-id hx-post-path hx-include]
+  [:div.relative.mt-1
+   [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.pr-6.font-mono
+    {:type "text" 
+     :name name 
+     :value value
+     :autocomplete "off"
+     :autocapitalize "off"
+     :autocorrect "off"
+     :spellcheck "false"
+     :data-lpignore "true"
+     :data-form-type "other"
+     :hx-post (str "/app/game/" player-id hx-post-path)
+     :hx-target "#resources-after" 
+     :hx-swap "outerHTML"
+     :hx-trigger "load, input"
+     :hx-include hx-include
+     ;; Strip non-numeric characters immediately while preserving cursor position
+     :oninput (str "let start = this.selectionStart; "
+                   "let end = this.selectionEnd; "
+                   "let oldVal = this.value; "
+                   "let newVal = oldVal.replace(/[^0-9]/g, ''); "
+                   "if (oldVal !== newVal) { "
+                   "  this.value = newVal; "
+                   "  let diff = oldVal.length - newVal.length; "
+                   "  this.setSelectionRange(start - diff, end - diff); "
+                   "}")
+     :onblur (str "let val = this.value.replace(/[^0-9]/g, ''); "
+                  "if (val === '' || val === '0') { val = '0'; } "
+                  "else { val = String(parseInt(val, 10)); } "
+                  "this.value = val;")}]
+   [:button
+    {:type "button"
+     :tabindex "-1"
+     :class "absolute right-2 top-1/2 -translate-y-1/2 text-green-400 hover:text-green-300 transition-colors text-2xl font-bold p-0 bg-none border-none cursor-pointer"
+     :onclick (str "document.querySelector('[name=\"" name "\"]').value = " value "; "
+                   "document.querySelector('[name=\"" name "\"]').dispatchEvent(new Event('input', {bubbles: true}))")
+     :title "Reset"}
+    "\u25e6"]])
