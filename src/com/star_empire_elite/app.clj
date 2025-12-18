@@ -1,12 +1,8 @@
 ;;; Development Notes
-;;; In order to add a new page <p>, the followin changes must be made to app.clj:
-;;;  - Import the <p> module at the top rquire with :as alias
-;;;    - This corresponds to a <p>.clj file in the 
-;;;  - Create a handler functino <p>-handler that:
-;;;    - Extracts the player-id from URL params
-;;;    - Fetches the player and game from database
-;;;    - Validates the player is in the right phase
-;;;    - Calls the page function from the module
+;;; In order to add a new page <p>, the following changes must be made to app.clj:
+;;;  - Import the <p> module at the top require with :as alias
+;;;    - This corresponds to a <p>.clj file in the pages/app directory
+;;;  - Create a handler function <p>-handler that uses with-player-and-game macro
 ;;;  - Add a route that maps a URL to the handler
 
 (ns com.star-empire-elite.app
@@ -22,15 +18,7 @@
             [com.star-empire-elite.pages.app.espionage :as espionage]
             [com.star-empire-elite.pages.app.outcomes :as outcomes]
             [com.star-empire-elite.constants :as const]
-            [xtdb.api :as xt]
-            ))
-
-;; :: check if player is in the correct phase for the requested page
-;; If not, redirect to the correct phase page
-(defn validate-phase [player-id current-phase required-phase]
-  (when (not= current-phase required-phase)
-    {:status 303
-     :headers {"location" (game/get-phase-url player-id current-phase)}}))
+            [com.star-empire-elite.utils :as utils]))
 
 ;; :: main app dashboard showing all player games
 (defn app [{:keys [session biff/db] :as ctx}]
@@ -117,82 +105,58 @@
     {:status 303
      :headers {"location" "/app"}}))
 
-(defn income-handler [{:keys [path-params biff/db] :as ctx}]
-  (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player (xt/entity db player-id)
-        game (xt/entity db (:player/game player))]
-    (if (nil? player)
-      {:status 404
-       :body "Player not found"}
-      ;; validate that player is in phase 1 (income phase)
-      (or (validate-phase player-id (:player/current-phase player) 1)
-          (income/income-page {:player player :game game})))))
+;;;;
+;;;; Phase Handlers - Streamlined using utils/with-player-and-game
+;;;;
+;;;; Each handler now uses the with-player-and-game macro which:
+;;;;  1. Loads player and game entities from the database
+;;;;  2. Handles the 404 error case automatically
+;;;;  3. Provides clean bindings for player, game, and player-id
+;;;;  4. Validates the player is in the correct phase
+;;;;  5. Calls the appropriate page function with the entities
+;;;;
 
-(defn expenses-handler [{:keys [path-params biff/db] :as ctx}]
-  (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player (xt/entity db player-id)
-        game (xt/entity db (:player/game player))]
-    (if (nil? player)
-      {:status 404
-       :body "Player not found"}
-      ;; validate that player is in phase 2 (expenses phase)
-      (or (validate-phase player-id (:player/current-phase player) 2)
-          (expenses/expenses-page {:player player :game game})))))
+(defn income-handler [ctx]
+  (utils/with-player-and-game [player game player-id] ctx
+    ;; Validate phase 1 (income), then show page
+    (or (utils/validate-phase player 1 player-id)
+        (income/income-page {:player player :game game}))))
 
-(defn exchange-handler [{:keys [path-params biff/db] :as ctx}]
-  (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player (xt/entity db player-id)
-        game (xt/entity db (:player/game player))]
-    (if (nil? player)
-      {:status 404
-       :body "Player not found"}
-      ;; validate that player is in phase 2 (exchange is a sub-phase of expenses)
-      (or (validate-phase player-id (:player/current-phase player) 2)
-          (exchange/exchange-page {:player player :game game})))))
+(defn expenses-handler [ctx]
+  (utils/with-player-and-game [player game player-id] ctx
+    ;; Validate phase 2 (expenses), then show page
+    (or (utils/validate-phase player 2 player-id)
+        (expenses/expenses-page {:player player :game game}))))
 
-(defn building-handler [{:keys [path-params biff/db] :as ctx}]
-  (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player (xt/entity db player-id)
-        game (xt/entity db (:player/game player))]
-    (if (nil? player)
-      {:status 404
-       :body "Player not found"}
-      ;; validate that player is in phase 3 (building phase)
-      (or (validate-phase player-id (:player/current-phase player) 3)
-          (building/building-page {:player player :game game})))))
+(defn exchange-handler [ctx]
+  (utils/with-player-and-game [player game player-id] ctx
+    ;; Exchange is a sub-phase of expenses (phase 2)
+    (or (utils/validate-phase player 2 player-id)
+        (exchange/exchange-page {:player player :game game}))))
 
-(defn action-handler [{:keys [path-params biff/db] :as ctx}]
-  (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player (xt/entity db player-id)
-        game (xt/entity db (:player/game player))]
-    (if (nil? player)
-      {:status 404
-       :body "Player not found"}
-      ;; validate that player is in phase 4 (action phase)
-      (or (validate-phase player-id (:player/current-phase player) 4)
-          (action/action-page {:player player :game game})))))
+(defn building-handler [ctx]
+  (utils/with-player-and-game [player game player-id] ctx
+    ;; Validate phase 3 (building), then show page
+    (or (utils/validate-phase player 3 player-id)
+        (building/building-page {:player player :game game}))))
 
-(defn espionage-handler [{:keys [path-params biff/db] :as ctx}]
-  (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player (xt/entity db player-id)
-        game (xt/entity db (:player/game player))]
-    (if (nil? player)
-      {:status 404
-       :body "Player not found"}
-      ;; validate that player is in phase 5 (espionage phase)
-      (or (validate-phase player-id (:player/current-phase player) 5)
-          (espionage/espionage-page {:player player :game game})))))
+(defn action-handler [ctx]
+  (utils/with-player-and-game [player game player-id] ctx
+    ;; Validate phase 4 (action), then show page
+    (or (utils/validate-phase player 4 player-id)
+        (action/action-page {:player player :game game}))))
 
-(defn outcomes-handler [{:keys [path-params biff/db] :as ctx}]
-  (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player (xt/entity db player-id)
-        game (xt/entity db (:player/game player))]
-    (if (nil? player)
-      {:status 404
-       :body "Player not found"}
-      ;; validate that player is in phase 6 (outcomes phase)
-      (or (validate-phase player-id (:player/current-phase player) 6)
-          (outcomes/outcomes-page {:player player :game game})))))
+(defn espionage-handler [ctx]
+  (utils/with-player-and-game [player game player-id] ctx
+    ;; Validate phase 5 (espionage), then show page
+    (or (utils/validate-phase player 5 player-id)
+        (espionage/espionage-page {:player player :game game}))))
+
+(defn outcomes-handler [ctx]
+  (utils/with-player-and-game [player game player-id] ctx
+    ;; Validate phase 6 (outcomes), then show page
+    (or (utils/validate-phase player 6 player-id)
+        (outcomes/outcomes-page {:player player :game game}))))
 
 (def module
   {:routes ["/app" {:middleware [mid/wrap-signed-in]}

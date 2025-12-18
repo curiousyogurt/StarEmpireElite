@@ -91,6 +91,111 @@
                 "Page not found."
                 "Something went wrong.")]))})
 
+;;; Resource display grid showing player's current or projected resources. Used across all
+;;; phases to display resources in a consistent format. Can highlight negative values in red.
+(defn resource-display-grid
+  "Display player resources in a responsive grid layout.
+   
+   Args:
+     resources - map of resource values to display (uses either player entity or custom map)
+     title - optional title for the display section
+     highlight-negative? - if true, shows negative values in red (default false)"
+  ([resources title]
+   (resource-display-grid resources title false))
+  ([resources title highlight-negative?]
+   [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
+    [:h3.font-bold.mb-4 title]
+    [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
+     [:div
+      [:p.text-xs "Credits"]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:credits resources) (:player/credits resources)) 0)) "text-red-400")} 
+       (or (:credits resources) (:player/credits resources))]]
+     [:div
+      [:p.text-xs "Food"]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:food resources) (:player/food resources)) 0)) "text-red-400")} 
+       (or (:food resources) (:player/food resources))]]
+     [:div
+      [:p.text-xs "Fuel"]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:fuel resources) (:player/fuel resources)) 0)) "text-red-400")} 
+       (or (:fuel resources) (:player/fuel resources))]]
+     [:div
+      [:p.text-xs "Galaxars"]
+      [:p.font-mono (or (:galaxars resources) (:player/galaxars resources))]]
+     [:div
+      [:p.text-xs "Soldiers"]
+      [:p.font-mono (or (:soldiers resources) (:player/soldiers resources))]]
+     [:div
+      [:p.text-xs "Fighters"]
+      [:p.font-mono (or (:fighters resources) (:player/fighters resources))]]
+     [:div
+      [:p.text-xs "Stations"]
+      [:p.font-mono (or (:stations resources) (:player/defence-stations resources))]]
+     [:div
+      [:p.text-xs "Agents"]
+      [:p.font-mono (or (:agents resources) (:player/agents resources))]]]]))
+
+;;; Extended resource display grid including all unit types and planets. Used in building phase
+;;; where players need to see all their assets, not just basic resources.
+(defn extended-resource-display-grid
+  "Display all player resources including units and planets in a responsive grid layout.
+   
+   Args:
+     resources - map of resource values to display (uses either player entity or custom map)
+     title - optional title for the display section
+     highlight-negative? - if true, shows negative values in red (default false)"
+  ([resources title]
+   (extended-resource-display-grid resources title false))
+  ([resources title highlight-negative?]
+   [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
+    [:h3.font-bold.mb-4 title]
+    [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
+     [:div
+      [:p.text-xs "Credits"]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:credits resources) (:player/credits resources)) 0)) "text-red-400")} 
+       (or (:credits resources) (:player/credits resources))]]
+     [:div
+      [:p.text-xs "Food"]
+      [:p.font-mono (or (:food resources) (:player/food resources))]]
+     [:div
+      [:p.text-xs "Fuel"]
+      [:p.font-mono (or (:fuel resources) (:player/fuel resources))]]
+     [:div
+      [:p.text-xs "Galaxars"]
+      [:p.font-mono (or (:galaxars resources) (:player/galaxars resources))]]
+     [:div
+      [:p.text-xs "Soldiers"]
+      [:p.font-mono (or (:soldiers resources) (:player/soldiers resources))]]
+     [:div
+      [:p.text-xs "Transports"]
+      [:p.font-mono (or (:transports resources) (:player/transports resources))]]
+     [:div
+      [:p.text-xs "Generals"]
+      [:p.font-mono (or (:generals resources) (:player/generals resources))]]
+     [:div
+      [:p.text-xs "Carriers"]
+      [:p.font-mono (or (:carriers resources) (:player/carriers resources))]]
+     [:div
+      [:p.text-xs "Fighters"]
+      [:p.font-mono (or (:fighters resources) (:player/fighters resources))]]
+     [:div
+      [:p.text-xs "Admirals"]
+      [:p.font-mono (or (:admirals resources) (:player/admirals resources))]]
+     [:div
+      [:p.text-xs "Stations"]
+      [:p.font-mono (or (:stations resources) (:player/defence-stations resources))]]
+     [:div
+      [:p.text-xs "Cmd Ships"]
+      [:p.font-mono (or (:command-ships resources) (:player/command-ships resources))]]
+     [:div
+      [:p.text-xs "Mil Plts"]
+      [:p.font-mono (or (:military-planets resources) (:player/military-planets resources))]]
+     [:div
+      [:p.text-xs "Food Plts"]
+      [:p.font-mono (or (:food-planets resources) (:player/food-planets resources))]]
+     [:div
+      [:p.text-xs "Ore Plts"]
+      [:p.font-mono (or (:ore-planets resources) (:player/ore-planets resources))]]]]))
+
 ;;; Numeric input field that only allows digits. Strips non-numeric characters as user types and
 ;;; provides htmx integration for dynamic updates. Includes a reset button to restore default value.
 (defn numeric-input 

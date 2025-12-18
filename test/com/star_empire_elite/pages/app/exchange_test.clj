@@ -2,6 +2,7 @@
   (:require [clojure.test :refer :all]
             [com.star-empire-elite.pages.app.exchange :as exchange]
             [xtdb.api :as xt]
+            [com.star-empire-elite.utils :as utils]
             [com.biffweb :as biff]))
 
 ;;;;
@@ -41,19 +42,19 @@
 
 (deftest test-parse-exchange-value
   (testing "Parses valid numeric strings correctly"
-    (is (= 100 (exchange/parse-exchange-value "100")))
-    (is (= 0 (exchange/parse-exchange-value "0")))
-    (is (= 999 (exchange/parse-exchange-value "999"))))
+    (is (= 100 (utils/parse-numeric-input "100")))
+    (is (= 0 (utils/parse-numeric-input "0")))
+    (is (= 999 (utils/parse-numeric-input "999"))))
   
   (testing "Treats empty/nil as 0"
-    (is (= 0 (exchange/parse-exchange-value "")))
-    (is (= 0 (exchange/parse-exchange-value nil))))
+    (is (= 0 (utils/parse-numeric-input "")))
+    (is (= 0 (utils/parse-numeric-input nil))))
   
   (testing "Strips non-numeric characters"
-    (is (= 123 (exchange/parse-exchange-value "123abc")))
-    (is (= 456 (exchange/parse-exchange-value "abc456")))
-    (is (= 789 (exchange/parse-exchange-value "7-8-9")))
-    (is (= 0 (exchange/parse-exchange-value "-100")))))  ; Minus sign stripped
+    (is (= 123 (utils/parse-numeric-input "123abc")))
+    (is (= 456 (utils/parse-numeric-input "abc456")))
+    (is (= 789 (utils/parse-numeric-input "7-8-9")))
+    (is (= 100 (utils/parse-numeric-input "-100")))))  ; Minus sign stripped
 
 (deftest test-get-exchange-rates
   (testing "Returns standard exchange rates"
@@ -356,7 +357,7 @@
                          :food-planets-sold "1" :ore-planets-sold "1"
                          :food-bought "0" :food-sold "0"
                          :fuel-bought "0" :fuel-sold "0"}
-            quantities (into {} (map (fn [[k v]] [k (exchange/parse-exchange-value v)]) 
+            quantities (into {} (map (fn [[k v]] [k (utils/parse-numeric-input v)]) 
                                      valid-params))
             rates (exchange/get-exchange-rates)
             credit-changes (exchange/calculate-exchange-credits quantities rates)
@@ -369,7 +370,7 @@
                            :military-planets-sold "0" :food-planets-sold "0" :ore-planets-sold "0"
                            :food-bought "0" :food-sold "0"
                            :fuel-bought "0" :fuel-sold "0"}
-            quantities (into {} (map (fn [[k v]] [k (exchange/parse-exchange-value v)]) 
+            quantities (into {} (map (fn [[k v]] [k (utils/parse-numeric-input v)]) 
                                      invalid-params))
             rates (exchange/get-exchange-rates)
             credit-changes (exchange/calculate-exchange-credits quantities rates)

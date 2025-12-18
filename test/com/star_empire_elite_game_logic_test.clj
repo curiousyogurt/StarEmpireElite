@@ -3,6 +3,7 @@
             [com.biffweb :as biff :refer [test-xtdb-node]]
             [com.star-empire-elite :as main]
             [com.star-empire-elite.app :as app]
+            [com.star-empire-elite.utils :as utils]  ; CHANGED: Added utils import
             [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.pages.app.income :as income]
             [xtdb.api :as xt]))
@@ -101,12 +102,14 @@ base-game {:db/doc-type :game
   (testing "Ore planets generate correct income"
     (with-open [node (test-xtdb-node [])]
       (let [ctx (get-context node)
-            {:keys [game-id player-id]} (create-test-player-and-game ctx
-                                                                     {:player/ore-planets 3
-                                                                      :player/credits 1000
-                                                                      :player/fuel 200
-                                                                      :player/galaxars 50}
-                                                                     {})
+            {:keys [game-id player-id]}
+            (create-test-player-and-game 
+              ctx
+              {:player/ore-planets 3
+               :player/credits 1000
+               :player/fuel 200
+               :player/galaxars 50}
+              {})
             db (xt/db node)
             player (xt/entity db player-id)
             game (xt/entity db game-id)
@@ -131,10 +134,12 @@ base-game {:db/doc-type :game
   (testing "Food planets generate correct food income"
     (with-open [node (test-xtdb-node [])]
       (let [ctx (get-context node)
-            {:keys [game-id player-id]} (create-test-player-and-game ctx
-                                                                     {:player/food-planets 4
-                                                                      :player/food 1000}
-                                                                     {})
+            {:keys [game-id player-id]}
+            (create-test-player-and-game 
+              ctx
+              {:player/food-planets 4
+               :player/food 1000}
+              {})
             db (xt/db node)
             player (xt/entity db player-id)
             game (xt/entity db game-id)
@@ -149,9 +154,11 @@ base-game {:db/doc-type :game
   (testing "Military planets generate correct military units"
     (with-open [node (test-xtdb-node [])]
       (let [ctx (get-context node)
-            {:keys [game-id player-id]} (create-test-player-and-game ctx
-                                                                     {:player/military-planets 2}
-                                                                     {})
+            {:keys [game-id player-id]}
+            (create-test-player-and-game
+              ctx
+              {:player/military-planets 2}
+              {})
             db (xt/db node)
             player (xt/entity db player-id)
             game (xt/entity db game-id)
@@ -199,16 +206,27 @@ base-game {:db/doc-type :game
 ;; Test 3: Phase Validation
 (deftest phase-validation-test
   (testing "Phase validation works correctly"
-    (let [player-id (java.util.UUID/randomUUID)]
-      ;; Test correct phase - should return nil (no redirect)
-      (is (nil? (app/validate-phase player-id 1 1)))
-      (is (nil? (app/validate-phase player-id 2 2)))
-      
-      ;; Test incorrect phase - should return redirect response
-      (let [redirect-response (app/validate-phase player-id 1 2)]
-        (is (some? redirect-response))
-        (is (= (:status redirect-response) 303))
-        (is (contains? (:headers redirect-response) "location"))))))
+    (with-open [node (test-xtdb-node [])]
+      (let [ctx (get-context node)
+            {:keys [player-id]}
+            (create-test-player-and-game 
+              ctx
+              {:player/current-phase 1}
+              {})
+            db (xt/db node)
+            player-phase-1 (xt/entity db player-id)
+            player-phase-2 (assoc player-phase-1 :player/current-phase 2)]
+        
+        ;; CHANGED: Now using utils/validate-phase with the new API (player, expected-phase, player-id)
+        ;; Test correct phase - should return nil (no redirect)
+        (is (nil? (utils/validate-phase player-phase-1 1 player-id)))
+        (is (nil? (utils/validate-phase player-phase-2 2 player-id)))
+        
+        ;; Test incorrect phase - should return redirect response
+        (let [redirect-response (utils/validate-phase player-phase-1 2 player-id)]
+          (is (some? redirect-response))
+          (is (= (:status redirect-response) 303))
+          (is (contains? (:headers redirect-response) "location")))))))
 
 ;; Test 4: Resource Boundaries
 (deftest resource-boundary-test
@@ -229,21 +247,22 @@ base-game {:db/doc-type :game
   (testing "Income calculation logic works correctly"
     (with-open [node (test-xtdb-node [])]
       (let [ctx (get-context node)
-            {:keys [game-id player-id]} (create-test-player-and-game 
-                                          ctx
-                                          {:player/current-phase 1
-                                           :player/ore-planets 2
-                                           :player/food-planets 1
-                                           :player/military-planets 1
-                                           :player/credits 1000
-                                           :player/food 500
-                                           :player/fuel 200
-                                           :player/galaxars 100
-                                           :player/soldiers 100
-                                           :player/fighters 20
-                                           :player/defence-stations 5
-                                           :player/agents 10}
-                                          {})
+            {:keys [game-id player-id]}
+            (create-test-player-and-game 
+              ctx
+              {:player/current-phase 1
+               :player/ore-planets 2
+               :player/food-planets 1
+               :player/military-planets 1
+               :player/credits 1000
+               :player/food 500
+               :player/fuel 200
+               :player/galaxars 100
+               :player/soldiers 100
+               :player/fighters 20
+               :player/defence-stations 5
+               :player/agents 10}
+              {})
             db (xt/db node)
             player (xt/entity db player-id)
             game (xt/entity db game-id)]

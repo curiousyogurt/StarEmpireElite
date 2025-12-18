@@ -13,21 +13,12 @@
 (ns com.star-empire-elite.pages.app.exchange
   (:require [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]
+            [com.star-empire-elite.utils :as utils]
             [xtdb.api :as xt]))
 
 ;;;;
 ;;;; Calculations
 ;;;;
-
-;;; Parse user exchange input safely, treating empty/nil/negative as 0
-(defn parse-exchange-value 
-  "Parse user input to a non-negative integer, stripping non-numeric chars and treating empty/nil as 0"
-  [val]
-  (let [s (str val)
-        cleaned (clojure.string/replace s #"[^0-9]" "")]
-    (if (empty? cleaned)
-      0
-      (parse-long cleaned))))
 
 ;;; Get exchange rates - these are currently hardcoded but should eventually come from game constants
 (defn get-exchange-rates
@@ -119,151 +110,144 @@
 ;;; Applies exchanges and redirects back to expenses page. Uses pure calculation functions to
 ;;; determine resource changes, then commits them in a single transaction.
 (defn apply-exchange [{:keys [path-params params biff/db] :as ctx}]
-  (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player (xt/entity db player-id)]
-    (if (nil? player)
-      {:status 404
-       :body "Player not found"}
-      ;; Phase validation - only allow exchange if player is in phase 2
-      (if (not= (:player/current-phase player) 2)
+  (utils/with-player-and-game [player game player-id] ctx
+    ;; Phase validation - only allow exchange if player is in phase 2
+    (if-let [redirect (utils/validate-phase player 2 player-id)]
+      redirect
+      ;; Parse all exchange inputs using shared utility
+      (let [quantities {:soldiers-sold (utils/parse-numeric-input (:soldiers-sold params))
+                        :fighters-sold (utils/parse-numeric-input (:fighters-sold params))
+                        :stations-sold (utils/parse-numeric-input (:stations-sold params))
+                        :military-planets-sold (utils/parse-numeric-input (:military-planets-sold params))
+                        :food-planets-sold (utils/parse-numeric-input (:food-planets-sold params))
+                        :ore-planets-sold (utils/parse-numeric-input (:ore-planets-sold params))
+                        :food-bought (utils/parse-numeric-input (:food-bought params))
+                        :food-sold (utils/parse-numeric-input (:food-sold params))
+                        :fuel-bought (utils/parse-numeric-input (:fuel-bought params))
+                        :fuel-sold (utils/parse-numeric-input (:fuel-sold params))}
+            
+            ;; Use pure calculation functions to determine final resource values
+            rates (get-exchange-rates)
+            credit-changes (calculate-exchange-credits quantities rates)
+            resources-after (calculate-resources-after-exchange player quantities credit-changes)]
+        
+        ;; Single atomic transaction updates resources (stays in phase 2)
+        ;; This prevents partial updates if something fails midway through
+        (biff/submit-tx ctx
+          [{:db/doc-type :player
+            :db/op :update
+            :xt/id player-id
+            :player/credits (:credits resources-after)
+            :player/soldiers (:soldiers resources-after)
+            :player/fighters (:fighters resources-after)
+            :player/defence-stations (:stations resources-after)
+            :player/military-planets (:military-planets resources-after)
+            :player/food-planets (:food-planets resources-after)
+            :player/ore-planets (:ore-planets resources-after)
+            :player/food (:food resources-after)
+            :player/fuel (:fuel resources-after)}])
         {:status 303
-         :headers {"location" (str "/app/game/" player-id)}}
-        ;; Parse all exchange inputs using pure function
-        (let [quantities {:soldiers-sold (parse-exchange-value (:soldiers-sold params))
-                          :fighters-sold (parse-exchange-value (:fighters-sold params))
-                          :stations-sold (parse-exchange-value (:stations-sold params))
-                          :military-planets-sold (parse-exchange-value (:military-planets-sold params))
-                          :food-planets-sold (parse-exchange-value (:food-planets-sold params))
-                          :ore-planets-sold (parse-exchange-value (:ore-planets-sold params))
-                          :food-bought (parse-exchange-value (:food-bought params))
-                          :food-sold (parse-exchange-value (:food-sold params))
-                          :fuel-bought (parse-exchange-value (:fuel-bought params))
-                          :fuel-sold (parse-exchange-value (:fuel-sold params))}
-              
-              ;; Use pure calculation functions to determine final resource values
-              rates (get-exchange-rates)
-              credit-changes (calculate-exchange-credits quantities rates)
-              resources-after (calculate-resources-after-exchange player quantities credit-changes)]
-          
-          ;; Single atomic transaction updates resources (stays in phase 2)
-          ;; This prevents partial updates if something fails midway through
-          (biff/submit-tx ctx
-            [{:db/doc-type :player
-              :db/op :update
-              :xt/id player-id
-              :player/credits (:credits resources-after)
-              :player/soldiers (:soldiers resources-after)
-              :player/fighters (:fighters resources-after)
-              :player/defence-stations (:stations resources-after)
-              :player/military-planets (:military-planets resources-after)
-              :player/food-planets (:food-planets resources-after)
-              :player/ore-planets (:ore-planets resources-after)
-              :player/food (:food resources-after)
-              :player/fuel (:fuel resources-after)}])
-          {:status 303
-           :headers {"location" (str "/app/game/" player-id "/expenses")}})))))
+         :headers {"location" (str "/app/game/" player-id "/expenses")}}))))
 
 ;;; Provides HTMX dynamic updates showing resources after exchange as user changes input values.
 ;;; This gives immediate feedback on whether the player can afford their selected exchanges.
 (defn calculate-exchange [{:keys [path-params params biff/db] :as ctx}]
-  (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player (xt/entity db player-id)
+  (utils/with-player-and-game [player game player-id] ctx
+    (let [;; Parse all exchange inputs using shared utility
+          quantities {:soldiers-sold (utils/parse-numeric-input (:soldiers-sold params))
+                     :fighters-sold (utils/parse-numeric-input (:fighters-sold params))
+                     :stations-sold (utils/parse-numeric-input (:stations-sold params))
+                     :military-planets-sold (utils/parse-numeric-input (:military-planets-sold params))
+                     :food-planets-sold (utils/parse-numeric-input (:food-planets-sold params))
+                     :ore-planets-sold (utils/parse-numeric-input (:ore-planets-sold params))
+                     :food-bought (utils/parse-numeric-input (:food-bought params))
+                     :food-sold (utils/parse-numeric-input (:food-sold params))
+                     :fuel-bought (utils/parse-numeric-input (:fuel-bought params))
+                     :fuel-sold (utils/parse-numeric-input (:fuel-sold params))}
         
-        ;; Parse all exchange inputs using pure function
-        quantities {:soldiers-sold (parse-exchange-value (:soldiers-sold params))
-                   :fighters-sold (parse-exchange-value (:fighters-sold params))
-                   :stations-sold (parse-exchange-value (:stations-sold params))
-                   :military-planets-sold (parse-exchange-value (:military-planets-sold params))
-                   :food-planets-sold (parse-exchange-value (:food-planets-sold params))
-                   :ore-planets-sold (parse-exchange-value (:ore-planets-sold params))
-                   :food-bought (parse-exchange-value (:food-bought params))
-                   :food-sold (parse-exchange-value (:food-sold params))
-                   :fuel-bought (parse-exchange-value (:fuel-bought params))
-                   :fuel-sold (parse-exchange-value (:fuel-sold params))}
-        
-        ;; Use pure calculation functions
-        rates (get-exchange-rates)
-        credit-changes (calculate-exchange-credits quantities rates)
-        resources-after (calculate-resources-after-exchange player quantities credit-changes)
-        can-execute? (valid-exchange? resources-after)
-        invalid-exchanges (identify-invalid-exchanges resources-after quantities)
-        
-        ;; Determine if any credit-related transaction is invalid
-        invalid-credits-transaction? (or (:invalid-soldier-sale? invalid-exchanges)
-                                         (:invalid-fighter-sale? invalid-exchanges)
-                                         (:invalid-station-sale? invalid-exchanges)
-                                         (:invalid-mil-planet-sale? invalid-exchanges)
-                                         (:invalid-food-planet-sale? invalid-exchanges)
-                                         (:invalid-ore-planet-sale? invalid-exchanges)
-                                         (:invalid-food-sale? invalid-exchanges)
-                                         (:invalid-fuel-sale? invalid-exchanges)
-                                         (:invalid-food-purchase? invalid-exchanges)
-                                         (:invalid-fuel-purchase? invalid-exchanges))]
+          ;; Use pure calculation functions
+          rates (get-exchange-rates)
+          credit-changes (calculate-exchange-credits quantities rates)
+          resources-after (calculate-resources-after-exchange player quantities credit-changes)
+          can-execute? (valid-exchange? resources-after)
+          invalid-exchanges (identify-invalid-exchanges resources-after quantities)
+          
+          ;; Determine if any credit-related transaction is invalid
+          invalid-credits-transaction? (or (:invalid-soldier-sale? invalid-exchanges)
+                                           (:invalid-fighter-sale? invalid-exchanges)
+                                           (:invalid-station-sale? invalid-exchanges)
+                                           (:invalid-mil-planet-sale? invalid-exchanges)
+                                           (:invalid-food-planet-sale? invalid-exchanges)
+                                           (:invalid-ore-planet-sale? invalid-exchanges)
+                                           (:invalid-food-sale? invalid-exchanges)
+                                           (:invalid-fuel-sale? invalid-exchanges)
+                                           (:invalid-food-purchase? invalid-exchanges)
+                                           (:invalid-fuel-purchase? invalid-exchanges))]
     
-    ;; Render HTMX response fragments that replace specific page elements
-    (biff/render
-      [:div
-       ;; Resources display with red highlighting for invalid values
-       [:div#resources-after.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
-        [:h3.font-bold.mb-4 "Resources After Exchange"]
-        [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
-         [:div
-          [:p.text-xs "Credits"]
-          [:p.font-mono {:class (when invalid-credits-transaction? "text-red-400")} 
-           (:credits resources-after)]]
-         [:div
-          [:p.text-xs "Food"]
-          [:p.font-mono {:class (when (or (:invalid-food-sale? invalid-exchanges) 
-                                          (:invalid-food-purchase? invalid-exchanges)) 
-                                   "text-red-400")} 
-           (:food resources-after)]]
-         [:div
-          [:p.text-xs "Fuel"]
-          [:p.font-mono {:class (when (or (:invalid-fuel-sale? invalid-exchanges) 
-                                          (:invalid-fuel-purchase? invalid-exchanges)) 
-                                   "text-red-400")} 
-           (:fuel resources-after)]]
-         [:div
-          [:p.text-xs "Galaxars"]
-          [:p.font-mono (:player/galaxars player)]]
-         [:div
-          [:p.text-xs "Soldiers"]
-          [:p.font-mono {:class (when (:invalid-soldier-sale? invalid-exchanges) "text-red-400")} 
-           (:soldiers resources-after)]]
-         [:div
-          [:p.text-xs "Fighters"]
-          [:p.font-mono {:class (when (:invalid-fighter-sale? invalid-exchanges) "text-red-400")} 
-           (:fighters resources-after)]]
-         [:div
-          [:p.text-xs "Stations"]
-          [:p.font-mono {:class (when (:invalid-station-sale? invalid-exchanges) "text-red-400")} 
-           (:stations resources-after)]]
-         [:div
-          [:p.text-xs "Mil Plts"]
-          [:p.font-mono {:class (when (:invalid-mil-planet-sale? invalid-exchanges) "text-red-400")} 
-           (:military-planets resources-after)]]
-         [:div
-          [:p.text-xs "Food Plts"]
-          [:p.font-mono {:class (when (:invalid-food-planet-sale? invalid-exchanges) "text-red-400")} 
-           (:food-planets resources-after)]]
-         [:div
-          [:p.text-xs "Ore Plts"]
-          [:p.font-mono {:class (when (:invalid-ore-planet-sale? invalid-exchanges) "text-red-400")} 
-           (:ore-planets resources-after)]]]]
-       
-       ;; Warning message if exchanges exceed available resources
-       [:div#exchange-warning.h-8.flex.items-center
-        {:hx-swap-oob "true"}
-        (when (not can-execute?)
-          [:p.text-yellow-400.font-bold "⚠ Invalid exchanges! You cannot sell more than you own."])]
-       
-       ;; Submit button - disabled if player can't execute exchanges
-       [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
-        {:type "submit"
-         :disabled (not can-execute?)
-         :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"
-         :hx-swap-oob "true"}
-        "Make Exchange"]])))
+      ;; Render HTMX response fragments that replace specific page elements
+      (biff/render
+        [:div
+         ;; Resources display with red highlighting for invalid values
+         [:div#resources-after.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
+          [:h3.font-bold.mb-4 "Resources After Exchange"]
+          [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
+           [:div
+            [:p.text-xs "Credits"]
+            [:p.font-mono {:class (when invalid-credits-transaction? "text-red-400")} 
+             (:credits resources-after)]]
+           [:div
+            [:p.text-xs "Food"]
+            [:p.font-mono {:class (when (or (:invalid-food-sale? invalid-exchanges) 
+                                            (:invalid-food-purchase? invalid-exchanges)) 
+                                     "text-red-400")} 
+             (:food resources-after)]]
+           [:div
+            [:p.text-xs "Fuel"]
+            [:p.font-mono {:class (when (or (:invalid-fuel-sale? invalid-exchanges) 
+                                            (:invalid-fuel-purchase? invalid-exchanges)) 
+                                     "text-red-400")} 
+             (:fuel resources-after)]]
+           [:div
+            [:p.text-xs "Galaxars"]
+            [:p.font-mono (:player/galaxars player)]]
+           [:div
+            [:p.text-xs "Soldiers"]
+            [:p.font-mono {:class (when (:invalid-soldier-sale? invalid-exchanges) "text-red-400")} 
+             (:soldiers resources-after)]]
+           [:div
+            [:p.text-xs "Fighters"]
+            [:p.font-mono {:class (when (:invalid-fighter-sale? invalid-exchanges) "text-red-400")} 
+             (:fighters resources-after)]]
+           [:div
+            [:p.text-xs "Stations"]
+            [:p.font-mono {:class (when (:invalid-station-sale? invalid-exchanges) "text-red-400")} 
+             (:stations resources-after)]]
+           [:div
+            [:p.text-xs "Mil Plts"]
+            [:p.font-mono {:class (when (:invalid-mil-planet-sale? invalid-exchanges) "text-red-400")} 
+             (:military-planets resources-after)]]
+           [:div
+            [:p.text-xs "Food Plts"]
+            [:p.font-mono {:class (when (:invalid-food-planet-sale? invalid-exchanges) "text-red-400")} 
+             (:food-planets resources-after)]]
+           [:div
+            [:p.text-xs "Ore Plts"]
+            [:p.font-mono {:class (when (:invalid-ore-planet-sale? invalid-exchanges) "text-red-400")} 
+             (:ore-planets resources-after)]]]]
+         
+         ;; Warning message if exchanges exceed available resources
+         [:div#exchange-warning.h-8.flex.items-center
+          {:hx-swap-oob "true"}
+          (when (not can-execute?)
+            [:p.text-yellow-400.font-bold "WARNING: Invalid exchanges! You cannot sell more than you own."])]
+         
+         ;; Submit button - disabled if player can't execute exchanges
+         [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
+          {:type "submit"
+           :disabled (not can-execute?)
+           :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"
+           :hx-swap-oob "true"}
+          "Make Exchange"]]))))
 
 ;;; Helper function for exchange input fields - delegates to shared numeric-input component
 (defn exchange-input [name value player-id hx-include]

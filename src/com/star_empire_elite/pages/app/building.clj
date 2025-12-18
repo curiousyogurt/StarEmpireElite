@@ -1,229 +1,186 @@
+;;;;;
+;;;;; Building Phase - Purchasing Units and Planets
+;;;;;
+;;;;; The building phase is the third phase of each turn, where players spend credits to purchase
+;;;;; military units, support units, and planets. Unlike expenses (which cost multiple resources),
+;;;;; building only costs credits.
+;;;;;
+;;;;; This phase uses htmx for dynamic validation, showing players in real-time whether they can
+;;;;; afford their selected purchases before submitting.
+;;;;;
+
 (ns com.star-empire-elite.pages.app.building
   (:require [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]
+            [com.star-empire-elite.utils :as utils]
             [xtdb.api :as xt]))
 
-;; :: apply building - save purchases to database and advance to phase 4
+;;;;
+;;;; Calculations
+;;;;
+
+;;; Calculate total cost of purchases using game constants
+(defn calculate-purchase-cost
+  "Calculate total credits needed for all purchases based on game constants.
+   Returns map with total cost."
+  [quantities game]
+  (let [total-cost (+ (* (:soldiers quantities)         (:game/soldier-cost game))
+                      (* (:transports quantities)       (:game/transport-cost game))
+                      (* (:generals quantities)         (:game/general-cost game))
+                      (* (:carriers quantities)         (:game/carrier-cost game))
+                      (* (:fighters quantities)         (:game/fighter-cost game))
+                      (* (:admirals quantities)         (:game/admiral-cost game))
+                      (* (:defence-stations quantities) (:game/station-cost game))
+                      (* (:command-ships quantities)    (:game/command-ship-cost game))
+                      (* (:military-planets quantities) (:game/military-planet-cost game))
+                      (* (:food-planets quantities)     (:game/food-planet-cost game))
+                      (* (:ore-planets quantities)      (:game/ore-planet-cost game)))]
+    {:total-cost total-cost}))
+
+;;; Calculate all resources after purchases
+(defn calculate-resources-after-purchases
+  "Calculate player resources after executing purchases.
+   Returns map of all resource values after purchases."
+  [player quantities cost-info]
+  {:credits          (- (:player/credits player)          (:total-cost cost-info))
+   :soldiers         (+ (:player/soldiers player)         (:soldiers quantities))
+   :transports       (+ (:player/transports player)       (:transports quantities))
+   :generals         (+ (:player/generals player)         (:generals quantities))
+   :carriers         (+ (:player/carriers player)         (:carriers quantities))
+   :fighters         (+ (:player/fighters player)         (:fighters quantities))
+   :admirals         (+ (:player/admirals player)         (:admirals quantities))
+   :defence-stations (+ (:player/defence-stations player) (:defence-stations quantities))
+   :command-ships    (+ (:player/command-ships player)    (:command-ships quantities))
+   :military-planets (+ (:player/military-planets player) (:military-planets quantities))
+   :food-planets     (+ (:player/food-planets player)     (:food-planets quantities))
+   :ore-planets      (+ (:player/ore-planets player)      (:ore-planets quantities))})
+
+;;; Validate purchase is affordable
+(defn can-afford-purchases?
+  "Returns true if player has enough credits for all purchases"
+  [resources-after]
+  (>= (:credits resources-after) 0))
+
+;;;;
+;;;; Actions
+;;;;
+;;;; There are three parts to the actions for this phase: (i) building-page, which shows the purchase 
+;;;; options and input fields, (ii) calculate-building which provides htmx dynamic updates as the 
+;;;; user changes values, and (iii) apply-building which commits the purchases to the database and 
+;;;; advances to phase 4.
+;;;;
+
+;;; Applies purchases and advances to the next phase. Uses pure calculation functions to
+;;; determine resource changes, then commits them in a single transaction.
 (defn apply-building [{:keys [path-params params biff/db] :as ctx}]
-  (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player (xt/entity db player-id)]
-    (if (nil? player)
-      {:status 404
-       :body "Player not found"}
-      ;; only allow building if player is in phase 3
-      (if (not= (:player/current-phase player) 3)
-        {:status 303
-         :headers {"location" (str "/app/game/" player-id)}}
-        (let [;; helper function to safely parse numbers, stripping non-numeric chars and treating empty/nil as 0
-              safe-parse (fn [val] 
-                           (let [s (str val)
-                                 cleaned (clojure.string/replace s #"[^0-9]" "")]
-                             (if (empty? cleaned)
-                               0
-                               (parse-long cleaned))))
+  (utils/with-player-and-game [player game player-id] ctx
+    ;; Phase validation - only allow building if player is in phase 3
+    (if-let [redirect (utils/validate-phase player 3 player-id)]
+      redirect
+      (let [;; Parse all purchase inputs using shared utility
+            quantities {:soldiers (utils/parse-numeric-input (:soldiers params))
+                       :transports (utils/parse-numeric-input (:transports params))
+                       :generals (utils/parse-numeric-input (:generals params))
+                       :carriers (utils/parse-numeric-input (:carriers params))
+                       :fighters (utils/parse-numeric-input (:fighters params))
+                       :admirals (utils/parse-numeric-input (:admirals params))
+                       :defence-stations (utils/parse-numeric-input (:defence-stations params))
+                       :command-ships (utils/parse-numeric-input (:command-ships params))
+                       :military-planets (utils/parse-numeric-input (:military-planets params))
+                       :food-planets (utils/parse-numeric-input (:food-planets params))
+                       :ore-planets (utils/parse-numeric-input (:ore-planets params))}
+            
+            ;; Use pure calculation functions to determine final resource values
+            cost-info (calculate-purchase-cost quantities game)
+            resources-after (calculate-resources-after-purchases player quantities cost-info)]
+        
+        ;; Validate player can afford purchases
+        (if (not (can-afford-purchases? resources-after))
+          {:status 400
+           :body "Insufficient credits for purchase"}
+          ;; Single atomic transaction updates resources and advances phase together
+          ;; This prevents partial updates if something fails midway through
+          (do
+            (biff/submit-tx ctx
+              [{:db/doc-type :player
+                :db/op :update
+                :xt/id player-id
+                :player/credits (:credits resources-after)
+                :player/soldiers (:soldiers resources-after)
+                :player/transports (:transports resources-after)
+                :player/generals (:generals resources-after)
+                :player/carriers (:carriers resources-after)
+                :player/fighters (:fighters resources-after)
+                :player/admirals (:admirals resources-after)
+                :player/defence-stations (:defence-stations resources-after)
+                :player/command-ships (:command-ships resources-after)
+                :player/military-planets (:military-planets resources-after)
+                :player/food-planets (:food-planets resources-after)
+                :player/ore-planets (:ore-planets resources-after)
+                :player/current-phase 4}])
+            {:status 303
+             :headers {"location" (str "/app/game/" player-id "/action")}}))))))
 
-              ;; parse purchase input values, default to 0 if not provided or empty
-              soldiers (safe-parse (:soldiers params))
-              transports (safe-parse (:transports params))
-              generals (safe-parse (:generals params))
-              carriers (safe-parse (:carriers params))
-              fighters (safe-parse (:fighters params))
-              admirals (safe-parse (:admirals params))
-              defence-stations (safe-parse (:defence-stations params))
-              command-ships (safe-parse (:command-ships params))
-              military-planets (safe-parse (:military-planets params))
-              food-planets (safe-parse (:food-planets params))
-              ore-planets (safe-parse (:ore-planets params))
-
-              ;; get game constants for costs
-              game (xt/entity db (:player/game player))
-
-              ;; calculate total cost with null safety
-              total-cost (+ (* soldiers (or (:game/soldier-cost game) 0))
-                            (* transports (or (:game/transport-cost game) 0))
-                            (* generals (or (:game/general-cost game) 0))
-                            (* carriers (or (:game/carrier-cost game) 0))
-                            (* fighters (or (:game/fighter-cost game) 0))
-                            (* admirals (or (:game/admiral-cost game) 0))
-                            (* defence-stations (or (:game/station-cost game) 0))
-                            (* command-ships (or (:game/command-ship-cost game) 0))
-                            (* military-planets (or (:game/military-planet-cost game) 0))
-                            (* food-planets (or (:game/food-planet-cost game) 0))
-                            (* ore-planets (or (:game/ore-planet-cost game) 0)))
-
-              ;; calculate new totals
-              new-credits (- (:player/credits player) total-cost)
-              new-soldiers (+ (:player/soldiers player) soldiers)
-              new-transports (+ (:player/transports player) transports)
-              new-generals (+ (:player/generals player) generals)
-              new-carriers (+ (:player/carriers player) carriers)
-              new-fighters (+ (:player/fighters player) fighters)
-              new-admirals (+ (:player/admirals player) admirals)
-              new-defence-stations (+ (:player/defence-stations player) defence-stations)
-              new-command-ships (+ (:player/command-ships player) command-ships)
-              new-military-planets (+ (:player/military-planets player) military-planets)
-              new-food-planets (+ (:player/food-planets player) food-planets)
-              new-ore-planets (+ (:player/ore-planets player) ore-planets)]
-
-          ;; only allow purchase if they have enough credits
-          (if (< new-credits 0)
-            {:status 400
-             :body "Insufficient credits for purchase"}
-            ;; submit transaction to update player resources and advance phase
-            (do
-              (biff/submit-tx ctx
-                              [{:db/doc-type :player
-                                :db/op :update
-                                :xt/id player-id
-                                :player/credits new-credits
-                                :player/soldiers new-soldiers
-                                :player/transports new-transports
-                                :player/generals new-generals
-                                :player/carriers new-carriers
-                                :player/fighters new-fighters
-                                :player/admirals new-admirals
-                                :player/defence-stations new-defence-stations
-                                :player/command-ships new-command-ships
-                                :player/military-planets new-military-planets
-                                :player/food-planets new-food-planets
-                                :player/ore-planets new-ore-planets
-                                :player/current-phase 4}])
-
-              ;; redirect to action page
-              {:status 303
-               :headers {"location" (str "/app/game/" player-id "/action")}})))))))
-
-;; :: calculate building costs dynamically for HTMX updates
+;;; Provides HTMX dynamic updates showing resources after purchases as user changes input values.
+;;; This gives immediate feedback on whether the player can afford their selected purchases.
 (defn calculate-building [{:keys [path-params params biff/db] :as ctx}]
-  (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player (xt/entity db player-id)
-        game (xt/entity db (:player/game player))
+  (utils/with-player-and-game [player game player-id] ctx
+    (let [;; Parse all purchase inputs using shared utility
+          quantities {:soldiers (utils/parse-numeric-input (:soldiers params))
+                     :transports (utils/parse-numeric-input (:transports params))
+                     :generals (utils/parse-numeric-input (:generals params))
+                     :carriers (utils/parse-numeric-input (:carriers params))
+                     :fighters (utils/parse-numeric-input (:fighters params))
+                     :admirals (utils/parse-numeric-input (:admirals params))
+                     :defence-stations (utils/parse-numeric-input (:defence-stations params))
+                     :command-ships (utils/parse-numeric-input (:command-ships params))
+                     :military-planets (utils/parse-numeric-input (:military-planets params))
+                     :food-planets (utils/parse-numeric-input (:food-planets params))
+                     :ore-planets (utils/parse-numeric-input (:ore-planets params))}
+        
+          ;; Use pure calculation functions
+          cost-info (calculate-purchase-cost quantities game)
+          resources-after (calculate-resources-after-purchases player quantities cost-info)
+          affordable? (can-afford-purchases? resources-after)]
+    
+      ;; Render HTMX response fragments that replace specific page elements
+      (biff/render
+        [:div
+         ;; Resources display with red highlighting for insufficient credits - use shared component
+         [:div#resources-after
+          (ui/extended-resource-display-grid 
+            resources-after
+            "Resources After Purchases"
+            true)]  ; Enable negative highlighting
+         
+         ;; Cost summary
+         [:div#cost-summary.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
+          {:hx-swap-oob "true"}
+          [:h3.font-bold.mb-2 "Total Cost"]
+          [:p.text-2xl.font-mono (:total-cost cost-info) " credits"]]
+         
+         ;; Warning message if purchases exceed available credits
+         [:div#building-warning.h-8.flex.items-center
+          {:hx-swap-oob "true"}
+          (when (not affordable?)
+            [:p.text-yellow-400.font-bold "WARNING: Insufficient credits for purchases!"])]
+         
+         ;; Submit button - disabled if player can't afford purchases
+         [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
+          {:type "submit"
+           :disabled (not affordable?)
+           :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"
+           :hx-swap-oob "true"}
+          "Complete Purchases"]]))))
 
-        ;; helper function to safely parse numbers, stripping non-numeric chars before parsing, treating empty/nil as 0
-        safe-parse (fn [val] 
-                     (let [s (str val)
-                           cleaned (clojure.string/replace s #"[^0-9]" "")]
-                       (if (empty? cleaned)
-                         0
-                         (parse-long cleaned))))
+;;; Helper function for building input fields - delegates to shared numeric-input component
+(defn building-input [name value player-id hx-include]
+  (ui/numeric-input name value player-id "/calculate-building" hx-include))
 
-        ;; parse purchase quantities, default to 0, ensure non-negative
-        soldiers (safe-parse (:soldiers params))
-        transports (safe-parse (:transports params))
-        generals (safe-parse (:generals params))
-        carriers (safe-parse (:carriers params))
-        fighters (safe-parse (:fighters params))
-        admirals (safe-parse (:admirals params))
-        defence-stations (safe-parse (:defence-stations params))
-        command-ships (safe-parse (:command-ships params))
-        military-planets (safe-parse (:military-planets params))
-        food-planets (safe-parse (:food-planets params))
-        ore-planets (safe-parse (:ore-planets params))
-
-        ;; calculate total cost with null safety
-        total-cost (+ (* soldiers (or (:game/soldier-cost game) 0))
-                      (* transports (or (:game/transport-cost game) 0))
-                      (* generals (or (:game/general-cost game) 0))
-                      (* carriers (or (:game/carrier-cost game) 0))
-                      (* fighters (or (:game/fighter-cost game) 0))
-                      (* admirals (or (:game/admiral-cost game) 0))
-                      (* defence-stations (or (:game/station-cost game) 0))
-                      (* command-ships (or (:game/command-ship-cost game) 0))
-                      (* military-planets (or (:game/military-planet-cost game) 0))
-                      (* food-planets (or (:game/food-planet-cost game) 0))
-                      (* ore-planets (or (:game/ore-planet-cost game) 0)))
-
-        ;; calculate remaining resources and new totals
-        credits-after (- (:player/credits player) total-cost)
-        soldiers-after (+ (:player/soldiers player) soldiers)
-        transports-after (+ (:player/transports player) transports)
-        generals-after (+ (:player/generals player) generals)
-        carriers-after (+ (:player/carriers player) carriers)
-        fighters-after (+ (:player/fighters player) fighters)
-        admirals-after (+ (:player/admirals player) admirals)
-        defence-stations-after (+ (:player/defence-stations player) defence-stations)
-        command-ships-after (+ (:player/command-ships player) command-ships)
-        military-planets-after (+ (:player/military-planets player) military-planets)
-        food-planets-after (+ (:player/food-planets player) food-planets)
-        ore-planets-after (+ (:player/ore-planets player) ore-planets)
-        can-afford? (>= credits-after 0)]
-
-    (biff/render
-      [:div
-       [:div#resources-after.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
-        [:h3.font-bold.mb-4 "Resources After Building"]
-        [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
-         [:div
-          [:p.text-xs "Credits"]
-          [:p.font-mono {:class (when (< credits-after 0) "text-red-400")} credits-after]]
-         [:div
-          [:p.text-xs "Food"]
-          [:p.font-mono (:player/food player)]]
-         [:div
-          [:p.text-xs "Fuel"]
-          [:p.font-mono (:player/fuel player)]]
-         [:div
-          [:p.text-xs "Galaxars"]
-          [:p.font-mono (:player/galaxars player)]]
-         [:div
-          [:p.text-xs "Soldiers"]
-          [:p.font-mono soldiers-after]]
-         [:div
-          [:p.text-xs "Fighters"]
-          [:p.font-mono fighters-after]]
-         [:div
-          [:p.text-xs "Stations"]
-          [:p.font-mono defence-stations-after]]
-         [:div
-          [:p.text-xs "Agents"]
-          [:p.font-mono (:player/agents player)]]]]
-       [:div#building-warning.h-8.flex.items-center
-        {:hx-swap-oob "true"}
-        (when (not can-afford?)
-          [:p.text-yellow-400.font-bold "⚠ Insufficient credits for purchases!"])]
-       [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
-        {:type "submit"
-         :disabled (not can-afford?)
-         :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"
-         :hx-swap-oob "true"}
-        "Continue to Action"]])))
-
-;; :: helper function for purchase input fields with reset button
-(defn purchase-input [name value player-id hx-include]
-  [:div.relative.mt-1
-   [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.pr-6.font-mono
-    {:type "text" 
-     :name name 
-     :value value
-     :autocomplete "off"           ; Disable autocomplete
-     :autocapitalize "off"         ; Disable auto-capitalization
-     :autocorrect "off"            ; Disable auto-correction
-     :spellcheck "false"           ; Disable spellcheck
-     :data-lpignore "true"         ; Ignore LastPass
-     :data-form-type "other"       ; Tell browsers this isn't a standard form
-     :hx-post (str "/app/game/" player-id "/calculate-building")
-     :hx-target "#resources-after" 
-     :hx-swap "outerHTML"
-     :hx-trigger "load, input"
-     :hx-include hx-include
-     :onblur (str "let val = this.value.replace(/[^0-9]/g, ''); "
-                  "if (val === '' || val === '0') { val = '0'; } "
-                  "else { val = String(parseInt(val, 10)); } "
-                  "this.value = val;")}]
-   [:button
-    {:type "button"
-     :tabindex "-1"
-     :class "absolute right-2 top-1/2 -translate-y-1/2 text-green-400 hover:text-green-300 transition-colors text-2xl font-bold p-0 bg-none border-none cursor-pointer"
-     :onclick (str "document.querySelector('[name=\"" name "\"]').value = 0; "
-                   "document.querySelector('[name=\"" name "\"]').dispatchEvent(new Event('input', {bubbles: true}))")
-     :title "Reset"}
-    "\u25e6"]])
-
-;; :: building page - players purchase units, ships, and planets
+;;; Shows building options and input fields for player to purchase units and planets
 (defn building-page [{:keys [player game]}]
   (let [player-id (:xt/id player)
         hx-include "[name='soldiers'],[name='transports'],[name='generals'],[name='carriers'],[name='fighters'],[name='admirals'],[name='defence-stations'],[name='command-ships'],[name='military-planets'],[name='food-planets'],[name='ore-planets']"]
-
     (ui/page
       {}
       [:div.text-green-400.font-mono
@@ -231,195 +188,149 @@
 
        (ui/phase-header (:player/current-phase player) "BUILDING")
 
-       ;; :: resources before building
-       [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
-        [:h3.font-bold.mb-4 "Resources Before Building"]
-        [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
-         [:div
-          [:p.text-xs "Credits"]
-          [:p.font-mono (:player/credits player)]]
-         [:div
-          [:p.text-xs "Food"]
-          [:p.font-mono (:player/food player)]]
-         [:div
-          [:p.text-xs "Fuel"]
-          [:p.font-mono (:player/fuel player)]]
-         [:div
-          [:p.text-xs "Galaxars"]
-          [:p.font-mono (:player/galaxars player)]]
-         [:div
-          [:p.text-xs "Soldiers"]
-          [:p.font-mono (:player/soldiers player)]]
-         [:div
-          [:p.text-xs "Fighters"]
-          [:p.font-mono (:player/fighters player)]]
-         [:div
-          [:p.text-xs "Stations"]
-          [:p.font-mono (:player/defence-stations player)]]
-         [:div
-          [:p.text-xs "Agents"]
-          [:p.font-mono (:player/agents player)]]]]
+       ;;; Current Resources Display - using shared extended component
+       (ui/extended-resource-display-grid player "Resources Before Purchases")
 
-       ;; :: building form
+       ;;; Purchase Input Form:
+       ;;; Player chooses what to buy. HTMX provides real-time feedback on total cost and
+       ;;; whether they can afford the purchases.
        (biff/form
          {:action (str "/app/game/" player-id "/apply-building")
           :method "post"}
 
-         [:h3.font-bold.mb-4 "Building This Round"]
+         [:h3.font-bold.mb-4 "Purchases This Round"]
          [:div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-3.gap-4.mb-8
 
-          ;; :: soldiers purchase
+          ;; Purchase soldiers
           [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Soldiers"]
+           [:h4.font-bold.mb-3 "Buy Soldiers"]
            [:div.space-y-2
             [:div
              [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (or (:game/soldier-cost game) 0) " credits")]]
+             [:p.font-mono (str (:game/soldier-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (purchase-input "soldiers" 0 player-id hx-include)]]]
+             (building-input "soldiers" 0 player-id hx-include)]]]
 
-          ;; :: transports purchase
+          ;; Purchase transports
           [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Transports"]
+           [:h4.font-bold.mb-3 "Buy Transports"]
            [:div.space-y-2
             [:div
              [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (or (:game/transport-cost game) 0) " credits")]]
+             [:p.font-mono (str (:game/transport-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (purchase-input "transports" 0 player-id hx-include)]]]
+             (building-input "transports" 0 player-id hx-include)]]]
 
-          ;; :: generals purchase
+          ;; Purchase generals
           [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Generals"]
+           [:h4.font-bold.mb-3 "Buy Generals"]
            [:div.space-y-2
             [:div
              [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (or (:game/general-cost game) 0) " credits")]]
+             [:p.font-mono (str (:game/general-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (purchase-input "generals" 0 player-id hx-include)]]]
+             (building-input "generals" 0 player-id hx-include)]]]
 
-          ;; :: carriers purchase
+          ;; Purchase carriers
           [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Carriers"]
+           [:h4.font-bold.mb-3 "Buy Carriers"]
            [:div.space-y-2
             [:div
              [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (or (:game/carrier-cost game) 0) " credits")]]
+             [:p.font-mono (str (:game/carrier-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (purchase-input "carriers" 0 player-id hx-include)]]]
+             (building-input "carriers" 0 player-id hx-include)]]]
 
-          ;; :: fighters purchase
+          ;; Purchase fighters
           [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Fighters"]
+           [:h4.font-bold.mb-3 "Buy Fighters"]
            [:div.space-y-2
             [:div
              [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (or (:game/fighter-cost game) 0) " credits")]]
+             [:p.font-mono (str (:game/fighter-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (purchase-input "fighters" 0 player-id hx-include)]]]
+             (building-input "fighters" 0 player-id hx-include)]]]
 
-          ;; :: admirals purchase
+          ;; Purchase admirals
           [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Admirals"]
+           [:h4.font-bold.mb-3 "Buy Admirals"]
            [:div.space-y-2
             [:div
              [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (or (:game/admiral-cost game) 0) " credits")]]
+             [:p.font-mono (str (:game/admiral-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (purchase-input "admirals" 0 player-id hx-include)]]]
+             (building-input "admirals" 0 player-id hx-include)]]]
 
-          ;; :: defence stations purchase
+          ;; Purchase defence stations
           [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Defence Stations"]
+           [:h4.font-bold.mb-3 "Buy Defence Stations"]
            [:div.space-y-2
             [:div
              [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (or (:game/station-cost game) 0) " credits")]]
+             [:p.font-mono (str (:game/station-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (purchase-input "defence-stations" 0 player-id hx-include)]]]
+             (building-input "defence-stations" 0 player-id hx-include)]]]
 
-          ;; :: command ships purchase
+          ;; Purchase command ships
           [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Command Ships"]
+           [:h4.font-bold.mb-3 "Buy Command Ships"]
            [:div.space-y-2
             [:div
              [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (or (:game/command-ship-cost game) 0) " credits")]]
+             [:p.font-mono (str (:game/command-ship-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (purchase-input "command-ships" 0 player-id hx-include)]]]
+             (building-input "command-ships" 0 player-id hx-include)]]]
 
-          ;; :: military planets purchase
+          ;; Purchase military planets
           [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Military Planets"]
+           [:h4.font-bold.mb-3 "Buy Military Planets"]
            [:div.space-y-2
             [:div
              [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (or (:game/military-planet-cost game) 0) " credits")]]
+             [:p.font-mono (str (:game/military-planet-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (purchase-input "military-planets" 0 player-id hx-include)]]]
+             (building-input "military-planets" 0 player-id hx-include)]]]
 
-          ;; :: food planets purchase
+          ;; Purchase food planets
           [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Food Planets"]
+           [:h4.font-bold.mb-3 "Buy Food Planets"]
            [:div.space-y-2
             [:div
              [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (or (:game/food-planet-cost game) 0) " credits")]]
+             [:p.font-mono (str (:game/food-planet-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (purchase-input "food-planets" 0 player-id hx-include)]]]
+             (building-input "food-planets" 0 player-id hx-include)]]]
 
-          ;; :: ore planets purchase
+          ;; Purchase ore planets
           [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Ore Planets"]
+           [:h4.font-bold.mb-3 "Buy Ore Planets"]
            [:div.space-y-2
             [:div
              [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (or (:game/ore-planet-cost game) 0) " credits")]]
+             [:p.font-mono (str (:game/ore-planet-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (purchase-input "ore-planets" 0 player-id hx-include)]]]
-          ]
+             (building-input "ore-planets" 0 player-id hx-include)]]]]
 
-         ;; :: resources after building
-         [:div#resources-after.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
-          [:h3.font-bold.mb-4 "Resources After Building"]
-          [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
-           [:div
-            [:p.text-xs "Credits"]
-            [:p.font-mono (:player/credits player)]]
-           [:div
-            [:p.text-xs "Food"]
-            [:p.font-mono (:player/food player)]]
-           [:div
-            [:p.text-xs "Fuel"]
-            [:p.font-mono (:player/fuel player)]]
-           [:div
-            [:p.text-xs "Galaxars"]
-            [:p.font-mono (:player/galaxars player)]]
-           [:div
-            [:p.text-xs "Soldiers"]
-            [:p.font-mono (:player/soldiers player)]]
-           [:div
-            [:p.text-xs "Fighters"]
-            [:p.font-mono (:player/fighters player)]]
-           [:div
-            [:p.text-xs "Stations"]
-            [:p.font-mono (:player/defence-stations player)]]
-           [:div
-            [:p.text-xs "Agents"]
-            [:p.font-mono (:player/agents player)]]]]
+         ;;; Resources After Purchases - using shared extended component
+         ;;; This section is dynamically updated by HTMX as the user changes input values.
+         [:div#resources-after
+          (ui/extended-resource-display-grid player "Resources After Purchases")]
 
+         ;; Warning message area - populated by HTMX if player can't afford purchases
          [:div#building-warning.h-8.flex.items-center]
+         
+         ;; Navigation and submit buttons
          [:div.flex.gap-4
           [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
            {:href (str "/app/game/" player-id)} "Back to Game"]
@@ -427,5 +338,5 @@
            {:type "submit"
             :disabled true
             :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"}
-           "Continue to Action"]])
-       ]))) ;; end of biff/form
+           "Complete Purchases"]])
+       ])))
