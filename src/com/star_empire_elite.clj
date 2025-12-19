@@ -123,12 +123,12 @@
 ;;;;
 ;;;; Data Validation Configuration
 ;;;;
-;;;; Malli is used throughout Biff applications for data validation and
-;;;; schema definition. This provides runtime safety and documentation.
+;;;; Malli is used throughout Biff applications for data validation and schema definition. This 
+;;;; provides runtime safety and documentation.
 ;;;;
 
-;; Malli configuration combining default schemas with application-specific ones. This registry is used
-;; throughout the app for validating data.
+;;; Malli configuration combining default schemas with application-specific ones. This registry is used
+;;; throughout the app for validating data.
 (def malli-opts
   {:registry (malr/composite-registry
               ;; Default Malli schemas (string, int, keyword, etc.)
@@ -163,9 +163,8 @@
 ;;;;
 ;;;; Component Configuration
 ;;;;
-;;;; Components are Biff's way of managing infrastructure services like databases,
-;;;; web servers, and background job processors. They start in a specific order and can
-;;;; depend on each other.
+;;;; Components are Biff's way of managing infrastructure services like databases, web servers, and 
+;;;; background job processors. They start in a specific order and can depend on each other.
 ;;;;
 
 ;;; System components that provide infrastructure services. Each component is a function that takes
