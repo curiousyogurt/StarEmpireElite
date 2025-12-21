@@ -19,10 +19,10 @@
    :game/ore-planet-fuel 50
    :game/ore-planet-galaxars 10
    :game/food-planet-food 200
-   :game/military-planet-soldiers 25
-   :game/military-planet-fighters 15
-   :game/military-planet-stations 5
-   :game/military-planet-agents 8})
+   :game/mil-planet-soldiers 25
+   :game/mil-planet-fighters 15
+   :game/mil-planet-stations 5
+   :game/mil-planet-agents 8})
 
 ;; Sample player entity as "before income"
 (def test-player
@@ -32,7 +32,7 @@
    :player/current-phase 1
    :player/ore-planets 3
    :player/food-planets 2
-   :player/military-planets 4
+   :player/mil-planets 4
    :player/credits 1000
    :player/food 500
    :player/fuel 300
@@ -58,15 +58,15 @@
   (testing "Calculates income correctly for standard player with all planet types"
     (let [player {:player/ore-planets 3
                   :player/food-planets 2
-                  :player/military-planets 4}
+                  :player/mil-planets 4}
           game {:game/ore-planet-credits 100
                 :game/ore-planet-fuel 50
                 :game/ore-planet-galaxars 10
                 :game/food-planet-food 200
-                :game/military-planet-soldiers 25
-                :game/military-planet-fighters 15
-                :game/military-planet-stations 5
-                :game/military-planet-agents 8}
+                :game/mil-planet-soldiers 25
+                :game/mil-planet-fighters 15
+                :game/mil-planet-stations 5
+                :game/mil-planet-agents 8}
           income (income/calculate-income player game)]
       ;; Ore planet income: 3 planets
       (is (= 300 (:ore-credits income)))  ; 3 × 100
@@ -84,7 +84,7 @@
   (testing "Returns zero income when player has no planets"
     (let [player {:player/ore-planets 0
                   :player/food-planets 0
-                  :player/military-planets 0}
+                  :player/mil-planets 0}
           game test-game
           income (income/calculate-income player game)]
       (is (= 0 (:ore-credits income)))
@@ -100,7 +100,7 @@
   (testing "Calculates correctly when player has only one planet type"
     (let [player {:player/ore-planets 5
                   :player/food-planets 0
-                  :player/military-planets 0}
+                  :player/mil-planets 0}
           game test-game
           income (income/calculate-income player game)]
       (is (= 500 (:ore-credits income)))
@@ -113,7 +113,7 @@
   (testing "Handles large planet counts correctly"
     (let [player {:player/ore-planets 1000
                   :player/food-planets 500
-                  :player/military-planets 250}
+                  :player/mil-planets 250}
           game test-game
           income (income/calculate-income player game)]
       (is (= 100000 (:ore-credits income)))   ; 1000 × 100
@@ -125,15 +125,15 @@
   (testing "Returns zero income when game rates are zero"
     (let [player {:player/ore-planets 3
                   :player/food-planets 2
-                  :player/military-planets 4}
+                  :player/mil-planets 4}
           game {:game/ore-planet-credits 0
                 :game/ore-planet-fuel 0
                 :game/ore-planet-galaxars 0
                 :game/food-planet-food 0
-                :game/military-planet-soldiers 0
-                :game/military-planet-fighters 0
-                :game/military-planet-stations 0
-                :game/military-planet-agents 0}
+                :game/mil-planet-soldiers 0
+                :game/mil-planet-fighters 0
+                :game/mil-planet-stations 0
+                :game/mil-planet-agents 0}
           income (income/calculate-income player game)]
       (is (= 0 (:ore-credits income)))
       (is (= 0 (:food-food income)))
@@ -143,15 +143,15 @@
   (testing "Handles different income rates per game configuration"
     (let [player {:player/ore-planets 2
                   :player/food-planets 3
-                  :player/military-planets 1}
+                  :player/mil-planets 1}
           game {:game/ore-planet-credits 500
                 :game/ore-planet-fuel 100
                 :game/ore-planet-galaxars 50
                 :game/food-planet-food 1000
-                :game/military-planet-soldiers 100
-                :game/military-planet-fighters 50
-                :game/military-planet-stations 25
-                :game/military-planet-agents 10}
+                :game/mil-planet-soldiers 100
+                :game/mil-planet-fighters 50
+                :game/mil-planet-stations 25
+                :game/mil-planet-agents 10}
           income (income/calculate-income player game)]
       (is (= 1000 (:ore-credits income)))     ; 2 × 500
       (is (= 200 (:ore-fuel income)))         ; 2 × 100
@@ -228,7 +228,7 @@
     (let [player (assoc test-player 
                         :player/ore-planets 0 
                         :player/food-planets 0 
-                        :player/military-planets 0)
+                        :player/mil-planets 0)
           tx-called (atom nil)]
       (with-redefs [xt/entity (fake-entity [player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
@@ -301,7 +301,7 @@
     (let [player (assoc test-player 
                         :player/ore-planets 0 
                         :player/food-planets 0 
-                        :player/military-planets 0)
+                        :player/mil-planets 0)
           result (income/income-page {:player player :game test-game})]
       ;; Should render without error
       (is (vector? result))

@@ -14,10 +14,10 @@
 
 (def food-planet-food 1000)
 
-(def military-planet-soldiers 50)
-(def military-planet-fighters 25)
-(def military-planet-stations 10)
-(def military-planet-agents 5)
+(def mil-planet-soldiers 50)
+(def mil-planet-fighters 25)
+(def mil-planet-stations 10)
+(def mil-planet-agents 5)
 
 ;; :: Upkeep/Expense Defaults
 ;; Cost to maintain units and infrastructure per round
@@ -52,6 +52,6 @@
 (def admiral-cost 750)
 (def station-cost 200)
 (def command-ship-cost 2000)
-(def military-planet-cost 5000)
+(def mil-planet-cost 5000)
 (def food-planet-cost 4000)
 (def ore-planet-cost 6000)

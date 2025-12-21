@@ -32,7 +32,7 @@
                       (* (:admirals quantities)         (:game/admiral-cost game))
                       (* (:stations quantities) (:game/station-cost game))
                       (* (:command-ships quantities)    (:game/command-ship-cost game))
-                      (* (:military-planets quantities) (:game/military-planet-cost game))
+                      (* (:mil-planets quantities) (:game/mil-planet-cost game))
                       (* (:food-planets quantities)     (:game/food-planet-cost game))
                       (* (:ore-planets quantities)      (:game/ore-planet-cost game)))]
     {:total-cost total-cost}))
@@ -51,7 +51,7 @@
    :admirals         (+ (:player/admirals player)         (:admirals quantities))
    :stations         (+ (:player/stations player) (:stations quantities))
    :command-ships    (+ (:player/command-ships player)    (:command-ships quantities))
-   :military-planets (+ (:player/military-planets player) (:military-planets quantities))
+   :mil-planets (+ (:player/mil-planets player) (:mil-planets quantities))
    :food-planets     (+ (:player/food-planets player)     (:food-planets quantities))
    :ore-planets      (+ (:player/ore-planets player)      (:ore-planets quantities))})
 
@@ -86,7 +86,7 @@
                        :admirals (utils/parse-numeric-input (:admirals params))
                        :stations (utils/parse-numeric-input (:stations params))
                        :command-ships (utils/parse-numeric-input (:command-ships params))
-                       :military-planets (utils/parse-numeric-input (:military-planets params))
+                       :mil-planets (utils/parse-numeric-input (:mil-planets params))
                        :food-planets (utils/parse-numeric-input (:food-planets params))
                        :ore-planets (utils/parse-numeric-input (:ore-planets params))}
             
@@ -114,7 +114,7 @@
                 :player/admirals (:admirals resources-after)
                 :player/stations (:stations resources-after)
                 :player/command-ships (:command-ships resources-after)
-                :player/military-planets (:military-planets resources-after)
+                :player/mil-planets (:mil-planets resources-after)
                 :player/food-planets (:food-planets resources-after)
                 :player/ore-planets (:ore-planets resources-after)
                 :player/current-phase 4}])
@@ -134,7 +134,7 @@
                      :admirals (utils/parse-numeric-input (:admirals params))
                      :stations (utils/parse-numeric-input (:stations params))
                      :command-ships (utils/parse-numeric-input (:command-ships params))
-                     :military-planets (utils/parse-numeric-input (:military-planets params))
+                     :mil-planets (utils/parse-numeric-input (:mil-planets params))
                      :food-planets (utils/parse-numeric-input (:food-planets params))
                      :ore-planets (utils/parse-numeric-input (:ore-planets params))}
         
@@ -183,7 +183,7 @@
 ;;; Shows building options and input fields for player to purchase units and planets
 (defn building-page [{:keys [player game]}]
   (let [player-id (:xt/id player)
-        hx-include "[name='soldiers'],[name='transports'],[name='generals'],[name='carriers'],[name='fighters'],[name='admirals'],[name='stations'],[name='command-ships'],[name='military-planets'],[name='food-planets'],[name='ore-planets']"]
+        hx-include "[name='soldiers'],[name='transports'],[name='generals'],[name='carriers'],[name='fighters'],[name='admirals'],[name='stations'],[name='command-ships'],[name='mil-planets'],[name='food-planets'],[name='ore-planets']"]
     (ui/page
       {}
       [:div.text-green-400.font-mono
@@ -298,10 +298,10 @@
            [:div.space-y-2
             [:div
              [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (:game/military-planet-cost game) " credits")]]
+             [:p.font-mono (str (:game/mil-planet-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (building-input "military-planets" 0 player-id hx-include)]]]
+             (building-input "mil-planets" 0 player-id hx-include)]]]
 
           ;; Purchase food planets
           [:div.border.border-green-400.p-4

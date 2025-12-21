@@ -21,7 +21,7 @@
    :player/soldiers 100
    :player/fighters 20
    :player/stations 10
-   :player/military-planets 5
+   :player/mil-planets 5
    :player/food-planets 4
    :player/ore-planets 6
    :player/food 500
@@ -62,7 +62,7 @@
       (is (= 50 (:soldier-sell rates)))
       (is (= 100 (:fighter-sell rates)))
       (is (= 150 (:station-sell rates)))
-      (is (= 500 (:military-planet-sell rates)))
+      (is (= 500 (:mil-planet-sell rates)))
       (is (= 500 (:food-planet-sell rates)))
       (is (= 500 (:ore-planet-sell rates)))
       (is (= 10 (:food-buy rates)))
@@ -75,7 +75,7 @@
     (let [quantities {:soldiers-sold 10
                      :fighters-sold 5
                      :stations-sold 2
-                     :military-planets-sold 1
+                     :mil-planets-sold 1
                      :food-planets-sold 1
                      :ore-planets-sold 1
                      :food-bought 0
@@ -94,7 +94,7 @@
     (let [quantities {:soldiers-sold 0
                      :fighters-sold 0
                      :stations-sold 0
-                     :military-planets-sold 0
+                     :mil-planets-sold 0
                      :food-planets-sold 0
                      :ore-planets-sold 0
                      :food-bought 20
@@ -115,7 +115,7 @@
     (let [quantities {:soldiers-sold 5
                      :fighters-sold 2
                      :stations-sold 1
-                     :military-planets-sold 0
+                     :mil-planets-sold 0
                      :food-planets-sold 0
                      :ore-planets-sold 0
                      :food-bought 10
@@ -139,7 +139,7 @@
                   :player/soldiers 100
                   :player/fighters 20
                   :player/stations 10
-                  :player/military-planets 5
+                  :player/mil-planets 5
                   :player/food-planets 4
                   :player/ore-planets 6
                   :player/food 500
@@ -147,7 +147,7 @@
           quantities {:soldiers-sold 10
                      :fighters-sold 5
                      :stations-sold 2
-                     :military-planets-sold 1
+                     :mil-planets-sold 1
                      :food-planets-sold 1
                      :ore-planets-sold 1
                      :food-bought 50
@@ -160,7 +160,7 @@
       (is (= 90 (:soldiers resources-after)))             ; 100 - 10
       (is (= 15 (:fighters resources-after)))             ; 20 - 5
       (is (= 8 (:stations resources-after)))              ; 10 - 2
-      (is (= 4 (:military-planets resources-after)))      ; 5 - 1
+      (is (= 4 (:mil-planets resources-after)))      ; 5 - 1
       (is (= 3 (:food-planets resources-after)))          ; 4 - 1
       (is (= 5 (:ore-planets resources-after)))           ; 6 - 1
       (is (= 530 (:food resources-after)))                ; 500 + 50 - 20
@@ -169,32 +169,32 @@
 (deftest test-valid-exchange
   (testing "Returns true when all resources are non-negative"
     (is (true? (exchange/valid-exchange? {:credits 100 :soldiers 50 :fighters 10 
-                                          :stations 5 :military-planets 2 :food-planets 3 
+                                          :stations 5 :mil-planets 2 :food-planets 3 
                                           :ore-planets 1 :food 1000 :fuel 500})))
     (is (true? (exchange/valid-exchange? {:credits 0 :soldiers 0 :fighters 0 
-                                          :stations 0 :military-planets 0 :food-planets 0 
+                                          :stations 0 :mil-planets 0 :food-planets 0 
                                           :ore-planets 0 :food 0 :fuel 0}))))
   
   (testing "Returns false when any resource is negative"
     (is (false? (exchange/valid-exchange? {:credits -1 :soldiers 50 :fighters 10 
-                                           :stations 5 :military-planets 2 :food-planets 3 
+                                           :stations 5 :mil-planets 2 :food-planets 3 
                                            :ore-planets 1 :food 1000 :fuel 500})))
     (is (false? (exchange/valid-exchange? {:credits 100 :soldiers -1 :fighters 10 
-                                           :stations 5 :military-planets 2 :food-planets 3 
+                                           :stations 5 :mil-planets 2 :food-planets 3 
                                            :ore-planets 1 :food 1000 :fuel 500})))
     (is (false? (exchange/valid-exchange? {:credits 100 :soldiers 50 :fighters 10 
-                                           :stations 5 :military-planets 2 :food-planets 3 
+                                           :stations 5 :mil-planets 2 :food-planets 3 
                                            :ore-planets 1 :food -1 :fuel 500})))))
 
 (deftest test-identify-invalid-exchanges
   (testing "Identifies specific invalid exchanges correctly"
     (let [resources-after {:credits -50 :soldiers -10 :fighters 15 
-                          :stations 8 :military-planets 4 :food-planets 3 
+                          :stations 8 :mil-planets 4 :food-planets 3 
                           :ore-planets 5 :food 530 :fuel 320}
           quantities {:soldiers-sold 110  ; Oversold
                      :fighters-sold 5
                      :stations-sold 2
-                     :military-planets-sold 1
+                     :mil-planets-sold 1
                      :food-planets-sold 1
                      :ore-planets-sold 1
                      :food-bought 50
@@ -241,7 +241,7 @@
     (let [params {:soldiers-sold "10"
                   :fighters-sold "5"
                   :stations-sold "2"
-                  :military-planets-sold "1"
+                  :mil-planets-sold "1"
                   :food-planets-sold "1"
                   :ore-planets-sold "1"
                   :food-bought "50"
@@ -259,7 +259,7 @@
               
               ;; Calculate expected values using pure functions
               quantities {:soldiers-sold 10 :fighters-sold 5 :stations-sold 2
-                         :military-planets-sold 1 :food-planets-sold 1 :ore-planets-sold 1
+                         :mil-planets-sold 1 :food-planets-sold 1 :ore-planets-sold 1
                          :food-bought 50 :food-sold 20 :fuel-bought 30 :fuel-sold 10}
               rates (exchange/get-exchange-rates)
               credit-changes (exchange/calculate-exchange-credits quantities rates)
@@ -280,7 +280,7 @@
           (is (= (:soldiers expected) (:player/soldiers actual-tx)))
           (is (= (:fighters expected) (:player/fighters actual-tx)))
           (is (= (:stations expected) (:player/stations actual-tx)))
-          (is (= (:military-planets expected) (:player/military-planets actual-tx)))
+          (is (= (:mil-planets expected) (:player/mil-planets actual-tx)))
           (is (= (:food-planets expected) (:player/food-planets actual-tx)))
           (is (= (:ore-planets expected) (:player/ore-planets actual-tx)))
           (is (= (:food expected) (:player/food actual-tx)))
@@ -289,7 +289,7 @@
 (deftest test-apply-exchange-zero-exchanges
   (testing "Handles zero exchanges correctly (no resources changed)"
     (let [params {:soldiers-sold "0" :fighters-sold "0" :stations-sold "0"
-                  :military-planets-sold "0" :food-planets-sold "0" :ore-planets-sold "0"
+                  :mil-planets-sold "0" :food-planets-sold "0" :ore-planets-sold "0"
                   :food-bought "0" :food-sold "0" :fuel-bought "0" :fuel-sold "0"}
           tx-called (atom nil)]
       (with-redefs [xt/entity (fake-entity [test-player])
@@ -339,7 +339,7 @@
                   biff/render identity]  ; Pass through hiccup unchanged
       (let [ctx {:path-params {:player-id (str test-player-id)}
                  :params {:soldiers-sold "10" :fighters-sold "5"
-                          :stations-sold "2" :military-planets-sold "1"
+                          :stations-sold "2" :mil-planets-sold "1"
                           :food-planets-sold "1" :ore-planets-sold "1"
                           :food-bought "50" :food-sold "20"
                           :fuel-bought "30" :fuel-sold "10"}
@@ -353,7 +353,7 @@
     (with-redefs [xt/entity (fake-entity [test-player])]
       ;; Test valid exchanges
       (let [valid-params {:soldiers-sold "10" :fighters-sold "5"
-                         :stations-sold "2" :military-planets-sold "1"
+                         :stations-sold "2" :mil-planets-sold "1"
                          :food-planets-sold "1" :ore-planets-sold "1"
                          :food-bought "0" :food-sold "0"
                          :fuel-bought "0" :fuel-sold "0"}
@@ -367,7 +367,7 @@
       ;; Test invalid exchanges (overselling)
       (let [invalid-params {:soldiers-sold "1000"  ; More than player has
                            :fighters-sold "0" :stations-sold "0"
-                           :military-planets-sold "0" :food-planets-sold "0" :ore-planets-sold "0"
+                           :mil-planets-sold "0" :food-planets-sold "0" :ore-planets-sold "0"
                            :food-bought "0" :food-sold "0"
                            :fuel-bought "0" :fuel-sold "0"}
             quantities (into {} (map (fn [[k v]] [k (utils/parse-numeric-input v)]) 

@@ -28,10 +28,10 @@
    :ore-fuel     (* (:player/ore-planets player)      (:game/ore-planet-fuel game))
    :ore-galaxars (* (:player/ore-planets player)      (:game/ore-planet-galaxars game))
    :food-food    (* (:player/food-planets player)     (:game/food-planet-food game))
-   :mil-soldiers (* (:player/military-planets player) (:game/military-planet-soldiers game))
-   :mil-fighters (* (:player/military-planets player) (:game/military-planet-fighters game))
-   :mil-stations (* (:player/military-planets player) (:game/military-planet-stations game))
-   :mil-agents   (* (:player/military-planets player) (:game/military-planet-agents game))})
+   :mil-soldiers (* (:player/mil-planets player) (:game/mil-planet-soldiers game))
+   :mil-fighters (* (:player/mil-planets player) (:game/mil-planet-fighters game))
+   :mil-stations (* (:player/mil-planets player) (:game/mil-planet-stations game))
+   :mil-agents   (* (:player/mil-planets player) (:game/mil-planet-agents game))})
 
 ;;;;
 ;;;; Actions
@@ -116,7 +116,7 @@
  
        ;; Military planets generate military units: soldiers, fighters, stations, and agents
        [:div.border.border-green-400.p-4
-        [:h4.font-bold.mb-3 (str "Military Planets (" (:player/military-planets player) ")")]
+        [:h4.font-bold.mb-3 (str "Military Planets (" (:player/mil-planets player) ")")]
         [:div.space-y-2
          [:div
           [:p.text-xs "Soldiers"]

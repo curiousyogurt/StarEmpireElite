@@ -39,10 +39,10 @@
    :game/ore-planet-fuel           0
    :game/ore-planet-galaxars       0
    :game/food-planet-food          0
-   :game/military-planet-stations  0
-   :game/military-planet-fighters  0
-   :game/military-planet-soldiers  0
-   :game/military-planet-agents    0})
+   :game/mil-planet-stations  0
+   :game/mil-planet-fighters  0
+   :game/mil-planet-soldiers  0
+   :game/mil-planet-agents    0})
 
 (defn make-game [sys overrides]
   (let [doc (merge game-defaults overrides)]
@@ -84,7 +84,7 @@
    ;; planet summaries
    :player/ore-planets        1
    :player/food-planets       3
-   :player/military-planets   2})
+   :player/mil-planets   2})
 
 (defn make-player [sys game-id overrides]
   (let [doc (-> player-defaults

@@ -44,7 +44,7 @@
     [:p.font-mono (:player/stability player) "%"]]
    [:div
     [:p.text-xs "Planets"]
-    [:p.font-mono (+ (:player/military-planets player)
+    [:p.font-mono (+ (:player/mil-planets player)
                      (:player/food-planets player)
                      (:player/ore-planets player))]]
  
@@ -93,7 +93,7 @@
          [:td.border-r.border-green-400.px-3.py-2 (:rank player)]
          [:td.border-r.border-green-400.px-3.py-2 (:player/empire-name player)]
          [:td.border-r.border-green-400.px-3.py-2 
-          (+ (:player/military-planets player)
+          (+ (:player/mil-planets player)
              (:player/food-planets player)
              (:player/ore-planets player))]
          [:td.px-3.py-2 (:player/score player)]])]]]])

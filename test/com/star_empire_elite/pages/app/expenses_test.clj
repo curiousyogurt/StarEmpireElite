@@ -35,7 +35,7 @@
    :player/current-phase 2
    :player/ore-planets 2
    :player/food-planets 2
-   :player/military-planets 1
+   :player/mil-planets 1
    :player/credits 1000
    :player/food 800
    :player/fuel 200

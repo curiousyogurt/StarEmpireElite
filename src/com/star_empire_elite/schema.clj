@@ -25,10 +25,10 @@
           [:game/ore-planet-fuel           :int]
           [:game/ore-planet-galaxars       :int]
           [:game/food-planet-food          :int]
-          [:game/military-planet-soldiers  :int]
-          [:game/military-planet-fighters  :int]
-          [:game/military-planet-stations  :int]
-          [:game/military-planet-agents    :int]
+          [:game/mil-planet-soldiers  :int]
+          [:game/mil-planet-fighters  :int]
+          [:game/mil-planet-stations  :int]
+          [:game/mil-planet-agents    :int]
           
           ;; Upkeep/expense constants
           [:game/planet-upkeep-credits     :int]
@@ -53,7 +53,7 @@
           [:game/admiral-cost            :int]
           [:game/station-cost            :int]
           [:game/command-ship-cost       :int]
-          [:game/military-planet-cost    :int]
+          [:game/mil-planet-cost    :int]
           [:game/food-planet-cost        :int]
           [:game/ore-planet-cost         :int]]
 
@@ -71,7 +71,7 @@
             [:player/galaxars              :int]
  
             ;; Resources
-            [:player/military-planets      :int]
+            [:player/mil-planets      :int]
             [:player/food-planets          :int]
             [:player/ore-planets           :int]
             [:player/population            :int]

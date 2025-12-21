@@ -32,10 +32,10 @@
                    :game/ore-planet-fuel const/ore-planet-fuel
                    :game/ore-planet-galaxars const/ore-planet-galaxars
                    :game/food-planet-food const/food-planet-food
-                   :game/military-planet-soldiers const/military-planet-soldiers
-                   :game/military-planet-fighters const/military-planet-fighters
-                   :game/military-planet-stations const/military-planet-stations
-                   :game/military-planet-agents const/military-planet-agents
+                   :game/mil-planet-soldiers const/mil-planet-soldiers
+                   :game/mil-planet-fighters const/mil-planet-fighters
+                   :game/mil-planet-stations const/mil-planet-stations
+                   :game/mil-planet-agents const/mil-planet-agents
                    :game/planet-upkeep-credits const/planet-upkeep-credits
                    :game/planet-upkeep-food const/planet-upkeep-food
                    :game/soldier-upkeep-credits const/soldier-upkeep-credits
@@ -57,7 +57,7 @@
                    :game/admiral-cost const/admiral-cost
                    :game/station-cost const/station-cost
                    :game/command-ship-cost const/command-ship-cost
-                   :game/military-planet-cost const/military-planet-cost
+                   :game/mil-planet-cost const/mil-planet-cost
                    :game/food-planet-cost const/food-planet-cost
                    :game/ore-planet-cost const/ore-planet-cost}
 
@@ -70,7 +70,7 @@
                      :player/food 500
                      :player/fuel 300
                      :player/galaxars 100
-                     :player/military-planets 1
+                     :player/mil-planets 1
                      :player/food-planets 1
                      :player/ore-planets 1
                      :player/population 100000
@@ -150,23 +150,23 @@
         (is (= expected-food 4000))  ; 4 * 1000
         (is (= actual-food expected-food))))))
 
-(deftest military-planet-income-calculation-test
+(deftest mil-planet-income-calculation-test
   (testing "Military planets generate correct military units"
     (with-open [node (test-xtdb-node [])]
       (let [ctx (get-context node)
             {:keys [game-id player-id]}
             (create-test-player-and-game
               ctx
-              {:player/military-planets 2}
+              {:player/mil-planets 2}
               {})
             db (xt/db node)
             player (xt/entity db player-id)
             game (xt/entity db game-id)
 
-            expected-soldiers (* 2 const/military-planet-soldiers)
-            expected-fighters (* 2 const/military-planet-fighters)
-            expected-stations (* 2 const/military-planet-stations)
-            expected-agents (* 2 const/military-planet-agents)]
+            expected-soldiers (* 2 const/mil-planet-soldiers)
+            expected-fighters (* 2 const/mil-planet-fighters)
+            expected-stations (* 2 const/mil-planet-stations)
+            expected-agents (* 2 const/mil-planet-agents)]
 
         (is (= expected-soldiers 100))  ; 2 * 50
         (is (= expected-fighters 50))   ; 2 * 25
@@ -174,10 +174,10 @@
         (is (= expected-agents 10))     ; 2 * 5
 
         ;; Test actual calculations
-        (let [mil-soldiers (* (:player/military-planets player) (:game/military-planet-soldiers game))
-              mil-fighters (* (:player/military-planets player) (:game/military-planet-fighters game))
-              mil-stations (* (:player/military-planets player) (:game/military-planet-stations game))
-              mil-agents (* (:player/military-planets player) (:game/military-planet-agents game))]
+        (let [mil-soldiers (* (:player/mil-planets player) (:game/mil-planet-soldiers game))
+              mil-fighters (* (:player/mil-planets player) (:game/mil-planet-fighters game))
+              mil-stations (* (:player/mil-planets player) (:game/mil-planet-stations game))
+              mil-agents (* (:player/mil-planets player) (:game/mil-planet-agents game))]
           (is (= mil-soldiers expected-soldiers))
           (is (= mil-fighters expected-fighters))
           (is (= mil-stations expected-stations))
@@ -253,7 +253,7 @@
               {:player/current-phase 1
                :player/ore-planets 2
                :player/food-planets 1
-               :player/military-planets 1
+               :player/mil-planets 1
                :player/credits 1000
                :player/food 500
                :player/fuel 200
@@ -272,10 +272,10 @@
               ore-fuel (* (:player/ore-planets player) (:game/ore-planet-fuel game))
               ore-galaxars (* (:player/ore-planets player) (:game/ore-planet-galaxars game))
               food-food (* (:player/food-planets player) (:game/food-planet-food game))
-              mil-soldiers (* (:player/military-planets player) (:game/military-planet-soldiers game))
-              mil-fighters (* (:player/military-planets player) (:game/military-planet-fighters game))
-              mil-stations (* (:player/military-planets player) (:game/military-planet-stations game))
-              mil-agents (* (:player/military-planets player) (:game/military-planet-agents game))
+              mil-soldiers (* (:player/mil-planets player) (:game/mil-planet-soldiers game))
+              mil-fighters (* (:player/mil-planets player) (:game/mil-planet-fighters game))
+              mil-stations (* (:player/mil-planets player) (:game/mil-planet-stations game))
+              mil-agents (* (:player/mil-planets player) (:game/mil-planet-agents game))
 
               ;; Calculate final resources after income
               final-credits (+ (:player/credits player) ore-credits)
@@ -317,7 +317,7 @@
               ctx
               {:player/ore-planets 0
                :player/food-planets 0
-               :player/military-planets 0}
+               :player/mil-planets 0}
               {})
             db (xt/db node)
             player (xt/entity db player-id)
@@ -326,7 +326,7 @@
         ;; All income should be zero
         (is (= (* (:player/ore-planets player) (:game/ore-planet-credits game)) 0))
         (is (= (* (:player/food-planets player) (:game/food-planet-food game)) 0))
-        (is (= (* (:player/military-planets player) (:game/military-planet-soldiers game)) 0))))))
+        (is (= (* (:player/mil-planets player) (:game/mil-planet-soldiers game)) 0))))))
 
 ;; Test 7: Game Constants Consistency
 (deftest game-constants-consistency-test
@@ -342,5 +342,5 @@
         (is (= (:game/ore-planet-fuel game) const/ore-planet-fuel))
         (is (= (:game/ore-planet-galaxars game) const/ore-planet-galaxars))
         (is (= (:game/food-planet-food game) const/food-planet-food))
-        (is (= (:game/military-planet-soldiers game) const/military-planet-soldiers))
-        (is (= (:game/military-planet-fighters game) const/military-planet-fighters))))))
+        (is (= (:game/mil-planet-soldiers game) const/mil-planet-soldiers))
+        (is (= (:game/mil-planet-fighters game) const/mil-planet-fighters))))))

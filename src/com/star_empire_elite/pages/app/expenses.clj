@@ -25,7 +25,7 @@
   "Calculate total required upkeep costs based on player's assets and game constants.
   Returns map with expense categories and their costs."
   [player game]
-  (let [planet-count (+ (:player/military-planets player)
+  (let [planet-count (+ (:player/mil-planets player)
                         (:player/food-planets player)
                         (:player/ore-planets player))]
     {:planets-credits   (* planet-count (:game/planet-upkeep-credits game))
@@ -217,7 +217,7 @@
            [:h4.font-bold.mb-3 "Planets Upkeep"]
            [:div.space-y-2
             [:div
-             [:p.text-xs "Planets: " (+ (:player/military-planets player)
+             [:p.text-xs "Planets: " (+ (:player/mil-planets player)
                                         (:player/food-planets player)
                                         (:player/ore-planets player))]]
             [:div

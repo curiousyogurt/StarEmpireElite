@@ -27,7 +27,7 @@
   {:soldier-sell 50
    :fighter-sell 100
    :station-sell 150
-   :military-planet-sell 500
+   :mil-planet-sell 500
    :food-planet-sell 500
    :ore-planet-sell 500
    :food-buy 10
@@ -43,7 +43,7 @@
   (let [credits-from-sales (+ (* (:soldiers-sold quantities) (:soldier-sell rates))
                               (* (:fighters-sold quantities) (:fighter-sell rates))
                               (* (:stations-sold quantities) (:station-sell rates))
-                              (* (:military-planets-sold quantities) (:military-planet-sell rates))
+                              (* (:mil-planets-sold quantities) (:mil-planet-sell rates))
                               (* (:food-planets-sold quantities) (:food-planet-sell rates))
                               (* (:ore-planets-sold quantities) (:ore-planet-sell rates)))
         credits-from-resources (- (+ (* (:food-sold quantities) (:food-sell rates))
@@ -63,7 +63,7 @@
    :soldiers (- (:player/soldiers player) (:soldiers-sold quantities))
    :fighters (- (:player/fighters player) (:fighters-sold quantities))
    :stations (- (:player/stations player) (:stations-sold quantities))
-   :military-planets (- (:player/military-planets player) (:military-planets-sold quantities))
+   :mil-planets (- (:player/mil-planets player) (:mil-planets-sold quantities))
    :food-planets (- (:player/food-planets player) (:food-planets-sold quantities))
    :ore-planets (- (:player/ore-planets player) (:ore-planets-sold quantities))
    :food (+ (:player/food player) (:food-bought quantities) (- (:food-sold quantities)))
@@ -77,7 +77,7 @@
        (>= (:soldiers resources-after) 0)
        (>= (:fighters resources-after) 0)
        (>= (:stations resources-after) 0)
-       (>= (:military-planets resources-after) 0)
+       (>= (:mil-planets resources-after) 0)
        (>= (:food-planets resources-after) 0)
        (>= (:ore-planets resources-after) 0)
        (>= (:food resources-after) 0)
@@ -90,7 +90,7 @@
   {:invalid-soldier-sale? (< (:soldiers resources-after) 0)
    :invalid-fighter-sale? (< (:fighters resources-after) 0)
    :invalid-station-sale? (< (:stations resources-after) 0)
-   :invalid-mil-planet-sale? (< (:military-planets resources-after) 0)
+   :invalid-mil-planet-sale? (< (:mil-planets resources-after) 0)
    :invalid-food-planet-sale? (< (:food-planets resources-after) 0)
    :invalid-ore-planet-sale? (< (:ore-planets resources-after) 0)
    :invalid-food-sale? (and (> (:food-sold quantities) 0) (< (:food resources-after) 0))
@@ -118,7 +118,7 @@
       (let [quantities {:soldiers-sold (utils/parse-numeric-input (:soldiers-sold params))
                         :fighters-sold (utils/parse-numeric-input (:fighters-sold params))
                         :stations-sold (utils/parse-numeric-input (:stations-sold params))
-                        :military-planets-sold (utils/parse-numeric-input (:military-planets-sold params))
+                        :mil-planets-sold (utils/parse-numeric-input (:mil-planets-sold params))
                         :food-planets-sold (utils/parse-numeric-input (:food-planets-sold params))
                         :ore-planets-sold (utils/parse-numeric-input (:ore-planets-sold params))
                         :food-bought (utils/parse-numeric-input (:food-bought params))
@@ -141,7 +141,7 @@
             :player/soldiers (:soldiers resources-after)
             :player/fighters (:fighters resources-after)
             :player/stations (:stations resources-after)
-            :player/military-planets (:military-planets resources-after)
+            :player/mil-planets (:mil-planets resources-after)
             :player/food-planets (:food-planets resources-after)
             :player/ore-planets (:ore-planets resources-after)
             :player/food (:food resources-after)
@@ -157,7 +157,7 @@
           quantities {:soldiers-sold (utils/parse-numeric-input (:soldiers-sold params))
                      :fighters-sold (utils/parse-numeric-input (:fighters-sold params))
                      :stations-sold (utils/parse-numeric-input (:stations-sold params))
-                     :military-planets-sold (utils/parse-numeric-input (:military-planets-sold params))
+                     :mil-planets-sold (utils/parse-numeric-input (:mil-planets-sold params))
                      :food-planets-sold (utils/parse-numeric-input (:food-planets-sold params))
                      :ore-planets-sold (utils/parse-numeric-input (:ore-planets-sold params))
                      :food-bought (utils/parse-numeric-input (:food-bought params))
@@ -225,7 +225,7 @@
            [:div
             [:p.text-xs "Mil Plts"]
             [:p.font-mono {:class (when (:invalid-mil-planet-sale? invalid-exchanges) "text-red-400")} 
-             (:military-planets resources-after)]]
+             (:mil-planets resources-after)]]
            [:div
             [:p.text-xs "Food Plts"]
             [:p.font-mono {:class (when (:invalid-food-planet-sale? invalid-exchanges) "text-red-400")} 
@@ -256,7 +256,7 @@
 ;;; Shows exchange options and input fields for player to buy/sell resources and assets
 (defn exchange-page [{:keys [player game]}]
   (let [player-id (:xt/id player)
-        hx-include "[name='soldiers-sold'],[name='fighters-sold'],[name='stations-sold'],[name='military-planets-sold'],[name='food-planets-sold'],[name='ore-planets-sold'],[name='food-bought'],[name='food-sold'],[name='fuel-bought'],[name='fuel-sold']"
+        hx-include "[name='soldiers-sold'],[name='fighters-sold'],[name='stations-sold'],[name='mil-planets-sold'],[name='food-planets-sold'],[name='ore-planets-sold'],[name='food-bought'],[name='food-sold'],[name='fuel-bought'],[name='fuel-sold']"
         rates (get-exchange-rates)]
     (ui/page
       {}
@@ -294,7 +294,7 @@
           [:p.font-mono (:player/stations player)]]
          [:div
           [:p.text-xs "Mil Plts"]
-          [:p.font-mono (:player/military-planets player)]]
+          [:p.font-mono (:player/mil-planets player)]]
          [:div
           [:p.text-xs "Food Plts"]
           [:p.font-mono (:player/food-planets player)]]
@@ -388,13 +388,13 @@
            [:div.space-y-2
             [:div
              [:p.text-xs "Price per Unit"]
-             [:p.font-mono (str (:military-planet-sell rates) " credits")]]
+             [:p.font-mono (str (:mil-planet-sell rates) " credits")]]
             [:div
              [:p.text-xs "Max Available"]
-             [:p.font-mono (:player/military-planets player)]]
+             [:p.font-mono (:player/mil-planets player)]]
             [:div
              [:label.text-xs "Sell Quantity"]
-             (exchange-input "military-planets-sold" 0 player-id hx-include)]]]
+             (exchange-input "mil-planets-sold" 0 player-id hx-include)]]]
 
           ;; Sell food - convert to credits at half buy price
           [:div.border.border-green-400.p-4
@@ -481,7 +481,7 @@
             [:p.font-mono (:player/stations player)]]
            [:div
             [:p.text-xs "Mil Plts"]
-            [:p.font-mono (:player/military-planets player)]]
+            [:p.font-mono (:player/mil-planets player)]]
            [:div
             [:p.text-xs "Food Plts"]
             [:p.font-mono (:player/food-planets player)]]

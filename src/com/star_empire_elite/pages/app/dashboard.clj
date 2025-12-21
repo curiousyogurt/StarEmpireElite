@@ -65,7 +65,7 @@
      [:p.font-mono (:player/food-planets player)]]
     [:div
      [:p.text-xs "Mil Plts"]
-     [:p.font-mono (:player/military-planets player)]]]
+     [:p.font-mono (:player/mil-planets player)]]]
    
    ;; :: row 2: military units and leadership
    [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2.mb-3.pb-3.border-b.border-green-400

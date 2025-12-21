@@ -23,7 +23,7 @@
   (testing "Game constants are properly defined"
     (is (= const/ore-planet-credits 500))
     (is (= const/food-planet-food 1000))
-    (is (= const/military-planet-soldiers 50))
+    (is (= const/mil-planet-soldiers 50))
     (is (pos? const/planet-upkeep-credits))
     (is (pos? const/soldier-upkeep-food))))
 
@@ -69,10 +69,10 @@
             :game/ore-planet-fuel const/ore-planet-fuel
             :game/ore-planet-galaxars const/ore-planet-galaxars
             :game/food-planet-food const/food-planet-food
-            :game/military-planet-soldiers const/military-planet-soldiers
-            :game/military-planet-fighters const/military-planet-fighters
-            :game/military-planet-stations const/military-planet-stations
-            :game/military-planet-agents const/military-planet-agents
+            :game/mil-planet-soldiers const/mil-planet-soldiers
+            :game/mil-planet-fighters const/mil-planet-fighters
+            :game/mil-planet-stations const/mil-planet-stations
+            :game/mil-planet-agents const/mil-planet-agents
             ;; All the required upkeep constants
             :game/planet-upkeep-credits const/planet-upkeep-credits
             :game/planet-upkeep-food const/planet-upkeep-food
@@ -95,7 +95,7 @@
             :game/admiral-cost const/admiral-cost
             :game/station-cost const/station-cost
             :game/command-ship-cost const/command-ship-cost
-            :game/military-planet-cost const/military-planet-cost
+            :game/mil-planet-cost const/mil-planet-cost
             :game/food-planet-cost const/food-planet-cost
             :game/ore-planet-cost const/ore-planet-cost}])
 
@@ -126,7 +126,7 @@
             :player/fuel 3000
             :player/galaxars 1000
             ;; Resources
-            :player/military-planets 2
+            :player/mil-planets 2
             :player/food-planets 3
             :player/ore-planets 1
             :player/population 1000000
@@ -181,10 +181,10 @@
                 :game/ore-planet-fuel const/ore-planet-fuel
                 :game/ore-planet-galaxars const/ore-planet-galaxars
                 :game/food-planet-food const/food-planet-food
-                :game/military-planet-soldiers const/military-planet-soldiers
-                :game/military-planet-fighters const/military-planet-fighters
-                :game/military-planet-stations const/military-planet-stations
-                :game/military-planet-agents const/military-planet-agents
+                :game/mil-planet-soldiers const/mil-planet-soldiers
+                :game/mil-planet-fighters const/mil-planet-fighters
+                :game/mil-planet-stations const/mil-planet-stations
+                :game/mil-planet-agents const/mil-planet-agents
                 ;; Upkeep/expense constants
                 :game/planet-upkeep-credits const/planet-upkeep-credits
                 :game/planet-upkeep-food const/planet-upkeep-food
@@ -207,7 +207,7 @@
                 :game/admiral-cost const/admiral-cost
                 :game/station-cost const/station-cost
                 :game/command-ship-cost const/command-ship-cost
-                :game/military-planet-cost const/military-planet-cost
+                :game/mil-planet-cost const/mil-planet-cost
                 :game/food-planet-cost const/food-planet-cost
                 :game/ore-planet-cost const/ore-planet-cost}
                {:db/doc-type :player
@@ -219,7 +219,7 @@
                 :player/food 5000
                 :player/fuel 3000
                 :player/galaxars 1000
-                :player/military-planets 2
+                :player/mil-planets 2
                 :player/food-planets 3
                 :player/ore-planets 1
                 :player/population 1000000

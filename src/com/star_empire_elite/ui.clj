@@ -188,7 +188,7 @@
       [:p.font-mono (or (:command-ships resources) (:player/command-ships resources))]]
      [:div
       [:p.text-xs "Mil Plts"]
-      [:p.font-mono (or (:military-planets resources) (:player/military-planets resources))]]
+      [:p.font-mono (or (:mil-planets resources) (:player/mil-planets resources))]]
      [:div
       [:p.text-xs "Food Plts"]
       [:p.font-mono (or (:food-planets resources) (:player/food-planets resources))]]
