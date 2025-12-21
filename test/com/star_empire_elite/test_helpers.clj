@@ -78,7 +78,7 @@
    :player/generals           5
    :player/transports         10
    :player/carriers           2
-   :player/command-ships      1
+   :player/cmd-ships          1
    :player/stations           5
 
    ;; planet summaries

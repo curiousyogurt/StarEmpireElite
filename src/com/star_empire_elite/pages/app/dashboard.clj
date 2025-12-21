@@ -91,8 +91,8 @@
      [:p.text-xs "Def Stns"]
      [:p.font-mono (:player/stations player)]]
     [:div
-     [:p.text-xs "Com Shpps"]
-     [:p.font-mono (:player/command-ships player)]]
+     [:p.text-xs "Cmd Ships"]
+     [:p.font-mono (:player/cmd-ships player)]]
     [:div
      [:p.text-xs "Agents"]
      [:p.font-mono (:player/agents player)]]]]])

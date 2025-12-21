@@ -24,17 +24,17 @@
   "Calculate total credits needed for all purchases based on game constants.
    Returns map with total cost."
   [quantities game]
-  (let [total-cost (+ (* (:soldiers quantities)         (:game/soldier-cost game))
-                      (* (:transports quantities)       (:game/transport-cost game))
-                      (* (:generals quantities)         (:game/general-cost game))
-                      (* (:carriers quantities)         (:game/carrier-cost game))
-                      (* (:fighters quantities)         (:game/fighter-cost game))
-                      (* (:admirals quantities)         (:game/admiral-cost game))
-                      (* (:stations quantities) (:game/station-cost game))
-                      (* (:command-ships quantities)    (:game/command-ship-cost game))
-                      (* (:mil-planets quantities) (:game/mil-planet-cost game))
-                      (* (:food-planets quantities)     (:game/food-planet-cost game))
-                      (* (:ore-planets quantities)      (:game/ore-planet-cost game)))]
+  (let [total-cost (+ (* (:soldiers quantities)     (:game/soldier-cost game))
+                      (* (:transports quantities)   (:game/transport-cost game))
+                      (* (:generals quantities)     (:game/general-cost game))
+                      (* (:carriers quantities)     (:game/carrier-cost game))
+                      (* (:fighters quantities)     (:game/fighter-cost game))
+                      (* (:admirals quantities)     (:game/admiral-cost game))
+                      (* (:stations quantities)     (:game/station-cost game))
+                      (* (:cmd-ships quantities)    (:game/cmd-ship-cost game))
+                      (* (:mil-planets quantities)  (:game/mil-planet-cost game))
+                      (* (:food-planets quantities) (:game/food-planet-cost game))
+                      (* (:ore-planets quantities)  (:game/ore-planet-cost game)))]
     {:total-cost total-cost}))
 
 ;;; Calculate all resources after purchases
@@ -42,18 +42,18 @@
   "Calculate player resources after executing purchases.
    Returns map of all resource values after purchases."
   [player quantities cost-info]
-  {:credits          (- (:player/credits player)          (:total-cost cost-info))
-   :soldiers         (+ (:player/soldiers player)         (:soldiers quantities))
-   :transports       (+ (:player/transports player)       (:transports quantities))
-   :generals         (+ (:player/generals player)         (:generals quantities))
-   :carriers         (+ (:player/carriers player)         (:carriers quantities))
-   :fighters         (+ (:player/fighters player)         (:fighters quantities))
-   :admirals         (+ (:player/admirals player)         (:admirals quantities))
-   :stations         (+ (:player/stations player) (:stations quantities))
-   :command-ships    (+ (:player/command-ships player)    (:command-ships quantities))
-   :mil-planets (+ (:player/mil-planets player) (:mil-planets quantities))
-   :food-planets     (+ (:player/food-planets player)     (:food-planets quantities))
-   :ore-planets      (+ (:player/ore-planets player)      (:ore-planets quantities))})
+  {:credits      (- (:player/credits player)      (:total-cost cost-info))
+   :soldiers     (+ (:player/soldiers player)     (:soldiers quantities))
+   :transports   (+ (:player/transports player)   (:transports quantities))
+   :generals     (+ (:player/generals player)     (:generals quantities))
+   :carriers     (+ (:player/carriers player)     (:carriers quantities))
+   :fighters     (+ (:player/fighters player)     (:fighters quantities))
+   :admirals     (+ (:player/admirals player)     (:admirals quantities))
+   :stations     (+ (:player/stations player)     (:stations quantities))
+   :cmd-ships    (+ (:player/cmd-ships player)    (:cmd-ships quantities))
+   :mil-planets  (+ (:player/mil-planets player)       (:mil-planets quantities))
+   :food-planets (+ (:player/food-planets player) (:food-planets quantities))
+   :ore-planets  (+ (:player/ore-planets player)  (:ore-planets quantities))})
 
 ;;; Validate purchase is affordable
 (defn can-afford-purchases?
@@ -78,17 +78,17 @@
     (if-let [redirect (utils/validate-phase player 3 player-id)]
       redirect
       (let [;; Parse all purchase inputs using shared utility
-            quantities {:soldiers (utils/parse-numeric-input (:soldiers params))
-                       :transports (utils/parse-numeric-input (:transports params))
-                       :generals (utils/parse-numeric-input (:generals params))
-                       :carriers (utils/parse-numeric-input (:carriers params))
-                       :fighters (utils/parse-numeric-input (:fighters params))
-                       :admirals (utils/parse-numeric-input (:admirals params))
-                       :stations (utils/parse-numeric-input (:stations params))
-                       :command-ships (utils/parse-numeric-input (:command-ships params))
-                       :mil-planets (utils/parse-numeric-input (:mil-planets params))
+            quantities {:soldiers    (utils/parse-numeric-input (:soldiers params))
+                       :transports   (utils/parse-numeric-input (:transports params))
+                       :generals     (utils/parse-numeric-input (:generals params))
+                       :carriers     (utils/parse-numeric-input (:carriers params))
+                       :fighters     (utils/parse-numeric-input (:fighters params))
+                       :admirals     (utils/parse-numeric-input (:admirals params))
+                       :stations     (utils/parse-numeric-input (:stations params))
+                       :cmd-ships    (utils/parse-numeric-input (:cmd-ships params))
+                       :mil-planets  (utils/parse-numeric-input (:mil-planets params))
                        :food-planets (utils/parse-numeric-input (:food-planets params))
-                       :ore-planets (utils/parse-numeric-input (:ore-planets params))}
+                       :ore-planets  (utils/parse-numeric-input (:ore-planets params))}
             
             ;; Use pure calculation functions to determine final resource values
             cost-info (calculate-purchase-cost quantities game)
@@ -105,18 +105,18 @@
               [{:db/doc-type :player
                 :db/op :update
                 :xt/id player-id
-                :player/credits (:credits resources-after)
-                :player/soldiers (:soldiers resources-after)
-                :player/transports (:transports resources-after)
-                :player/generals (:generals resources-after)
-                :player/carriers (:carriers resources-after)
-                :player/fighters (:fighters resources-after)
-                :player/admirals (:admirals resources-after)
-                :player/stations (:stations resources-after)
-                :player/command-ships (:command-ships resources-after)
-                :player/mil-planets (:mil-planets resources-after)
+                :player/credits      (:credits resources-after)
+                :player/soldiers     (:soldiers resources-after)
+                :player/transports   (:transports resources-after)
+                :player/generals     (:generals resources-after)
+                :player/carriers     (:carriers resources-after)
+                :player/fighters     (:fighters resources-after)
+                :player/admirals     (:admirals resources-after)
+                :player/stations     (:stations resources-after)
+                :player/cmd-ships    (:cmd-ships resources-after)
+                :player/mil-planets  (:mil-planets resources-after)
                 :player/food-planets (:food-planets resources-after)
-                :player/ore-planets (:ore-planets resources-after)
+                :player/ore-planets  (:ore-planets resources-after)
                 :player/current-phase 4}])
             {:status 303
              :headers {"location" (str "/app/game/" player-id "/action")}}))))))
@@ -126,17 +126,17 @@
 (defn calculate-building [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (let [;; Parse all purchase inputs using shared utility
-          quantities {:soldiers (utils/parse-numeric-input (:soldiers params))
-                     :transports (utils/parse-numeric-input (:transports params))
-                     :generals (utils/parse-numeric-input (:generals params))
-                     :carriers (utils/parse-numeric-input (:carriers params))
-                     :fighters (utils/parse-numeric-input (:fighters params))
-                     :admirals (utils/parse-numeric-input (:admirals params))
-                     :stations (utils/parse-numeric-input (:stations params))
-                     :command-ships (utils/parse-numeric-input (:command-ships params))
-                     :mil-planets (utils/parse-numeric-input (:mil-planets params))
+          quantities {:soldiers    (utils/parse-numeric-input (:soldiers params))
+                     :transports   (utils/parse-numeric-input (:transports params))
+                     :generals     (utils/parse-numeric-input (:generals params))
+                     :carriers     (utils/parse-numeric-input (:carriers params))
+                     :fighters     (utils/parse-numeric-input (:fighters params))
+                     :admirals     (utils/parse-numeric-input (:admirals params))
+                     :stations     (utils/parse-numeric-input (:stations params))
+                     :cmd-ships    (utils/parse-numeric-input (:cmd-ships params))
+                     :mil-planets  (utils/parse-numeric-input (:mil-planets params))
                      :food-planets (utils/parse-numeric-input (:food-planets params))
-                     :ore-planets (utils/parse-numeric-input (:ore-planets params))}
+                     :ore-planets  (utils/parse-numeric-input (:ore-planets params))}
         
           ;; Use pure calculation functions
           cost-info (calculate-purchase-cost quantities game)
@@ -183,7 +183,7 @@
 ;;; Shows building options and input fields for player to purchase units and planets
 (defn building-page [{:keys [player game]}]
   (let [player-id (:xt/id player)
-        hx-include "[name='soldiers'],[name='transports'],[name='generals'],[name='carriers'],[name='fighters'],[name='admirals'],[name='stations'],[name='command-ships'],[name='mil-planets'],[name='food-planets'],[name='ore-planets']"]
+        hx-include "[name='soldiers'],[name='transports'],[name='generals'],[name='carriers'],[name='fighters'],[name='admirals'],[name='stations'],[name='cmd-ships'],[name='mil-planets'],[name='food-planets'],[name='ore-planets']"]
     (ui/page
       {}
       [:div.text-green-400.font-mono
@@ -287,10 +287,10 @@
            [:div.space-y-2
             [:div
              [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (:game/command-ship-cost game) " credits")]]
+             [:p.font-mono (str (:game/cmd-ship-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (building-input "command-ships" 0 player-id hx-include)]]]
+             (building-input "cmd-ships" 0 player-id hx-include)]]]
 
           ;; Purchase military planets
           [:div.border.border-green-400.p-4

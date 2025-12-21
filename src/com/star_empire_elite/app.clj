@@ -69,39 +69,39 @@
         :game/fighter-cost const/fighter-cost
         :game/admiral-cost const/admiral-cost
         :game/station-cost const/station-cost
-        :game/command-ship-cost const/command-ship-cost
+        :game/cmd-ship-cost const/cmd-ship-cost
         :game/mil-planet-cost const/mil-planet-cost
         :game/food-planet-cost const/food-planet-cost
         :game/ore-planet-cost const/ore-planet-cost}
-       {:db/doc-type :player
-        :xt/id player-id
-        :player/user (:uid session)
-        :player/game game-id
-        :player/empire-name "Test Empire"
-        :player/credits 10000
-        :player/food 5000
-        :player/fuel 3000
-        :player/galaxars 1000
-        :player/mil-planets 2
-        :player/food-planets 3
-        :player/ore-planets 1
-        :player/population 1000000
-        :player/stability 75
-        :player/status 0
-        :player/score 0
-        :player/current-turn 1
+       {:db/doc-type          :player
+        :xt/id                player-id
+        :player/user          (:uid session)
+        :player/game          game-id
+        :player/empire-name   "Test Empire"
+        :player/credits       10000
+        :player/food          5000
+        :player/fuel          3000
+        :player/galaxars      1000
+        :player/mil-planets   2
+        :player/food-planets  3
+        :player/ore-planets   1
+        :player/population    1000000
+        :player/stability     75
+        :player/status        0
+        :player/score         0
+        :player/current-turn  1
         :player/current-round 1
         :player/current-phase 1
-        :player/turns-used 0
-        :player/generals 5
-        :player/admirals 3
-        :player/soldiers 1000
-        :player/transports 10
-        :player/stations 5
-        :player/carriers 2
-        :player/fighters 50
-        :player/command-ships 1
-        :player/agents 10}])
+        :player/turns-used    0
+        :player/generals      5
+        :player/admirals      3
+        :player/soldiers      1000
+        :player/transports    10
+        :player/stations      5
+        :player/carriers      2
+        :player/fighters      50
+        :player/cmd-ships     1
+        :player/agents        10}])
     {:status 303
      :headers {"location" "/app"}}))
 

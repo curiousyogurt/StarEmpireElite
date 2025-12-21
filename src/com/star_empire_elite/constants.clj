@@ -51,7 +51,7 @@
 (def fighter-cost 50)
 (def admiral-cost 750)
 (def station-cost 200)
-(def command-ship-cost 2000)
+(def cmd-ship-cost 2000)
 (def mil-planet-cost 5000)
 (def food-planet-cost 4000)
 (def ore-planet-cost 6000)

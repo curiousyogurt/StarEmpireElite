@@ -40,14 +40,14 @@
   "Calculate net credit change from selling units/planets and buying/selling resources.
    Returns map with breakdown of credit sources."
   [quantities rates]
-  (let [credits-from-sales (+ (* (:soldiers-sold quantities) (:soldier-sell rates))
-                              (* (:fighters-sold quantities) (:fighter-sell rates))
-                              (* (:stations-sold quantities) (:station-sell rates))
-                              (* (:mil-planets-sold quantities) (:mil-planet-sell rates))
+  (let [credits-from-sales (+ (* (:soldiers-sold quantities)     (:soldier-sell rates))
+                              (* (:fighters-sold quantities)     (:fighter-sell rates))
+                              (* (:stations-sold quantities)     (:station-sell rates))
+                              (* (:mil-planets-sold quantities)  (:mil-planet-sell rates))
                               (* (:food-planets-sold quantities) (:food-planet-sell rates))
-                              (* (:ore-planets-sold quantities) (:ore-planet-sell rates)))
-        credits-from-resources (- (+ (* (:food-sold quantities) (:food-sell rates))
-                                     (* (:fuel-sold quantities) (:fuel-sell rates)))
+                              (* (:ore-planets-sold quantities)  (:ore-planet-sell rates)))
+        credits-from-resources (- (+ (* (:food-sold quantities)   (:food-sell rates))
+                                     (* (:fuel-sold quantities)   (:fuel-sell rates)))
                                   (+ (* (:food-bought quantities) (:food-buy rates))
                                      (* (:fuel-bought quantities) (:fuel-buy rates))))]
     {:credits-from-sales credits-from-sales
@@ -59,13 +59,13 @@
   "Calculate all player resources after executing exchanges.
    Returns map of all resource values after exchange."
   [player quantities credit-changes]
-  {:credits (+ (:player/credits player) (:total-credits credit-changes))
-   :soldiers (- (:player/soldiers player) (:soldiers-sold quantities))
-   :fighters (- (:player/fighters player) (:fighters-sold quantities))
-   :stations (- (:player/stations player) (:stations-sold quantities))
-   :mil-planets (- (:player/mil-planets player) (:mil-planets-sold quantities))
+  {:credits      (+ (:player/credits player)      (:total-credits credit-changes))
+   :soldiers     (- (:player/soldiers player)     (:soldiers-sold quantities))
+   :fighters     (- (:player/fighters player)     (:fighters-sold quantities))
+   :stations     (- (:player/stations player)     (:stations-sold quantities))
+   :mil-planets  (- (:player/mil-planets player)  (:mil-planets-sold quantities))
    :food-planets (- (:player/food-planets player) (:food-planets-sold quantities))
-   :ore-planets (- (:player/ore-planets player) (:ore-planets-sold quantities))
+   :ore-planets  (- (:player/ore-planets player)  (:ore-planets-sold quantities))
    :food (+ (:player/food player) (:food-bought quantities) (- (:food-sold quantities)))
    :fuel (+ (:player/fuel player) (:fuel-bought quantities) (- (:fuel-sold quantities)))})
 

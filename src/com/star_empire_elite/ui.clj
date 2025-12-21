@@ -185,7 +185,7 @@
       [:p.font-mono (or (:stations resources) (:player/stations resources))]]
      [:div
       [:p.text-xs "Cmd Ships"]
-      [:p.font-mono (or (:command-ships resources) (:player/command-ships resources))]]
+      [:p.font-mono (or (:cmd-ships resources) (:player/cmd-ships resources))]]
      [:div
       [:p.text-xs "Mil Plts"]
       [:p.font-mono (or (:mil-planets resources) (:player/mil-planets resources))]]

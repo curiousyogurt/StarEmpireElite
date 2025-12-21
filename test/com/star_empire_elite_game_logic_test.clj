@@ -56,7 +56,7 @@
                    :game/fighter-cost const/fighter-cost
                    :game/admiral-cost const/admiral-cost
                    :game/station-cost const/station-cost
-                   :game/command-ship-cost const/command-ship-cost
+                   :game/cmd-ship-cost const/cmd-ship-cost
                    :game/mil-planet-cost const/mil-planet-cost
                    :game/food-planet-cost const/food-planet-cost
                    :game/ore-planet-cost const/ore-planet-cost}
@@ -88,7 +88,7 @@
                      :player/stations 2
                      :player/carriers 1
                      :player/fighters 10
-                     :player/command-ships 1
+                     :player/cmd-ships 1
                      :player/agents 5}]
 
     (biff/submit-tx ctx

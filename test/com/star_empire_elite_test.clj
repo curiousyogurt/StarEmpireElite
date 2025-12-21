@@ -94,7 +94,7 @@
             :game/fighter-cost const/fighter-cost
             :game/admiral-cost const/admiral-cost
             :game/station-cost const/station-cost
-            :game/command-ship-cost const/command-ship-cost
+            :game/cmd-ship-cost const/cmd-ship-cost
             :game/mil-planet-cost const/mil-planet-cost
             :game/food-planet-cost const/food-planet-cost
             :game/ore-planet-cost const/ore-planet-cost}])
@@ -145,7 +145,7 @@
             :player/stations 5
             :player/carriers 2
             :player/fighters 50
-            :player/command-ships 1
+            :player/cmd-ships 1
             :player/generals 5
             :player/admirals 3
             :player/agents 10}])
@@ -206,7 +206,7 @@
                 :game/fighter-cost const/fighter-cost
                 :game/admiral-cost const/admiral-cost
                 :game/station-cost const/station-cost
-                :game/command-ship-cost const/command-ship-cost
+                :game/cmd-ship-cost const/cmd-ship-cost
                 :game/mil-planet-cost const/mil-planet-cost
                 :game/food-planet-cost const/food-planet-cost
                 :game/ore-planet-cost const/ore-planet-cost}
@@ -237,7 +237,7 @@
                 :player/stations 5
                 :player/carriers 2
                 :player/fighters 50
-                :player/command-ships 1
+                :player/cmd-ships 1
                 :player/agents 10}])
           db (xt/db node)
           game (xt/entity db game-id)
