@@ -39,7 +39,7 @@
    :player/galaxars 50
    :player/soldiers 100
    :player/fighters 75
-   :player/defence-stations 20
+   :player/stations 20
    :player/agents 10})
 
 ;; Utility: Returns a function that simulates XTDB's entity lookup for given entities
@@ -218,8 +218,8 @@
                  (:player/soldiers actual-tx)))
           (is (= (+ (:player/fighters test-player) (:mil-fighters expected-income))
                  (:player/fighters actual-tx)))
-          (is (= (+ (:player/defence-stations test-player) (:mil-stations expected-income))
-                 (:player/defence-stations actual-tx)))
+          (is (= (+ (:player/stations test-player) (:mil-stations expected-income))
+                 (:player/stations actual-tx)))
           (is (= (+ (:player/agents test-player) (:mil-agents expected-income))
                  (:player/agents actual-tx))))))))
 
@@ -242,7 +242,7 @@
           (is (= (:player/galaxars player) (:player/galaxars actual-tx)))
           (is (= (:player/soldiers player) (:player/soldiers actual-tx)))
           (is (= (:player/fighters player) (:player/fighters actual-tx)))
-          (is (= (:player/defence-stations player) (:player/defence-stations actual-tx)))
+          (is (= (:player/stations player) (:player/stations actual-tx)))
           (is (= (:player/agents player)   (:player/agents actual-tx)))
           ;; But phase should still advance
           (is (= 2 (:player/current-phase actual-tx))))))))
@@ -284,7 +284,7 @@
           expected-galaxars (+ (:player/galaxars test-player) (:ore-galaxars expected-income))
           expected-soldiers (+ (:player/soldiers test-player) (:mil-soldiers expected-income))
           expected-fighters (+ (:player/fighters test-player) (:mil-fighters expected-income))
-          expected-stations (+ (:player/defence-stations test-player) (:mil-stations expected-income))
+          expected-stations (+ (:player/stations test-player) (:mil-stations expected-income))
           expected-agents   (+ (:player/agents test-player)   (:mil-agents expected-income))]
       ;; Verify expected values (useful for documentation/regression testing)
       (is (= 1300 expected-credits))    ; 1000 + 300

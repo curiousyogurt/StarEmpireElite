@@ -79,7 +79,7 @@
    :player/transports         10
    :player/carriers           2
    :player/command-ships      1
-   :player/defence-stations   5
+   :player/stations           5
 
    ;; planet summaries
    :player/ore-planets        1

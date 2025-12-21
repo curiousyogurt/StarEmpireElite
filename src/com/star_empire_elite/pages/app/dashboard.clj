@@ -89,7 +89,7 @@
      [:p.font-mono (:player/carriers player)]]
     [:div
      [:p.text-xs "Def Stns"]
-     [:p.font-mono (:player/defence-stations player)]]
+     [:p.font-mono (:player/stations player)]]
     [:div
      [:p.text-xs "Com Shpps"]
      [:p.font-mono (:player/command-ships player)]]

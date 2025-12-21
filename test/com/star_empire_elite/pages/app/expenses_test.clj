@@ -42,7 +42,7 @@
    :player/galaxars 666
    :player/soldiers 3000
    :player/fighters 7
-   :player/defence-stations 2
+   :player/stations 2
    :player/agents 1500
    :player/population 9000})
 

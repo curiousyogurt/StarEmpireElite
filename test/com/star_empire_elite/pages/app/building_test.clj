@@ -40,7 +40,7 @@
    :player/carriers 1
    :player/fighters 5
    :player/admirals 0
-   :player/defence-stations 3
+   :player/stations 3
    :player/command-ships 1
    :player/military-planets 2
    :player/food-planets 2
@@ -82,7 +82,7 @@
                      :carriers 3
                      :fighters 8
                      :admirals 1
-                     :defence-stations 4
+                     :stations 4
                      :command-ships 2
                      :military-planets 1
                      :food-planets 1
@@ -101,7 +101,7 @@
                      :carriers 0
                      :fighters 0
                      :admirals 0
-                     :defence-stations 0
+                     :stations 0
                      :command-ships 0
                      :military-planets 0
                      :food-planets 0
@@ -118,7 +118,7 @@
                      :carriers 0
                      :fighters 0
                      :admirals 0
-                     :defence-stations 0
+                     :stations 0
                      :command-ships 0
                      :military-planets 0
                      :food-planets 0
@@ -134,7 +134,7 @@
                      :carriers 0
                      :fighters 0
                      :admirals 0
-                     :defence-stations 0
+                     :stations 0
                      :command-ships 0
                      :military-planets 5
                      :food-planets 0
@@ -152,7 +152,7 @@
                   :player/carriers 10
                   :player/fighters 50
                   :player/admirals 2
-                  :player/defence-stations 15
+                  :player/stations 15
                   :player/command-ships 3
                   :player/military-planets 5
                   :player/food-planets 4
@@ -163,7 +163,7 @@
                      :carriers 3
                      :fighters 8
                      :admirals 1
-                     :defence-stations 4
+                     :stations 4
                      :command-ships 2
                      :military-planets 1
                      :food-planets 1
@@ -177,7 +177,7 @@
       (is (= 13 (:carriers resources-after)))             ; 10 + 3
       (is (= 58 (:fighters resources-after)))             ; 50 + 8
       (is (= 3 (:admirals resources-after)))              ; 2 + 1
-      (is (= 19 (:defence-stations resources-after)))     ; 15 + 4
+      (is (= 19 (:stations resources-after)))     ; 15 + 4
       (is (= 5 (:command-ships resources-after)))         ; 3 + 2
       (is (= 6 (:military-planets resources-after)))      ; 5 + 1
       (is (= 5 (:food-planets resources-after)))          ; 4 + 1
@@ -192,7 +192,7 @@
                   :player/carriers 0
                   :player/fighters 0
                   :player/admirals 0
-                  :player/defence-stations 0
+                  :player/stations 0
                   :player/command-ships 0
                   :player/military-planets 0
                   :player/food-planets 0
@@ -203,7 +203,7 @@
                      :carriers 0
                      :fighters 0
                      :admirals 0
-                     :defence-stations 0
+                     :stations 0
                      :command-ships 0
                      :military-planets 0
                      :food-planets 0
@@ -259,7 +259,7 @@
                   :carriers "4"
                   :fighters "3"
                   :admirals "1"
-                  :defence-stations "2"
+                  :stations "2"
                   :command-ships "1"
                   :military-planets "2"
                   :food-planets "1"
@@ -275,7 +275,7 @@
               
               ;; Calculate expected values using pure functions
               quantities {:soldiers 3 :transports 2 :generals 1 :carriers 4
-                         :fighters 3 :admirals 1 :defence-stations 2 :command-ships 1
+                         :fighters 3 :admirals 1 :stations 2 :command-ships 1
                          :military-planets 2 :food-planets 1 :ore-planets 3}
               cost-info (building/calculate-purchase-cost quantities test-game)
               expected (building/calculate-resources-after-purchases test-player quantities cost-info)]
@@ -301,7 +301,7 @@
           (is (= (:carriers expected) (:player/carriers actual-tx)))
           (is (= (:fighters expected) (:player/fighters actual-tx)))
           (is (= (:admirals expected) (:player/admirals actual-tx)))
-          (is (= (:defence-stations expected) (:player/defence-stations actual-tx)))
+          (is (= (:stations expected) (:player/stations actual-tx)))
           (is (= (:command-ships expected) (:player/command-ships actual-tx)))
           (is (= (:military-planets expected) (:player/military-planets actual-tx)))
           (is (= (:food-planets expected) (:player/food-planets actual-tx)))
@@ -326,7 +326,7 @@
 (deftest test-apply-building-zero-purchases
   (testing "Handles zero purchases correctly (no resources changed except phase)"
     (let [params {:soldiers "0" :transports "0" :generals "0" :carriers "0"
-                  :fighters "0" :admirals "0" :defence-stations "0" :command-ships "0"
+                  :fighters "0" :admirals "0" :stations "0" :command-ships "0"
                   :military-planets "0" :food-planets "0" :ore-planets "0"}
           tx-called (atom nil)]
       (with-redefs [xt/entity (fake-entity [test-player test-game])
@@ -389,7 +389,7 @@
       (let [affordable-params {:soldiers "10" :transports "5"}
             quantities (into {} (map (fn [[k v]] [k (utils/parse-numeric-input v)]) 
                                      (merge {:soldiers 0 :transports 0 :generals 0 :carriers 0
-                                            :fighters 0 :admirals 0 :defence-stations 0 :command-ships 0
+                                            :fighters 0 :admirals 0 :stations 0 :command-ships 0
                                             :military-planets 0 :food-planets 0 :ore-planets 0}
                                             affordable-params)))
             cost-info (building/calculate-purchase-cost quantities test-game)
@@ -400,7 +400,7 @@
       (let [unaffordable-params {:soldiers "10000"}  ; Way more than player can afford
             quantities (into {} (map (fn [[k v]] [k (utils/parse-numeric-input v)]) 
                                      (merge {:soldiers 0 :transports 0 :generals 0 :carriers 0
-                                            :fighters 0 :admirals 0 :defence-stations 0 :command-ships 0
+                                            :fighters 0 :admirals 0 :stations 0 :command-ships 0
                                             :military-planets 0 :food-planets 0 :ore-planets 0}
                                             unaffordable-params)))
             cost-info (building/calculate-purchase-cost quantities test-game)

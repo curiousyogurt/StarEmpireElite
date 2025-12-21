@@ -20,7 +20,7 @@
    :player/credits 5000
    :player/soldiers 100
    :player/fighters 20
-   :player/defence-stations 10
+   :player/stations 10
    :player/military-planets 5
    :player/food-planets 4
    :player/ore-planets 6
@@ -138,7 +138,7 @@
     (let [player {:player/credits 1000
                   :player/soldiers 100
                   :player/fighters 20
-                  :player/defence-stations 10
+                  :player/stations 10
                   :player/military-planets 5
                   :player/food-planets 4
                   :player/ore-planets 6
@@ -279,7 +279,7 @@
           (is (= (:credits expected) (:player/credits actual-tx)))
           (is (= (:soldiers expected) (:player/soldiers actual-tx)))
           (is (= (:fighters expected) (:player/fighters actual-tx)))
-          (is (= (:stations expected) (:player/defence-stations actual-tx)))
+          (is (= (:stations expected) (:player/stations actual-tx)))
           (is (= (:military-planets expected) (:player/military-planets actual-tx)))
           (is (= (:food-planets expected) (:player/food-planets actual-tx)))
           (is (= (:ore-planets expected) (:player/ore-planets actual-tx)))

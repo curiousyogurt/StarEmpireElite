@@ -19,47 +19,47 @@
         user-id (java.util.UUID/randomUUID)
         now (java.util.Date.)
         end-date (java.util.Date. (+ (.getTime now) (* 30 24 60 60 1000)))
-        
-base-game {:db/doc-type :game
-           :xt/id game-id
-           :game/name "Test Game"
-           :game/created-at now
-           :game/scheduled-end-at end-date
-           :game/status 0
-           :game/turns-per-day 6
-           :game/rounds-per-day 4
-           :game/ore-planet-credits const/ore-planet-credits
-           :game/ore-planet-fuel const/ore-planet-fuel
-           :game/ore-planet-galaxars const/ore-planet-galaxars
-           :game/food-planet-food const/food-planet-food
-           :game/military-planet-soldiers const/military-planet-soldiers
-           :game/military-planet-fighters const/military-planet-fighters
-           :game/military-planet-stations const/military-planet-stations
-           :game/military-planet-agents const/military-planet-agents
-           :game/planet-upkeep-credits const/planet-upkeep-credits
-           :game/planet-upkeep-food const/planet-upkeep-food
-           :game/soldier-upkeep-credits const/soldier-upkeep-credits
-           :game/soldier-upkeep-food const/soldier-upkeep-food
-           :game/fighter-upkeep-credits const/fighter-upkeep-credits
-           :game/fighter-upkeep-fuel const/fighter-upkeep-fuel
-           :game/station-upkeep-credits const/station-upkeep-credits
-           :game/station-upkeep-fuel const/station-upkeep-fuel
-           :game/agent-upkeep-credits const/agent-upkeep-credits
-           :game/agent-upkeep-food const/agent-upkeep-food
-           :game/population-upkeep-credits const/population-upkeep-credits
-           :game/population-upkeep-food const/population-upkeep-food
-           ;; Building cost constants
-           :game/soldier-cost const/soldier-cost
-           :game/transport-cost const/transport-cost
-           :game/general-cost const/general-cost
-           :game/carrier-cost const/carrier-cost
-           :game/fighter-cost const/fighter-cost
-           :game/admiral-cost const/admiral-cost
-           :game/station-cost const/station-cost
-           :game/command-ship-cost const/command-ship-cost
-           :game/military-planet-cost const/military-planet-cost
-           :game/food-planet-cost const/food-planet-cost
-           :game/ore-planet-cost const/ore-planet-cost}
+
+        base-game {:db/doc-type :game
+                   :xt/id game-id
+                   :game/name "Test Game"
+                   :game/created-at now
+                   :game/scheduled-end-at end-date
+                   :game/status 0
+                   :game/turns-per-day 6
+                   :game/rounds-per-day 4
+                   :game/ore-planet-credits const/ore-planet-credits
+                   :game/ore-planet-fuel const/ore-planet-fuel
+                   :game/ore-planet-galaxars const/ore-planet-galaxars
+                   :game/food-planet-food const/food-planet-food
+                   :game/military-planet-soldiers const/military-planet-soldiers
+                   :game/military-planet-fighters const/military-planet-fighters
+                   :game/military-planet-stations const/military-planet-stations
+                   :game/military-planet-agents const/military-planet-agents
+                   :game/planet-upkeep-credits const/planet-upkeep-credits
+                   :game/planet-upkeep-food const/planet-upkeep-food
+                   :game/soldier-upkeep-credits const/soldier-upkeep-credits
+                   :game/soldier-upkeep-food const/soldier-upkeep-food
+                   :game/fighter-upkeep-credits const/fighter-upkeep-credits
+                   :game/fighter-upkeep-fuel const/fighter-upkeep-fuel
+                   :game/station-upkeep-credits const/station-upkeep-credits
+                   :game/station-upkeep-fuel const/station-upkeep-fuel
+                   :game/agent-upkeep-credits const/agent-upkeep-credits
+                   :game/agent-upkeep-food const/agent-upkeep-food
+                   :game/population-upkeep-credits const/population-upkeep-credits
+                   :game/population-upkeep-food const/population-upkeep-food
+                   ;; Building cost constants
+                   :game/soldier-cost const/soldier-cost
+                   :game/transport-cost const/transport-cost
+                   :game/general-cost const/general-cost
+                   :game/carrier-cost const/carrier-cost
+                   :game/fighter-cost const/fighter-cost
+                   :game/admiral-cost const/admiral-cost
+                   :game/station-cost const/station-cost
+                   :game/command-ship-cost const/command-ship-cost
+                   :game/military-planet-cost const/military-planet-cost
+                   :game/food-planet-cost const/food-planet-cost
+                   :game/ore-planet-cost const/ore-planet-cost}
 
         base-player {:db/doc-type :player
                      :xt/id player-id
@@ -85,16 +85,16 @@ base-game {:db/doc-type :game
                      :player/admirals 1
                      :player/soldiers 100
                      :player/transports 5
-                     :player/defence-stations 2
+                     :player/stations 2
                      :player/carriers 1
                      :player/fighters 10
                      :player/command-ships 1
                      :player/agents 5}]
-    
+
     (biff/submit-tx ctx
-      [(merge base-game game-overrides)
-       (merge base-player player-overrides)])
-    
+                    [(merge base-game game-overrides)
+                     (merge base-player player-overrides)])
+
     {:game-id game-id :player-id player-id :user-id user-id}))
 
 ;; Test 1: Income Calculations
@@ -113,15 +113,15 @@ base-game {:db/doc-type :game
             db (xt/db node)
             player (xt/entity db player-id)
             game (xt/entity db game-id)
-            
+
             expected-credits (* 3 const/ore-planet-credits)
             expected-fuel (* 3 const/ore-planet-fuel)
             expected-galaxars (* 3 const/ore-planet-galaxars)]
-        
+
         (is (= expected-credits 1500))  ; 3 * 500
         (is (= expected-fuel 600))      ; 3 * 200
         (is (= expected-galaxars 300))  ; 3 * 100
-        
+
         ;; Test the income calculation logic directly
         (let [ore-credits (* (:player/ore-planets player) (:game/ore-planet-credits game))
               ore-fuel (* (:player/ore-planets player) (:game/ore-planet-fuel game))
@@ -143,10 +143,10 @@ base-game {:db/doc-type :game
             db (xt/db node)
             player (xt/entity db player-id)
             game (xt/entity db game-id)
-            
+
             expected-food (* 4 const/food-planet-food)
             actual-food (* (:player/food-planets player) (:game/food-planet-food game))]
-        
+
         (is (= expected-food 4000))  ; 4 * 1000
         (is (= actual-food expected-food))))))
 
@@ -162,17 +162,17 @@ base-game {:db/doc-type :game
             db (xt/db node)
             player (xt/entity db player-id)
             game (xt/entity db game-id)
-            
+
             expected-soldiers (* 2 const/military-planet-soldiers)
             expected-fighters (* 2 const/military-planet-fighters)
             expected-stations (* 2 const/military-planet-stations)
             expected-agents (* 2 const/military-planet-agents)]
-        
+
         (is (= expected-soldiers 100))  ; 2 * 50
         (is (= expected-fighters 50))   ; 2 * 25
         (is (= expected-stations 20))   ; 2 * 10
         (is (= expected-agents 10))     ; 2 * 5
-        
+
         ;; Test actual calculations
         (let [mil-soldiers (* (:player/military-planets player) (:game/military-planet-soldiers game))
               mil-fighters (* (:player/military-planets player) (:game/military-planet-fighters game))
@@ -189,15 +189,15 @@ base-game {:db/doc-type :game
     (let [initial-credits 1000
           initial-food 500
           initial-fuel 300
-          
+
           planets-pay 50
           soldiers-credits 100
           fighters-fuel 80
-          
+
           expected-credits (- initial-credits planets-pay soldiers-credits)
           expected-food initial-food
           expected-fuel (- initial-fuel fighters-fuel)]
-      
+
       ;; Test the calculation logic from app.clj
       (is (= expected-credits 850))
       (is (= expected-food 500))
@@ -216,12 +216,12 @@ base-game {:db/doc-type :game
             db (xt/db node)
             player-phase-1 (xt/entity db player-id)
             player-phase-2 (assoc player-phase-1 :player/current-phase 2)]
-        
+
         ;; CHANGED: Now using utils/validate-phase with the new API (player, expected-phase, player-id)
         ;; Test correct phase - should return nil (no redirect)
         (is (nil? (utils/validate-phase player-phase-1 1 player-id)))
         (is (nil? (utils/validate-phase player-phase-2 2 player-id)))
-        
+
         ;; Test incorrect phase - should return redirect response
         (let [redirect-response (utils/validate-phase player-phase-1 2 player-id)]
           (is (some? redirect-response))
@@ -234,10 +234,10 @@ base-game {:db/doc-type :game
     (let [player-credits 100
           expense-amount 150
           result (- player-credits expense-amount)]
-      
+
       ;; This shows the calculation result - in a real game you'd want to prevent this
       (is (= result -50))
-      
+
       ;; Test safe subtraction
       (let [safe-result (max 0 (- player-credits expense-amount))]
         (is (= safe-result 0))))))
@@ -260,13 +260,13 @@ base-game {:db/doc-type :game
                :player/galaxars 100
                :player/soldiers 100
                :player/fighters 20
-               :player/defence-stations 5
+               :player/stations 5
                :player/agents 10}
               {})
             db (xt/db node)
             player (xt/entity db player-id)
             game (xt/entity db game-id)]
-        
+
         ;; Test income calculations (from income.clj logic)
         (let [ore-credits (* (:player/ore-planets player) (:game/ore-planet-credits game))
               ore-fuel (* (:player/ore-planets player) (:game/ore-planet-fuel game))
@@ -276,7 +276,7 @@ base-game {:db/doc-type :game
               mil-fighters (* (:player/military-planets player) (:game/military-planet-fighters game))
               mil-stations (* (:player/military-planets player) (:game/military-planet-stations game))
               mil-agents (* (:player/military-planets player) (:game/military-planet-agents game))
-              
+
               ;; Calculate final resources after income
               final-credits (+ (:player/credits player) ore-credits)
               final-food (+ (:player/food player) food-food)
@@ -284,9 +284,9 @@ base-game {:db/doc-type :game
               final-galaxars (+ (:player/galaxars player) ore-galaxars)
               final-soldiers (+ (:player/soldiers player) mil-soldiers)
               final-fighters (+ (:player/fighters player) mil-fighters)
-              final-stations (+ (:player/defence-stations player) mil-stations)
+              final-stations (+ (:player/stations player) mil-stations)
               final-agents (+ (:player/agents player) mil-agents)]
-          
+
           ;; Verify individual income components
           (is (= ore-credits 1000))     ; 2 ore planets * 500 credits
           (is (= ore-fuel 400))         ; 2 ore planets * 200 fuel
@@ -296,7 +296,7 @@ base-game {:db/doc-type :game
           (is (= mil-fighters 25))      ; 1 military planet * 25 fighters
           (is (= mil-stations 10))      ; 1 military planet * 10 stations
           (is (= mil-agents 5))         ; 1 military planet * 5 agents
-          
+
           ;; Verify final resource totals
           (is (= final-credits 2000))   ; 1000 + 1000
           (is (= final-food 1500))      ; 500 + 1000
@@ -322,7 +322,7 @@ base-game {:db/doc-type :game
             db (xt/db node)
             player (xt/entity db player-id)
             game (xt/entity db game-id)]
-        
+
         ;; All income should be zero
         (is (= (* (:player/ore-planets player) (:game/ore-planet-credits game)) 0))
         (is (= (* (:player/food-planets player) (:game/food-planet-food game)) 0))
@@ -336,7 +336,7 @@ base-game {:db/doc-type :game
             {:keys [game-id]} (create-test-player-and-game ctx {} {})
             db (xt/db node)
             game (xt/entity db game-id)]
-        
+
         ;; Verify game constants match const namespace
         (is (= (:game/ore-planet-credits game) const/ore-planet-credits))
         (is (= (:game/ore-planet-fuel game) const/ore-planet-fuel))

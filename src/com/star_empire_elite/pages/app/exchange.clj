@@ -62,7 +62,7 @@
   {:credits (+ (:player/credits player) (:total-credits credit-changes))
    :soldiers (- (:player/soldiers player) (:soldiers-sold quantities))
    :fighters (- (:player/fighters player) (:fighters-sold quantities))
-   :stations (- (:player/defence-stations player) (:stations-sold quantities))
+   :stations (- (:player/stations player) (:stations-sold quantities))
    :military-planets (- (:player/military-planets player) (:military-planets-sold quantities))
    :food-planets (- (:player/food-planets player) (:food-planets-sold quantities))
    :ore-planets (- (:player/ore-planets player) (:ore-planets-sold quantities))
@@ -140,7 +140,7 @@
             :player/credits (:credits resources-after)
             :player/soldiers (:soldiers resources-after)
             :player/fighters (:fighters resources-after)
-            :player/defence-stations (:stations resources-after)
+            :player/stations (:stations resources-after)
             :player/military-planets (:military-planets resources-after)
             :player/food-planets (:food-planets resources-after)
             :player/ore-planets (:ore-planets resources-after)
@@ -291,7 +291,7 @@
           [:p.font-mono (:player/fighters player)]]
          [:div
           [:p.text-xs "Stations"]
-          [:p.font-mono (:player/defence-stations player)]]
+          [:p.font-mono (:player/stations player)]]
          [:div
           [:p.text-xs "Mil Plts"]
           [:p.font-mono (:player/military-planets player)]]
@@ -349,7 +349,7 @@
              [:p.font-mono (str (:station-sell rates) " credits")]]
             [:div
              [:p.text-xs "Max Available"]
-             [:p.font-mono (:player/defence-stations player)]]
+             [:p.font-mono (:player/stations player)]]
             [:div
              [:label.text-xs "Sell Quantity"]
              (exchange-input "stations-sold" 0 player-id hx-include)]]]
@@ -478,7 +478,7 @@
             [:p.font-mono (:player/fighters player)]]
            [:div
             [:p.text-xs "Stations"]
-            [:p.font-mono (:player/defence-stations player)]]
+            [:p.font-mono (:player/stations player)]]
            [:div
             [:p.text-xs "Mil Plts"]
             [:p.font-mono (:player/military-planets player)]]

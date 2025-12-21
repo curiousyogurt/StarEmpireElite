@@ -94,7 +94,7 @@
             ;; Military units
             [:player/soldiers              :int]
             [:player/transports            :int]
-            [:player/defence-stations      :int]
+            [:player/stations              :int]
             [:player/carriers              :int]
             [:player/fighters              :int]
             [:player/command-ships         :int]

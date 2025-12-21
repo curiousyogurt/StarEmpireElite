@@ -40,9 +40,9 @@
                            (:game/fighter-upkeep-credits game))
      :fighters-fuel     (* (:player/fighters player) 
                            (:game/fighter-upkeep-fuel game))
-     :stations-credits  (* (:player/defence-stations player) 
+     :stations-credits  (* (:player/stations player) 
                            (:game/station-upkeep-credits game))
-     :stations-fuel     (* (:player/defence-stations player) 
+     :stations-fuel     (* (:player/stations player) 
                            (:game/station-upkeep-fuel game))
      :agents-credits    (* (:player/agents player) 
                            (:game/agent-upkeep-credits game))
@@ -161,6 +161,9 @@
           (ui/resource-display-grid 
             (assoc resources-after 
                    :galaxars (:player/galaxars player)
+                   :soldiers (:player/soldiers player)
+                   :fighters (:player/fighters player)
+                   :stations (:player/stations player)
                    :agents (:player/agents player))
             "Resources After Expenses"
             true)]  ; Enable negative highlighting
@@ -279,7 +282,7 @@
            [:h4.font-bold.mb-3 "Defence Stations Upkeep"]
            [:div.space-y-2
             [:div
-             [:p.text-xs "Stations: " (:player/defence-stations player)]]
+             [:p.text-xs "Stations: " (:player/stations player)]]
             [:div
              [:p.text-xs "Cost per Station"]
              [:p.font-mono (str (:game/station-upkeep-credits game) " credits, " 
@@ -357,4 +360,3 @@
             :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"}
            "Continue to Building"]])
        ])))
-

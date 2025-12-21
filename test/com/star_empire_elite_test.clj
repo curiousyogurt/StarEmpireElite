@@ -142,7 +142,7 @@
             ;; Military units
             :player/soldiers 1000
             :player/transports 10
-            :player/defence-stations 5
+            :player/stations 5
             :player/carriers 2
             :player/fighters 50
             :player/command-ships 1
@@ -234,7 +234,7 @@
                 :player/admirals 3
                 :player/soldiers 1000
                 :player/transports 10
-                :player/defence-stations 5
+                :player/stations 5
                 :player/carriers 2
                 :player/fighters 50
                 :player/command-ships 1

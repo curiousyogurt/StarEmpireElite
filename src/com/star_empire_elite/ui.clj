@@ -129,7 +129,7 @@
       [:p.font-mono (or (:fighters resources) (:player/fighters resources))]]
      [:div
       [:p.text-xs "Stations"]
-      [:p.font-mono (or (:stations resources) (:player/defence-stations resources))]]
+      [:p.font-mono (or (:stations resources) (:player/stations resources))]]
      [:div
       [:p.text-xs "Agents"]
       [:p.font-mono (or (:agents resources) (:player/agents resources))]]]]))
@@ -182,7 +182,7 @@
       [:p.font-mono (or (:admirals resources) (:player/admirals resources))]]
      [:div
       [:p.text-xs "Stations"]
-      [:p.font-mono (or (:stations resources) (:player/defence-stations resources))]]
+      [:p.font-mono (or (:stations resources) (:player/stations resources))]]
      [:div
       [:p.text-xs "Cmd Ships"]
       [:p.font-mono (or (:command-ships resources) (:player/command-ships resources))]]

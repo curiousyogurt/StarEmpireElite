@@ -91,7 +91,7 @@
          [:p.font-mono (:player/fighters player)]]
         [:div
          [:p.text-xs "Stations"]
-         [:p.font-mono (:player/defence-stations player)]]
+         [:p.font-mono (:player/stations player)]]
         [:div
          [:p.text-xs "Agents"]
          [:p.font-mono (:player/agents player)]]]]

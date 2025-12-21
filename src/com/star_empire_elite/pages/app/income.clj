@@ -62,7 +62,7 @@
             :player/galaxars         (+ (:player/galaxars player)         (:ore-galaxars income))
             :player/soldiers         (+ (:player/soldiers player)         (:mil-soldiers income))
             :player/fighters         (+ (:player/fighters player)         (:mil-fighters income))
-            :player/defence-stations (+ (:player/defence-stations player) (:mil-stations income))
+            :player/stations (+ (:player/stations player) (:mil-stations income))
             :player/agents           (+ (:player/agents player)           (:mil-agents income))
             :player/current-phase 2}])
         ;; Set 303 status, which tells the browser to redirect to another url
@@ -78,7 +78,7 @@
      [:div.text-green-400.font-mono
       [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
  
-      : Current phase displray:
+      ;;; Current phase display:
       (ui/phase-header (:player/current-phase player) "INCOME")
  
       ;;; Current resources display:
@@ -141,7 +141,7 @@
          :galaxars (+ (:player/galaxars player) (:ore-galaxars income))
          :soldiers (+ (:player/soldiers player) (:mil-soldiers income))
          :fighters (+ (:player/fighters player) (:mil-fighters income))
-         :stations (+ (:player/defence-stations player) (:mil-stations income))
+         :stations (+ (:player/stations player) (:mil-stations income))
          :agents   (+ (:player/agents player) (:mil-agents income))}
         "Resources After Income")
 
