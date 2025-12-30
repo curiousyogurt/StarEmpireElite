@@ -331,7 +331,11 @@
 
 (deftest test-calculate-exchange-renders-hiccup
   (testing "Returns hiccup vector for HTMX response"
-    (with-redefs [xt/entity (helpers/fake-entity [test-player])
+    (with-redefs [utils/load-player-and-game 
+                  (fn [db player-id-str]
+                    {:player test-player
+                     :game {}
+                     :player-id test-player-id})
                   biff/render identity]  ; Pass through hiccup unchanged
       (let [ctx {:path-params {:player-id (str test-player-id)}
                  :params {:soldiers-sold "10" :fighters-sold "5"

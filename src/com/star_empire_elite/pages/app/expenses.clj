@@ -85,6 +85,70 @@
        (>= (:food resources-after) 0)
        (>= (:fuel resources-after) 0)))
 
+;;; Parse expense payment inputs from request parameters
+(defn parse-expense-payments
+  "Parse all expense payment inputs from request params.
+   Returns map of payments for all expense categories."
+  [params]
+  {:planets-pay         (utils/parse-numeric-input (:planets-pay params))
+   :planets-food        (utils/parse-numeric-input (:planets-food params))
+   :soldiers-credits    (utils/parse-numeric-input (:soldiers-credits params))
+   :soldiers-food       (utils/parse-numeric-input (:soldiers-food params))
+   :fighters-credits    (utils/parse-numeric-input (:fighters-credits params))
+   :fighters-fuel       (utils/parse-numeric-input (:fighters-fuel params))
+   :stations-credits    (utils/parse-numeric-input (:stations-credits params))
+   :stations-fuel       (utils/parse-numeric-input (:stations-fuel params))
+   :agents-credits      (utils/parse-numeric-input (:agents-credits params))
+   :agents-food         (utils/parse-numeric-input (:agents-food params))
+   :population-credits  (utils/parse-numeric-input (:population-credits params))
+   :population-food     (utils/parse-numeric-input (:population-food params))})
+
+;;;;
+;;;; UI Components
+;;;;
+
+;;; Submit button component - extracted to avoid duplication
+(defn submit-button
+  "Renders the submit button with dynamic disabled state based on affordability.
+   Used in both initial page render and HTMX updates.
+   Accepts optional extra-attrs map for additional HTML attributes."
+  ([affordable?] (submit-button affordable? {}))
+  ([affordable? extra-attrs]
+   [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
+    (merge {:type "submit"
+            :disabled (not affordable?)
+            :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"}
+           extra-attrs)
+    "Continue to Building"]))
+
+;;; Expense input card component
+(defn expense-input-card
+  "Renders an expense input card for upkeep costs.
+   Parameters:
+   - category-name: Display name (e.g. 'Planets Upkeep', 'Soldiers Upkeep')
+   - asset-count: Current count of the asset (e.g. number of planets, soldiers)
+   - cost-per-unit: Map with :credits, :food, or :fuel keys showing cost per unit
+   - total-required: Map with :credits, :food, or :fuel keys showing total required
+   - input-fields: Vector of maps, each with :label, :field-name, and :default-value
+   - player-id: Player identifier for HTMX routing
+   - hx-include: HTMX include string for related fields"
+  [category-name asset-count cost-per-unit total-required input-fields player-id hx-include]
+  [:div.border.border-green-400.p-4
+   [:h4.font-bold.mb-3 category-name]
+   [:div.space-y-2
+    [:div
+     [:p.text-xs asset-count]]
+    [:div
+     [:p.text-xs "Cost per " (or (:per-label cost-per-unit) "Unit")]
+     [:p.font-mono (or (:display cost-per-unit) "")]]
+    [:div
+     [:p.text-xs "Total Required"]
+     [:p.font-mono (or (:display total-required) "")]]
+    (for [{:keys [label field-name default-value]} input-fields]
+      [:div {:key field-name}
+       [:label.text-xs label]
+       (ui/numeric-input field-name default-value player-id "/calculate-expenses" hx-include)])]])
+
 ;;;;
 ;;;; Actions
 ;;;;
@@ -101,19 +165,8 @@
     ;; Phase validation prevents players from applying expenses multiple times or out of order
     (if-let [redirect (utils/validate-phase player 2 player-id)]
       redirect
-      ;; Parse all expense payment inputs using shared utility
-      (let [payments {:planets-pay         (utils/parse-numeric-input (:planets-pay params))
-                      :planets-food        (utils/parse-numeric-input (:planets-food params))
-                      :soldiers-credits    (utils/parse-numeric-input (:soldiers-credits params))
-                      :soldiers-food       (utils/parse-numeric-input (:soldiers-food params))
-                      :fighters-credits    (utils/parse-numeric-input (:fighters-credits params))
-                      :fighters-fuel       (utils/parse-numeric-input (:fighters-fuel params))
-                      :stations-credits    (utils/parse-numeric-input (:stations-credits params))
-                      :stations-fuel       (utils/parse-numeric-input (:stations-fuel params))
-                      :agents-credits      (utils/parse-numeric-input (:agents-credits params))
-                      :agents-food         (utils/parse-numeric-input (:agents-food params))
-                      :population-credits  (utils/parse-numeric-input (:population-credits params))
-                      :population-food     (utils/parse-numeric-input (:population-food params))}
+      ;; Parse all expense payment inputs using extracted function
+      (let [payments (parse-expense-payments params)
 
             ;; Calculate the final resource values
             resources-after (calculate-resources-after-expenses player payments)]
@@ -135,19 +188,8 @@
 ;;; This gives immediate feedback on whether the player can afford their selected expenses.
 (defn calculate-expenses [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
-    ;; Parse expense payment inputs using shared utility
-    (let [payments {:planets-pay         (utils/parse-numeric-input (:planets-pay params))
-                    :planets-food        (utils/parse-numeric-input (:planets-food params))
-                    :soldiers-credits    (utils/parse-numeric-input (:soldiers-credits params))
-                    :soldiers-food       (utils/parse-numeric-input (:soldiers-food params))
-                    :fighters-credits    (utils/parse-numeric-input (:fighters-credits params))
-                    :fighters-fuel       (utils/parse-numeric-input (:fighters-fuel params))
-                    :stations-credits    (utils/parse-numeric-input (:stations-credits params))
-                    :stations-fuel       (utils/parse-numeric-input (:stations-fuel params))
-                    :agents-credits      (utils/parse-numeric-input (:agents-credits params))
-                    :agents-food         (utils/parse-numeric-input (:agents-food params))
-                    :population-credits  (utils/parse-numeric-input (:population-credits params))
-                    :population-food     (utils/parse-numeric-input (:population-food params))}
+    ;; Parse expense payment inputs using extracted function
+    (let [payments (parse-expense-payments params)
 
           ;; Calculate resulting resources and whether affordable
           resources-after (calculate-resources-after-expenses player payments)
@@ -175,19 +217,16 @@
             [:p.text-yellow-400.font-bold "WARNING: Insufficient resources to pay expenses!"])]
 
          ;; Submit button - disabled if player can't afford expenses
-         [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
-          {:type "submit"
-           :disabled (not affordable?)
-           :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"
-           :hx-swap-oob "true"}
-          "Continue to Building"]]))))
+         (submit-button affordable? {:hx-swap-oob "true"})]))))
 
 ;;; Shows expense requirements and input fields for player to choose how much to pay
 (defn expenses-page [{:keys [player game]}]
   (let [required (calculate-required-expenses player game)
-
         player-id (:xt/id player)
-        hx-include "[name='planets-pay'],[name='planets-food'],[name='soldiers-credits'],[name='soldiers-food'],[name='fighters-credits'],[name='fighters-fuel'],[name='stations-credits'],[name='stations-fuel'],[name='agents-credits'],[name='agents-food'],[name='population-credits'],[name='population-food']"]
+        hx-include "[name='planets-pay'],[name='planets-food'],[name='soldiers-credits'],[name='soldiers-food'],[name='fighters-credits'],[name='fighters-fuel'],[name='stations-credits'],[name='stations-fuel'],[name='agents-credits'],[name='agents-food'],[name='population-credits'],[name='population-food']"
+        planet-count (+ (:player/mil-planets player)
+                        (:player/food-planets player)
+                        (:player/ore-planets player))]
     (ui/page
       {}
       [:div.text-green-400.font-mono
@@ -208,133 +247,84 @@
          [:h3.font-bold.mb-4 "Expenses This Round"]
          [:div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-3.gap-4.mb-8
 
-          ;; Planets upkeep - costs credits and food
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Planets Upkeep"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Planets: " (+ (:player/mil-planets player)
-                                        (:player/food-planets player)
-                                        (:player/ore-planets player))]]
-            [:div
-             [:p.text-xs "Cost per Planet"]
-             [:p.font-mono (str (:game/planet-upkeep-credits game) " credits, " 
-                                (:game/planet-upkeep-food game) " food")]]
-            [:div
-             [:p.text-xs "Total Required"]
-             [:p.font-mono (str (:planets-credits required) " credits, " 
-                                (:planets-food required) " food")]]
-            [:div
-             [:label.text-xs "Pay Credits"]
-             (ui/numeric-input "planets-pay" (:planets-credits required) player-id "/calculate-expenses" hx-include)]
-            [:div
-             [:label.text-xs "Pay Food"]
-             (ui/numeric-input "planets-food" (:planets-food required) player-id "/calculate-expenses" hx-include)]]]
+          ;; All expense cards using extracted component
+          (expense-input-card
+            "Planets Upkeep"
+            (str "Planets: " planet-count)
+            {:per-label "Planet"
+             :display (str (:game/planet-upkeep-credits game) " credits, " 
+                          (:game/planet-upkeep-food game) " food")}
+            {:display (str (:planets-credits required) " credits, " 
+                          (:planets-food required) " food")}
+            [{:label "Pay Credits" :field-name "planets-pay" :default-value (:planets-credits required)}
+             {:label "Pay Food" :field-name "planets-food" :default-value (:planets-food required)}]
+            player-id
+            hx-include)
 
-          ;; Soldiers upkeep - costs credits and food per 1000 soldiers
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Soldiers Upkeep"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Soldiers: " (:player/soldiers player)]]
-            [:div
-             [:p.text-xs "Cost per 1000"]
-             [:p.font-mono (str (:game/soldier-upkeep-credits game) " credit, " 
-                                (:game/soldier-upkeep-food game) " food")]]
-            [:div
-             [:p.text-xs "Total Required"]
-             [:p.font-mono (str (:soldiers-credits required) " credits, " 
-                                (:soldiers-food required) " food")]]
-            [:div
-             [:label.text-xs "Pay Credits"]
-             (ui/numeric-input "soldiers-credits" (:soldiers-credits required) player-id "/calculate-expenses" hx-include)]
-            [:div
-             [:label.text-xs "Pay Food"]
-             (ui/numeric-input "soldiers-food" (:soldiers-food required) player-id "/calculate-expenses" hx-include)]]]
+          (expense-input-card
+            "Soldiers Upkeep"
+            (str "Soldiers: " (:player/soldiers player))
+            {:per-label "1000"
+             :display (str (:game/soldier-upkeep-credits game) " credit, " 
+                          (:game/soldier-upkeep-food game) " food")}
+            {:display (str (:soldiers-credits required) " credits, " 
+                          (:soldiers-food required) " food")}
+            [{:label "Pay Credits" :field-name "soldiers-credits" :default-value (:soldiers-credits required)}
+             {:label "Pay Food" :field-name "soldiers-food" :default-value (:soldiers-food required)}]
+            player-id
+            hx-include)
 
-          ;; Fighters upkeep - costs credits and fuel per fighter
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Fighters Upkeep"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Fighters: " (:player/fighters player)]]
-            [:div
-             [:p.text-xs "Cost per Fighter"]
-             [:p.font-mono (str (:game/fighter-upkeep-credits game) " credits, " 
-                                (:game/fighter-upkeep-fuel game) " fuel")]]
-            [:div
-             [:p.text-xs "Total Required"]
-             [:p.font-mono (str (:fighters-credits required) " credits, " 
-                                (:fighters-fuel required) " fuel")]]
-            [:div
-             [:label.text-xs "Pay Credits"]
-             (ui/numeric-input "fighters-credits" (:fighters-credits required) player-id "/calculate-expenses" hx-include)]
-            [:div
-             [:label.text-xs "Pay Fuel"]
-             (ui/numeric-input "fighters-fuel" (:fighters-fuel required) player-id "/calculate-expenses" hx-include)]]]
+          (expense-input-card
+            "Fighters Upkeep"
+            (str "Fighters: " (:player/fighters player))
+            {:per-label "Fighter"
+             :display (str (:game/fighter-upkeep-credits game) " credits, " 
+                          (:game/fighter-upkeep-fuel game) " fuel")}
+            {:display (str (:fighters-credits required) " credits, " 
+                          (:fighters-fuel required) " fuel")}
+            [{:label "Pay Credits" :field-name "fighters-credits" :default-value (:fighters-credits required)}
+             {:label "Pay Fuel" :field-name "fighters-fuel" :default-value (:fighters-fuel required)}]
+            player-id
+            hx-include)
 
-          ;; Defence stations upkeep - costs credits and fuel per station
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Defence Stations Upkeep"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Stations: " (:player/stations player)]]
-            [:div
-             [:p.text-xs "Cost per Station"]
-             [:p.font-mono (str (:game/station-upkeep-credits game) " credits, " 
-                                (:game/station-upkeep-fuel game) " fuel")]]
-            [:div
-             [:p.text-xs "Total Required"]
-             [:p.font-mono (str (:stations-credits required) " credits, " 
-                                (:stations-fuel required) " fuel")]]
-            [:div
-             [:label.text-xs "Pay Credits"]
-             (ui/numeric-input "stations-credits" (:stations-credits required) player-id "/calculate-expenses" hx-include)]
-            [:div
-             [:label.text-xs "Pay Fuel"]
-             (ui/numeric-input "stations-fuel" (:stations-fuel required) player-id "/calculate-expenses" hx-include)]]]
+          (expense-input-card
+            "Defence Stations Upkeep"
+            (str "Stations: " (:player/stations player))
+            {:per-label "Station"
+             :display (str (:game/station-upkeep-credits game) " credits, " 
+                          (:game/station-upkeep-fuel game) " fuel")}
+            {:display (str (:stations-credits required) " credits, " 
+                          (:stations-fuel required) " fuel")}
+            [{:label "Pay Credits" :field-name "stations-credits" :default-value (:stations-credits required)}
+             {:label "Pay Fuel" :field-name "stations-fuel" :default-value (:stations-fuel required)}]
+            player-id
+            hx-include)
 
-          ;; Agents upkeep - costs credits and food per 1000 agents
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Agents Upkeep"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Agents: " (:player/agents player)]]
-            [:div
-             [:p.text-xs "Cost per 1000 Agents"]
-             [:p.font-mono (str (:game/agent-upkeep-credits game) " credits, " 
-                                (:game/agent-upkeep-food game) " food")]]
-            [:div
-             [:p.text-xs "Total Required"]
-             [:p.font-mono (str (:agents-credits required) " credits, " 
-                                (:agents-food required) " food")]]
-            [:div
-             [:label.text-xs "Pay Credits"]
-             (ui/numeric-input "agents-credits" (:agents-credits required) player-id "/calculate-expenses" hx-include)]
-            [:div
-             [:label.text-xs "Pay Food"]
-             (ui/numeric-input "agents-food" (:agents-food required) player-id "/calculate-expenses" hx-include)]]]
+          (expense-input-card
+            "Agents Upkeep"
+            (str "Agents: " (:player/agents player))
+            {:per-label "1000 Agents"
+             :display (str (:game/agent-upkeep-credits game) " credits, " 
+                          (:game/agent-upkeep-food game) " food")}
+            {:display (str (:agents-credits required) " credits, " 
+                          (:agents-food required) " food")}
+            [{:label "Pay Credits" :field-name "agents-credits" :default-value (:agents-credits required)}
+             {:label "Pay Food" :field-name "agents-food" :default-value (:agents-food required)}]
+            player-id
+            hx-include)
 
-          ;; Population upkeep - costs credits and food per 1000 population
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Population Upkeep"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Population: " (:player/population player)]]
-            [:div
-             [:p.text-xs "Cost per 1000"]
-             [:p.font-mono (str (:game/population-upkeep-credits game) " credit, " 
-                                (:game/population-upkeep-food game) " food")]]
-            [:div
-             [:p.text-xs "Total Required"]
-             [:p.font-mono (str (:population-credits required) " credits, " 
-                                (:population-food required) " food")]]
-            [:div
-             [:label.text-xs "Pay Credits"]
-             (ui/numeric-input "population-credits" (:population-credits required) player-id "/calculate-expenses" hx-include)]
-            [:div
-             [:label.text-xs "Pay Food"]
-             (ui/numeric-input "population-food" (:population-food required) player-id "/calculate-expenses" hx-include)]]]]
+          (expense-input-card
+            "Population Upkeep"
+            (str "Population: " (:player/population player))
+            {:per-label "1000"
+             :display (str (:game/population-upkeep-credits game) " credit, " 
+                          (:game/population-upkeep-food game) " food")}
+            {:display (str (:population-credit required) " credits, " 
+                          (:population-food required) " food")}
+            [{:label "Pay Credits" :field-name "population-credits" :default-value (:population-credit required)}
+             {:label "Pay Food" :field-name "population-food" :default-value (:population-food required)}]
+            player-id
+            hx-include)]
 
          ;;; Resources after expenses - using shared component
          ;;; This section is dynamically updated by htmx as the user changes input values.
@@ -350,9 +340,6 @@
            {:href (str "/app/game/" player-id)} "Back to Game"]
           [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
            {:href (str "/app/game/" player-id "/exchange")} "Continue to Exchange"]
-          [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
-           {:type "submit"
-            :disabled true
-            :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"}
-           "Continue to Building"]])
+          ;; Initial button starts disabled - HTMX updates will enable it when affordable
+          (submit-button false)])
        ])))

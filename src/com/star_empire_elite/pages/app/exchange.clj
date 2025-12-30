@@ -36,6 +36,22 @@
    :fuel-buy const/fuel-buy
    :fuel-sell const/fuel-sell})
 
+;;; Parse exchange quantities from request parameters
+(defn parse-exchange-quantities
+  "Parse all exchange quantity inputs from request params.
+   Returns map of quantities for all exchange types."
+  [params]
+  {:soldiers-sold (utils/parse-numeric-input (:soldiers-sold params))
+   :fighters-sold (utils/parse-numeric-input (:fighters-sold params))
+   :stations-sold (utils/parse-numeric-input (:stations-sold params))
+   :mil-planets-sold (utils/parse-numeric-input (:mil-planets-sold params))
+   :food-planets-sold (utils/parse-numeric-input (:food-planets-sold params))
+   :ore-planets-sold (utils/parse-numeric-input (:ore-planets-sold params))
+   :food-bought (utils/parse-numeric-input (:food-bought params))
+   :food-sold (utils/parse-numeric-input (:food-sold params))
+   :fuel-bought (utils/parse-numeric-input (:fuel-bought params))
+   :fuel-sold (utils/parse-numeric-input (:fuel-sold params))})
+
 ;;; Calculate credit changes from all exchanges
 (defn calculate-exchange-credits
   "Calculate net credit change from selling units/planets and buying/selling resources.
@@ -100,6 +116,68 @@
    :invalid-fuel-purchase? (and (> (:fuel-bought quantities) 0) (< (:credits resources-after) 0))})
 
 ;;;;
+;;;; UI Components
+;;;;
+
+;;; Submit button component - extracted to avoid duplication
+(defn submit-button
+  "Renders the submit button with dynamic disabled state based on validity.
+   Used in both initial page render and HTMX updates.
+   Accepts optional extra-attrs map for additional HTML attributes."
+  ([can-execute?] (submit-button can-execute? {}))
+  ([can-execute? extra-attrs]
+   [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
+    (merge {:type "submit"
+            :disabled (not can-execute?)
+            :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"}
+           extra-attrs)
+    "Make Exchange"]))
+
+;;; Sell exchange card component
+(defn sell-exchange-card
+  "Renders a sell exchange card for units, planets, or resources.
+   Parameters:
+   - item-name: Display name (e.g. 'Soldiers', 'Ore Planets', 'Food')
+   - field-name: Form field name (e.g. 'soldiers-sold', 'ore-planets-sold')
+   - price: Price per unit in credits
+   - max-available: Current quantity player owns
+   - player-id: Player identifier for HTMX routing
+   - hx-include: HTMX include string for related fields"
+  [item-name field-name price max-available player-id hx-include]
+  [:div.border.border-green-400.p-4
+   [:h4.font-bold.mb-3 (str "Sell " item-name)]
+   [:div.space-y-2
+    [:div
+     [:p.text-xs "Price per Unit"]
+     [:p.font-mono (str price " credits")]]
+    [:div
+     [:p.text-xs "Max Available"]
+     [:p.font-mono max-available]]
+    [:div
+     [:label.text-xs "Sell Quantity"]
+     (ui/numeric-input field-name 0 player-id "/calculate-exchange" hx-include)]]])
+
+;;; Buy exchange card component
+(defn buy-exchange-card
+  "Renders a buy exchange card for resources.
+   Parameters:
+   - item-name: Display name (e.g. 'Food', 'Fuel')
+   - field-name: Form field name (e.g. 'food-bought', 'fuel-bought')
+   - price: Price per unit in credits
+   - player-id: Player identifier for HTMX routing
+   - hx-include: HTMX include string for related fields"
+  [item-name field-name price player-id hx-include]
+  [:div.border.border-green-400.p-4
+   [:h4.font-bold.mb-3 (str "Buy " item-name)]
+   [:div.space-y-2
+    [:div
+     [:p.text-xs "Price per Unit"]
+     [:p.font-mono (str price " credits")]]
+    [:div
+     [:label.text-xs "Buy Quantity"]
+     (ui/numeric-input field-name 0 player-id "/calculate-exchange" hx-include)]]])
+
+;;;;
 ;;;; Actions
 ;;;;
 ;;;; There are three parts to the actions for this phase: (i) exchange-page, which shows the
@@ -115,17 +193,8 @@
     ;; Phase validation - only allow exchange if player is in phase 2
     (if-let [redirect (utils/validate-phase player 2 player-id)]
       redirect
-      ;; Parse all exchange inputs using shared utility
-      (let [quantities {:soldiers-sold (utils/parse-numeric-input (:soldiers-sold params))
-                        :fighters-sold (utils/parse-numeric-input (:fighters-sold params))
-                        :stations-sold (utils/parse-numeric-input (:stations-sold params))
-                        :mil-planets-sold (utils/parse-numeric-input (:mil-planets-sold params))
-                        :food-planets-sold (utils/parse-numeric-input (:food-planets-sold params))
-                        :ore-planets-sold (utils/parse-numeric-input (:ore-planets-sold params))
-                        :food-bought (utils/parse-numeric-input (:food-bought params))
-                        :food-sold (utils/parse-numeric-input (:food-sold params))
-                        :fuel-bought (utils/parse-numeric-input (:fuel-bought params))
-                        :fuel-sold (utils/parse-numeric-input (:fuel-sold params))}
+      ;; Parse all exchange inputs using extracted function
+      (let [quantities (parse-exchange-quantities params)
             
             ;; Use pure calculation functions to determine final resource values
             rates (get-exchange-rates)
@@ -154,17 +223,8 @@
 ;;; This gives immediate feedback on whether the player can afford their selected exchanges.
 (defn calculate-exchange [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
-    (let [;; Parse all exchange inputs using shared utility
-          quantities {:soldiers-sold (utils/parse-numeric-input (:soldiers-sold params))
-                     :fighters-sold (utils/parse-numeric-input (:fighters-sold params))
-                     :stations-sold (utils/parse-numeric-input (:stations-sold params))
-                     :mil-planets-sold (utils/parse-numeric-input (:mil-planets-sold params))
-                     :food-planets-sold (utils/parse-numeric-input (:food-planets-sold params))
-                     :ore-planets-sold (utils/parse-numeric-input (:ore-planets-sold params))
-                     :food-bought (utils/parse-numeric-input (:food-bought params))
-                     :food-sold (utils/parse-numeric-input (:food-sold params))
-                     :fuel-bought (utils/parse-numeric-input (:fuel-bought params))
-                     :fuel-sold (utils/parse-numeric-input (:fuel-sold params))}
+    (let [;; Parse all exchange inputs using extracted function
+          quantities (parse-exchange-quantities params)
         
           ;; Use pure calculation functions
           rates (get-exchange-rates)
@@ -243,15 +303,9 @@
             [:p.text-yellow-400.font-bold "WARNING: Invalid exchanges! You cannot sell more than you own."])]
          
          ;; Submit button - disabled if player can't execute exchanges
-         [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
-          {:type "submit"
-           :disabled (not can-execute?)
-           :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"
-           :hx-swap-oob "true"}
-           "Make Exchange"]]))))
+         (submit-button can-execute? {:hx-swap-oob "true"})]))))
 
 ;;; Shows exchange options and input fields for player to buy/sell resources and assets
-
 (defn exchange-page [{:keys [player game]}]
   (let [player-id (:xt/id player)
         hx-include "[name='soldiers-sold'],[name='fighters-sold'],[name='stations-sold'],[name='mil-planets-sold'],[name='food-planets-sold'],[name='ore-planets-sold'],[name='food-bought'],[name='food-sold'],[name='fuel-bought'],[name='fuel-sold']"
@@ -310,142 +364,30 @@
          [:h3.font-bold.mb-4 "Exchanges This Round"]
          [:div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-3.gap-4.mb-8
 
-          ;; Sell soldiers - convert to credits
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Sell Soldiers"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Price per Unit"]
-             [:p.font-mono (str (:soldier-sell rates) " credits")]]
-            [:div
-             [:p.text-xs "Max Available"]
-             [:p.font-mono (:player/soldiers player)]]
-            [:div
-             [:label.text-xs "Sell Quantity"]
-             (ui/numeric-input "soldiers-sold" 0 player-id "/calculate-exchange" hx-include)]]]
-
-          ;; Sell fighters - convert to credits
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Sell Fighters"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Price per Unit"]
-             [:p.font-mono (str (:fighter-sell rates) " credits")]]
-            [:div
-             [:p.text-xs "Max Available"]
-             [:p.font-mono (:player/fighters player)]]
-            [:div
-             [:label.text-xs "Sell Quantity"]
-             (ui/numeric-input "fighters-sold" 0 player-id "/calculate-exchange" hx-include)]]]
-
-          ;; Sell stations - convert to credits
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Sell Stations"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Price per Unit"]
-             [:p.font-mono (str (:station-sell rates) " credits")]]
-            [:div
-             [:p.text-xs "Max Available"]
-             [:p.font-mono (:player/stations player)]]
-            [:div
-             [:label.text-xs "Sell Quantity"]
-             (ui/numeric-input "stations-sold" 0 player-id "/calculate-exchange" hx-include)]]]
-
-          ;; Sell ore planets - convert to credits
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Sell Ore Planets"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Price per Unit"]
-             [:p.font-mono (str (:ore-planet-sell rates) " credits")]]
-            [:div
-             [:p.text-xs "Max Available"]
-             [:p.font-mono (:player/ore-planets player)]]
-            [:div
-             [:label.text-xs "Sell Quantity"]
-             (ui/numeric-input "ore-planets-sold" 0 player-id "/calculate-exchange" hx-include)]]]
-
-          ;; Sell food planets - convert to credits
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Sell Food Planets"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Price per Unit"]
-             [:p.font-mono (str (:food-planet-sell rates) " credits")]]
-            [:div
-             [:p.text-xs "Max Available"]
-             [:p.font-mono (:player/food-planets player)]]
-            [:div
-             [:label.text-xs "Sell Quantity"]
-             (ui/numeric-input "food-planets-sold" 0 player-id "/calculate-exchange" hx-include)]]]
-
-          ;; Sell military planets - convert to credits
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Sell Military Planets"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Price per Unit"]
-             [:p.font-mono (str (:mil-planet-sell rates) " credits")]]
-            [:div
-             [:p.text-xs "Max Available"]
-             [:p.font-mono (:player/mil-planets player)]]
-            [:div
-             [:label.text-xs "Sell Quantity"]
-             (ui/numeric-input "mil-planets-sold" 0 player-id "/calculate-exchange" hx-include)]]]
-
-          ;; Sell food - convert to credits at half buy price
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Sell Food"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Price per Unit"]
-             [:p.font-mono (str (:food-sell rates) " credits")]]
-            [:div
-             [:p.text-xs "Max Available"]
-             [:p.font-mono (:player/food player)]]
-            [:div
-             [:label.text-xs "Sell Quantity"]
-             (ui/numeric-input "food-sold" 0 player-id "/calculate-exchange" hx-include)]]]
-
-          ;; Sell fuel - convert to credits at half buy price
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Sell Fuel"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Price per Unit"]
-             [:p.font-mono (str (:fuel-sell rates) " credits")]]
-            [:div
-             [:p.text-xs "Max Available"]
-             [:p.font-mono (:player/fuel player)]]
-            [:div
-             [:label.text-xs "Sell Quantity"]
-             (ui/numeric-input "fuel-sold" 0 player-id "/calculate-exchange" hx-include)]]]
+          ;; All sell cards using extracted component
+          (sell-exchange-card "Soldiers" "soldiers-sold" (:soldier-sell rates) 
+                              (:player/soldiers player) player-id hx-include)
+          (sell-exchange-card "Fighters" "fighters-sold" (:fighter-sell rates) 
+                              (:player/fighters player) player-id hx-include)
+          (sell-exchange-card "Stations" "stations-sold" (:station-sell rates) 
+                              (:player/stations player) player-id hx-include)
+          (sell-exchange-card "Ore Planets" "ore-planets-sold" (:ore-planet-sell rates) 
+                              (:player/ore-planets player) player-id hx-include)
+          (sell-exchange-card "Food Planets" "food-planets-sold" (:food-planet-sell rates) 
+                              (:player/food-planets player) player-id hx-include)
+          (sell-exchange-card "Military Planets" "mil-planets-sold" (:mil-planet-sell rates) 
+                              (:player/mil-planets player) player-id hx-include)
+          (sell-exchange-card "Food" "food-sold" (:food-sell rates) 
+                              (:player/food player) player-id hx-include)
+          (sell-exchange-card "Fuel" "fuel-sold" (:fuel-sell rates) 
+                              (:player/fuel player) player-id hx-include)
 
           ;; Invisible placeholder for grid alignment (only visible on lg screens)
           [:div.hidden.lg:block.invisible.border.border-green-400.p-4]
 
-          ;; Buy food - spend credits to get food
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Buy Food"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Price per Unit"]
-             [:p.font-mono (str (:food-buy rates) " credits")]]
-            [:div
-             [:label.text-xs "Buy Quantity"]
-             (ui/numeric-input "food-bought" 0 player-id "/calculate-exchange" hx-include)]]]
-
-          ;; Buy fuel - spend credits to get fuel
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Buy Fuel"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Price per Unit"]
-             [:p.font-mono (str (:fuel-buy rates) " credits")]]
-            [:div
-             [:label.text-xs "Buy Quantity"]
-             (ui/numeric-input "fuel-bought" 0 player-id "/calculate-exchange" hx-include)]]]
+          ;; All buy cards using extracted component
+          (buy-exchange-card "Food" "food-bought" (:food-buy rates) player-id hx-include)
+          (buy-exchange-card "Fuel" "fuel-bought" (:fuel-buy rates) player-id hx-include)
 
           ;; Invisible placeholder for grid alignment (only visible on lg screens)
           [:div.hidden.lg:block.invisible.border.border-green-400.p-4]]
@@ -494,9 +436,6 @@
          [:div.flex.gap-4
           [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
            {:href (str "/app/game/" player-id "/expenses")} "Cancel Exchange"]
-          [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
-           {:type "submit"
-            :disabled true
-            :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"}
-           "Make Exchange"]])
+          ;; Initial button starts disabled - HTMX updates will enable it when valid
+          (submit-button false)])
        ])))

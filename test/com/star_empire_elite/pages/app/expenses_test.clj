@@ -171,10 +171,13 @@
 
 (deftest test-calculate-expenses-hiccup-render
   (testing "calculate-expenses returns hiccup and handles negative result markup"
-    (let [params {"planets-pay" "123"}
-          player test-player]
-      (with-redefs [xt/entity (helpers/fake-entity [player])
-                    biff/render (fn [hiccup] hiccup)] ; short-circuit rendering
+    (let [params {"planets-pay" "123"}]
+      (with-redefs [utils/load-player-and-game 
+                    (fn [db player-id-str]
+                      {:player test-player
+                       :game test-game
+                       :player-id test-player-id})
+                    biff/render identity]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params params
                    :biff/db nil}
