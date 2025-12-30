@@ -10,6 +10,17 @@
 (defn plus-days ^Instant [^Instant inst ^long days]
   (.plusSeconds inst (* 86400 days)))            ;; Instant supports Duration/seconds
 
+;; ---- Test fixture utilities -------------------------------------------------
+
+;;; Returns a function that simulates XTDB's entity lookup for given entities.
+;;; This is used across multiple test files to mock database entity retrieval.
+(defn fake-entity 
+  "Creates a mock entity lookup function for testing.
+   Takes a collection of entities and returns a function that looks them up by :xt/id."
+  [entities]
+  (fn [_ id]
+    (first (filter #(= (:xt/id %) id) entities))))
+
 ;; ---- schema-complete defaults (match your Malli keys) -----------------------
 
 (def game-defaults

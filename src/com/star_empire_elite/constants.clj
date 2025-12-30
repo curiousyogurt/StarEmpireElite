@@ -55,3 +55,17 @@
 (def mil-planet-cost 5000)
 (def food-planet-cost 4000)
 (def ore-planet-cost 6000)
+
+;; :: Exchange Rate Defaults
+;; Rates for buying and selling resources and assets in the exchange
+
+(def soldier-sell 50)
+(def fighter-sell 100)
+(def station-sell 150)
+(def mil-planet-sell 500)
+(def food-planet-sell 500)
+(def ore-planet-sell 500)
+(def food-buy 10)
+(def food-sell 5)      ; Half of buy rate
+(def fuel-buy 15)
+(def fuel-sell 7)      ; Half of buy rate (rounded down)

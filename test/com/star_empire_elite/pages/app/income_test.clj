@@ -1,6 +1,7 @@
 (ns com.star-empire-elite.pages.app.income-test
   (:require [clojure.test :refer :all]
             [com.star-empire-elite.pages.app.income :as income]
+            [com.star-empire-elite.test-helpers :as helpers]
             [xtdb.api :as xt]
             [com.biffweb :as biff]))
 
@@ -41,11 +42,6 @@
    :player/fighters 75
    :player/stations 20
    :player/agents 10})
-
-;; Utility: Returns a function that simulates XTDB's entity lookup for given entities
-(defn fake-entity [entities]
-  (fn [_ id]
-    (first (filter #(= (:xt/id %) id) entities))))
 
 ;;;;
 ;;;; Calculation Tests
@@ -178,7 +174,7 @@
 (deftest test-apply-income-wrong-phase
   (testing "Redirects to game page when player is not in phase 1"
     (let [wrong-phase-player (assoc test-player :player/current-phase 2)]
-      (with-redefs [xt/entity (fake-entity [wrong-phase-player test-game])]
+      (with-redefs [xt/entity (helpers/fake-entity [wrong-phase-player test-game])]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :biff/db nil}
               result (income/apply-income ctx)]
@@ -189,7 +185,7 @@
 (deftest test-apply-income-submits-correct-tx
   (testing "Submits transaction with correct resource updates and phase advance"
     (let [tx-called (atom nil)]
-      (with-redefs [xt/entity (fake-entity [test-player test-game])
+      (with-redefs [xt/entity (helpers/fake-entity [test-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)} :biff/db nil}
               result (income/apply-income ctx)
@@ -230,7 +226,7 @@
                         :player/food-planets 0 
                         :player/mil-planets 0)
           tx-called (atom nil)]
-      (with-redefs [xt/entity (fake-entity [player test-game])
+      (with-redefs [xt/entity (helpers/fake-entity [player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)} :biff/db nil}
               _ (income/apply-income ctx)

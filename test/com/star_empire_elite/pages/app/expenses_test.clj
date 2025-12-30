@@ -1,6 +1,7 @@
 (ns com.star-empire-elite.pages.app.expenses-test
   (:require [clojure.test :refer :all]
             [com.star-empire-elite.pages.app.expenses :as expenses]
+            [com.star-empire-elite.test-helpers :as helpers]
             [xtdb.api :as xt]
             [com.star-empire-elite.utils :as utils]
             [com.biffweb :as biff]))
@@ -46,11 +47,6 @@
    :player/agents 1500
    :player/population 9000})
 
-;; Helper: simulate a lookup for XTDB's entity function
-(defn fake-entity [entities]
-  (fn [_ id]
-    (first (filter #(= (:xt/id %) id) entities))))
-
 ;;
 ;; Happy path and error/edge-case tests for apply-expenses
 ;;
@@ -68,7 +64,7 @@
 (deftest test-apply-expenses-phase-check
   (testing "Not phase 2 redirects to game (phase check)"
     (let [player (assoc test-player :player/current-phase 1)]
-      (with-redefs [xt/entity (fake-entity [player])]
+      (with-redefs [xt/entity (helpers/fake-entity [player])]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params {}
                    :biff/db nil}
@@ -120,7 +116,7 @@
     (let [params {} ;; no params at all
           start-player (assoc test-player :player/current-phase 2)
           tx-called (atom nil)]
-      (with-redefs [xt/entity (fake-entity [start-player])
+      (with-redefs [xt/entity (helpers/fake-entity [start-player])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params params
@@ -137,7 +133,7 @@
     (let [params {"planets-pay" "abc" "agents-food" ""}
           player (assoc test-player :player/current-phase 2)
           tx-called (atom nil)]
-      (with-redefs [xt/entity (fake-entity [player])
+      (with-redefs [xt/entity (helpers/fake-entity [player])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params params
@@ -177,7 +173,7 @@
   (testing "calculate-expenses returns hiccup and handles negative result markup"
     (let [params {"planets-pay" "123"}
           player test-player]
-      (with-redefs [xt/entity (fake-entity [player])
+      (with-redefs [xt/entity (helpers/fake-entity [player])
                     biff/render (fn [hiccup] hiccup)] ; short-circuit rendering
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params params

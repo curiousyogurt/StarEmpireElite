@@ -1,6 +1,7 @@
 (ns com.star-empire-elite.pages.app.exchange-test
   (:require [clojure.test :refer :all]
             [com.star-empire-elite.pages.app.exchange :as exchange]
+            [com.star-empire-elite.test-helpers :as helpers]
             [xtdb.api :as xt]
             [com.star-empire-elite.utils :as utils]
             [com.biffweb :as biff]))
@@ -27,11 +28,6 @@
    :player/food 500
    :player/fuel 300
    :player/galaxars 100})
-
-;; Utility: Returns a function that simulates XTDB's entity lookup for given entities
-(defn fake-entity [entities]
-  (fn [_ id]
-    (first (filter #(= (:xt/id %) id) entities))))
 
 ;;;;
 ;;;; Tests for Pure Calculation Functions
@@ -227,7 +223,7 @@
 (deftest test-apply-exchange-wrong-phase
   (testing "Redirects to game page when player is not in phase 2"
     (let [wrong-phase-player (assoc test-player :player/current-phase 1)]
-      (with-redefs [xt/entity (fake-entity [wrong-phase-player])]
+      (with-redefs [xt/entity (helpers/fake-entity [wrong-phase-player])]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params {}
                    :biff/db nil}
@@ -249,7 +245,7 @@
                   :fuel-bought "30"
                   :fuel-sold "10"}
           tx-called (atom nil)]
-      (with-redefs [xt/entity (fake-entity [test-player])
+      (with-redefs [xt/entity (helpers/fake-entity [test-player])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params params
@@ -292,7 +288,7 @@
                   :mil-planets-sold "0" :food-planets-sold "0" :ore-planets-sold "0"
                   :food-bought "0" :food-sold "0" :fuel-bought "0" :fuel-sold "0"}
           tx-called (atom nil)]
-      (with-redefs [xt/entity (fake-entity [test-player])
+      (with-redefs [xt/entity (helpers/fake-entity [test-player])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params params
@@ -309,7 +305,7 @@
   (testing "Treats empty/missing params as zero"
     (let [params {}  ; All params missing
           tx-called (atom nil)]
-      (with-redefs [xt/entity (fake-entity [test-player])
+      (with-redefs [xt/entity (helpers/fake-entity [test-player])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params params
@@ -335,7 +331,7 @@
 
 (deftest test-calculate-exchange-renders-hiccup
   (testing "Returns hiccup vector for HTMX response"
-    (with-redefs [xt/entity (fake-entity [test-player])
+    (with-redefs [xt/entity (helpers/fake-entity [test-player])
                   biff/render identity]  ; Pass through hiccup unchanged
       (let [ctx {:path-params {:player-id (str test-player-id)}
                  :params {:soldiers-sold "10" :fighters-sold "5"
@@ -350,7 +346,7 @@
 
 (deftest test-calculate-exchange-validity
   (testing "Correctly identifies when player can/cannot execute exchanges"
-    (with-redefs [xt/entity (fake-entity [test-player])]
+    (with-redefs [xt/entity (helpers/fake-entity [test-player])]
       ;; Test valid exchanges
       (let [valid-params {:soldiers-sold "10" :fighters-sold "5"
                          :stations-sold "2" :mil-planets-sold "1"

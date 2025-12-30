@@ -14,26 +14,27 @@
   (:require [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]
+            [com.star-empire-elite.constants :as const]
             [xtdb.api :as xt]))
 
 ;;;;
 ;;;; Calculations
 ;;;;
 
-;;; Get exchange rates - these are currently hardcoded but should eventually come from game constants
+;;; Get exchange rates from constants
 (defn get-exchange-rates
-  "Returns map of all exchange rates. TODO: Move to game constants in database"
+  "Returns map of all exchange rates from game constants"
   []
-  {:soldier-sell 50
-   :fighter-sell 100
-   :station-sell 150
-   :mil-planet-sell 500
-   :food-planet-sell 500
-   :ore-planet-sell 500
-   :food-buy 10
-   :food-sell 5      ; Half of buy rate
-   :fuel-buy 15
-   :fuel-sell 7})    ; Half of buy rate (rounded down)
+  {:soldier-sell const/soldier-sell
+   :fighter-sell const/fighter-sell
+   :station-sell const/station-sell
+   :mil-planet-sell const/mil-planet-sell
+   :food-planet-sell const/food-planet-sell
+   :ore-planet-sell const/ore-planet-sell
+   :food-buy const/food-buy
+   :food-sell const/food-sell
+   :fuel-buy const/fuel-buy
+   :fuel-sell const/fuel-sell})
 
 ;;; Calculate credit changes from all exchanges
 (defn calculate-exchange-credits

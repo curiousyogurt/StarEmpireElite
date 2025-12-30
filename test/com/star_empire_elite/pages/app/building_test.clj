@@ -1,6 +1,7 @@
 (ns com.star-empire-elite.pages.app.building-test
   (:require [clojure.test :refer :all]
             [com.star-empire-elite.pages.app.building :as building]
+            [com.star-empire-elite.test-helpers :as helpers]
             [xtdb.api :as xt]
             [com.star-empire-elite.utils :as utils]
             [com.biffweb :as biff]))
@@ -45,11 +46,6 @@
    :player/mil-planets 2
    :player/food-planets 2
    :player/ore-planets 2})
-
-;; Utility: Returns a function that simulates XTDB's entity lookup for given entities
-(defn fake-entity [entities]
-  (fn [_ id]
-    (first (filter #(= (:xt/id %) id) entities))))
 
 ;;;;
 ;;;; Tests for Pure Calculation Functions
@@ -242,7 +238,7 @@
 (deftest test-apply-building-wrong-phase
   (testing "Redirects to game page when player is not in phase 3"
     (let [wrong-phase-player (assoc test-player :player/current-phase 2)]
-      (with-redefs [xt/entity (fake-entity [wrong-phase-player test-game])]
+      (with-redefs [xt/entity (helpers/fake-entity [wrong-phase-player test-game])]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params {}
                    :biff/db nil}
@@ -265,7 +261,7 @@
                   :food-planets "1"
                   :ore-planets "3"}
           tx-called (atom nil)]
-      (with-redefs [xt/entity (fake-entity [test-player test-game])
+      (with-redefs [xt/entity (helpers/fake-entity [test-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params params
@@ -312,7 +308,7 @@
     (let [params {:soldiers "1000"}  ; Way too expensive!
           player (assoc test-player :player/credits 100)
           tx-called (atom nil)]
-      (with-redefs [xt/entity (fake-entity [player test-game])
+      (with-redefs [xt/entity (helpers/fake-entity [player test-game])
                     biff/submit-tx (fn [_ _] (reset! tx-called true) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params params
@@ -329,7 +325,7 @@
                   :fighters "0" :admirals "0" :stations "0" :cmd-ships "0"
                   :mil-planets "0" :food-planets "0" :ore-planets "0"}
           tx-called (atom nil)]
-      (with-redefs [xt/entity (fake-entity [test-player test-game])
+      (with-redefs [xt/entity (helpers/fake-entity [test-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params params
@@ -347,7 +343,7 @@
   (testing "Treats empty/missing params as zero"
     (let [params {}  ; All params missing
           tx-called (atom nil)]
-      (with-redefs [xt/entity (fake-entity [test-player test-game])
+      (with-redefs [xt/entity (helpers/fake-entity [test-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params params
@@ -373,7 +369,7 @@
 
 (deftest test-calculate-building-renders-hiccup
   (testing "Returns hiccup vector for HTMX response"
-    (with-redefs [xt/entity (fake-entity [test-player test-game])
+    (with-redefs [xt/entity (helpers/fake-entity [test-player test-game])
                   biff/render identity]  ; Pass through hiccup unchanged
       (let [ctx {:path-params {:player-id (str test-player-id)}
                  :params {:soldiers "2" :fighters "3"}
@@ -384,7 +380,7 @@
 
 (deftest test-calculate-building-affordability
   (testing "Correctly identifies when player can/cannot afford purchases"
-    (with-redefs [xt/entity (fake-entity [test-player test-game])]
+    (with-redefs [xt/entity (helpers/fake-entity [test-player test-game])]
       ;; Test affordable purchases
       (let [affordable-params {:soldiers "10" :transports "5"}
             quantities (into {} (map (fn [[k v]] [k (utils/parse-numeric-input v)]) 
