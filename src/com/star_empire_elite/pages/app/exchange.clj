@@ -249,6 +249,7 @@
            :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"
            :hx-swap-oob "true"}
 ;;; Shows exchange options and input fields for player to buy/sell resources and assets
+
 (defn exchange-page [{:keys [player game]}]
   (let [player-id (:xt/id player)
         hx-include "[name='soldiers-sold'],[name='fighters-sold'],[name='stations-sold'],[name='mil-planets-sold'],[name='food-planets-sold'],[name='ore-planets-sold'],[name='food-bought'],[name='food-sold'],[name='fuel-bought'],[name='fuel-sold']"
