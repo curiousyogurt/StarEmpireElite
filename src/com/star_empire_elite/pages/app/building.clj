@@ -176,9 +176,6 @@
            :hx-swap-oob "true"}
           "Complete Purchases"]]))))
 
-;;; Helper function for building input fields - delegates to shared numeric-input component
-(defn building-input [name value player-id hx-include]
-  (ui/numeric-input name value player-id "/calculate-building" hx-include))
 
 ;;; Shows building options and input fields for player to purchase units and planets
 (defn building-page [{:keys [player game]}]
@@ -213,7 +210,7 @@
              [:p.font-mono (str (:game/soldier-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (building-input "soldiers" 0 player-id hx-include)]]]
+             (ui/numeric-input "soldiers" 0 player-id "/calculate-building" hx-include)]]]
 
           ;; Purchase transports
           [:div.border.border-green-400.p-4
@@ -224,7 +221,7 @@
              [:p.font-mono (str (:game/transport-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (building-input "transports" 0 player-id hx-include)]]]
+             (ui/numeric-input "transports" 0 player-id "/calculate-building" hx-include)]]]
 
           ;; Purchase generals
           [:div.border.border-green-400.p-4
@@ -235,7 +232,7 @@
              [:p.font-mono (str (:game/general-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (building-input "generals" 0 player-id hx-include)]]]
+             (ui/numeric-input "generals" 0 player-id "/calculate-building" hx-include)]]]
 
           ;; Purchase carriers
           [:div.border.border-green-400.p-4
@@ -246,7 +243,7 @@
              [:p.font-mono (str (:game/carrier-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (building-input "carriers" 0 player-id hx-include)]]]
+             (ui/numeric-input "carriers" 0 player-id "/calculate-building" hx-include)]]]
 
           ;; Purchase fighters
           [:div.border.border-green-400.p-4
@@ -257,7 +254,7 @@
              [:p.font-mono (str (:game/fighter-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (building-input "fighters" 0 player-id hx-include)]]]
+             (ui/numeric-input "fighters" 0 player-id "/calculate-building" hx-include)]]]
 
           ;; Purchase admirals
           [:div.border.border-green-400.p-4
@@ -268,7 +265,7 @@
              [:p.font-mono (str (:game/admiral-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (building-input "admirals" 0 player-id hx-include)]]]
+             (ui/numeric-input "admirals" 0 player-id "/calculate-building" hx-include)]]]
 
           ;; Purchase defence stations
           [:div.border.border-green-400.p-4
@@ -279,7 +276,7 @@
              [:p.font-mono (str (:game/station-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (building-input "stations" 0 player-id hx-include)]]]
+             (ui/numeric-input "stations" 0 player-id "/calculate-building" hx-include)]]]
 
           ;; Purchase command ships
           [:div.border.border-green-400.p-4
@@ -290,7 +287,7 @@
              [:p.font-mono (str (:game/cmd-ship-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (building-input "cmd-ships" 0 player-id hx-include)]]]
+             (ui/numeric-input "cmd-ships" 0 player-id "/calculate-building" hx-include)]]]
 
           ;; Purchase military planets
           [:div.border.border-green-400.p-4
@@ -301,7 +298,7 @@
              [:p.font-mono (str (:game/mil-planet-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (building-input "mil-planets" 0 player-id hx-include)]]]
+             (ui/numeric-input "mil-planets" 0 player-id "/calculate-building" hx-include)]]]
 
           ;; Purchase food planets
           [:div.border.border-green-400.p-4
@@ -312,7 +309,7 @@
              [:p.font-mono (str (:game/food-planet-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (building-input "food-planets" 0 player-id hx-include)]]]
+             (ui/numeric-input "food-planets" 0 player-id "/calculate-building" hx-include)]]]
 
           ;; Purchase ore planets
           [:div.border.border-green-400.p-4
@@ -323,7 +320,7 @@
              [:p.font-mono (str (:game/ore-planet-cost game) " credits")]]
             [:div
              [:label.text-xs "Purchase Quantity"]
-             (building-input "ore-planets" 0 player-id hx-include)]]]]
+             (ui/numeric-input "ore-planets" 0 player-id "/calculate-building" hx-include)]]]]
 
          ;;; Resources After Purchases - using shared extended component
          ;;; This section is dynamically updated by HTMX as the user changes input values.

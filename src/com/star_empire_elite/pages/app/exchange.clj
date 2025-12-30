@@ -248,10 +248,6 @@
            :disabled (not can-execute?)
            :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"
            :hx-swap-oob "true"}
-          "Make Exchange"]]))))
-
-;;; Helper function for exchange input fields - delegates to shared numeric-input component
-(defn exchange-input [name value player-id hx-include]
   (ui/numeric-input name value player-id "/calculate-exchange" hx-include))
 
 ;;; Shows exchange options and input fields for player to buy/sell resources and assets
@@ -325,7 +321,7 @@
              [:p.font-mono (:player/soldiers player)]]
             [:div
              [:label.text-xs "Sell Quantity"]
-             (exchange-input "soldiers-sold" 0 player-id hx-include)]]]
+             (ui/numeric-input "soldiers-sold" 0 player-id "/calculate-exchange" hx-include)]]]
 
           ;; Sell fighters - convert to credits
           [:div.border.border-green-400.p-4
@@ -339,7 +335,7 @@
              [:p.font-mono (:player/fighters player)]]
             [:div
              [:label.text-xs "Sell Quantity"]
-             (exchange-input "fighters-sold" 0 player-id hx-include)]]]
+             (ui/numeric-input "fighters-sold" 0 player-id "/calculate-exchange" hx-include)]]]
 
           ;; Sell stations - convert to credits
           [:div.border.border-green-400.p-4
@@ -353,7 +349,7 @@
              [:p.font-mono (:player/stations player)]]
             [:div
              [:label.text-xs "Sell Quantity"]
-             (exchange-input "stations-sold" 0 player-id hx-include)]]]
+             (ui/numeric-input "stations-sold" 0 player-id "/calculate-exchange" hx-include)]]]
 
           ;; Sell ore planets - convert to credits
           [:div.border.border-green-400.p-4
@@ -367,7 +363,7 @@
              [:p.font-mono (:player/ore-planets player)]]
             [:div
              [:label.text-xs "Sell Quantity"]
-             (exchange-input "ore-planets-sold" 0 player-id hx-include)]]]
+             (ui/numeric-input "ore-planets-sold" 0 player-id "/calculate-exchange" hx-include)]]]
 
           ;; Sell food planets - convert to credits
           [:div.border.border-green-400.p-4
@@ -381,7 +377,7 @@
              [:p.font-mono (:player/food-planets player)]]
             [:div
              [:label.text-xs "Sell Quantity"]
-             (exchange-input "food-planets-sold" 0 player-id hx-include)]]]
+             (ui/numeric-input "food-planets-sold" 0 player-id "/calculate-exchange" hx-include)]]]
 
           ;; Sell military planets - convert to credits
           [:div.border.border-green-400.p-4
@@ -395,7 +391,7 @@
              [:p.font-mono (:player/mil-planets player)]]
             [:div
              [:label.text-xs "Sell Quantity"]
-             (exchange-input "mil-planets-sold" 0 player-id hx-include)]]]
+             (ui/numeric-input "mil-planets-sold" 0 player-id "/calculate-exchange" hx-include)]]]
 
           ;; Sell food - convert to credits at half buy price
           [:div.border.border-green-400.p-4
@@ -409,7 +405,7 @@
              [:p.font-mono (:player/food player)]]
             [:div
              [:label.text-xs "Sell Quantity"]
-             (exchange-input "food-sold" 0 player-id hx-include)]]]
+             (ui/numeric-input "food-sold" 0 player-id "/calculate-exchange" hx-include)]]]
 
           ;; Sell fuel - convert to credits at half buy price
           [:div.border.border-green-400.p-4
@@ -423,7 +419,7 @@
              [:p.font-mono (:player/fuel player)]]
             [:div
              [:label.text-xs "Sell Quantity"]
-             (exchange-input "fuel-sold" 0 player-id hx-include)]]]
+             (ui/numeric-input "fuel-sold" 0 player-id "/calculate-exchange" hx-include)]]]
 
           ;; Invisible placeholder for grid alignment (only visible on lg screens)
           [:div.hidden.lg:block.invisible.border.border-green-400.p-4]
@@ -437,7 +433,7 @@
              [:p.font-mono (str (:food-buy rates) " credits")]]
             [:div
              [:label.text-xs "Buy Quantity"]
-             (exchange-input "food-bought" 0 player-id hx-include)]]]
+             (ui/numeric-input "food-bought" 0 player-id "/calculate-exchange" hx-include)]]]
 
           ;; Buy fuel - spend credits to get fuel
           [:div.border.border-green-400.p-4
@@ -448,7 +444,7 @@
              [:p.font-mono (str (:fuel-buy rates) " credits")]]
             [:div
              [:label.text-xs "Buy Quantity"]
-             (exchange-input "fuel-bought" 0 player-id hx-include)]]]
+             (ui/numeric-input "fuel-bought" 0 player-id "/calculate-exchange" hx-include)]]]
 
           ;; Invisible placeholder for grid alignment (only visible on lg screens)
           [:div.hidden.lg:block.invisible.border.border-green-400.p-4]]

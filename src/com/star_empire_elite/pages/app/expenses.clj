@@ -182,10 +182,6 @@
            :hx-swap-oob "true"}
           "Continue to Building"]]))))
 
-;;; Helper function for expense input fields - delegates to shared numeric-input component
-(defn expense-input [name value player-id hx-include]
-  (ui/numeric-input name value player-id "/calculate-expenses" hx-include))
-
 ;;; Shows expense requirements and input fields for player to choose how much to pay
 (defn expenses-page [{:keys [player game]}]
   (let [required (calculate-required-expenses player game)
@@ -230,10 +226,10 @@
                                 (:planets-food required) " food")]]
             [:div
              [:label.text-xs "Pay Credits"]
-             (expense-input "planets-pay" (:planets-credits required) player-id hx-include)]
+             (ui/numeric-input "planets-pay" (:planets-credits required) player-id "/calculate-expenses" hx-include)]
             [:div
              [:label.text-xs "Pay Food"]
-             (expense-input "planets-food" (:planets-food required) player-id hx-include)]]]
+             (ui/numeric-input "planets-food" (:planets-food required) player-id "/calculate-expenses" hx-include)]]]
 
           ;; Soldiers upkeep - costs credits and food per 1000 soldiers
           [:div.border.border-green-400.p-4
@@ -251,10 +247,10 @@
                                 (:soldiers-food required) " food")]]
             [:div
              [:label.text-xs "Pay Credits"]
-             (expense-input "soldiers-credits" (:soldiers-credits required) player-id hx-include)]
+             (ui/numeric-input "soldiers-credits" (:soldiers-credits required) player-id "/calculate-expenses" hx-include)]
             [:div
              [:label.text-xs "Pay Food"]
-             (expense-input "soldiers-food" (:soldiers-food required) player-id hx-include)]]]
+             (ui/numeric-input "soldiers-food" (:soldiers-food required) player-id "/calculate-expenses" hx-include)]]]
 
           ;; Fighters upkeep - costs credits and fuel per fighter
           [:div.border.border-green-400.p-4
@@ -272,10 +268,10 @@
                                 (:fighters-fuel required) " fuel")]]
             [:div
              [:label.text-xs "Pay Credits"]
-             (expense-input "fighters-credits" (:fighters-credits required) player-id hx-include)]
+             (ui/numeric-input "fighters-credits" (:fighters-credits required) player-id "/calculate-expenses" hx-include)]
             [:div
              [:label.text-xs "Pay Fuel"]
-             (expense-input "fighters-fuel" (:fighters-fuel required) player-id hx-include)]]]
+             (ui/numeric-input "fighters-fuel" (:fighters-fuel required) player-id "/calculate-expenses" hx-include)]]]
 
           ;; Defence stations upkeep - costs credits and fuel per station
           [:div.border.border-green-400.p-4
@@ -293,10 +289,10 @@
                                 (:stations-fuel required) " fuel")]]
             [:div
              [:label.text-xs "Pay Credits"]
-             (expense-input "stations-credits" (:stations-credits required) player-id hx-include)]
+             (ui/numeric-input "stations-credits" (:stations-credits required) player-id "/calculate-expenses" hx-include)]
             [:div
              [:label.text-xs "Pay Fuel"]
-             (expense-input "stations-fuel" (:stations-fuel required) player-id hx-include)]]]
+             (ui/numeric-input "stations-fuel" (:stations-fuel required) player-id "/calculate-expenses" hx-include)]]]
 
           ;; Agents upkeep - costs credits and food per 1000 agents
           [:div.border.border-green-400.p-4
@@ -314,10 +310,10 @@
                                 (:agents-food required) " food")]]
             [:div
              [:label.text-xs "Pay Credits"]
-             (expense-input "agents-credits" (:agents-credits required) player-id hx-include)]
+             (ui/numeric-input "agents-credits" (:agents-credits required) player-id "/calculate-expenses" hx-include)]
             [:div
              [:label.text-xs "Pay Food"]
-             (expense-input "agents-food" (:agents-food required) player-id hx-include)]]]
+             (ui/numeric-input "agents-food" (:agents-food required) player-id "/calculate-expenses" hx-include)]]]
 
           ;; Population upkeep - costs credits and food per 1000 population
           [:div.border.border-green-400.p-4
@@ -335,10 +331,10 @@
                                 (:population-food required) " food")]]
             [:div
              [:label.text-xs "Pay Credits"]
-             (expense-input "population-credits" (:population-credits required) player-id hx-include)]
+             (ui/numeric-input "population-credits" (:population-credits required) player-id "/calculate-expenses" hx-include)]
             [:div
              [:label.text-xs "Pay Food"]
-             (expense-input "population-food" (:population-food required) player-id hx-include)]]]]
+             (ui/numeric-input "population-food" (:population-food required) player-id "/calculate-expenses" hx-include)]]]]
 
          ;;; Resources after expenses - using shared component
          ;;; This section is dynamically updated by htmx as the user changes input values.
