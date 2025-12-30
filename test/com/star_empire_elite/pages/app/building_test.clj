@@ -46,9 +46,9 @@
    :player/mil-planets 2
    :player/food-planets 2
    :player/ore-planets 2
-   :player/food 100           ; ADD THIS
-   :player/fuel 50            ; ADD THIS
-   :player/galaxars 0})       ; ADD THIS
+   :player/food 100
+   :player/fuel 50
+   :player/galaxars 0})
 
 ;;;;
 ;;;; Tests for Pure Calculation Functions

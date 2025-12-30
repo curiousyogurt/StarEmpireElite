@@ -85,13 +85,16 @@
 ;;; Submit button component - extracted to avoid duplication
 (defn submit-button
   "Renders the submit button with dynamic disabled state based on affordability.
-   Used in both initial page render and HTMX updates."
-  [affordable?]
-  [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
-   {:type "submit"
-    :disabled (not affordable?)
-    :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"}
-   "Continue to Action"])
+   Used in both initial page render and HTMX updates.
+   Accepts optional extra-attrs map for additional HTML attributes."
+  ([affordable?] (submit-button affordable? {}))
+  ([affordable? extra-attrs]
+   [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
+    (merge {:type "submit"
+            :disabled (not affordable?)
+            :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"}
+           extra-attrs)
+    "Continue to Action"]))
 
 ;;; Purchase input card component
 (defn purchase-input-card
@@ -168,13 +171,14 @@
 ;;; This gives immediate feedback on whether the player can afford their selected purchases.
 (defn calculate-building [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
-    (let [quantities (parse-purchase-quantities params)
+    (let [;; Parse all purchase inputs using extracted function
+          quantities (parse-purchase-quantities params)
+        
+          ;; Use pure calculation functions
           cost-info (calculate-purchase-cost quantities game)
           resources-after (calculate-resources-after-purchases player quantities cost-info)
-          _ (println "DEBUG resources-after type:" (type resources-after))
-          _ (println "DEBUG resources-after value:" resources-after)
-          affordable? (can-afford-purchases? resources-after)]    
-
+          affordable? (can-afford-purchases? resources-after)]
+    
       ;; Render HTMX response fragments that replace specific page elements
       (biff/render
         [:div
@@ -185,7 +189,7 @@
                    :food (:player/food player)
                    :fuel (:player/fuel player)
                    :galaxars (:player/galaxars player))
-            "Resources After Purchases"
+            "Resources After Building"
             true)]  ; Enable negative highlighting
          
          ;; Cost summary
@@ -201,8 +205,7 @@
             [:p.text-yellow-400.font-bold "WARNING: Insufficient credits for purchases!"])]
          
          ;; Submit button - dynamically enabled/disabled based on affordability
-         (assoc (submit-button affordable?)
-                :hx-swap-oob "true")]))))
+         (submit-button affordable? {:hx-swap-oob "true"})]))))
 
 
 ;;; Shows building options and input fields for player to purchase units and planets
@@ -217,7 +220,7 @@
        (ui/phase-header (:player/current-phase player) "BUILDING")
 
        ;;; Current Resources Display - using shared extended component
-       (ui/extended-resource-display-grid player "Resources Before Purchases")
+       (ui/extended-resource-display-grid player "Resources Before Building")
 
        ;;; Purchase Input Form:
        ;;; Player chooses what to buy. HTMX provides real-time feedback on total cost and
