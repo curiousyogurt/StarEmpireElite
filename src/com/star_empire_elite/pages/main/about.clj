@@ -38,8 +38,9 @@
      [:h2.text-2xl.font-bold.mb-4 "Turn-Based System 🎉"]
      [:p.text-center.w-full.mb-8.text-sm.max-w-3xl
       "The game operates on a turn-based system where each player receives a fixed number of turns "
-      "per day. On each turn, you manage planet maintenance, buy and sell food, conduct covert "
-      "operations, purchase military units, attack other empires, and send diplomatic messages."]
+      "per time interval On each turn, you manage planet maintenance, buy and sell food, conduct "
+      "covert operations, purchase military units, attack other empires, and send diplomatic "
+      "messages."]
  
      ;; AI opponent description
      [:h2.text-2xl.font-bold.mb-4 "The Radoffian Dynasty 👑"]

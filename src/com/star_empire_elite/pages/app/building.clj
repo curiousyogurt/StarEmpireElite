@@ -19,6 +19,23 @@
 ;;;; Calculations
 ;;;;
 
+;;; Parse purchase quantities from request parameters
+(defn parse-purchase-quantities
+  "Parse all purchase quantity inputs from request params.
+   Returns map of quantities for all purchasable items."
+  [params]
+  {:soldiers     (utils/parse-numeric-input (:soldiers params))
+   :transports   (utils/parse-numeric-input (:transports params))
+   :generals     (utils/parse-numeric-input (:generals params))
+   :carriers     (utils/parse-numeric-input (:carriers params))
+   :fighters     (utils/parse-numeric-input (:fighters params))
+   :admirals     (utils/parse-numeric-input (:admirals params))
+   :stations     (utils/parse-numeric-input (:stations params))
+   :cmd-ships    (utils/parse-numeric-input (:cmd-ships params))
+   :mil-planets  (utils/parse-numeric-input (:mil-planets params))
+   :food-planets (utils/parse-numeric-input (:food-planets params))
+   :ore-planets  (utils/parse-numeric-input (:ore-planets params))})
+
 ;;; Calculate total cost of purchases using game constants
 (defn calculate-purchase-cost
   "Calculate total credits needed for all purchases based on game constants.
@@ -62,6 +79,42 @@
   (>= (:credits resources-after) 0))
 
 ;;;;
+;;;; UI Components
+;;;;
+
+;;; Submit button component - extracted to avoid duplication
+(defn submit-button
+  "Renders the submit button with dynamic disabled state based on affordability.
+   Used in both initial page render and HTMX updates."
+  [affordable?]
+  [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
+   {:type "submit"
+    :disabled (not affordable?)
+    :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"}
+   "Continue to Action"])
+
+;;; Purchase input card component
+(defn purchase-input-card
+  "Renders a purchase input card for a unit/planet type with cost and quantity input.
+   Parameters:
+   - unit-name: Display name (e.g. 'Soldiers', 'Defence Stations')
+   - unit-key: Keyword for form field (e.g. :soldiers, :stations)
+   - cost-key: Keyword for game cost constant (e.g. :game/soldier-cost)
+   - game: Game configuration map
+   - player-id: Player identifier for HTMX routing
+   - hx-include: HTMX include string for related fields"
+  [unit-name unit-key cost-key game player-id hx-include]
+  [:div.border.border-green-400.p-4
+   [:h4.font-bold.mb-3 (str "Buy " unit-name)]
+   [:div.space-y-2
+    [:div
+     [:p.text-xs "Cost per Unit"]
+     [:p.font-mono (str (get game cost-key) " credits")]]
+    [:div
+     [:label.text-xs "Purchase Quantity"]
+     (ui/numeric-input (name unit-key) 0 player-id "/calculate-building" hx-include)]]])
+
+;;;;
 ;;;; Actions
 ;;;;
 ;;;; There are three parts to the actions for this phase: (i) building-page, which shows the purchase 
@@ -77,18 +130,8 @@
     ;; Phase validation - only allow building if player is in phase 3
     (if-let [redirect (utils/validate-phase player 3 player-id)]
       redirect
-      (let [;; Parse all purchase inputs using shared utility
-            quantities {:soldiers    (utils/parse-numeric-input (:soldiers params))
-                       :transports   (utils/parse-numeric-input (:transports params))
-                       :generals     (utils/parse-numeric-input (:generals params))
-                       :carriers     (utils/parse-numeric-input (:carriers params))
-                       :fighters     (utils/parse-numeric-input (:fighters params))
-                       :admirals     (utils/parse-numeric-input (:admirals params))
-                       :stations     (utils/parse-numeric-input (:stations params))
-                       :cmd-ships    (utils/parse-numeric-input (:cmd-ships params))
-                       :mil-planets  (utils/parse-numeric-input (:mil-planets params))
-                       :food-planets (utils/parse-numeric-input (:food-planets params))
-                       :ore-planets  (utils/parse-numeric-input (:ore-planets params))}
+      (let [;; Parse all purchase inputs using extracted function
+            quantities (parse-purchase-quantities params)
             
             ;; Use pure calculation functions to determine final resource values
             cost-info (calculate-purchase-cost quantities game)
@@ -125,24 +168,13 @@
 ;;; This gives immediate feedback on whether the player can afford their selected purchases.
 (defn calculate-building [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
-    (let [;; Parse all purchase inputs using shared utility
-          quantities {:soldiers    (utils/parse-numeric-input (:soldiers params))
-                     :transports   (utils/parse-numeric-input (:transports params))
-                     :generals     (utils/parse-numeric-input (:generals params))
-                     :carriers     (utils/parse-numeric-input (:carriers params))
-                     :fighters     (utils/parse-numeric-input (:fighters params))
-                     :admirals     (utils/parse-numeric-input (:admirals params))
-                     :stations     (utils/parse-numeric-input (:stations params))
-                     :cmd-ships    (utils/parse-numeric-input (:cmd-ships params))
-                     :mil-planets  (utils/parse-numeric-input (:mil-planets params))
-                     :food-planets (utils/parse-numeric-input (:food-planets params))
-                     :ore-planets  (utils/parse-numeric-input (:ore-planets params))}
-        
-          ;; Use pure calculation functions
+    (let [quantities (parse-purchase-quantities params)
           cost-info (calculate-purchase-cost quantities game)
           resources-after (calculate-resources-after-purchases player quantities cost-info)
-          affordable? (can-afford-purchases? resources-after)]
-    
+          _ (println "DEBUG resources-after type:" (type resources-after))
+          _ (println "DEBUG resources-after value:" resources-after)
+          affordable? (can-afford-purchases? resources-after)]    
+
       ;; Render HTMX response fragments that replace specific page elements
       (biff/render
         [:div
@@ -168,13 +200,9 @@
           (when (not affordable?)
             [:p.text-yellow-400.font-bold "WARNING: Insufficient credits for purchases!"])]
          
-         ;; Submit button - disabled if player can't afford purchases
-         [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
-          {:type "submit"
-           :disabled (not affordable?)
-           :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"
-           :hx-swap-oob "true"}
-          "Complete Purchases"]]))))
+         ;; Submit button - dynamically enabled/disabled based on affordability
+         (assoc (submit-button affordable?)
+                :hx-swap-oob "true")]))))
 
 
 ;;; Shows building options and input fields for player to purchase units and planets
@@ -200,127 +228,18 @@
 
          [:h3.font-bold.mb-4 "Purchases This Round"]
          [:div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-3.gap-4.mb-8
-
-          ;; Purchase soldiers
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Buy Soldiers"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (:game/soldier-cost game) " credits")]]
-            [:div
-             [:label.text-xs "Purchase Quantity"]
-             (ui/numeric-input "soldiers" 0 player-id "/calculate-building" hx-include)]]]
-
-          ;; Purchase transports
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Buy Transports"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (:game/transport-cost game) " credits")]]
-            [:div
-             [:label.text-xs "Purchase Quantity"]
-             (ui/numeric-input "transports" 0 player-id "/calculate-building" hx-include)]]]
-
-          ;; Purchase generals
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Buy Generals"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (:game/general-cost game) " credits")]]
-            [:div
-             [:label.text-xs "Purchase Quantity"]
-             (ui/numeric-input "generals" 0 player-id "/calculate-building" hx-include)]]]
-
-          ;; Purchase carriers
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Buy Carriers"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (:game/carrier-cost game) " credits")]]
-            [:div
-             [:label.text-xs "Purchase Quantity"]
-             (ui/numeric-input "carriers" 0 player-id "/calculate-building" hx-include)]]]
-
-          ;; Purchase fighters
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Buy Fighters"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (:game/fighter-cost game) " credits")]]
-            [:div
-             [:label.text-xs "Purchase Quantity"]
-             (ui/numeric-input "fighters" 0 player-id "/calculate-building" hx-include)]]]
-
-          ;; Purchase admirals
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Buy Admirals"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (:game/admiral-cost game) " credits")]]
-            [:div
-             [:label.text-xs "Purchase Quantity"]
-             (ui/numeric-input "admirals" 0 player-id "/calculate-building" hx-include)]]]
-
-          ;; Purchase defence stations
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Buy Defence Stations"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (:game/station-cost game) " credits")]]
-            [:div
-             [:label.text-xs "Purchase Quantity"]
-             (ui/numeric-input "stations" 0 player-id "/calculate-building" hx-include)]]]
-
-          ;; Purchase command ships
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Buy Command Ships"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (:game/cmd-ship-cost game) " credits")]]
-            [:div
-             [:label.text-xs "Purchase Quantity"]
-             (ui/numeric-input "cmd-ships" 0 player-id "/calculate-building" hx-include)]]]
-
-          ;; Purchase military planets
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Buy Military Planets"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (:game/mil-planet-cost game) " credits")]]
-            [:div
-             [:label.text-xs "Purchase Quantity"]
-             (ui/numeric-input "mil-planets" 0 player-id "/calculate-building" hx-include)]]]
-
-          ;; Purchase food planets
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Buy Food Planets"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (:game/food-planet-cost game) " credits")]]
-            [:div
-             [:label.text-xs "Purchase Quantity"]
-             (ui/numeric-input "food-planets" 0 player-id "/calculate-building" hx-include)]]]
-
-          ;; Purchase ore planets
-          [:div.border.border-green-400.p-4
-           [:h4.font-bold.mb-3 "Buy Ore Planets"]
-           [:div.space-y-2
-            [:div
-             [:p.text-xs "Cost per Unit"]
-             [:p.font-mono (str (:game/ore-planet-cost game) " credits")]]
-            [:div
-             [:label.text-xs "Purchase Quantity"]
-             (ui/numeric-input "ore-planets" 0 player-id "/calculate-building" hx-include)]]]]
+          ;; All purchase cards using extracted component
+          (purchase-input-card "Soldiers" :soldiers :game/soldier-cost game player-id hx-include)
+          (purchase-input-card "Transports" :transports :game/transport-cost game player-id hx-include)
+          (purchase-input-card "Generals" :generals :game/general-cost game player-id hx-include)
+          (purchase-input-card "Carriers" :carriers :game/carrier-cost game player-id hx-include)
+          (purchase-input-card "Fighters" :fighters :game/fighter-cost game player-id hx-include)
+          (purchase-input-card "Admirals" :admirals :game/admiral-cost game player-id hx-include)
+          (purchase-input-card "Defence Stations" :stations :game/station-cost game player-id hx-include)
+          (purchase-input-card "Command Ships" :cmd-ships :game/cmd-ship-cost game player-id hx-include)
+          (purchase-input-card "Military Planets" :mil-planets :game/mil-planet-cost game player-id hx-include)
+          (purchase-input-card "Food Planets" :food-planets :game/food-planet-cost game player-id hx-include)
+          (purchase-input-card "Ore Planets" :ore-planets :game/ore-planet-cost game player-id hx-include)]
 
          ;;; Resources After Purchases - using shared extended component
          ;;; This section is dynamically updated by HTMX as the user changes input values.
@@ -334,9 +253,6 @@
          [:div.flex.gap-4
           [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
            {:href (str "/app/game/" player-id)} "Back to Game"]
-          [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
-           {:type "submit"
-            :disabled true
-            :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"}
-           "Complete Purchases"]])
+          ;; Initial button starts disabled - HTMX updates will enable it when affordable
+          (submit-button false)])
        ])))

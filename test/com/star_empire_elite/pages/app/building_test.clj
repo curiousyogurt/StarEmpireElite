@@ -45,7 +45,10 @@
    :player/cmd-ships 1
    :player/mil-planets 2
    :player/food-planets 2
-   :player/ore-planets 2})
+   :player/ore-planets 2
+   :player/food 100           ; ADD THIS
+   :player/fuel 50            ; ADD THIS
+   :player/galaxars 0})       ; ADD THIS
 
 ;;;;
 ;;;; Tests for Pure Calculation Functions
@@ -369,10 +372,24 @@
 
 (deftest test-calculate-building-renders-hiccup
   (testing "Returns hiccup vector for HTMX response"
-    (with-redefs [xt/entity (helpers/fake-entity [test-player test-game])
+    (with-redefs [utils/load-player-and-game 
+                  (fn [db player-id-str]
+                    {:player test-player
+                     :game test-game
+                     :player-id test-player-id})
                   biff/render identity]  ; Pass through hiccup unchanged
       (let [ctx {:path-params {:player-id (str test-player-id)}
-                 :params {:soldiers "2" :fighters "3"}
+                 :params {:soldiers "2" 
+                          :transports "0"
+                          :generals "0"
+                          :carriers "0"
+                          :fighters "3"
+                          :admirals "0"
+                          :stations "0"
+                          :cmd-ships "0"
+                          :mil-planets "0"
+                          :food-planets "0"
+                          :ore-planets "0"}
                  :biff/db nil}
             result (building/calculate-building ctx)]
         (is (vector? result))

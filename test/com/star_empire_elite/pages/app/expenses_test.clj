@@ -95,7 +95,7 @@
           expected-credits (- 1000 225 18 28 24 13 63)
           expected-food    (- 800 3 27 24 18)
           expected-fuel    (- 200 21 16)]
-      (with-redefs [xt/entity (fake-entity [test-player])
+      (with-redefs [xt/entity (helpers/fake-entity [test-player])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params params
