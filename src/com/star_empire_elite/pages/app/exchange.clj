@@ -248,7 +248,6 @@
            :disabled (not can-execute?)
            :class "disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-600 disabled:hover:bg-gray-600"
            :hx-swap-oob "true"}
-  (ui/numeric-input name value player-id "/calculate-exchange" hx-include))
 
 ;;; Shows exchange options and input fields for player to buy/sell resources and assets
 (defn exchange-page [{:keys [player game]}]
