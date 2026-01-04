@@ -65,16 +65,16 @@
                 :game/mil-planet-agents 8}
           income (income/calculate-income player game)]
       ;; Ore planet income: 3 planets
-      (is (= 300 (:ore-credits income)))  ; 3 × 100
-      (is (= 150 (:ore-fuel income)))     ; 3 × 50
-      (is (= 30 (:ore-galaxars income)))  ; 3 × 10
+      (is (= 300 (:ore-credits income)))  ; 3 Ã— 100
+      (is (= 150 (:ore-fuel income)))     ; 3 Ã— 50
+      (is (= 30 (:ore-galaxars income)))  ; 3 Ã— 10
       ;; Food planet income: 2 planets
-      (is (= 400 (:food-food income)))    ; 2 × 200
+      (is (= 400 (:food-food income)))    ; 2 Ã— 200
       ;; Military planet income: 4 planets
-      (is (= 100 (:mil-soldiers income))) ; 4 × 25
-      (is (= 60 (:mil-fighters income)))  ; 4 × 15
-      (is (= 20 (:mil-stations income)))  ; 4 × 5
-      (is (= 32 (:mil-agents income)))))) ; 4 × 8
+      (is (= 100 (:mil-soldiers income))) ; 4 Ã— 25
+      (is (= 60 (:mil-fighters income)))  ; 4 Ã— 15
+      (is (= 20 (:mil-stations income)))  ; 4 Ã— 5
+      (is (= 32 (:mil-agents income)))))) ; 4 Ã— 8
 
 (deftest test-calculate-income-zero-planets
   (testing "Returns zero income when player has no planets"
@@ -112,10 +112,10 @@
                   :player/mil-planets 250}
           game test-game
           income (income/calculate-income player game)]
-      (is (= 100000 (:ore-credits income)))   ; 1000 × 100
-      (is (= 50000 (:ore-fuel income)))       ; 1000 × 50
-      (is (= 100000 (:food-food income)))     ; 500 × 200
-      (is (= 6250 (:mil-soldiers income))))))  ; 250 × 25
+      (is (= 100000 (:ore-credits income)))   ; 1000 Ã— 100
+      (is (= 50000 (:ore-fuel income)))       ; 1000 Ã— 50
+      (is (= 100000 (:food-food income)))     ; 500 Ã— 200
+      (is (= 6250 (:mil-soldiers income))))))  ; 250 Ã— 25
 
 (deftest test-calculate-income-zero-rates
   (testing "Returns zero income when game rates are zero"
@@ -149,17 +149,17 @@
                 :game/mil-planet-stations 25
                 :game/mil-planet-agents 10}
           income (income/calculate-income player game)]
-      (is (= 1000 (:ore-credits income)))     ; 2 × 500
-      (is (= 200 (:ore-fuel income)))         ; 2 × 100
-      (is (= 3000 (:food-food income)))       ; 3 × 1000
-      (is (= 100 (:mil-soldiers income)))     ; 1 × 100
-      (is (= 50 (:mil-fighters income))))))   ; 1 × 50
+      (is (= 1000 (:ore-credits income)))     ; 2 Ã— 500
+      (is (= 200 (:ore-fuel income)))         ; 2 Ã— 100
+      (is (= 3000 (:food-food income)))       ; 3 Ã— 1000
+      (is (= 100 (:mil-soldiers income)))     ; 1 Ã— 100
+      (is (= 50 (:mil-fighters income))))))   ; 1 Ã— 50
 
 ;;;;
 ;;;; Action Tests (apply-income)
 ;;;;
 ;;;; These tests verify the apply-income function which has side effects (database writes, http
-;;;; redirects). Mocking intercepts the side effects and verify the behaviour.
+                                                                                   ;;;; redirects). Mocking intercepts the side effects and verify the behaviour.
 ;;;;
 
 (deftest test-apply-income-player-not-found
@@ -306,3 +306,150 @@
         (is (= 0 (:ore-credits income)))
         (is (= 0 (:food-food income)))
         (is (= 0 (:mil-soldiers income)))))))
+
+;;;;
+;;;; UI Component Tests (income-row)
+;;;;
+;;;; These tests verify that the income-row component renders correctly with various inputs.
+;;;;
+
+(deftest test-income-row-renders-hiccup
+  (testing "Income row returns valid hiccup structure"
+    (let [income-map {:credits 500 :fuel 200 :galaxars 100}
+          result (income/income-row "Ore" 3 income-map)]
+      (is (vector? result))
+      (is (= :div.border-b.border-green-400.last:border-b-0 (first result))))))
+
+(deftest test-income-row-handles-all-resources
+  (testing "Income row correctly renders all resource types"
+    (let [income-map {:credits 500 :fuel 200 :galaxars 100
+                      :food 1000 :soldiers 50 :fighters 25
+                      :stations 10 :agents 5}
+          result (income/income-row "Mil" 4 income-map)]
+      ;; Should render without error with all resources present
+      (is (vector? result))
+      (is (some? result)))))
+
+(deftest test-income-row-handles-zero-values
+  (testing "Income row correctly handles zero values in income map"
+    (let [income-map {:credits 0 :fuel 0 :galaxars 0 :food 0 
+                      :soldiers 0 :fighters 0 :stations 0 :agents 0}
+          result (income/income-row "Food" 2 income-map)]
+      ;; Should render without error even with all zeros
+      (is (vector? result))
+      (is (some? result)))))
+
+(deftest test-income-row-handles-missing-keys
+  (testing "Income row handles income map with missing keys"
+    (let [income-map {:credits 500}  ; Only credits, rest missing
+          result (income/income-row "Ore" 1 income-map)]
+      (is (vector? result))
+      (is (some? result)))))
+
+(deftest test-income-row-handles-nil-values
+  (testing "Income row handles nil values gracefully using (or (k income-map) 0)"
+    (let [income-map {:credits nil :fuel 200 :galaxars nil}
+          result (income/income-row "Ore" 1 income-map)]
+      (is (vector? result))
+      (is (some? result)))))
+
+(deftest test-income-row-handles-large-numbers
+  (testing "Income row handles very large numbers"
+    (let [income-map {:credits 1234567890 :fuel 999999999}
+          result (income/income-row "Ore" 1000 income-map)]
+      ;; Should render without error
+      (is (vector? result))
+      (is (some? result)))))
+
+(deftest test-income-row-handles-zero-planet-count
+  (testing "Income row renders with zero planets"
+    (let [income-map {:credits 0 :fuel 0}
+          result (income/income-row "Ore" 0 income-map)]
+      (is (vector? result))
+      (is (some? result)))))
+
+;;;;
+;;;; Edge Case Tests for calculate-income
+;;;;
+;;;; Additional edge cases to ensure robustness.
+;;;;
+
+(deftest test-calculate-income-negative-planets
+  (testing "Handles negative planet counts (defensive programming)"
+    (let [player {:player/ore-planets -1
+                  :player/food-planets 0
+                  :player/mil-planets 0}
+          game test-game
+          income (income/calculate-income player game)]
+      ;; Negative planets should produce negative income
+      (is (= -100 (:ore-credits income)))
+      (is (= -50 (:ore-fuel income)))
+      (is (= -10 (:ore-galaxars income))))))
+
+(deftest test-calculate-income-very-large-planets
+  (testing "Handles very large planet counts without overflow"
+    (let [player {:player/ore-planets 100000
+                  :player/food-planets 100000
+                  :player/mil-planets 100000}
+          game test-game
+          income (income/calculate-income player game)]
+      ;; Should calculate without overflow
+      (is (= 10000000 (:ore-credits income)))    ; 100000 × 100
+      (is (= 5000000 (:ore-fuel income)))        ; 100000 × 50
+      (is (= 20000000 (:food-food income)))      ; 100000 × 200
+      (is (= 2500000 (:mil-soldiers income))))))  ; 100000 × 25
+
+(deftest test-calculate-income-fractional-rates
+  (testing "Handles fractional income rates from game configuration"
+    (let [player {:player/ore-planets 3
+                  :player/food-planets 2
+                  :player/mil-planets 0}
+          game {:game/ore-planet-credits 33.33
+                :game/ore-planet-fuel 16.67
+                :game/ore-planet-galaxars 5.5
+                :game/food-planet-food 250.5
+                :game/mil-planet-soldiers 0
+                :game/mil-planet-fighters 0
+                :game/mil-planet-stations 0
+                :game/mil-planet-agents 0}
+          income (income/calculate-income player game)]
+      ;; Results will be floating point
+      (is (< (Math/abs (- 99.99 (:ore-credits income))) 0.01))
+      (is (< (Math/abs (- 50.01 (:ore-fuel income))) 0.01))
+      (is (< (Math/abs (- 16.5 (:ore-galaxars income))) 0.01))
+      (is (< (Math/abs (- 501.0 (:food-food income))) 0.01)))))
+
+;;;;
+;;;; Integration Tests
+;;;;
+;;;; Tests that verify the full income page flow works correctly.
+;;;;
+
+(deftest test-income-page-integration
+  (testing "Income page correctly integrates calculate-income and displays all data"
+    (let [page (income/income-page {:player test-player :game test-game})
+          income (income/calculate-income test-player test-game)]
+      ;; Page should be valid hiccup
+      (is (vector? page))
+      ;; Verify income calculations are correct
+      (is (= 300 (:ore-credits income)))
+      (is (= 150 (:ore-fuel income)))
+      (is (= 30 (:ore-galaxars income)))
+      (is (= 400 (:food-food income)))
+      (is (= 100 (:mil-soldiers income)))
+      (is (= 60 (:mil-fighters income)))
+      (is (= 20 (:mil-stations income)))
+      (is (= 32 (:mil-agents income))))))
+
+(deftest test-income-page-with-extreme-values
+  (testing "Income page handles extreme values without breaking"
+    (let [extreme-player (assoc test-player
+                                :player/ore-planets 999999
+                                :player/credits 1234567890
+                                :player/food 999999999)
+          extreme-game (assoc test-game
+                              :game/ore-planet-credits 9999)
+          result (income/income-page {:player extreme-player :game extreme-game})]
+      ;; Should render without error even with huge numbers
+      (is (vector? result))
+      (is (some? result)))))
