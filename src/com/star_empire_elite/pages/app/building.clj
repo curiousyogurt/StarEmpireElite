@@ -96,9 +96,9 @@
            extra-attrs)
     "Continue to Action"]))
 
-;;; Purchase input card component
-(defn purchase-input-card
-  "Renders a purchase input card for a unit/planet type with cost and quantity input.
+;;; Purchase row component using phase-row for responsive layout
+(defn purchase-row
+  "Renders a purchase row that displays as a card on mobile and as a table row on wide screens.
    Parameters:
    - unit-name: Display name (e.g. 'Soldiers', 'Defence Stations')
    - unit-key: Keyword for form field (e.g. :soldiers, :stations)
@@ -107,15 +107,13 @@
    - player-id: Player identifier for HTMX routing
    - hx-include: HTMX include string for related fields"
   [unit-name unit-key cost-key game player-id hx-include]
-  [:div.border.border-green-400.p-4
-   [:h4.font-bold.mb-3 (str "Buy " unit-name)]
-   [:div.space-y-2
-    [:div
-     [:p.text-xs "Cost per Unit"]
-     [:p.font-mono (str (get game cost-key) " credits")]]
-    [:div
-     [:label.text-xs "Purchase Quantity"]
-     (ui/numeric-input (name unit-key) 0 player-id "/calculate-building" hx-include)]]])
+  (ui/phase-row
+    [{:label "Item"
+      :value unit-name}
+     {:label "Cost per Unit"
+      :value (str (get game cost-key) " credits")}
+     {:label "Purchase Quantity"
+      :component (ui/numeric-input (name unit-key) 0 player-id "/calculate-building" hx-include)}]))
 
 ;;;;
 ;;;; Actions
@@ -230,24 +228,34 @@
           :method "post"}
 
          [:h3.font-bold.mb-4 "Purchases This Round"]
-         [:div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-3.gap-4.mb-8
-          ;; All purchase cards using extracted component
-          (purchase-input-card "Soldiers" :soldiers :game/soldier-cost game player-id hx-include)
-          (purchase-input-card "Transports" :transports :game/transport-cost game player-id hx-include)
-          (purchase-input-card "Generals" :generals :game/general-cost game player-id hx-include)
-          (purchase-input-card "Carriers" :carriers :game/carrier-cost game player-id hx-include)
-          (purchase-input-card "Fighters" :fighters :game/fighter-cost game player-id hx-include)
-          (purchase-input-card "Admirals" :admirals :game/admiral-cost game player-id hx-include)
-          (purchase-input-card "Defence Stations" :stations :game/station-cost game player-id hx-include)
-          (purchase-input-card "Command Ships" :cmd-ships :game/cmd-ship-cost game player-id hx-include)
-          (purchase-input-card "Military Planets" :mil-planets :game/mil-planet-cost game player-id hx-include)
-          (purchase-input-card "Food Planets" :food-planets :game/food-planet-cost game player-id hx-include)
-          (purchase-input-card "Ore Planets" :ore-planets :game/ore-planet-cost game player-id hx-include)]
+         
+         ;; Table container with header and rows
+         [:div.border.border-green-400.mb-8
+          ;; Header row (only visible on wide screens)
+          (ui/phase-table-header ["Item" "Cost per Unit" "Purchase Quantity"])
+          
+          ;; All purchase rows using phase-row component
+          (purchase-row "Soldiers" :soldiers :game/soldier-cost game player-id hx-include)
+          (purchase-row "Transports" :transports :game/transport-cost game player-id hx-include)
+          (purchase-row "Generals" :generals :game/general-cost game player-id hx-include)
+          (purchase-row "Carriers" :carriers :game/carrier-cost game player-id hx-include)
+          (purchase-row "Fighters" :fighters :game/fighter-cost game player-id hx-include)
+          (purchase-row "Admirals" :admirals :game/admiral-cost game player-id hx-include)
+          (purchase-row "Defence Stations" :stations :game/station-cost game player-id hx-include)
+          (purchase-row "Command Ships" :cmd-ships :game/cmd-ship-cost game player-id hx-include)
+          (purchase-row "Military Planets" :mil-planets :game/mil-planet-cost game player-id hx-include)
+          (purchase-row "Food Planets" :food-planets :game/food-planet-cost game player-id hx-include)
+          (purchase-row "Ore Planets" :ore-planets :game/ore-planet-cost game player-id hx-include)]
 
          ;;; Resources After Purchases - using shared extended component
          ;;; This section is dynamically updated by HTMX as the user changes input values.
          [:div#resources-after
           (ui/extended-resource-display-grid player "Resources After Purchases")]
+
+         ;; Cost summary box - updated by HTMX
+         [:div#cost-summary.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
+          [:h3.font-bold.mb-2 "Total Cost"]
+          [:p.text-2xl.font-mono "0 credits"]]
 
          ;; Warning message area - populated by HTMX if player can't afford purchases
          [:div#building-warning.h-8.flex.items-center]

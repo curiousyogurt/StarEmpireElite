@@ -38,11 +38,15 @@
 ;;; Complete phase header with title on the left and progress indicator on the right. Takes current 
 ;;; phase number and phase name string to generate the full header with progress visualization.
 (defn phase-header [current-phase phase-name]
-  [:div.flex.items-center.justify-between.mb-6
-   ;; Phase title on the left
-   [:h2.text-xl.font-bold (str "PHASE " current-phase ": " phase-name)]
-   ;; Phase indicator on the right
-   (phase-indicator current-phase)])
+  [:div.mb-6
+   ;; Mobile: Stack vertically
+   [:div.flex.flex-col.gap-3.lg:hidden
+    [:h2.text-xl.font-bold (str "PHASE " current-phase ": " phase-name)]
+    (phase-indicator current-phase)]
+   ;; Wide screen: Horizontal with space between
+   [:div.hidden.lg:flex.lg:items-center.lg:justify-between
+    [:h2.text-xl.font-bold (str "PHASE " current-phase ": " phase-name)]
+    (phase-indicator current-phase)]])
 
 (defn base [{:keys [::recaptcha] :as ctx} & body]
   (apply
@@ -111,16 +115,16 @@
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:credits resources) (:player/credits resources)) 0)) "text-red-400")} 
        (or (:credits resources) (:player/credits resources))]]
      [:div
-      [:p.text-xs "Food"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:food resources) (:player/food resources)) 0)) "text-red-400")} 
-       (or (:food resources) (:player/food resources))]]
-     [:div
       [:p.text-xs "Fuel"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:fuel resources) (:player/fuel resources)) 0)) "text-red-400")} 
        (or (:fuel resources) (:player/fuel resources))]]
      [:div
       [:p.text-xs "Galaxars"]
       [:p.font-mono (or (:galaxars resources) (:player/galaxars resources))]]
+     [:div
+      [:p.text-xs "Food"]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:food resources) (:player/food resources)) 0)) "text-red-400")} 
+       (or (:food resources) (:player/food resources))]]
      [:div
       [:p.text-xs "Soldiers"]
       [:p.font-mono (or (:soldiers resources) (:player/soldiers resources))]]
@@ -246,3 +250,61 @@
                    "document.querySelector('[name=\"" name "\"]').dispatchEvent(new Event('input', {bubbles: true}))")
      :title "Reset"}
     "\u25e6"]])
+
+;;; Phase table header for wide screen spreadsheet-like layout
+(defn phase-table-header
+  "Renders a header row for phase tables on wide screens only.
+   
+   Args:
+     column-labels - Vector of header label strings"
+  [column-labels]
+  [:div.hidden.lg:grid.lg:gap-4.lg:px-4.lg:py-3.lg:bg-green-400.lg:bg-opacity-10.lg:font-bold.border-b.border-green-400
+   {:style {:grid-template-columns (str "repeat(" (count column-labels) ", minmax(0, 1fr))")}}
+   (for [label column-labels]
+     [:div {:key label} label])])
+
+;;; Responsive phase row component for spreadsheet-like layout on wide screens
+(defn phase-row
+  "Renders a responsive row that displays as a card on mobile/tablet and as a table row on wide screens.
+   This creates a consistent spreadsheet-like interface across all game phases.
+   
+   Args:
+     columns - Vector of column maps. Each map can have:
+               :label - Column label/header
+               :value - Simple text value to display
+               :component - Hiccup component to render (for inputs, etc.)
+               :class - Additional CSS classes for the column
+               :highlight? - If true, highlights negative values in red (for numbers)
+               :hide-on-mobile? - If true, hides this field on mobile (but shows on wide screen)
+   
+   Example:
+     (phase-row [{:label \"Item\" :value \"Soldiers\"}
+                 {:label \"Cost\" :value \"10 credits\"}
+                 {:label \"Quantity\" :component (numeric-input ...)}])"
+  [columns]
+  [:div.border-b.border-green-400.last:border-b-0
+   
+   ;; Mobile/Tablet: Vertical card layout (stacked fields)
+   [:div.lg:hidden.p-4.space-y-2
+    (for [{:keys [label value component highlight? hide-on-mobile?]} columns]
+      (when (and (or value component) (not hide-on-mobile?))
+        [:div {:key label}
+         [:p.text-xs.text-green-300 label]
+         (if component
+           component
+           [:p.font-mono 
+            {:class (when (and highlight? (number? value) (neg? value)) "text-red-400")}
+            value])]))]
+   
+   ;; Wide screen: Horizontal row layout (spreadsheet-like)
+   [:div.hidden.lg:grid.lg:gap-4.lg:items-center.lg:px-4.lg:py-3
+    {:style {:grid-template-columns (str "repeat(" (count columns) ", minmax(0, 1fr))")}}
+    (for [{:keys [label value component class highlight?]} columns]
+      [:div {:key label :class class}
+       (if component
+         ;; For input components, just show the component (no label, header has it)
+         component
+         ;; For display-only values, just show the value (no label, header has it)
+         [:span.font-mono
+          {:class (when (and highlight? (number? value) (neg? value)) "text-red-400")}
+          value])])]])
