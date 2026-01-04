@@ -15,6 +15,27 @@
     (str path "?t=" last-modified)
     path))
 
+(defn format-number
+  "Format numbers for display with hybrid approach:
+   - Small numbers (< 100K): Display as-is (e.g., 999, 1234, 99999)
+   - Large numbers (≥ 100K): Use abbreviated suffixes (e.g., 123K, 1.2M, 5.7B)
+   
+   Returns a hiccup span with title attribute for tooltip on hover.
+   Abbreviations: K (thousand), M (million), B (billion), T (trillion), Q (quadrillion)"
+  [n]
+  (let [formatted (cond
+                    ;; If n needs a suffix       divide by the value and round                 sym
+                    (>= n 1000000000000000) (str (/ (Math/round (/ n 100000000000000.0)) 10.0) "Q")
+                    (>= n 1000000000000)    (str (/ (Math/round (/ n 100000000000.0))    10.0) "T")
+                    (>= n 1000000000)       (str (/ (Math/round (/ n 100000000.0))       10.0) "B")
+                    (>= n 1000000)          (str (/ (Math/round (/ n 100000.0))          10.0) "M")
+                    (>= n 100000)           (str (/ (Math/round (/ n 100.0))             10.0) "K")
+                    :else (str n))
+        is-abbreviated? (>= n 100000)]
+    (if is-abbreviated?
+      [:span {:title (str n)} formatted] ; If Abbreviated: add tooltip with full number
+      formatted)))                       ; Otherwise     : just return the string
+
 ;;; Phase progress indicator showing current position in the 6-phase turn cycle. Uses filled circles
 ;;; for completed phases, a highlighted circle for current phase, and empty circles for future phases.
 (defn phase-indicator [current-phase]
@@ -113,30 +134,30 @@
      [:div
       [:p.text-xs "Credits"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:credits resources) (:player/credits resources)) 0)) "text-red-400")} 
-       (or (:credits resources) (:player/credits resources))]]
+       (format-number (or (:credits resources) (:player/credits resources)))]]
      [:div
       [:p.text-xs "Fuel"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:fuel resources) (:player/fuel resources)) 0)) "text-red-400")} 
-       (or (:fuel resources) (:player/fuel resources))]]
+       (format-number (or (:fuel resources) (:player/fuel resources)))]]
      [:div
       [:p.text-xs "Galaxars"]
-      [:p.font-mono (or (:galaxars resources) (:player/galaxars resources))]]
+      [:p.font-mono (format-number (or (:galaxars resources) (:player/galaxars resources)))]]
      [:div
       [:p.text-xs "Food"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:food resources) (:player/food resources)) 0)) "text-red-400")} 
-       (or (:food resources) (:player/food resources))]]
+       (format-number (or (:food resources) (:player/food resources)))]]
      [:div
       [:p.text-xs "Soldiers"]
-      [:p.font-mono (or (:soldiers resources) (:player/soldiers resources))]]
+      [:p.font-mono (format-number (or (:soldiers resources) (:player/soldiers resources)))]]
      [:div
       [:p.text-xs "Fighters"]
-      [:p.font-mono (or (:fighters resources) (:player/fighters resources))]]
+      [:p.font-mono (format-number (or (:fighters resources) (:player/fighters resources)))]]
      [:div
       [:p.text-xs "Stations"]
-      [:p.font-mono (or (:stations resources) (:player/stations resources))]]
+      [:p.font-mono (format-number (or (:stations resources) (:player/stations resources)))]]
      [:div
       [:p.text-xs "Agents"]
-      [:p.font-mono (or (:agents resources) (:player/agents resources))]]]]))
+      [:p.font-mono (format-number (or (:agents resources) (:player/agents resources)))]]]]))
 
 ;;; Extended resource display grid including all unit types and planets. Used in building phase
 ;;; where players need to see all their assets, not just basic resources.

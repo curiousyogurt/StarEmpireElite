@@ -23,15 +23,16 @@
   "Calculate income from all planet types. Returns map of resource changes."
   [player game]
   ;; Keys such as :player/ore-planets are fully qualified keys in the player map.
-  ;; There is actually a key in the players map named :player/ore-planets.
-  {:ore-credits  (* (:player/ore-planets player)      (:game/ore-planet-credits game))
-   :ore-fuel     (* (:player/ore-planets player)      (:game/ore-planet-fuel game))
-   :ore-galaxars (* (:player/ore-planets player)      (:game/ore-planet-galaxars game))
-   :food-food    (* (:player/food-planets player)     (:game/food-planet-food game))
-   :mil-soldiers (* (:player/mil-planets player) (:game/mil-planet-soldiers game))
-   :mil-fighters (* (:player/mil-planets player) (:game/mil-planet-fighters game))
-   :mil-stations (* (:player/mil-planets player) (:game/mil-planet-stations game))
-   :mil-agents   (* (:player/mil-planets player) (:game/mil-planet-agents game))})
+  ;; That is, there is a key in the player map named :player/ore-planets, etc.
+  ;;             (* resource count for player     resource value in game)
+  {:ore-credits  (* (:player/ore-planets player)  (:game/ore-planet-credits game))
+   :ore-fuel     (* (:player/ore-planets player)  (:game/ore-planet-fuel game))
+   :ore-galaxars (* (:player/ore-planets player)  (:game/ore-planet-galaxars game))
+   :food-food    (* (:player/food-planets player) (:game/food-planet-food game))
+   :mil-soldiers (* (:player/mil-planets player)  (:game/mil-planet-soldiers game))
+   :mil-fighters (* (:player/mil-planets player)  (:game/mil-planet-fighters game))
+   :mil-stations (* (:player/mil-planets player)  (:game/mil-planet-stations game))
+   :mil-agents   (* (:player/mil-planets player)  (:game/mil-planet-agents game))})
 
 ;;;;
 ;;;; UI Components
@@ -51,8 +52,10 @@
   [planet-type-name planet-count income-map]
   [:div.border-b.border-green-400.last:border-b-0
 
+   ;;
    ;; Narrow screen: Compact card layout (< 1024px)
    ;; Shows planet type and count on one line, then only non-zero resources below
+   ;;
    [:div.lg:hidden.p-4
     ;; Planet header: name on left, count on right
     [:div.flex.justify-between.items-center.mb-2
@@ -62,17 +65,19 @@
     ;; Resource list: only resources with non-zero values are displayed
     ;; This keeps mobile cards compact by hiding resources this planet type doesn't produce
     [:div.space-y-1
-     (for [[k label] [[:credits  "Credits"]  [:fuel     "Fuel"]     [:galaxars "Galaxars"] 
-                      [:food      "Food"]    [:soldiers "Soldiers"] [:fighters "Fighters"] 
-                      [:stations "Stations"] [:agents   "Agents"]]
+     (for [[k label] [[:credits  "Credits" ] [:fuel     "Fuel"    ] [:galaxars "Galaxars"] 
+                      [:food     "Food"    ] [:soldiers "Soldiers"] [:fighters "Fighters"] 
+                      [:stations "Stations"] [:agents   "Agents"  ]]
            :let [v (or (k income-map) 0)]
            :when (pos? v)]  ; Skip zero values on mobile
        [:div.flex.justify-between {:key k}
         [:span.text-xs.text-green-300 label]
-        [:span.font-mono {:style {:word-spacing "-0.2em"}} "+" v]])]]
+        [:span.font-mono {:style {:word-spacing "-0.2em"}} "+" (ui/format-number v)]])]]
 
+   ;;
    ;; Wide screen: Table row layout (≥ 1024px)
    ;; Shows all 10 columns for consistent table alignment, with zeros dimmed
+   ;;
    [:div.hidden.lg:grid.lg:gap-4.lg:items-center.lg:px-4.lg:py-3
     {:style {:grid-template-columns "repeat(10, minmax(0, 1fr))"}}
     ;; First two columns: planet type and count (always visible)
@@ -84,7 +89,7 @@
       [:div {:key k}
        [:span.font-mono {:style {:word-spacing "-0.2em"}
                          :class (when (zero? v) "opacity-20")}  ; Dim zero values
-        "+" v]])]])
+        "+" (ui/format-number v)]])]])
 
 ;;;;
 ;;;; Actions
@@ -109,16 +114,16 @@
                         [{:db/doc-type :player ; Document type is player
                           :db/op :update       ; Update operation
                           :xt/id player-id     ; Target has id player-id
-                          :player/credits          (+ (:player/credits player)          (:ore-credits income))
-                          :player/food             (+ (:player/food player)             (:food-food income))
-                          :player/fuel             (+ (:player/fuel player)             (:ore-fuel income))
-                          :player/galaxars         (+ (:player/galaxars player)         (:ore-galaxars income))
-                          :player/soldiers         (+ (:player/soldiers player)         (:mil-soldiers income))
-                          :player/fighters         (+ (:player/fighters player)         (:mil-fighters income))
+                          :player/credits  (+ (:player/credits player)  (:ore-credits income))
+                          :player/food     (+ (:player/food player)     (:food-food income))
+                          :player/fuel     (+ (:player/fuel player)     (:ore-fuel income))
+                          :player/galaxars (+ (:player/galaxars player) (:ore-galaxars income))
+                          :player/soldiers (+ (:player/soldiers player) (:mil-soldiers income))
+                          :player/fighters (+ (:player/fighters player) (:mil-fighters income))
                           :player/stations (+ (:player/stations player) (:mil-stations income))
-                          :player/agents           (+ (:player/agents player)           (:mil-agents income))
-                          :player/current-phase 2}])
-        ;; Set 303 status, which tells the browser to redirect to another url
+                          :player/agents   (+ (:player/agents player)   (:mil-agents income))
+                          :player/current-phase 2}]) ; Move player to next phase
+        ;; Set 303 status, which tells the browser to redirect to the expenses page
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/expenses")}}))))
 
@@ -142,10 +147,11 @@
        ;;; Income breakdown table:
        ;;; Displays as cards on mobile and as a spreadsheet-like table on wide screens.
        ;;; This makes it clear which planets generate which resources.
-       [:h3.font-bold.mb-4 "Planetary Income"]
+       [:h3.font-bold.mb-4 "Income"]
        [:div.border.border-green-400.mb-8
         ;; Header row (only visible on wide screens)
-        (ui/phase-table-header ["Type" "Count" "Credits" "Fuel" "Galaxars" "Food" "Soldiers" "Fighters" "Stations" "Agents"])
+        (ui/phase-table-header ["Planet"   "Count"    "Credits" "Fuel" "Galaxars" "Food" "Soldiers"
+                                "Fighters" "Stations" "Agents"])
 
         ;; Ore planets generate economic resources: credits, fuel, and galaxars (the premium currency)
         (income-row "Ore" 
@@ -168,27 +174,27 @@
                      :agents (:mil-agents income)})]
 
        ;;; Final resource totals:
-       ;;; Shows what the player will have after income is applied. This preview helps players plan
-       ;;; expenses and future building choices.
+       ;;; Shows what the player will have after income is applied. This preview helps players
+       ;;; anticipate actions that they might want or need to take in the subsequent phases.
        (ui/resource-display-grid 
-         {:credits  (+ (:player/credits player) (:ore-credits income))
-          :food     (+ (:player/food player) (:food-food income))
-          :fuel     (+ (:player/fuel player) (:ore-fuel income))
+         {:credits  (+ (:player/credits player)  (:ore-credits income))
+          :food     (+ (:player/food player)     (:food-food income))
+          :fuel     (+ (:player/fuel player)     (:ore-fuel income))
           :galaxars (+ (:player/galaxars player) (:ore-galaxars income))
           :soldiers (+ (:player/soldiers player) (:mil-soldiers income))
           :fighters (+ (:player/fighters player) (:mil-fighters income))
           :stations (+ (:player/stations player) (:mil-stations income))
-          :agents   (+ (:player/agents player) (:mil-agents income))}
+          :agents   (+ (:player/agents player)   (:mil-agents income))}
          "Resources After Income")
 
        [:.h-6]
 
        ;;; Phase Advance Form:
        ;;; Simple form submission with no validation needed. Income is always valid and beneficial.
-       ;;; No htmx dynamic updates (unlike later phases) since there are no player choices to validate.
+       ;;; No htmx dynamic updates (unlike later phases) since there are no player choices to 
+       ;;; validate.
        (biff/form
-         {:action (str "/app/game/" (:xt/id player) "/apply-income")
-          :method "post"}
+         {:action (str "/app/game/" (:xt/id player) "/apply-income") :method "post"}
          [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
-          {:type "submit"}
-          "Continue to Expenses"])])))
+          {:type "submit"} "Continue to Expenses"])])))
+
