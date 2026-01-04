@@ -18,7 +18,7 @@
 (defn format-number
   "Format numbers for display with hybrid approach:
    - Small numbers (< 100K): Display as-is (e.g., 999, 1234, 99999)
-   - Large numbers (≥ 100K): Use abbreviated suffixes (e.g., 123K, 1.2M, 5.7B)
+   - Large numbers (Ã¢â€°Â¥ 100K): Use abbreviated suffixes (e.g., 123K, 1.2M, 5.7B)
    
    Returns a hiccup span with title attribute for tooltip on hover.
    Abbreviations: K (thousand), M (million), B (billion), T (trillion), Q (quadrillion)"
@@ -54,7 +54,7 @@
         phase]]
       ;; Arrow between phases (except after last phase)
       (when (< phase 6)
-        [:span.text-green-400.text-xs.ml-1 "→"])])])
+        [:span.text-green-400.text-xs.ml-1 "Ã¢â€ â€™"])])])
 
 ;;; Complete phase header with title on the left and progress indicator on the right. Takes current 
 ;;; phase number and phase name string to generate the full header with progress visualization.
@@ -233,7 +233,7 @@
      hx-post-path - relative path for HTMX post (e.g. '/calculate-expenses')
      hx-include - selector string for fields to include in HTMX request"
   [name value player-id hx-post-path hx-include]
-  [:div.relative.mt-1
+  [:div.relative
    [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.pr-6.font-mono
     {:type "text" 
      :name name 
@@ -267,8 +267,8 @@
     {:type "button"
      :tabindex "-1"
      :class "absolute right-2 top-1/2 -translate-y-1/2 text-green-400 hover:text-green-300 transition-colors text-2xl font-bold p-0 bg-none border-none cursor-pointer"
-     :onclick (str "document.querySelector('[name=\"" name "\"]').value = " value "; "
-                   "document.querySelector('[name=\"" name "\"]').dispatchEvent(new Event('input', {bubbles: true}))")
+     :onclick (str "this.previousElementSibling.value = '" value "'; "
+                   "this.previousElementSibling.dispatchEvent(new Event('input', {bubbles: true}));")
      :title "Reset"}
     "\u25e6"]])
 
@@ -277,12 +277,16 @@
   "Renders a header row for phase tables on wide screens only.
    
    Args:
-     column-labels - Vector of header label strings"
-  [column-labels]
+     columns - Vector of column definitions. Each can be either:
+               - A string (simple label, left-aligned)
+               - A map with :label and optional :class for custom styling"
+  [columns]
   [:div.hidden.lg:grid.lg:gap-4.lg:px-4.lg:py-3.lg:bg-green-400.lg:bg-opacity-10.lg:font-bold.border-b.border-green-400
-   {:style {:grid-template-columns (str "repeat(" (count column-labels) ", minmax(0, 1fr))")}}
-   (for [label column-labels]
-     [:div {:key label} label])])
+   {:style {:grid-template-columns (str "repeat(" (count columns) ", minmax(0, 1fr))")}}
+   (for [col columns]
+     (if (string? col)
+       [:div {:key col} col]
+       [:div {:key (:label col) :class (:class col)} (:label col)]))])
 
 ;;; Responsive phase row component for spreadsheet-like layout on wide screens
 (defn phase-row
@@ -312,7 +316,9 @@
         [:div {:key label}
          [:p.text-xs.text-green-300 label]
          (if component
-           component
+           ;; Wrap component in a container that disables the input on desktop
+           [:div.lg:pointer-events-none.lg:opacity-0.lg:h-0.lg:overflow-hidden
+            component]
            [:p.font-mono 
             {:class (when (and highlight? (number? value) (neg? value)) "text-red-400")}
             value])]))]
@@ -323,7 +329,7 @@
     (for [{:keys [label value component class highlight?]} columns]
       [:div {:key label :class class}
        (if component
-         ;; For input components, just show the component (no label, header has it)
+         ;; Render component for desktop - this one will be active on desktop
          component
          ;; For display-only values, just show the value (no label, header has it)
          [:span.font-mono
