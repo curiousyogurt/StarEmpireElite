@@ -18,7 +18,7 @@
 (defn format-number
   "Format numbers for display with hybrid approach:
    - Small numbers (< 100K): Display as-is (e.g., 999, 1234, 99999)
-   - Large numbers (Ã¢â€°Â¥ 100K): Use abbreviated suffixes (e.g., 123K, 1.2M, 5.7B)
+   - Large numbers (≥ 100K): Use abbreviated suffixes (e.g., 123K, 1.2M, 5.7B)
    
    Returns a hiccup span with title attribute for tooltip on hover.
    Abbreviations: K (thousand), M (million), B (billion), T (trillion), Q (quadrillion)"
@@ -54,7 +54,7 @@
         phase]]
       ;; Arrow between phases (except after last phase)
       (when (< phase 6)
-        [:span.text-green-400.text-xs.ml-1 "Ã¢â€ â€™"])])])
+        [:span.text-green-400.text-xs.ml-1 "→"])])])
 
 ;;; Complete phase header with title on the left and progress indicator on the right. Takes current 
 ;;; phase number and phase name string to generate the full header with progress visualization.
@@ -272,7 +272,6 @@
      :title "Reset"}
     "\u25e6"]])
 
-;;; Phase table header for wide screen spreadsheet-like layout
 (defn phase-table-header
   "Renders a header row for phase tables on wide screens only.
    
@@ -281,44 +280,41 @@
                - A string (simple label, left-aligned)
                - A map with :label and optional :class for custom styling"
   [columns]
-  [:div.hidden.lg:grid.lg:gap-4.lg:px-4.lg:py-3.lg:bg-green-400.lg:bg-opacity-10.lg:font-bold.border-b.border-green-400
-   {:style {:grid-template-columns (str "repeat(" (count columns) ", minmax(0, 1fr))")}}
-   (for [col columns]
-     (if (string? col)
-       [:div {:key col} col]
-       [:div {:key (:label col) :class (:class col)} (:label col)]))])
+  (let [col-count (count columns)
+        ;; If this is the 5-column building header, bias the first column wider
+        template (if (= col-count 5)
+                   "1.5fr 1fr 1fr 1fr 1fr"
+                   (str "repeat(" col-count ", minmax(0, 1fr))"))]
+    [:div.hidden.lg:grid.lg:gap-4.lg:px-4.lg:py-3.lg:bg-green-400.lg:bg-opacity-10.lg:font-bold.border-b.border-green-400
+     {:style {:grid-template-columns template}}
+     (for [col columns]
+       (if (string? col)
+         [:div {:key col} col]
+         [:div {:key (:label col) :class (:class col)} (:label col)]))]))
 
 ;;; Responsive phase row component for spreadsheet-like layout on wide screens
 (defn phase-row
   "Renders a responsive row that displays as a card on mobile/tablet and as a table row on wide screens.
-   This creates a consistent spreadsheet-like interface across all game phases.
+   This is a display-only component: it does not render interactive inputs.
    
    Args:
      columns - Vector of column maps. Each map can have:
                :label - Column label/header
-               :value - Simple text value to display
-               :component - Hiccup component to render (for inputs, etc.)
+               :value - Simple text value or Hiccup to display
                :class - Additional CSS classes for the column
                :highlight? - If true, highlights negative values in red (for numbers)
-               :hide-on-mobile? - If true, hides this field on mobile (but shows on wide screen)
-   
-   Example:
-     (phase-row [{:label \"Item\" :value \"Soldiers\"}
-                 {:label \"Cost\" :value \"10 credits\"}
-                 {:label \"Quantity\" :component (numeric-input ...)}])"
+               :hide-on-mobile? - If true, hides this field on mobile (but shows on wide screen)"
   [columns]
   [:div.border-b.border-green-400.last:border-b-0
    
    ;; Mobile/Tablet: Vertical card layout (stacked fields)
    [:div.lg:hidden.p-4.space-y-2
-    (for [{:keys [label value component highlight? hide-on-mobile?]} columns]
-      (when (and (or value component) (not hide-on-mobile?))
-        [:div {:key label}
+    (for [{:keys [label value highlight? hide-on-mobile?]} columns]
+      (when (and (some? value) (not hide-on-mobile?))
+        [:div {:key (str "m-" label)}
          [:p.text-xs.text-green-300 label]
-         (if component
-           ;; Wrap component in a container that disables the input on desktop
-           [:div.lg:pointer-events-none.lg:opacity-0.lg:h-0.lg:overflow-hidden
-            component]
+         (if (vector? value)
+           value
            [:p.font-mono 
             {:class (when (and highlight? (number? value) (neg? value)) "text-red-400")}
             value])]))]
@@ -326,12 +322,10 @@
    ;; Wide screen: Horizontal row layout (spreadsheet-like)
    [:div.hidden.lg:grid.lg:gap-4.lg:items-center.lg:px-4.lg:py-3
     {:style {:grid-template-columns (str "repeat(" (count columns) ", minmax(0, 1fr))")}}
-    (for [{:keys [label value component class highlight?]} columns]
-      [:div {:key label :class class}
-       (if component
-         ;; Render component for desktop - this one will be active on desktop
-         component
-         ;; For display-only values, just show the value (no label, header has it)
+    (for [{:keys [label value class highlight?]} columns]
+      [:div {:key (str "d-" label) :class class}
+       (if (vector? value)
+         value
          [:span.font-mono
           {:class (when (and highlight? (number? value) (neg? value)) "text-red-400")}
           value])])]])
