@@ -131,11 +131,11 @@
            extra-attrs)
     "Continue to Action"]))
 
-;;; Purchase row with abbreviated mobile names and compact layout
+
+;;; Purchase row with single input field, CSS-only responsive styling
 (defn purchase-row
-  "Renders a purchase row with:
-   - Mobile: compact 5-column grid with abbreviated item names
-   - Desktop: full 5-column table row with complete names
+  "Renders a purchase row with ONE input field that's just restyled for mobile vs desktop.
+   Uses responsive CSS grid - no duplicate inputs, no JavaScript sync needed.
    
    Parameters:
    - unit-name: Full display name (e.g. 'Defence Stations')
@@ -152,89 +152,57 @@
         item-cost (* cost-per-unit current-quantity)
         cost-id (str "cost-" (name unit-key))
         max-qty-id (str "max-qty-" (name unit-key))]
-    [:div.border-b.border-green-400.last:border-b-0
-
-     ;; Mobile: Compact grid with abbreviated names
-     [:div.grid.gap-1.px-2.py-2.items-center.text-xs.leading-tight.lg:hidden
-      {:style {:grid-template-columns "0.9fr 0.8fr 0.7fr 1.1fr 0.9fr"}}
-      
-      ;; Item name - abbreviated for mobile
-      [:div.font-mono unit-name-mobile]
-      
-      ;; Cost per unit - right aligned
-      [:div.text-right.font-mono (ui/format-number cost-per-unit)]
-      
-      ;; Maximum quantity - right aligned
-      [:div.text-right.font-mono
-       [:span {:id max-qty-id
-               :class (cond
-                        (< max-quantity 0) "text-red-400"
-                        (zero? max-quantity) "opacity-20"
-                        :else "")}
-        (ui/format-number max-quantity)]]
-      
-      ;; Input box - compact
-      [:div.px-1
-       (ui/numeric-input (name unit-key) current-quantity player-id "/calculate-building" hx-include
-                         {:input-class "py-0.5 text-xs"})]
-      
-      ;; Cost in credits - right aligned
-      [:div.text-right.font-mono
-       [:span {:id cost-id
-               :class (when (zero? item-cost) "opacity-20")}
-        "+" (ui/format-number item-cost)]]]
-
-     ;; Desktop: Full table row with complete names
-     [:div.hidden.lg:grid.lg:gap-3.lg:items-center.lg:px-4.lg:py-2
-      {:style {:grid-template-columns "1.5fr 1fr 1fr 1fr 1fr"}}
-
-      ;; Col 1: Item - full name
-      [:div.pr-4
-       [:span.font-mono.whitespace-nowrap unit-name]]
-
-      ;; Col 2: Credits per Unit
-      [:div.lg:text-right.lg:pr-4
-       [:span.font-mono (ui/format-number cost-per-unit)]]
-
-      ;; Col 3: Maximum Quantity
-      [:div.lg:text-right.lg:pr-4
-       [:span.font-mono
-        [:span {:id max-qty-id
-                :class (cond
-                         (< max-quantity 0) "text-red-400"
-                         (zero? max-quantity) "opacity-20"
-                         :else "")}
-         (ui/format-number max-quantity)]]]
-
-      ;; Col 4: Purchase Quantity (real HTMX input)
-      [:div.lg:pr-4
-       (ui/numeric-input (name unit-key) current-quantity player-id "/calculate-building" hx-include
-                         {:input-class "py-1 text-sm"})]
-
-      ;; Col 5: Cost in Credits
-      [:div.lg:text-right.lg:pr-4
-       [:span.font-mono
-        [:span {:id cost-id
-                :class (when (zero? item-cost) "opacity-20")}
-         "+" (ui/format-number item-cost)]]]]]))
+    ;; Single grid that changes layout responsively - one input, just restyled
+    [:div.border-b.border-green-400.last:border-b-0.grid.items-center.gap-1.px-2.py-2.text-xs.leading-tight.lg:gap-3.lg:px-4.lg:py-2.lg:text-base.building-row-grid
+     
+     ;; Col 1: Item name (abbreviated on mobile, full on desktop)
+     [:div.font-mono.lg:pr-4
+      [:span.lg:hidden unit-name-mobile]
+      [:span.hidden.lg:inline.whitespace-nowrap unit-name]]
+     
+     ;; Col 2: Cost per unit
+     [:div.text-right.font-mono.lg:pr-4
+      (ui/format-number cost-per-unit)]
+     
+     ;; Col 3: Maximum quantity
+     [:div.text-right.font-mono.lg:pr-4
+      [:span {:id max-qty-id
+              :class (when (zero? max-quantity) "opacity-20")}
+       (ui/format-number (if (neg? max-quantity) 0 max-quantity))]]
+     
+     ;; Col 4: Purchase Quantity - SINGLE input field with responsive sizing
+     [:div.px-1.lg:pr-4
+      (ui/numeric-input (name unit-key) current-quantity player-id "/calculate-building" hx-include
+                        {:input-class "py-0.5 text-xs lg:py-1 lg:text-sm"})]
+     
+     ;; Col 5: Cost in credits
+     [:div.text-right.font-mono.lg:pr-4
+      [:span {:id cost-id
+              :class (when (zero? item-cost) "opacity-20")}
+       "+" (ui/format-number item-cost)]]]))
 
 ;;; Total cost summary row
 (defn total-cost-row
-  "Renders the total cost summary at the bottom of the table"
-  [total-cost]
+  "Renders the total cost summary at the bottom of the table.
+   Shows cost in red if it exceeds available credits."
+  [total-cost affordable?]
   [:div#cost-summary.border-t-2.border-green-400.bg-green-400.bg-opacity-10
    
    ;; Mobile: Compact layout
    [:div.grid.gap-1.px-2.py-3.font-bold.text-sm.lg:hidden
     {:style {:grid-template-columns "1.2fr 0.8fr 0.6fr 1fr 0.8fr"}}
     [:div.col-span-4.text-right.pr-4 "Total Cost:"]
-    [:div.text-right.font-mono.text-base (ui/format-number total-cost)]]
+    [:div.text-right.font-mono.text-base
+     {:class (when (not affordable?) "text-red-400")}
+     (ui/format-number total-cost)]]
    
    ;; Desktop: Full width layout
    [:div.hidden.lg:grid.lg:gap-3.lg:px-4.lg:py-2.lg:font-bold
     {:style {:grid-template-columns "1.5fr 1fr 1fr 1fr 1fr"}}
     [:div.col-span-4.text-right.text-lg.pr-4 "Total Cost:"]
-    [:div.text-right.font-mono.text-xl (ui/format-number total-cost)]]])
+    [:div.text-right.font-mono.text-xl
+     {:class (when (not affordable?) "text-red-400")}
+     (ui/format-number total-cost)]]])
 
 ;;;;
 ;;;; Actions
@@ -301,16 +269,13 @@
             true)]
          [:div#cost-summary
           {:hx-swap-oob "true"}
-          (total-cost-row (:total-cost cost-info))]
+          (total-cost-row (:total-cost cost-info) affordable?)]
          (for [[item-key max-qty] max-quantities]
            [:span {:id (str "max-qty-" (name item-key))
                    :hx-swap-oob "true"
                    :key (str "max-" item-key)
-                   :class (cond
-                            (< max-qty 0) "text-red-400"
-                            (zero? max-qty) "opacity-20"
-                            :else "")}
-            (ui/format-number max-qty)])
+                   :class (when (or (zero? max-qty) (neg? max-qty)) "opacity-20")}
+            (ui/format-number (if (neg? max-qty) 0 max-qty))])
          (for [[item-key cost] item-costs]
            [:span {:id (str "cost-" (name item-key))
                    :hx-swap-oob "true"
@@ -329,6 +294,18 @@
     (ui/page
       {}
       [:div.mx-auto.max-w-4xl.w-full.text-green-400.font-mono
+       ;; CSS for responsive grid columns
+       [:style "
+         .building-row-grid {
+           grid-template-columns: 0.9fr 0.8fr 0.7fr 1.1fr 0.9fr;
+         }
+         @media (min-width: 1024px) {
+           .building-row-grid {
+             grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
+           }
+         }
+       "]
+       
        [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
 
        (ui/phase-header (:player/current-phase player) "BUILDING")
@@ -377,7 +354,7 @@
             (purchase-row "Food Planets" "Food Plts" :food-planets :game/food-planet-cost 0 0 game player-id hx-include)
             (purchase-row "Military Planets" "Mil Plts" :mil-planets :game/mil-planet-cost 0 0 game player-id hx-include)
 
-            (total-cost-row 0)]]]
+            (total-cost-row 0 true)]]]
 
          ;; Resources after purchases - initial copy, updated via HTMX
          [:div#resources-after
