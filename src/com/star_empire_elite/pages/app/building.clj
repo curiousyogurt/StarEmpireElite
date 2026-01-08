@@ -131,85 +131,110 @@
            extra-attrs)
     "Continue to Action"]))
 
-;;; Unified responsive purchase row (no phase-row, exactly one input per item)
+;;; Purchase row with abbreviated mobile names and compact layout
 (defn purchase-row
-  "Renders a purchase row in a single responsive structure:
-   - On mobile: a vertical card, similar to income cards.
-   - On desktop: fields align under the 5-column header:
-       Item | Credits per Unit | Maximum Quantity | Purchase Quantity | Cost in Credits"
-  [unit-name unit-key cost-key current-quantity max-quantity game player-id hx-include]
+  "Renders a purchase row with:
+   - Mobile: compact 5-column grid with abbreviated item names
+   - Desktop: full 5-column table row with complete names
+   
+   Parameters:
+   - unit-name: Full display name (e.g. 'Defence Stations')
+   - unit-name-mobile: Abbreviated name for mobile (e.g. 'Def Stns')
+   - unit-key: Form field key (e.g. :stations)
+   - cost-key: Game constant key (e.g. :game/station-cost)
+   - current-quantity: Current input value
+   - max-quantity: Maximum affordable quantity
+   - game: Game entity with cost constants
+   - player-id: Player UUID
+   - hx-include: HTMX include selector string"
+  [unit-name unit-name-mobile unit-key cost-key current-quantity max-quantity game player-id hx-include]
   (let [cost-per-unit (get game cost-key)
         item-cost (* cost-per-unit current-quantity)
         cost-id (str "cost-" (name unit-key))
         max-qty-id (str "max-qty-" (name unit-key))]
-    [:div.border-b.border-green-400.last:border-b-0.py-3.px-4
-     ;; One grid for both layouts; desktop uses 5 columns, mobile stacks.
-     [:div.grid.grid-cols-1.lg:grid-cols-5.gap-3.lg:items-center
-      ;; Make first column a bit wider on desktop so long labels don't wrap
+    [:div.border-b.border-green-400.last:border-b-0
+
+     ;; Mobile: Compact grid with abbreviated names
+     [:div.grid.gap-1.px-2.py-2.items-center.text-xs.leading-tight.lg:hidden
+      {:style {:grid-template-columns "0.9fr 0.8fr 0.7fr 1.1fr 0.9fr"}}
+      
+      ;; Item name - abbreviated for mobile
+      [:div.font-mono unit-name-mobile]
+      
+      ;; Cost per unit - right aligned
+      [:div.text-right.font-mono (ui/format-number cost-per-unit)]
+      
+      ;; Maximum quantity - right aligned
+      [:div.text-right.font-mono
+       [:span {:id max-qty-id
+               :class (cond
+                        (< max-quantity 0) "text-red-400"
+                        (zero? max-quantity) "opacity-20"
+                        :else "")}
+        (ui/format-number max-quantity)]]
+      
+      ;; Input box - compact
+      [:div.px-1
+       (ui/numeric-input (name unit-key) current-quantity player-id "/calculate-building" hx-include
+                         {:input-class "py-0.5 text-xs"})]
+      
+      ;; Cost in credits - right aligned
+      [:div.text-right.font-mono
+       [:span {:id cost-id
+               :class (when (zero? item-cost) "opacity-20")}
+        "+" (ui/format-number item-cost)]]]
+
+     ;; Desktop: Full table row with complete names
+     [:div.hidden.lg:grid.lg:gap-3.lg:items-center.lg:px-4.lg:py-2
       {:style {:grid-template-columns "1.5fr 1fr 1fr 1fr 1fr"}}
 
-      ;; Col 1: Item
-      ;; - Mobile: big label at top (like "Ore", "Food", "Mil" in income).
-      ;; - Desktop: regular text in first column.
+      ;; Col 1: Item - full name
       [:div.pr-4
-       [:div.lg:hidden.mb-1
-        [:span.text-xs.text-green-300 "Item"]]
-       [:span.font-mono.whitespace-nowrap.text-lg.lg:text-base.font-bold.lg:font-normal
-        unit-name]]
+       [:span.font-mono.whitespace-nowrap unit-name]]
 
       ;; Col 2: Credits per Unit
-      ;; - Mobile: label on left, value on right in a small row.
-      ;; - Desktop: value right-aligned under header.
       [:div.lg:text-right.lg:pr-4
-       [:div.flex.justify-between.items-center.lg:block
-        [:span.text-xs.text-green-300.lg:hidden "Credits per Unit"]
-        [:span.font-mono (ui/format-number cost-per-unit)]]]
+       [:span.font-mono (ui/format-number cost-per-unit)]]
 
       ;; Col 3: Maximum Quantity
       [:div.lg:text-right.lg:pr-4
-       [:div.flex.justify-between.items-center.lg:block
-        [:span.text-xs.text-green-300.lg:hidden "Maximum Quantity"]
-        [:span.font-mono
-         [:span {:id max-qty-id
-                 :class (cond
-                          (< max-quantity 0) "text-red-400"
-                          (zero? max-quantity) "opacity-20"
-                          :else "")}
-          (ui/format-number max-quantity)]]]]
+       [:span.font-mono
+        [:span {:id max-qty-id
+                :class (cond
+                         (< max-quantity 0) "text-red-400"
+                         (zero? max-quantity) "opacity-20"
+                         :else "")}
+         (ui/format-number max-quantity)]]]
 
-      ;; Col 4: Purchase Quantity (single numeric input)
-      ;; - Mobile: label on left, input on right.
-      ;; - Desktop: input under its header column.
+      ;; Col 4: Purchase Quantity (real HTMX input)
       [:div.lg:pr-4
-       [:div.flex.justify-between.items-center.lg:block
-        [:span.text-xs.text-green-300.lg:hidden "Purchase Quantity"]
-        [:div.w-24.lg:w-auto
-         (ui/numeric-input (name unit-key) current-quantity player-id "/calculate-building" hx-include)]]]
+       (ui/numeric-input (name unit-key) current-quantity player-id "/calculate-building" hx-include
+                         {:input-class "py-1 text-sm"})]
 
       ;; Col 5: Cost in Credits
       [:div.lg:text-right.lg:pr-4
-       [:div.flex.justify-between.items-center.lg:block
-        [:span.text-xs.text-green-300.lg:hidden "Cost in Credits"]
-        [:span.font-mono
-         [:span {:id cost-id
-                 :class (when (zero? item-cost) "opacity-20")}
-          "+" (ui/format-number item-cost)]]]]]]))
+       [:span.font-mono
+        [:span {:id cost-id
+                :class (when (zero? item-cost) "opacity-20")}
+         "+" (ui/format-number item-cost)]]]]]))
 
+;;; Total cost summary row
 (defn total-cost-row
-  "Renders the total cost as a row at the bottom of the table."
+  "Renders the total cost summary at the bottom of the table"
   [total-cost]
-  [:div#cost-summary.border-t.border-green-400
-   [:div.lg:hidden.p-4.bg-green-400.bg-opacity-10
-    [:div.flex.justify-between.items-center
-     [:span.font-bold.text-lg "Total Credits:"]
-     [:span.font-mono.text-xl (ui/format-number total-cost) " credits"]]]
-   [:div.hidden.lg:grid.lg:gap-4.lg:items-center.lg:px-4.lg:py-3.lg:bg-green-400.lg:bg-opacity-10.font-bold
-    {:style {:grid-template-columns "repeat(5, minmax(0, 1fr))"}}
-    [:div.pr-4 ""]
-    [:div.text-right.pr-4 ""]
-    [:div.text-right.pr-4 ""]
-    [:div "Total Credits:"]
-    [:div.text-right.pr-4 (ui/format-number total-cost)]]])
+  [:div#cost-summary.border-t-2.border-green-400.bg-green-400.bg-opacity-10
+   
+   ;; Mobile: Compact layout
+   [:div.grid.gap-1.px-2.py-3.font-bold.text-sm.lg:hidden
+    {:style {:grid-template-columns "1.2fr 0.8fr 0.6fr 1fr 0.8fr"}}
+    [:div.col-span-4.text-right.pr-4 "Total Cost:"]
+    [:div.text-right.font-mono.text-base (ui/format-number total-cost)]]
+   
+   ;; Desktop: Full width layout
+   [:div.hidden.lg:grid.lg:gap-3.lg:px-4.lg:py-2.lg:font-bold
+    {:style {:grid-template-columns "1.5fr 1fr 1fr 1fr 1fr"}}
+    [:div.col-span-4.text-right.text-lg.pr-4 "Total Cost:"]
+    [:div.text-right.font-mono.text-xl (ui/format-number total-cost)]]])
 
 ;;;;
 ;;;; Actions
@@ -317,32 +342,42 @@
 
          [:h3.font-bold.mb-4 "Building This Round"]
 
-         ;; Table container with header and rows, horizontally scrollable on very narrow screens
-         [:div.border.border-green-400.mb-8.overflow-x-auto
-          [:div.min-w-full
-           ;; Header row (wide screens)
-           (ui/phase-table-header
-             [{:label "Item" :class "pr-4"}
-              {:label "Credits/Unit" :class "text-right pr-4"}
-              {:label "Maximum" :class "text-right pr-4"}
-              {:label "Purchase" :class "pr-4"}
-              {:label "Credits" :class "text-right pr-4"}])
+         ;; Table container with header and rows
+         [:div.w-full.mb-8
+          [:div.border.border-green-400.overflow-x-auto
+           [:div
+            
+            ;; Mobile header - abbreviated
+            [:div.grid.gap-1.px-2.py-2.bg-green-400.bg-opacity-10.font-bold.border-b.border-green-400.text-xs.lg:hidden
+             {:style {:grid-template-columns "0.9fr 0.8fr 0.7fr 1.1fr 0.9fr"}}
+             [:div "Item"]
+             [:div.text-right "Cost"]
+             [:div.text-right "Max"]
+             [:div.text-center "Buy"]
+             [:div.text-right "Cred"]]
+            
+            ;; Desktop header - full text
+            (ui/phase-table-header
+              [{:label "Item" :class "pr-4"}
+               {:label "Credits/Unit" :class "text-right pr-4"}
+               {:label "Maximum" :class "text-right pr-4"}
+               {:label "Purchase" :class "pr-4"}
+               {:label "Credits" :class "text-right pr-4"}])
 
-           ;; All purchase rows using unified component
-           (purchase-row "Soldiers" :soldiers :game/soldier-cost 0 0 game player-id hx-include)
-           (purchase-row "Transports" :transports :game/transport-cost 0 0 game player-id hx-include)
-           (purchase-row "Generals" :generals :game/general-cost 0 0 game player-id hx-include)
-           (purchase-row "Carriers" :carriers :game/carrier-cost 0 0 game player-id hx-include)
-           (purchase-row "Fighters" :fighters :game/fighter-cost 0 0 game player-id hx-include)
-           (purchase-row "Admirals" :admirals :game/admiral-cost 0 0 game player-id hx-include)
-           (purchase-row "Defence Stations" :stations :game/station-cost 0 0 game player-id hx-include)
-           (purchase-row "Command Ships" :cmd-ships :game/cmd-ship-cost 0 0 game player-id hx-include)
-           (purchase-row "Ore Planets" :ore-planets :game/ore-planet-cost 0 0 game player-id hx-include)
-           (purchase-row "Food Planets" :food-planets :game/food-planet-cost 0 0 game player-id hx-include)
-           (purchase-row "Military Planets" :mil-planets :game/mil-planet-cost 0 0 game player-id hx-include)
+            ;; All purchase rows with abbreviated mobile names
+            (purchase-row "Soldiers" "Soldiers" :soldiers :game/soldier-cost 0 0 game player-id hx-include)
+            (purchase-row "Transports" "Transport" :transports :game/transport-cost 0 0 game player-id hx-include)
+            (purchase-row "Generals" "Generals" :generals :game/general-cost 0 0 game player-id hx-include)
+            (purchase-row "Carriers" "Carriers" :carriers :game/carrier-cost 0 0 game player-id hx-include)
+            (purchase-row "Fighters" "Fighters" :fighters :game/fighter-cost 0 0 game player-id hx-include)
+            (purchase-row "Admirals" "Admirals" :admirals :game/admiral-cost 0 0 game player-id hx-include)
+            (purchase-row "Defence Stations" "Def Stns" :stations :game/station-cost 0 0 game player-id hx-include)
+            (purchase-row "Command Ships" "Cmd Ships" :cmd-ships :game/cmd-ship-cost 0 0 game player-id hx-include)
+            (purchase-row "Ore Planets" "Ore Plts" :ore-planets :game/ore-planet-cost 0 0 game player-id hx-include)
+            (purchase-row "Food Planets" "Food Plts" :food-planets :game/food-planet-cost 0 0 game player-id hx-include)
+            (purchase-row "Military Planets" "Mil Plts" :mil-planets :game/mil-planet-cost 0 0 game player-id hx-include)
 
-           ;; Total cost row as last row in table - updated by HTMX
-           (total-cost-row 0)]]
+            (total-cost-row 0)]]]
 
          ;; Resources after purchases - initial copy, updated via HTMX
          [:div#resources-after

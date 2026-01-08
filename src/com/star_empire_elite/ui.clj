@@ -221,71 +221,89 @@
       [:p.text-xs "Ore Plts"]
       [:p.font-mono (or (:ore-planets resources) (:player/ore-planets resources))]]]]))
 
-;;; Numeric input field that only allows digits. Strips non-numeric characters as user types and
-;;; provides htmx integration for dynamic updates. Includes a reset button to restore default value.
 (defn numeric-input 
   "Creates a numeric-only input field with HTMX integration and reset button.
-   
-   Args:
-     name - input field name
-     value - default/initial value
-     player-id - player UUID for HTMX endpoint
-     hx-post-path - relative path for HTMX post (e.g. '/calculate-expenses')
-     hx-include - selector string for fields to include in HTMX request"
-  [name value player-id hx-post-path hx-include]
+
+  Args:
+  name - input field name
+  value - default/initial value
+  player-id - player UUID for HTMX endpoint
+  hx-post-path - relative path for HTMX post (e.g. '/calculate-expenses')
+  hx-include - selector string for fields to include in HTMX request
+  opts - optional map:
+  {:display-only? true        ; strip name and HTMX wiring (for read-only mirrors)
+   :input-class   \"...\"     ; extra classes for the <input>
+   :sync-key      \"soldiers\"} ; optional key for JS sync across views"
+  [name value player-id hx-post-path hx-include & [{:keys [display-only? input-class sync-key]}]]
   [:div.relative
-   [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.pr-6.font-mono
-    {:type "text" 
-     :name name 
-     :value value
-     :autocomplete "off"
-     :autocapitalize "off"
-     :autocorrect "off"
-     :spellcheck "false"
-     :data-lpignore "true"
-     :data-form-type "other"
-     :hx-post (str "/app/game/" player-id hx-post-path)
-     :hx-target "#resources-after" 
-     :hx-swap "outerHTML"
-     :hx-trigger "load, input"
-     :hx-include hx-include
-     ;; Strip non-numeric characters immediately while preserving cursor position
-     :oninput (str "let start = this.selectionStart; "
-                   "let end = this.selectionEnd; "
-                   "let oldVal = this.value; "
-                   "let newVal = oldVal.replace(/[^0-9]/g, ''); "
-                   "if (oldVal !== newVal) { "
-                   "  this.value = newVal; "
-                   "  let diff = oldVal.length - newVal.length; "
-                   "  this.setSelectionRange(start - diff, end - diff); "
-                   "}")
-     :onblur (str "let val = this.value.replace(/[^0-9]/g, ''); "
-                  "if (val === '' || val === '0') { val = '0'; } "
-                  "else { val = String(parseInt(val, 10)); } "
-                  "this.value = val;")}]
-   [:button
-    {:type "button"
-     :tabindex "-1"
-     :class "absolute right-2 top-1/2 -translate-y-1/2 text-green-400 hover:text-green-300 transition-colors text-2xl font-bold p-0 bg-none border-none cursor-pointer"
-     :onclick (str "this.previousElementSibling.value = '" value "'; "
-                   "this.previousElementSibling.dispatchEvent(new Event('input', {bubbles: true}));")
-     :title "Reset"}
-    "\u25e6"]])
+   [:input
+    (cond-> {:type "text"
+             :value value
+             :autocomplete "off"
+             :autocapitalize "off"
+             :autocorrect "off"
+             :spellcheck "false"
+             :data-lpignore "true"
+             :data-form-type "other"
+             :class (str "w-full bg-black border border-green-400 text-green-400 "
+                         "p-2 pr-6 font-mono "
+                         (or input-class ""))
+             ;; Strip non-numeric characters immediately while preserving cursor position
+             :oninput (str
+                        "let start=this.selectionStart;"
+                        "let end=this.selectionEnd;"
+                        "let oldVal=this.value;"
+                        "let newVal=oldVal.replace(/[^0-9]/g,'');"
+                        "if(oldVal!==newVal){"
+                                             "  this.value=newVal;"
+                                             "  let diff=oldVal.length-newVal.length;"
+                                             "  this.setSelectionRange(start-diff,end-diff);"
+                                             "}"
+                        ;; Optional sync to matching proxy inputs
+                        (when sync-key
+                          (str "if(window.seeSyncBuildingField){"
+                                                                "  window.seeSyncBuildingField('" sync-key "', this);"
+                                                                "}")))
+             :onblur (str
+                       "let val=this.value.replace(/[^0-9]/g,'');"
+                       "if(val===''||val==='0'){val='0';}"
+                       "else{val=String(parseInt(val,10));}"
+                       "this.value=val;")}
+      ;; Only real, HTMX-enabled input gets name + hx-*
+      (not display-only?)
+      (merge {:name name
+              :hx-post (str "/app/game/" player-id hx-post-path)
+              :hx-target "#resources-after"
+              :hx-swap "outerHTML"
+              :hx-trigger "load, input"
+              :hx-include hx-include})
+      ;; JS-sync key, if provided
+      sync-key (assoc :data-sync-key sync-key))]
+   ;; Reset button only for non-display inputs
+   (when (not display-only?)
+     [:button
+      {:type "button"
+       :tabindex "-1"
+       :class "absolute right-2 top-1/2 -translate-y-1/2 text-green-400 hover:text-green-300 transition-colors text-2xl font-bold p-0 bg-none border-none cursor-pointer"
+       :onclick (str "this.previousElementSibling.value='" value "';"
+                     "this.previousElementSibling.dispatchEvent(new Event('input',{bubbles:true}));")
+       :title "Reset"}
+      "\u25e6"])])
 
 (defn phase-table-header
   "Renders a header row for phase tables on wide screens only.
-   
-   Args:
-     columns - Vector of column definitions. Each can be either:
-               - A string (simple label, left-aligned)
-               - A map with :label and optional :class for custom styling"
+
+  Args:
+  columns - Vector of column definitions. Each can be either:
+  - A string (simple label, left-aligned)
+  - A map with :label and optional :class for custom styling"
   [columns]
   (let [col-count (count columns)
         ;; If this is the 5-column building header, bias the first column wider
         template (if (= col-count 5)
                    "1.5fr 1fr 1fr 1fr 1fr"
                    (str "repeat(" col-count ", minmax(0, 1fr))"))]
-    [:div.hidden.lg:grid.lg:gap-4.lg:px-4.lg:py-3.lg:bg-green-400.lg:bg-opacity-10.lg:font-bold.border-b.border-green-400
+    [:div.hidden.lg:grid.lg:gap-4.lg:px-4.lg:py-2.lg:bg-green-400.lg:bg-opacity-10.lg:font-bold.border-b.border-green-400
      {:style {:grid-template-columns template}}
      (for [col columns]
        (if (string? col)
@@ -295,18 +313,18 @@
 ;;; Responsive phase row component for spreadsheet-like layout on wide screens
 (defn phase-row
   "Renders a responsive row that displays as a card on mobile/tablet and as a table row on wide screens.
-   This is a display-only component: it does not render interactive inputs.
-   
-   Args:
-     columns - Vector of column maps. Each map can have:
-               :label - Column label/header
-               :value - Simple text value or Hiccup to display
-               :class - Additional CSS classes for the column
-               :highlight? - If true, highlights negative values in red (for numbers)
-               :hide-on-mobile? - If true, hides this field on mobile (but shows on wide screen)"
+  This is a display-only component: it does not render interactive inputs.
+
+  Args:
+  columns - Vector of column maps. Each map can have:
+  :label - Column label/header
+  :value - Simple text value or Hiccup to display
+  :class - Additional CSS classes for the column
+  :highlight? - If true, highlights negative values in red (for numbers)
+  :hide-on-mobile? - If true, hides this field on mobile (but shows on wide screen)"
   [columns]
   [:div.border-b.border-green-400.last:border-b-0
-   
+
    ;; Mobile/Tablet: Vertical card layout (stacked fields)
    [:div.lg:hidden.p-4.space-y-2
     (for [{:keys [label value highlight? hide-on-mobile?]} columns]
@@ -318,7 +336,7 @@
            [:p.font-mono 
             {:class (when (and highlight? (number? value) (neg? value)) "text-red-400")}
             value])]))]
-   
+
    ;; Wide screen: Horizontal row layout (spreadsheet-like)
    [:div.hidden.lg:grid.lg:gap-4.lg:items-center.lg:px-4.lg:py-3
     {:style {:grid-template-columns (str "repeat(" (count columns) ", minmax(0, 1fr))")}}

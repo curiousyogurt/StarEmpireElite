@@ -1,3 +1,6 @@
+http://www-cs-students.stanford.edu/~amitp/Articles/SRE-Clones.html
+http://www-cs-students.stanford.edu/~amitp/Articles/SRE-Design.html
+
   create_table "users", force: :cascade do |t|
     t.string   "empire_name"
     t.integer  "score",                       limit: 8, default: 0
