@@ -176,50 +176,64 @@
     [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
      [:div
       [:p.text-xs "Credits"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:credits resources) (:player/credits resources)) 0)) "text-red-400")} 
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:credits resources) (:player/credits resources) 0) 0)) "text-red-400")}
        (or (:credits resources) (:player/credits resources))]]
      [:div
       [:p.text-xs "Food"]
-      [:p.font-mono (or (:food resources) (:player/food resources))]]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:food resources) (:player/food resources) 0) 0)) "text-red-400")}
+       (or (:food resources) (:player/food resources))]]
      [:div
       [:p.text-xs "Fuel"]
-      [:p.font-mono (or (:fuel resources) (:player/fuel resources))]]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:fuel resources) (:player/fuel resources) 0) 0)) "text-red-400")}
+       (or (:fuel resources) (:player/fuel resources))]]
      [:div
       [:p.text-xs "Galaxars"]
-      [:p.font-mono (or (:galaxars resources) (:player/galaxars resources))]]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:galaxars resources) (:player/galaxars resources) 0) 0)) "text-red-400")}
+       (or (:galaxars resources) (:player/galaxars resources))]]
      [:div
       [:p.text-xs "Soldiers"]
-      [:p.font-mono (or (:soldiers resources) (:player/soldiers resources))]]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:soldiers resources) (:player/soldiers resources) 0) 0)) "text-red-400")}
+       (or (:soldiers resources) (:player/soldiers resources))]]
      [:div
       [:p.text-xs "Transports"]
-      [:p.font-mono (or (:transports resources) (:player/transports resources))]]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:transports resources) (:player/transports resources) 0) 0)) "text-red-400")}
+       (or (:transports resources) (:player/transports resources))]]
      [:div
       [:p.text-xs "Generals"]
-      [:p.font-mono (or (:generals resources) (:player/generals resources))]]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:generals resources) (:player/generals resources) 0) 0)) "text-red-400")}
+       (or (:generals resources) (:player/generals resources))]]
      [:div
       [:p.text-xs "Carriers"]
-      [:p.font-mono (or (:carriers resources) (:player/carriers resources))]]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:carriers resources) (:player/carriers resources) 0) 0)) "text-red-400")}
+       (or (:carriers resources) (:player/carriers resources))]]
      [:div
       [:p.text-xs "Fighters"]
-      [:p.font-mono (or (:fighters resources) (:player/fighters resources))]]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:fighters resources) (:player/fighters resources) 0) 0)) "text-red-400")}
+       (or (:fighters resources) (:player/fighters resources))]]
      [:div
       [:p.text-xs "Admirals"]
-      [:p.font-mono (or (:admirals resources) (:player/admirals resources))]]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:admirals resources) (:player/admirals resources) 0) 0)) "text-red-400")}
+       (or (:admirals resources) (:player/admirals resources))]]
      [:div
       [:p.text-xs "Stations"]
-      [:p.font-mono (or (:stations resources) (:player/stations resources))]]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:stations resources) (:player/stations resources) 0) 0)) "text-red-400")}
+       (or (:stations resources) (:player/stations resources))]]
      [:div
       [:p.text-xs "Cmd Ships"]
-      [:p.font-mono (or (:cmd-ships resources) (:player/cmd-ships resources))]]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:cmd-ships resources) (:player/cmd-ships resources) 0) 0)) "text-red-400")}
+       (or (:cmd-ships resources) (:player/cmd-ships resources))]]
      [:div
       [:p.text-xs "Mil Plts"]
-      [:p.font-mono (or (:mil-planets resources) (:player/mil-planets resources))]]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:mil-planets resources) (:player/mil-planets resources) 0) 0)) "text-red-400")}
+       (or (:mil-planets resources) (:player/mil-planets resources))]]
      [:div
       [:p.text-xs "Food Plts"]
-      [:p.font-mono (or (:food-planets resources) (:player/food-planets resources))]]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:food-planets resources) (:player/food-planets resources) 0) 0)) "text-red-400")}
+       (or (:food-planets resources) (:player/food-planets resources))]]
      [:div
       [:p.text-xs "Ore Plts"]
-      [:p.font-mono (or (:ore-planets resources) (:player/ore-planets resources))]]]]))
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:ore-planets resources) (:player/ore-planets resources) 0) 0)) "text-red-400")}
+       (or (:ore-planets resources) (:player/ore-planets resources))]]]]))
 
 (defn numeric-input 
   "Creates a numeric-only input field with HTMX integration and reset button.

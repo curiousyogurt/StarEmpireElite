@@ -164,23 +164,23 @@
 
 (deftest test-valid-exchange
   (testing "Returns true when all resources are non-negative"
-    (is (true? (exchange/valid-exchange? {:credits 100 :soldiers 50 :fighters 10 
-                                          :stations 5 :mil-planets 2 :food-planets 3 
-                                          :ore-planets 1 :food 1000 :fuel 500})))
-    (is (true? (exchange/valid-exchange? {:credits 0 :soldiers 0 :fighters 0 
-                                          :stations 0 :mil-planets 0 :food-planets 0 
-                                          :ore-planets 0 :food 0 :fuel 0}))))
+    (is (true? (exchange/valid-exchange? {:credits 100 :soldiers 50 :fighters 10
+                                          :stations 5 :mil-planets 2 :food-planets 3
+                                          :ore-planets 1 :food 1000 :fuel 500 :galaxars 5})))
+    (is (true? (exchange/valid-exchange? {:credits 0 :soldiers 0 :fighters 0
+                                          :stations 0 :mil-planets 0 :food-planets 0
+                                          :ore-planets 0 :food 0 :fuel 0 :galaxars 0}))))
   
   (testing "Returns false when any resource is negative"
-    (is (false? (exchange/valid-exchange? {:credits -1 :soldiers 50 :fighters 10 
-                                           :stations 5 :mil-planets 2 :food-planets 3 
-                                           :ore-planets 1 :food 1000 :fuel 500})))
-    (is (false? (exchange/valid-exchange? {:credits 100 :soldiers -1 :fighters 10 
-                                           :stations 5 :mil-planets 2 :food-planets 3 
-                                           :ore-planets 1 :food 1000 :fuel 500})))
-    (is (false? (exchange/valid-exchange? {:credits 100 :soldiers 50 :fighters 10 
-                                           :stations 5 :mil-planets 2 :food-planets 3 
-                                           :ore-planets 1 :food -1 :fuel 500})))))
+    (is (false? (exchange/valid-exchange? {:credits -1 :soldiers 50 :fighters 10
+                                           :stations 5 :mil-planets 2 :food-planets 3
+                                           :ore-planets 1 :food 1000 :fuel 500 :galaxars 5})))
+    (is (false? (exchange/valid-exchange? {:credits 100 :soldiers -1 :fighters 10
+                                           :stations 5 :mil-planets 2 :food-planets 3
+                                           :ore-planets 1 :food 1000 :fuel 500 :galaxars 5})))
+    (is (false? (exchange/valid-exchange? {:credits 100 :soldiers 50 :fighters 10
+                                           :stations 5 :mil-planets 2 :food-planets 3
+                                           :ore-planets 1 :food -1 :fuel 500 :galaxars 5})))))
 
 (deftest test-identify-invalid-exchanges
   (testing "Identifies specific invalid exchanges correctly"

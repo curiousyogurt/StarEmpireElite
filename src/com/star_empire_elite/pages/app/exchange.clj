@@ -71,6 +71,19 @@
      :credits-from-resources credits-from-resources
      :total-credits (+ credits-from-sales credits-from-resources)}))
 
+;;; Calculate maximum quantities that can be bought based on available credits after selling
+(defn calculate-max-buy-quantities
+  "Calculate maximum quantities that can be purchased with available credits after all sales.
+   Returns map with max quantities for each buyable item."
+  [player sell-quantities rates]
+  (let [sell-credit-changes (calculate-exchange-credits
+                            (assoc sell-quantities
+                                   :food-bought 0 :fuel-bought 0)
+                            rates)
+        total-available-credits (+ (:player/credits player) (:total-credits sell-credit-changes))]
+    {:max-food (max 0 (quot total-available-credits (:food-buy rates)))
+     :max-fuel (max 0 (quot total-available-credits (:fuel-buy rates)))}))
+
 ;;; Calculate all resources after exchange
 (defn calculate-resources-after-exchange
   "Calculate all player resources after executing exchanges.
@@ -84,7 +97,8 @@
    :food-planets (- (:player/food-planets player) (:food-planets-sold quantities))
    :ore-planets  (- (:player/ore-planets player)  (:ore-planets-sold quantities))
    :food (+ (:player/food player) (:food-bought quantities) (- (:food-sold quantities)))
-   :fuel (+ (:player/fuel player) (:fuel-bought quantities) (- (:fuel-sold quantities)))})
+   :fuel (+ (:player/fuel player) (:fuel-bought quantities) (- (:fuel-sold quantities)))
+   :galaxars (:player/galaxars player)})
 
 ;;; Validate exchange is legal
 (defn valid-exchange?
@@ -116,7 +130,7 @@
    :invalid-fuel-purchase? (and (> (:fuel-bought quantities) 0) (< (:credits resources-after) 0))})
 
 ;;;;
-;;;; UI Components
+;;;; UI Components for Table-Based Layout
 ;;;;
 
 ;;; Submit button component - extracted to avoid duplication
@@ -133,49 +147,126 @@
            extra-attrs)
     "Make Exchange"]))
 
-;;; Sell exchange card component
-(defn sell-exchange-card
-  "Renders a sell exchange card for units, planets, or resources.
-   Parameters:
-   - item-name: Display name (e.g. 'Soldiers', 'Ore Planets', 'Food')
-   - field-name: Form field name (e.g. 'soldiers-sold', 'ore-planets-sold')
-   - price: Price per unit in credits
-   - max-available: Current quantity player owns
-   - player-id: Player identifier for HTMX routing
-   - hx-include: HTMX include string for related fields"
-  [item-name field-name price max-available player-id hx-include]
-  [:div.border.border-green-400.p-4
-   [:h4.font-bold.mb-3 (str "Sell " item-name)]
-   [:div.space-y-2
-    [:div
-     [:p.text-xs "Price per Unit"]
-     [:p.font-mono (str price " credits")]]
-    [:div
-     [:p.text-xs "Max Available"]
-     [:p.font-mono max-available]]
-    [:div
-     [:label.text-xs "Sell Quantity"]
-     (ui/numeric-input field-name 0 player-id "/calculate-exchange" hx-include)]]])
+;;; Sell row with single input field, CSS-only responsive styling (like building page)
+(defn sell-row
+  "Renders a sell row with ONE input field that's just restyled for mobile vs desktop.
+   Uses responsive CSS grid - no duplicate inputs, no JavaScript sync needed.
 
-;;; Buy exchange card component
-(defn buy-exchange-card
-  "Renders a buy exchange card for resources.
    Parameters:
-   - item-name: Display name (e.g. 'Food', 'Fuel')
-   - field-name: Form field name (e.g. 'food-bought', 'fuel-bought')
-   - price: Price per unit in credits
-   - player-id: Player identifier for HTMX routing
-   - hx-include: HTMX include string for related fields"
-  [item-name field-name price player-id hx-include]
-  [:div.border.border-green-400.p-4
-   [:h4.font-bold.mb-3 (str "Buy " item-name)]
-   [:div.space-y-2
-    [:div
-     [:p.text-xs "Price per Unit"]
-     [:p.font-mono (str price " credits")]]
-    [:div
-     [:label.text-xs "Buy Quantity"]
-     (ui/numeric-input field-name 0 player-id "/calculate-exchange" hx-include)]]])
+   - item-name: Full display name (e.g. 'Soldiers', 'Defence Stations')
+   - item-name-mobile: Abbreviated name for mobile (e.g. 'Soldiers', 'Def Stns')
+   - field-key: Form field key (e.g. 'soldiers-sold')
+   - price-per-unit: Credits received per unit sold
+   - current-quantity: Current input value
+   - max-quantity: Maximum quantity available to sell
+   - player-id: Player UUID
+   - hx-include: HTMX include selector string"
+  [item-name item-name-mobile field-key price-per-unit current-quantity max-quantity player-id hx-include]
+  (let [credit-gain (* price-per-unit current-quantity)
+        credit-id (str "credit-" field-key)
+        max-qty-id (str "max-qty-" field-key)]
+    ;; Single grid that changes layout responsively - one input, just restyled
+    [:div.border-b.border-green-400.last:border-b-0.grid.items-center.gap-1.px-2.py-2.text-xs.leading-tight.lg:gap-3.lg:px-4.lg:py-2.lg:text-base.exchange-row-grid
+
+     ;; Col 1: Item name (abbreviated on mobile, full on desktop)
+     [:div.font-mono.lg:pr-4
+      [:span.lg:hidden item-name-mobile]
+      [:span.hidden.lg:inline.whitespace-nowrap item-name]]
+
+     ;; Col 2: Credits per unit
+     [:div.text-right.font-mono.lg:pr-4
+      (ui/format-number price-per-unit)]
+
+     ;; Col 3: Maximum quantity available
+     [:div.text-right.font-mono.lg:pr-4
+      [:span {:id max-qty-id
+              :class (when (zero? max-quantity) "opacity-20")}
+       (ui/format-number (if (neg? max-quantity) 0 max-quantity))]]
+
+     ;; Col 4: Sell Quantity - SINGLE input field with responsive sizing
+     [:div.px-1.lg:pr-4
+      (ui/numeric-input field-key current-quantity player-id "/calculate-exchange" hx-include
+                        {:input-class "py-0.5 text-xs lg:py-1 lg:text-sm"})]
+
+     ;; Col 5: Credits gained
+     [:div.text-right.font-mono.lg:pr-4
+      [:span {:id credit-id
+              :class (when (zero? credit-gain) "opacity-20")}
+       "+" (ui/format-number credit-gain)]]]))
+
+;;; Buy row with single input field, CSS-only responsive styling (like building page)
+(defn buy-row
+  "Renders a buy row with ONE input field that's just restyled for mobile vs desktop.
+   Uses responsive CSS grid - no duplicate inputs, no JavaScript sync needed.
+
+   Parameters:
+   - item-name: Full display name (e.g. 'Food', 'Fuel')
+   - item-name-mobile: Abbreviated name for mobile (e.g. 'Food', 'Fuel')
+   - field-key: Form field key (e.g. 'food-bought')
+   - price-per-unit: Credits per unit cost
+   - current-quantity: Current input value
+   - max-quantity: Maximum quantity affordable
+   - player-id: Player UUID
+   - hx-include: HTMX include selector string"
+  [item-name item-name-mobile field-key price-per-unit current-quantity max-quantity player-id hx-include]
+  (let [credit-cost (* price-per-unit current-quantity)
+        credit-id (str "credit-" field-key)
+        max-qty-id (str "max-qty-" field-key)]
+    ;; Single grid that changes layout responsively - one input, just restyled
+    [:div.border-b.border-green-400.last:border-b-0.grid.items-center.gap-1.px-2.py-2.text-xs.leading-tight.lg:gap-3.lg:px-4.lg:py-2.lg:text-base.exchange-row-grid
+
+     ;; Col 1: Item name (abbreviated on mobile, full on desktop)
+     [:div.font-mono.lg:pr-4
+      [:span.lg:hidden item-name-mobile]
+      [:span.hidden.lg:inline.whitespace-nowrap item-name]]
+
+     ;; Col 2: Credits per unit
+     [:div.text-right.font-mono.lg:pr-4
+      (ui/format-number price-per-unit)]
+
+     ;; Col 3: Maximum quantity affordable
+     [:div.text-right.font-mono.lg:pr-4
+      [:span {:id max-qty-id
+              :class (when (zero? max-quantity) "opacity-20")}
+       (ui/format-number (if (neg? max-quantity) 0 max-quantity))]]
+
+     ;; Col 4: Buy Quantity - SINGLE input field with responsive sizing
+     [:div.px-1.lg:pr-4
+      (ui/numeric-input field-key current-quantity player-id "/calculate-exchange" hx-include
+                        {:input-class "py-0.5 text-xs lg:py-1 lg:text-sm"})]
+
+     ;; Col 5: Credits cost
+     [:div.text-right.font-mono.lg:pr-4
+      [:span {:id credit-id
+              :class (when (zero? credit-cost) "opacity-20")}
+       "-" (ui/format-number credit-cost)]]]))
+
+;;; Total credits summary row
+(defn total-credits-row
+  "Renders the total credits gained summary at the bottom of the table.
+   Shows credits in red if player tries to sell more than they have."
+  [total-credits can-execute?]
+  [:div#cost-summary.border-t-2.border-green-400.bg-green-400.bg-opacity-10
+
+   ;; Mobile: Compact layout
+   [:div.grid.gap-1.px-2.py-3.font-bold.text-sm.lg:hidden
+    {:style {:grid-template-columns "1.2fr 0.8fr 0.6fr 1fr 0.8fr"}}
+    [:div.col-span-4.text-right.pr-4 "Total Credits:"]
+    [:div.text-right.font-mono.text-base
+     {:class (when (and (not can-execute?) (< total-credits 0)) "text-red-400")}
+     (if (>= total-credits 0)
+       (str "+" (ui/format-number total-credits))
+       (str "-" (ui/format-number (- total-credits))))]]
+
+   ;; Desktop: Full width layout
+   [:div.hidden.lg:grid.lg:gap-3.lg:px-4.lg:py-2.lg:font-bold
+    {:style {:grid-template-columns "1.5fr 1fr 1fr 1fr 1fr"}}
+    [:div.col-span-4.text-right.text-lg.pr-4 "Total Credits:"]
+    [:div.text-right.font-mono.text-xl
+     {:class (when (and (not can-execute?) (< total-credits 0)) "text-red-400")}
+     (if (>= total-credits 0)
+       (str "+" (ui/format-number total-credits))
+       (str "-" (ui/format-number (- total-credits))))]]])
 
 ;;;;
 ;;;; Actions
@@ -220,88 +311,83 @@
          :headers {"location" (str "/app/game/" player-id "/expenses")}}))))
 
 ;;; Provides HTMX dynamic updates showing resources after exchange as user changes input values.
-;;; This gives immediate feedback on whether the player can afford their selected exchanges.
 (defn calculate-exchange [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (let [;; Parse all exchange inputs using extracted function
           quantities (parse-exchange-quantities params)
-        
+
           ;; Use pure calculation functions
           rates (get-exchange-rates)
           credit-changes (calculate-exchange-credits quantities rates)
           resources-after (calculate-resources-after-exchange player quantities credit-changes)
           can-execute? (valid-exchange? resources-after)
-          invalid-exchanges (identify-invalid-exchanges resources-after quantities)
-          
-          ;; Determine if any credit-related transaction is invalid
-          invalid-credits-transaction? (or (:invalid-soldier-sale? invalid-exchanges)
-                                           (:invalid-fighter-sale? invalid-exchanges)
-                                           (:invalid-station-sale? invalid-exchanges)
-                                           (:invalid-mil-planet-sale? invalid-exchanges)
-                                           (:invalid-food-planet-sale? invalid-exchanges)
-                                           (:invalid-ore-planet-sale? invalid-exchanges)
-                                           (:invalid-food-sale? invalid-exchanges)
-                                           (:invalid-fuel-sale? invalid-exchanges)
-                                           (:invalid-food-purchase? invalid-exchanges)
-                                           (:invalid-fuel-purchase? invalid-exchanges))]
-    
+
+          ;; Calculate maximums for buy quantities based on sell proceeds
+          sell-quantities {:soldiers-sold (:soldiers-sold quantities)
+                          :fighters-sold (:fighters-sold quantities)
+                          :stations-sold (:stations-sold quantities)
+                          :mil-planets-sold (:mil-planets-sold quantities)
+                          :food-planets-sold (:food-planets-sold quantities)
+                          :ore-planets-sold (:ore-planets-sold quantities)
+                          :food-sold (:food-sold quantities)
+                          :fuel-sold (:fuel-sold quantities)
+                          :food-bought 0 :fuel-bought 0}
+          max-buy-quantities (calculate-max-buy-quantities player sell-quantities rates)]
+
       ;; Render HTMX response fragments that replace specific page elements
       (biff/render
         [:div
-         ;; Resources display with red highlighting for invalid values
-         [:div#resources-after.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
-          [:h3.font-bold.mb-4 "Resources After Exchange"]
-          [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
-           [:div
-            [:p.text-xs "Credits"]
-            [:p.font-mono {:class (when invalid-credits-transaction? "text-red-400")} 
-             (:credits resources-after)]]
-           [:div
-            [:p.text-xs "Food"]
-            [:p.font-mono {:class (when (or (:invalid-food-sale? invalid-exchanges) 
-                                            (:invalid-food-purchase? invalid-exchanges)) 
-                                     "text-red-400")} 
-             (:food resources-after)]]
-           [:div
-            [:p.text-xs "Fuel"]
-            [:p.font-mono {:class (when (or (:invalid-fuel-sale? invalid-exchanges) 
-                                            (:invalid-fuel-purchase? invalid-exchanges)) 
-                                     "text-red-400")} 
-             (:fuel resources-after)]]
-           [:div
-            [:p.text-xs "Galaxars"]
-            [:p.font-mono (:player/galaxars player)]]
-           [:div
-            [:p.text-xs "Soldiers"]
-            [:p.font-mono {:class (when (:invalid-soldier-sale? invalid-exchanges) "text-red-400")} 
-             (:soldiers resources-after)]]
-           [:div
-            [:p.text-xs "Fighters"]
-            [:p.font-mono {:class (when (:invalid-fighter-sale? invalid-exchanges) "text-red-400")} 
-             (:fighters resources-after)]]
-           [:div
-            [:p.text-xs "Stations"]
-            [:p.font-mono {:class (when (:invalid-station-sale? invalid-exchanges) "text-red-400")} 
-             (:stations resources-after)]]
-           [:div
-            [:p.text-xs "Mil Plts"]
-            [:p.font-mono {:class (when (:invalid-mil-planet-sale? invalid-exchanges) "text-red-400")} 
-             (:mil-planets resources-after)]]
-           [:div
-            [:p.text-xs "Food Plts"]
-            [:p.font-mono {:class (when (:invalid-food-planet-sale? invalid-exchanges) "text-red-400")} 
-             (:food-planets resources-after)]]
-           [:div
-            [:p.text-xs "Ore Plts"]
-            [:p.font-mono {:class (when (:invalid-ore-planet-sale? invalid-exchanges) "text-red-400")} 
-             (:ore-planets resources-after)]]]]
-         
-         ;; Warning message if exchanges exceed available resources
-         [:div#exchange-warning.h-8.flex.items-center
+         ;; Update individual credits for sell rows
+         [:span {:id "credit-soldiers-sold" :hx-swap-oob "true"
+                 :class (when (zero? (* (:soldiers-sold quantities) (:soldier-sell rates))) "opacity-20")}
+          "+" (ui/format-number (* (:soldiers-sold quantities) (:soldier-sell rates)))]
+         [:span {:id "credit-fighters-sold" :hx-swap-oob "true"
+                 :class (when (zero? (* (:fighters-sold quantities) (:fighter-sell rates))) "opacity-20")}
+          "+" (ui/format-number (* (:fighters-sold quantities) (:fighter-sell rates)))]
+         [:span {:id "credit-stations-sold" :hx-swap-oob "true"
+                 :class (when (zero? (* (:stations-sold quantities) (:station-sell rates))) "opacity-20")}
+          "+" (ui/format-number (* (:stations-sold quantities) (:station-sell rates)))]
+         [:span {:id "credit-mil-planets-sold" :hx-swap-oob "true"
+                 :class (when (zero? (* (:mil-planets-sold quantities) (:mil-planet-sell rates))) "opacity-20")}
+          "+" (ui/format-number (* (:mil-planets-sold quantities) (:mil-planet-sell rates)))]
+         [:span {:id "credit-food-planets-sold" :hx-swap-oob "true"
+                 :class (when (zero? (* (:food-planets-sold quantities) (:food-planet-sell rates))) "opacity-20")}
+          "+" (ui/format-number (* (:food-planets-sold quantities) (:food-planet-sell rates)))]
+         [:span {:id "credit-ore-planets-sold" :hx-swap-oob "true"
+                 :class (when (zero? (* (:ore-planets-sold quantities) (:ore-planet-sell rates))) "opacity-20")}
+          "+" (ui/format-number (* (:ore-planets-sold quantities) (:ore-planet-sell rates)))]
+         [:span {:id "credit-food-sold" :hx-swap-oob "true"
+                 :class (when (zero? (* (:food-sold quantities) (:food-sell rates))) "opacity-20")}
+          "+" (ui/format-number (* (:food-sold quantities) (:food-sell rates)))]
+         [:span {:id "credit-fuel-sold" :hx-swap-oob "true"
+                 :class (when (zero? (* (:fuel-sold quantities) (:fuel-sell rates))) "opacity-20")}
+          "+" (ui/format-number (* (:fuel-sold quantities) (:fuel-sell rates)))]
+
+         ;; Update individual credits for buy rows
+         [:span {:id "credit-food-bought" :hx-swap-oob "true"
+                 :class (when (zero? (* (:food-bought quantities) (:food-buy rates))) "opacity-20")}
+          "-" (ui/format-number (* (:food-bought quantities) (:food-buy rates)))]
+         [:span {:id "credit-fuel-bought" :hx-swap-oob "true"
+                 :class (when (zero? (* (:fuel-bought quantities) (:fuel-buy rates))) "opacity-20")}
+          "-" (ui/format-number (* (:fuel-bought quantities) (:fuel-buy rates)))]
+
+         ;; Update buy-row maximum quantities
+         [:span {:id "max-qty-food-bought" :hx-swap-oob "true"
+                 :class (when (zero? (:max-food max-buy-quantities)) "opacity-20")}
+          (ui/format-number (:max-food max-buy-quantities))]
+         [:span {:id "max-qty-fuel-bought" :hx-swap-oob "true"
+                 :class (when (zero? (:max-fuel max-buy-quantities)) "opacity-20")}
+          (ui/format-number (:max-fuel max-buy-quantities))]
+
+         ;; Resources display with red highlighting for negative values
+         [:div#resources-after
+          (ui/extended-resource-display-grid resources-after "Resources After Exchange" true)]
+
+         ;; Total credits summary
+         [:div#cost-summary
           {:hx-swap-oob "true"}
-          (when (not can-execute?)
-            [:p.text-yellow-400.font-bold "WARNING: Invalid exchanges! You cannot sell more than you own."])]
-         
+          (total-credits-row (:total-credits credit-changes) can-execute?)]
+
          ;; Submit button - disabled if player can't execute exchanges
          (submit-button can-execute? {:hx-swap-oob "true"})]))))
 
@@ -309,129 +395,105 @@
 (defn exchange-page [{:keys [player game]}]
   (let [player-id (:xt/id player)
         hx-include "[name='soldiers-sold'],[name='fighters-sold'],[name='stations-sold'],[name='mil-planets-sold'],[name='food-planets-sold'],[name='ore-planets-sold'],[name='food-bought'],[name='food-sold'],[name='fuel-bought'],[name='fuel-sold']"
-        rates (get-exchange-rates)]
+        rates (get-exchange-rates)
+        max-buy-quantities (calculate-max-buy-quantities player {:soldiers-sold 0 :fighters-sold 0 :stations-sold 0 :mil-planets-sold 0 :food-planets-sold 0 :ore-planets-sold 0 :food-sold 0 :fuel-sold 0 :food-bought 0 :fuel-bought 0} rates)]
     (ui/page
       {}
-      [:div.text-green-400.font-mono
+      [:div.mx-auto.max-w-4xl.w-full.text-green-400.font-mono
+       ;; CSS for responsive grid layout
+       [:style "
+         .exchange-row-grid {
+           grid-template-columns: 0.9fr 0.8fr 0.7fr 1.1fr 0.9fr;
+         }
+         @media (min-width: 1024px) {
+           .exchange-row-grid {
+             grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
+           }
+         }
+       "]
+
        [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
 
        (ui/phase-header (:player/current-phase player) "EXCHANGE")
 
-       ;;;  Current Resources Display:
-       ;;; Shows starting position before exchanges, helping players understand what they have
-       ;;; available to sell or spend.
-       [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
-        [:h3.font-bold.mb-4 "Resources Before Exchange"]
-        [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
-         [:div
-          [:p.text-xs "Credits"]
-          [:p.font-mono (:player/credits player)]]
-         [:div
-          [:p.text-xs "Food"]
-          [:p.font-mono (:player/food player)]]
-         [:div
-          [:p.text-xs "Fuel"]
-          [:p.font-mono (:player/fuel player)]]
-         [:div
-          [:p.text-xs "Galaxars"]
-          [:p.font-mono (:player/galaxars player)]]
-         [:div
-          [:p.text-xs "Soldiers"]
-          [:p.font-mono (:player/soldiers player)]]
-         [:div
-          [:p.text-xs "Fighters"]
-          [:p.font-mono (:player/fighters player)]]
-         [:div
-          [:p.text-xs "Stations"]
-          [:p.font-mono (:player/stations player)]]
-         [:div
-          [:p.text-xs "Mil Plts"]
-          [:p.font-mono (:player/mil-planets player)]]
-         [:div
-          [:p.text-xs "Food Plts"]
-          [:p.font-mono (:player/food-planets player)]]
-         [:div
-          [:p.text-xs "Ore Plts"]
-          [:p.font-mono (:player/ore-planets player)]]]]
+       ;; Current resources before exchange
+       (ui/extended-resource-display-grid player "Resources Before Exchange")
 
-       ;;; Exchange Input Form:
-       ;;; Player chooses what to buy and sell. HTMX provides real-time feedback on whether
-       ;;; they can afford the total exchanges.
+       ;; Exchange Input Form
        (biff/form
          {:action (str "/app/game/" player-id "/apply-exchange")
           :method "post"}
 
-         [:h3.font-bold.mb-4 "Exchanges This Round"]
-         [:div.grid.grid-cols-1.md:grid-cols-2.lg:grid-cols-3.gap-4.mb-8
+         ;; Selling This Round Table
+         [:h3.font-bold.mb-4 "Selling This Round"]
+         [:div.w-full.mb-8
+          [:div.border.border-green-400.overflow-x-auto
+           [:div
 
-          ;; All sell cards using extracted component
-          (sell-exchange-card "Soldiers" "soldiers-sold" (:soldier-sell rates) 
-                              (:player/soldiers player) player-id hx-include)
-          (sell-exchange-card "Fighters" "fighters-sold" (:fighter-sell rates) 
-                              (:player/fighters player) player-id hx-include)
-          (sell-exchange-card "Stations" "stations-sold" (:station-sell rates) 
-                              (:player/stations player) player-id hx-include)
-          (sell-exchange-card "Ore Planets" "ore-planets-sold" (:ore-planet-sell rates) 
-                              (:player/ore-planets player) player-id hx-include)
-          (sell-exchange-card "Food Planets" "food-planets-sold" (:food-planet-sell rates) 
-                              (:player/food-planets player) player-id hx-include)
-          (sell-exchange-card "Military Planets" "mil-planets-sold" (:mil-planet-sell rates) 
-                              (:player/mil-planets player) player-id hx-include)
-          (sell-exchange-card "Food" "food-sold" (:food-sell rates) 
-                              (:player/food player) player-id hx-include)
-          (sell-exchange-card "Fuel" "fuel-sold" (:fuel-sell rates) 
-                              (:player/fuel player) player-id hx-include)
+            ;; Mobile header - abbreviated
+            [:div.grid.gap-1.px-2.py-2.bg-green-400.bg-opacity-10.font-bold.border-b.border-green-400.text-xs.lg:hidden
+             {:style {:grid-template-columns "0.9fr 0.8fr 0.7fr 1.1fr 0.9fr"}}
+             [:div "Item"]
+             [:div.text-right "Credits/Unit"]
+             [:div.text-right "Max"]
+             [:div.text-center "Sell"]
+             [:div.text-right "Cred"]]
 
-          ;; Invisible placeholder for grid alignment (only visible on lg screens)
-          [:div.hidden.lg:block.invisible.border.border-green-400.p-4]
+            ;; Desktop header - full text
+            (ui/phase-table-header
+              [{:label "Item" :class "pr-4"}
+               {:label "Credits/Unit" :class "text-right pr-4"}
+               {:label "Maximum" :class "text-right pr-4"}
+               {:label "Sell" :class "pr-4"}
+               {:label "Credits" :class "text-right pr-4"}])
 
-          ;; All buy cards using extracted component
-          (buy-exchange-card "Food" "food-bought" (:food-buy rates) player-id hx-include)
-          (buy-exchange-card "Fuel" "fuel-bought" (:fuel-buy rates) player-id hx-include)
+            ;; Sell rows
+            (sell-row "Soldiers" "Soldiers" "soldiers-sold" (:soldier-sell rates) 0 (:player/soldiers player) player-id hx-include)
+            (sell-row "Fighters" "Fighters" "fighters-sold" (:fighter-sell rates) 0 (:player/fighters player) player-id hx-include)
+            (sell-row "Defence Stations" "Def Stns" "stations-sold" (:station-sell rates) 0 (:player/stations player) player-id hx-include)
+            (sell-row "Military Planets" "Mil Plts" "mil-planets-sold" (:mil-planet-sell rates) 0 (:player/mil-planets player) player-id hx-include)
+            (sell-row "Food Planets" "Food Plts" "food-planets-sold" (:food-planet-sell rates) 0 (:player/food-planets player) player-id hx-include)
+            (sell-row "Ore Planets" "Ore Plts" "ore-planets-sold" (:ore-planet-sell rates) 0 (:player/ore-planets player) player-id hx-include)
+            (sell-row "Food" "Food" "food-sold" (:food-sell rates) 0 (:player/food player) player-id hx-include)
+            (sell-row "Fuel" "Fuel" "fuel-sold" (:fuel-sell rates) 0 (:player/fuel player) player-id hx-include)]]]
 
-          ;; Invisible placeholder for grid alignment (only visible on lg screens)
-          [:div.hidden.lg:block.invisible.border.border-green-400.p-4]]
+         ;; Buying This Round Table
+         [:h3.font-bold.mb-4 "Buying This Round"]
+         [:div.w-full.mb-8
+          [:div.border.border-green-400.overflow-x-auto
+           [:div
 
-         ;;; Resources After Exchange:
-         ;;; This section is dynamically updated by HTMX as the user changes input values.
-         ;;; Initially shows current resources (no exchanges applied yet).
-         [:div#resources-after.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
-          [:h3.font-bold.mb-4 "Resources After Exchange"]
-          [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
-           [:div
-            [:p.text-xs "Credits"]
-            [:p.font-mono (:player/credits player)]]
-           [:div
-            [:p.text-xs "Food"]
-            [:p.font-mono (:player/food player)]]
-           [:div
-            [:p.text-xs "Fuel"]
-            [:p.font-mono (:player/fuel player)]]
-           [:div
-            [:p.text-xs "Galaxars"]
-            [:p.font-mono (:player/galaxars player)]]
-           [:div
-            [:p.text-xs "Soldiers"]
-            [:p.font-mono (:player/soldiers player)]]
-           [:div
-            [:p.text-xs "Fighters"]
-            [:p.font-mono (:player/fighters player)]]
-           [:div
-            [:p.text-xs "Stations"]
-            [:p.font-mono (:player/stations player)]]
-           [:div
-            [:p.text-xs "Mil Plts"]
-            [:p.font-mono (:player/mil-planets player)]]
-           [:div
-            [:p.text-xs "Food Plts"]
-            [:p.font-mono (:player/food-planets player)]]
-           [:div
-            [:p.text-xs "Ore Plts"]
-            [:p.font-mono (:player/ore-planets player)]]]]
+            ;; Mobile header - abbreviated
+            [:div.grid.gap-1.px-2.py-2.bg-green-400.bg-opacity-10.font-bold.border-b.border-green-400.text-xs.lg:hidden
+             {:style {:grid-template-columns "0.9fr 0.8fr 0.7fr 1.1fr 0.9fr"}}
+             [:div "Item"]
+             [:div.text-right "Credits/Unit"]
+             [:div.text-right "Max"]
+             [:div.text-center "Buy"]
+             [:div.text-right "Cred"]]
 
-         ;; Warning message area - populated by HTMX if player can't afford exchanges
-         [:div#exchange-warning.h-8.flex.items-center]
-         
+            ;; Desktop header - full text
+            (ui/phase-table-header
+              [{:label "Item" :class "pr-4"}
+               {:label "Credits/Unit" :class "text-right pr-4"}
+               {:label "Maximum" :class "text-right pr-4"}
+               {:label "Buy" :class "pr-4"}
+               {:label "Credits" :class "text-right pr-4"}])
+
+            ;; Buy rows
+            (buy-row "Food" "Food" "food-bought" (:food-buy rates) 0 (:max-food max-buy-quantities) player-id hx-include)
+            (buy-row "Fuel" "Fuel" "fuel-bought" (:fuel-buy rates) 0 (:max-fuel max-buy-quantities) player-id hx-include)]]]
+
+         ;; Total Credits Summary
+         [:h3.font-bold.mb-4 "Total Credits"]
+         [:div.w-full.mb-8
+          [:div.border.border-green-400
+           (total-credits-row 0 true)]]
+
+         ;; Resources After Exchange (initially shows current resources)
+         [:div#resources-after
+          (ui/extended-resource-display-grid player "Resources After Exchange" true)]
+
          ;; Navigation and submit buttons
          [:div.flex.gap-4
           [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
