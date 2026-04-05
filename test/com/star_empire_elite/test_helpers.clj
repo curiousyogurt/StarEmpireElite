@@ -38,10 +38,10 @@
    :game/soldier-upkeep-food       0
    :game/fighter-upkeep-credits    0
    :game/fighter-upkeep-fuel       0
-   :game/agent-upkeep-credits      0
    :game/agent-upkeep-food         0
-   :game/population-upkeep-credits 0
+   :game/agent-upkeep-fuel         0
    :game/population-upkeep-food    0
+   :game/population-upkeep-fuel    0
    :game/station-upkeep-credits    0
    :game/station-upkeep-fuel       0
    :game/planet-upkeep-credits     0

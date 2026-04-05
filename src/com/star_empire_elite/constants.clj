@@ -35,11 +35,11 @@
 (def station-upkeep-credits 3)
 (def station-upkeep-fuel 3)
 
-(def agent-upkeep-credits 2)
 (def agent-upkeep-food 1)
+(def agent-upkeep-fuel 2)
 
-(def population-upkeep-credits 1)
 (def population-upkeep-food 1)
+(def population-upkeep-fuel 1)
 
 ;; :: Building/Purchase Cost Defaults
 ;; Cost to purchase new units, ships, and planets

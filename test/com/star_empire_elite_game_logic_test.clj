@@ -44,10 +44,10 @@
                    :game/fighter-upkeep-fuel const/fighter-upkeep-fuel
                    :game/station-upkeep-credits const/station-upkeep-credits
                    :game/station-upkeep-fuel const/station-upkeep-fuel
-                   :game/agent-upkeep-credits const/agent-upkeep-credits
                    :game/agent-upkeep-food const/agent-upkeep-food
-                   :game/population-upkeep-credits const/population-upkeep-credits
+                   :game/agent-upkeep-fuel const/agent-upkeep-fuel
                    :game/population-upkeep-food const/population-upkeep-food
+                   :game/population-upkeep-fuel const/population-upkeep-fuel
                    ;; Building cost constants
                    :game/soldier-cost const/soldier-cost
                    :game/transport-cost const/transport-cost

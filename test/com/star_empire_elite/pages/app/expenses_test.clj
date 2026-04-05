@@ -25,10 +25,10 @@
    :game/fighter-upkeep-fuel 3
    :game/station-upkeep-credits 12
    :game/station-upkeep-fuel 8
-   :game/agent-upkeep-credits 9
    :game/agent-upkeep-food 16
-   :game/population-upkeep-credits 7
-   :game/population-upkeep-food 2})
+   :game/agent-upkeep-fuel 9
+   :game/population-upkeep-food 2
+   :game/population-upkeep-fuel 7})
 
 (def test-player
   {:xt/id test-player-id
@@ -87,14 +87,14 @@
                   :fighters-fuel "21"      ; 7 fighters * 3 fuel/fighter
                   :stations-credits "24"   ; 2 stations * 12 credits
                   :stations-fuel "16"      ; 2 stations * 8 fuel
-                  :agents-credits "13"
                   :agents-food "24"
-                  :population-credits "63"
-                  :population-food "18"}
+                  :agents-fuel "13"
+                  :population-food "18"
+                  :population-fuel "63"}
           ;; Expected new resource totals, based on params above
-          expected-credits (- 1000 225 18 28 24 13 63)
+          expected-credits (- 1000 225 18 28 24)
           expected-food    (- 800 3 27 24 18)
-          expected-fuel    (- 200 21 16)]
+          expected-fuel    (- 200 21 16 13 63)]
       (with-redefs [xt/entity (helpers/fake-entity [test-player])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)}

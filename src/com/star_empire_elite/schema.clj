@@ -39,10 +39,10 @@
           [:game/fighter-upkeep-fuel       :int]
           [:game/station-upkeep-credits    :int]
           [:game/station-upkeep-fuel       :int]
-          [:game/agent-upkeep-credits      :int]
           [:game/agent-upkeep-food         :int]
-          [:game/population-upkeep-credits :int]
+          [:game/agent-upkeep-fuel         :int]
           [:game/population-upkeep-food    :int]
+          [:game/population-upkeep-fuel    :int]
  
           ;; Building/purchase cost constants (add these to your :game schema)
           [:game/soldier-cost            :int]

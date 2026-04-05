@@ -58,8 +58,8 @@
     ;; Planet type
     [:div.font-mono planet-type-name]
     
-    ;; Planet count
-    [:div.text.font-mono (str "(" planet-count ")")]
+    ;; Planet count (formatted with parentheses)
+    [:div.text.font-mono "(" (ui/format-number planet-count) ")"]
     
     ;; Resources - all in one column, spaced out
     [:div.flex.gap-3.justify-start.flex-wrap
@@ -72,11 +72,11 @@
         [:span.text-green-300 label]
         [:span.font-mono.ml-1 "+" (ui/format-number v)]])]]
 
-   ;; Desktop: Full table row (unchanged)
+   ;; Desktop: Full table row with formatted planet count
    [:div.hidden.lg:grid.lg:gap-4.lg:items-center.lg:px-4.lg:py-3
     {:style {:grid-template-columns "repeat(10, minmax(0, 1fr))"}}
     [:div planet-type-name]
-    [:div planet-count]
+    [:div (ui/format-number planet-count)]
     (for [k [:credits :fuel :galaxars :food :soldiers :fighters :stations :agents]
           :let [v (or (k income-map) 0)]]
       [:div {:key k}
@@ -190,4 +190,3 @@
          {:action (str "/app/game/" (:xt/id player) "/apply-income") :method "post"}
          [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
           {:type "submit"} "Continue to Expenses"])])))
-
