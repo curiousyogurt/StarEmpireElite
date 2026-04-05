@@ -22,7 +22,7 @@
 ;;; Parse purchase quantities from request parameters
 (defn parse-purchase-quantities
   "Parse all purchase quantity inputs from request params.
-   Returns map of quantities for all purchasable items."
+  Returns map of quantities for all purchasable items."
   [params]
   {:soldiers     (utils/parse-numeric-input (:soldiers params))
    :transports   (utils/parse-numeric-input (:transports params))
@@ -39,7 +39,7 @@
 ;;; Calculate total cost of purchases using game constants
 (defn calculate-purchase-cost
   "Calculate total credits needed for all purchases based on game constants.
-   Returns map with total cost."
+  Returns map with total cost."
   [quantities game]
   (let [total-cost (+ (* (:soldiers quantities)     (:game/soldier-cost game))
                       (* (:transports quantities)   (:game/transport-cost game))
@@ -57,7 +57,7 @@
 ;;; Calculate all resources after purchases
 (defn calculate-resources-after-purchases
   "Calculate player resources after executing purchases.
-   Returns map of all resource values after purchases."
+  Returns map of all resource values after purchases."
   [player quantities cost-info]
   {:credits      (- (:player/credits player)      (:total-cost cost-info))
    :soldiers     (+ (:player/soldiers player)     (:soldiers quantities))
@@ -81,14 +81,14 @@
 ;;; Calculate maximum affordable quantity for each item type
 (defn calculate-max-quantities
   "Calculate the maximum quantity of each item that can be purchased with remaining credits.
-   Takes into account credits already spent on other items in current selections.
+  Takes into account credits already spent on other items in current selections.
 
-   Parameters:
-   - player: Player entity with current credits
-   - quantities: Map of current purchase quantities
-   - game: Game entity with cost constants
+  Parameters:
+  - player: Player entity with current credits
+  - quantities: Map of current purchase quantities
+  - game: Game entity with cost constants
 
-   Returns: Map of item-key to max affordable quantity"
+  Returns: Map of item-key to max affordable quantity"
   [player quantities game]
   (let [total-cost-so-far (+ (* (:soldiers quantities)     (:game/soldier-cost game))
                              (* (:transports quantities)   (:game/transport-cost game))
@@ -120,8 +120,8 @@
 
 (defn submit-button
   "Renders the submit button with dynamic disabled state based on affordability.
-   Used in both initial page render and HTMX updates.
-   Accepts optional extra-attrs map for additional HTML attributes."
+  Used in both initial page render and HTMX updates.
+  Accepts optional extra-attrs map for additional HTML attributes."
   ([affordable?] (submit-button affordable? {}))
   ([affordable? extra-attrs]
    [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
@@ -135,18 +135,18 @@
 ;;; Purchase row with single input field, CSS-only responsive styling
 (defn purchase-row
   "Renders a purchase row with ONE input field that's just restyled for mobile vs desktop.
-   Uses responsive CSS grid - no duplicate inputs, no JavaScript sync needed.
-   
-   Parameters:
-   - unit-name: Full display name (e.g. 'Defence Stations')
-   - unit-name-mobile: Abbreviated name for mobile (e.g. 'Def Stns')
-   - unit-key: Form field key (e.g. :stations)
-   - cost-key: Game constant key (e.g. :game/station-cost)
-   - current-quantity: Current input value
-   - max-quantity: Maximum affordable quantity
-   - game: Game entity with cost constants
-   - player-id: Player UUID
-   - hx-include: HTMX include selector string"
+  Uses responsive CSS grid - no duplicate inputs, no JavaScript sync needed.
+
+  Parameters:
+  - unit-name: Full display name (e.g. 'Defence Stations')
+  - unit-name-mobile: Abbreviated name for mobile (e.g. 'Def Stns')
+  - unit-key: Form field key (e.g. :stations)
+  - cost-key: Game constant key (e.g. :game/station-cost)
+  - current-quantity: Current input value
+  - max-quantity: Maximum affordable quantity
+  - game: Game entity with cost constants
+  - player-id: Player UUID
+  - hx-include: HTMX include selector string"
   [unit-name unit-name-mobile unit-key cost-key current-quantity max-quantity game player-id hx-include]
   (let [cost-per-unit (get game cost-key)
         item-cost (* cost-per-unit current-quantity)
@@ -154,27 +154,27 @@
         max-qty-id (str "max-qty-" (name unit-key))]
     ;; Single grid that changes layout responsively - one input, just restyled
     [:div.border-b.border-green-400.last:border-b-0.grid.items-center.gap-1.px-2.py-2.text-xs.leading-tight.lg:gap-3.lg:px-4.lg:py-2.lg:text-base.building-row-grid
-     
+
      ;; Col 1: Item name (abbreviated on mobile, full on desktop)
      [:div.font-mono.lg:pr-4
       [:span.lg:hidden unit-name-mobile]
       [:span.hidden.lg:inline.whitespace-nowrap unit-name]]
-     
+
      ;; Col 2: Cost per unit
      [:div.text-right.font-mono.lg:pr-4
       (ui/format-number cost-per-unit)]
-     
+
      ;; Col 3: Maximum quantity
      [:div.text-right.font-mono.lg:pr-4
       [:span {:id max-qty-id
               :class (when (zero? max-quantity) "opacity-20")}
        (ui/format-number (if (neg? max-quantity) 0 max-quantity))]]
-     
+
      ;; Col 4: Purchase Quantity - SINGLE input field with responsive sizing
      [:div.px-1.lg:pr-4
       (ui/numeric-input (name unit-key) current-quantity player-id "/calculate-building" hx-include
                         {:input-class "py-0.5 text-xs lg:py-1 lg:text-sm"})]
-     
+
      ;; Col 5: Cost in credits
      [:div.text-right.font-mono.lg:pr-4
       [:span {:id cost-id
@@ -184,10 +184,10 @@
 ;;; Total cost summary row
 (defn total-cost-row
   "Renders the total cost summary at the bottom of the table.
-   Shows cost in red if it exceeds available credits."
+  Shows cost in red if it exceeds available credits."
   [total-cost affordable?]
   [:div#cost-summary.border-t-2.border-green-400.bg-green-400.bg-opacity-10
-   
+
    ;; Mobile: Compact layout
    [:div.grid.gap-1.px-2.py-3.font-bold.text-sm.lg:hidden
     {:style {:grid-template-columns "1.2fr 0.8fr 0.6fr 1fr 0.8fr"}}
@@ -195,7 +195,7 @@
     [:div.text-right.font-mono.text-base
      {:class (when (not affordable?) "text-red-400")}
      (ui/format-number total-cost)]]
-   
+
    ;; Desktop: Full width layout
    [:div.hidden.lg:grid.lg:gap-3.lg:px-4.lg:py-2.lg:font-bold
     {:style {:grid-template-columns "1.5fr 1fr 1fr 1fr 1fr"}}
@@ -296,16 +296,16 @@
       [:div.mx-auto.max-w-4xl.w-full.text-green-400.font-mono
        ;; CSS for responsive grid columns
        [:style "
-         .building-row-grid {
-           grid-template-columns: 0.9fr 0.8fr 0.7fr 1.1fr 0.9fr;
-         }
-         @media (min-width: 1024px) {
-           .building-row-grid {
-             grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
-           }
-         }
-       "]
-       
+        .building-row-grid {
+                            grid-template-columns: 0.9fr 0.8fr 0.7fr 1.1fr 0.9fr;
+                            }
+        @media (min-width: 1024px) {
+                                    .building-row-grid {
+                                                        grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
+                                                        }
+                                    }
+        "]
+
        [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
 
        (ui/phase-header (:player/current-phase player) "BUILDING")
@@ -323,7 +323,7 @@
          [:div.w-full.mb-8
           [:div.border.border-green-400.overflow-x-auto
            [:div
-            
+
             ;; Mobile header - abbreviated
             [:div.grid.gap-1.px-2.py-2.bg-green-400.bg-opacity-10.font-bold.border-b.border-green-400.text-xs.lg:hidden
              {:style {:grid-template-columns "0.9fr 0.8fr 0.7fr 1.1fr 0.9fr"}}
@@ -332,7 +332,7 @@
              [:div.text-right "Max"]
              [:div.text-center "Buy"]
              [:div.text-right "Cred"]]
-            
+
             ;; Desktop header - full text
             (ui/phase-table-header
               [{:label "Item" :class "pr-4"}

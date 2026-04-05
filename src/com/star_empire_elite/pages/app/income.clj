@@ -138,7 +138,7 @@
        (ui/resource-display-grid player "Resources Before Income")
 
        ;;; Income breakdown table:
-       ;;; Displays as cards on mobile and as a spreadsheet-like table on wide screens.
+       ;;; Displays as spreadsheet: normal on wide screen; compressed on mobile
        ;;; This makes it clear which planets generate which resources.
        [:h3.font-bold.mb-4 "Income"]
        [:div.border.border-green-400.mb-8

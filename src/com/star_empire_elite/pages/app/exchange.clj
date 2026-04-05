@@ -39,7 +39,7 @@
 ;;; Parse exchange quantities from request parameters
 (defn parse-exchange-quantities
   "Parse all exchange quantity inputs from request params.
-   Returns map of quantities for all exchange types."
+  Returns map of quantities for all exchange types."
   [params]
   {:soldiers-sold (utils/parse-numeric-input (:soldiers-sold params))
    :fighters-sold (utils/parse-numeric-input (:fighters-sold params))
@@ -55,18 +55,18 @@
 ;;; Calculate credit changes from all exchanges
 (defn calculate-exchange-credits
   "Calculate net credit change from selling units/planets and buying/selling resources.
-   Returns map with breakdown of credit sources."
+  Returns map with breakdown of credit sources."
   [quantities rates]
-  (let [credits-from-sales (+ (* (:soldiers-sold quantities)     (:soldier-sell rates))
-                              (* (:fighters-sold quantities)     (:fighter-sell rates))
-                              (* (:stations-sold quantities)     (:station-sell rates))
-                              (* (:mil-planets-sold quantities)  (:mil-planet-sell rates))
-                              (* (:food-planets-sold quantities) (:food-planet-sell rates))
-                              (* (:ore-planets-sold quantities)  (:ore-planet-sell rates)))
-        credits-from-resources (- (+ (* (:food-sold quantities)   (:food-sell rates))
-                                     (* (:fuel-sold quantities)   (:fuel-sell rates)))
-                                  (+ (* (:food-bought quantities) (:food-buy rates))
-                                     (* (:fuel-bought quantities) (:fuel-buy rates))))]
+  (let [credits-from-sales        (+ (* (:soldiers-sold quantities)     (:soldier-sell rates))
+                                     (* (:fighters-sold quantities)     (:fighter-sell rates))
+                                     (* (:stations-sold quantities)     (:station-sell rates))
+                                     (* (:mil-planets-sold quantities)  (:mil-planet-sell rates))
+                                     (* (:food-planets-sold quantities) (:food-planet-sell rates))
+                                     (* (:ore-planets-sold quantities)  (:ore-planet-sell rates)))
+        credits-from-resources (- (+ (* (:food-sold quantities)         (:food-sell rates))
+                                     (* (:fuel-sold quantities)         (:fuel-sell rates)))
+                                  (+ (* (:food-bought quantities)       (:food-buy rates))
+                                     (* (:fuel-bought quantities)       (:fuel-buy rates))))]
     {:credits-from-sales credits-from-sales
      :credits-from-resources credits-from-resources
      :total-credits (+ credits-from-sales credits-from-resources)}))
@@ -74,12 +74,12 @@
 ;;; Calculate maximum quantities that can be bought based on available credits after selling
 (defn calculate-max-buy-quantities
   "Calculate maximum quantities that can be purchased with available credits after all sales.
-   Returns map with max quantities for each buyable item."
+  Returns map with max quantities for each buyable item."
   [player sell-quantities rates]
   (let [sell-credit-changes (calculate-exchange-credits
-                            (assoc sell-quantities
-                                   :food-bought 0 :fuel-bought 0)
-                            rates)
+                              (assoc sell-quantities
+                                     :food-bought 0 :fuel-bought 0)
+                              rates)
         total-available-credits (+ (:player/credits player) (:total-credits sell-credit-changes))]
     {:max-food (max 0 (quot total-available-credits (:food-buy rates)))
      :max-fuel (max 0 (quot total-available-credits (:fuel-buy rates)))}))
@@ -87,7 +87,7 @@
 ;;; Calculate all resources after exchange
 (defn calculate-resources-after-exchange
   "Calculate all player resources after executing exchanges.
-   Returns map of all resource values after exchange."
+  Returns map of all resource values after exchange."
   [player quantities credit-changes]
   {:credits      (+ (:player/credits player)      (:total-credits credit-changes))
    :soldiers     (- (:player/soldiers player)     (:soldiers-sold quantities))
@@ -136,8 +136,8 @@
 ;;; Submit button component - extracted to avoid duplication
 (defn submit-button
   "Renders the submit button with dynamic disabled state based on validity.
-   Used in both initial page render and HTMX updates.
-   Accepts optional extra-attrs map for additional HTML attributes."
+  Used in both initial page render and HTMX updates.
+  Accepts optional extra-attrs map for additional HTML attributes."
   ([can-execute?] (submit-button can-execute? {}))
   ([can-execute? extra-attrs]
    [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
@@ -150,17 +150,17 @@
 ;;; Sell row with single input field, CSS-only responsive styling (like building page)
 (defn sell-row
   "Renders a sell row with ONE input field that's just restyled for mobile vs desktop.
-   Uses responsive CSS grid - no duplicate inputs, no JavaScript sync needed.
+  Uses responsive CSS grid - no duplicate inputs, no JavaScript sync needed.
 
-   Parameters:
-   - item-name: Full display name (e.g. 'Soldiers', 'Defence Stations')
-   - item-name-mobile: Abbreviated name for mobile (e.g. 'Soldiers', 'Def Stns')
-   - field-key: Form field key (e.g. 'soldiers-sold')
-   - price-per-unit: Credits received per unit sold
-   - current-quantity: Current input value
-   - max-quantity: Maximum quantity available to sell
-   - player-id: Player UUID
-   - hx-include: HTMX include selector string"
+  Parameters:
+  - item-name: Full display name (e.g. 'Soldiers', 'Defence Stations')
+  - item-name-mobile: Abbreviated name for mobile (e.g. 'Soldiers', 'Def Stns')
+  - field-key: Form field key (e.g. 'soldiers-sold')
+  - price-per-unit: Credits received per unit sold
+  - current-quantity: Current input value
+  - max-quantity: Maximum quantity available to sell
+  - player-id: Player UUID
+  - hx-include: HTMX include selector string"
   [item-name item-name-mobile field-key price-per-unit current-quantity max-quantity player-id hx-include]
   (let [credit-gain (* price-per-unit current-quantity)
         credit-id (str "credit-" field-key)
@@ -197,17 +197,17 @@
 ;;; Buy row with single input field, CSS-only responsive styling (like building page)
 (defn buy-row
   "Renders a buy row with ONE input field that's just restyled for mobile vs desktop.
-   Uses responsive CSS grid - no duplicate inputs, no JavaScript sync needed.
+  Uses responsive CSS grid - no duplicate inputs, no JavaScript sync needed.
 
-   Parameters:
-   - item-name: Full display name (e.g. 'Food', 'Fuel')
-   - item-name-mobile: Abbreviated name for mobile (e.g. 'Food', 'Fuel')
-   - field-key: Form field key (e.g. 'food-bought')
-   - price-per-unit: Credits per unit cost
-   - current-quantity: Current input value
-   - max-quantity: Maximum quantity affordable
-   - player-id: Player UUID
-   - hx-include: HTMX include selector string"
+  Parameters:
+  - item-name: Full display name (e.g. 'Food', 'Fuel')
+  - item-name-mobile: Abbreviated name for mobile (e.g. 'Food', 'Fuel')
+  - field-key: Form field key (e.g. 'food-bought')
+  - price-per-unit: Credits per unit cost
+  - current-quantity: Current input value
+  - max-quantity: Maximum quantity affordable
+  - player-id: Player UUID
+  - hx-include: HTMX include selector string"
   [item-name item-name-mobile field-key price-per-unit current-quantity max-quantity player-id hx-include]
   (let [credit-cost (* price-per-unit current-quantity)
         credit-id (str "credit-" field-key)
@@ -244,7 +244,7 @@
 ;;; Total credits summary row
 (defn total-credits-row
   "Renders the total credits gained summary at the bottom of the table.
-   Shows credits in red if player tries to sell more than they have."
+  Shows credits in red if player tries to sell more than they have."
   [total-credits can-execute?]
   [:div#cost-summary.border-t-2.border-green-400.bg-green-400.bg-opacity-10
 
@@ -286,27 +286,27 @@
       redirect
       ;; Parse all exchange inputs using extracted function
       (let [quantities (parse-exchange-quantities params)
-            
+
             ;; Use pure calculation functions to determine final resource values
             rates (get-exchange-rates)
             credit-changes (calculate-exchange-credits quantities rates)
             resources-after (calculate-resources-after-exchange player quantities credit-changes)]
-        
+
         ;; Single atomic transaction updates resources (stays in phase 2)
         ;; This prevents partial updates if something fails midway through
         (biff/submit-tx ctx
-          [{:db/doc-type :player
-            :db/op :update
-            :xt/id player-id
-            :player/credits (:credits resources-after)
-            :player/soldiers (:soldiers resources-after)
-            :player/fighters (:fighters resources-after)
-            :player/stations (:stations resources-after)
-            :player/mil-planets (:mil-planets resources-after)
-            :player/food-planets (:food-planets resources-after)
-            :player/ore-planets (:ore-planets resources-after)
-            :player/food (:food resources-after)
-            :player/fuel (:fuel resources-after)}])
+                        [{:db/doc-type :player
+                          :db/op :update
+                          :xt/id player-id
+                          :player/credits (:credits resources-after)
+                          :player/soldiers (:soldiers resources-after)
+                          :player/fighters (:fighters resources-after)
+                          :player/stations (:stations resources-after)
+                          :player/mil-planets (:mil-planets resources-after)
+                          :player/food-planets (:food-planets resources-after)
+                          :player/ore-planets (:ore-planets resources-after)
+                          :player/food (:food resources-after)
+                          :player/fuel (:fuel resources-after)}])
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/expenses")}}))))
 
@@ -324,14 +324,14 @@
 
           ;; Calculate maximums for buy quantities based on sell proceeds
           sell-quantities {:soldiers-sold (:soldiers-sold quantities)
-                          :fighters-sold (:fighters-sold quantities)
-                          :stations-sold (:stations-sold quantities)
-                          :mil-planets-sold (:mil-planets-sold quantities)
-                          :food-planets-sold (:food-planets-sold quantities)
-                          :ore-planets-sold (:ore-planets-sold quantities)
-                          :food-sold (:food-sold quantities)
-                          :fuel-sold (:fuel-sold quantities)
-                          :food-bought 0 :fuel-bought 0}
+                           :fighters-sold (:fighters-sold quantities)
+                           :stations-sold (:stations-sold quantities)
+                           :mil-planets-sold (:mil-planets-sold quantities)
+                           :food-planets-sold (:food-planets-sold quantities)
+                           :ore-planets-sold (:ore-planets-sold quantities)
+                           :food-sold (:food-sold quantities)
+                           :fuel-sold (:fuel-sold quantities)
+                           :food-bought 0 :fuel-bought 0}
           max-buy-quantities (calculate-max-buy-quantities player sell-quantities rates)]
 
       ;; Render HTMX response fragments that replace specific page elements
@@ -402,15 +402,15 @@
       [:div.mx-auto.max-w-4xl.w-full.text-green-400.font-mono
        ;; CSS for responsive grid layout
        [:style "
-         .exchange-row-grid {
-           grid-template-columns: 0.9fr 0.8fr 0.7fr 1.1fr 0.9fr;
-         }
-         @media (min-width: 1024px) {
-           .exchange-row-grid {
-             grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
-           }
-         }
-       "]
+        .exchange-row-grid {
+                            grid-template-columns: 0.9fr 0.8fr 0.7fr 1.1fr 0.9fr;
+                            }
+        @media (min-width: 1024px) {
+                                    .exchange-row-grid {
+                                                        grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
+                                                        }
+                                    }
+        "]
 
        [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
 
