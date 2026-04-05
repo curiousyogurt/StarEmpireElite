@@ -18,7 +18,8 @@
             [com.star-empire-elite.pages.app.espionage :as espionage]
             [com.star-empire-elite.pages.app.outcomes :as outcomes]
             [com.star-empire-elite.constants :as const]
-            [com.star-empire-elite.utils :as utils]))
+            [com.star-empire-elite.utils :as utils]
+            [xtdb.api :as xt]))
 
 ;; :: main app dashboard showing all player games
 (defn app [{:keys [session biff/db] :as ctx}]
@@ -105,6 +106,61 @@
     {:status 303
      :headers {"location" "/app"}}))
 
+;; :: join an existing game as a new player
+(defn join-game [{:keys [session biff/db path-params] :as ctx}]
+  (let [uid (:uid session)
+        game-id (try (java.util.UUID/fromString (:game-id path-params))
+                     (catch IllegalArgumentException _ nil))
+        game (when game-id (xt/entity db game-id))]
+    (cond
+      (nil? game)
+      {:status 303
+       :headers {"location" "/app?error=not-found"}}
+
+      (seq (biff/q db
+                   '{:find [player]
+                     :in [user-id game-id]
+                     :where [[player :player/user user-id]
+                             [player :player/game game-id]]}
+                   uid game-id))
+      {:status 303
+       :headers {"location" "/app?error=already-joined"}}
+
+      :else
+      (let [player-id (java.util.UUID/randomUUID)]
+        (biff/submit-tx ctx
+          [{:db/doc-type          :player
+            :xt/id                player-id
+            :player/user          uid
+            :player/game          game-id
+            :player/empire-name   "Test Empire"
+            :player/credits       10000
+            :player/food          5000
+            :player/fuel          3000
+            :player/galaxars      1000
+            :player/mil-planets   2
+            :player/food-planets  3
+            :player/ore-planets   1
+            :player/population    1000000
+            :player/stability     75
+            :player/status        0
+            :player/score         0
+            :player/current-turn  1
+            :player/current-round 1
+            :player/current-phase 1
+            :player/turns-used    0
+            :player/generals      5
+            :player/admirals      3
+            :player/soldiers      1000
+            :player/transports    10
+            :player/stations      5
+            :player/carriers      2
+            :player/fighters      50
+            :player/cmd-ships     1
+            :player/agents        10}])
+        {:status 303
+         :headers {"location" "/app"}}))))
+
 ;;;;
 ;;;; Phase Handlers - Streamlined using utils/with-player-and-game
 ;;;;
@@ -162,6 +218,7 @@
   {:routes ["/app" {:middleware [mid/wrap-signed-in]}
             ["" {:get app}]
             ["/create-test-game" {:post create-test-game}]
+            ["/join-game/:game-id" {:post join-game}]
             ["/game/:player-id" {:get game/game-view}]
             ["/game/:player-id/income" {:get income-handler}]
             ["/game/:player-id/apply-income" {:post income/apply-income}]

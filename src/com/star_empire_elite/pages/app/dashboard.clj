@@ -15,6 +15,44 @@
         {:player player
          :game game}))))
 
+;; :: fetch all games the current user has not yet joined
+(defn get-open-games [db uid]
+  (let [user-game-ids (->> (q db
+                              '{:find [game-id]
+                                :in [user-id]
+                                :where [[player :player/user user-id]
+                                        [player :player/game game-id]]}
+                              uid)
+                           (map first)
+                           set)
+        all-games (q db
+                     '{:find (pull game [*])
+                       :where [[game :game/name]]})]
+    (for [game all-games
+          :when (not (contains? user-game-ids (:xt/id game)))]
+      (let [player-count (count (q db
+                                   '{:find [player]
+                                     :in [game-id]
+                                     :where [[player :player/game game-id]]}
+                                   (:xt/id game)))]
+        {:game game
+         :player-count player-count}))))
+
+;; :: render a joinable game as a card with a join button
+(defn join-game-card [{:keys [game player-count]}]
+  [:div.border.border-green-400.p-4.mb-4.max-w-6xl
+   [:div.flex.justify-between.items-center
+    [:div
+     [:h3.font-bold (:game/name game)]
+     [:p.text-xs.text-green-400.text-opacity-75
+      (str player-count " player" (when (not= player-count 1) "s") " joined")]]
+    (biff/form
+     {:action (str "/app/join-game/" (:xt/id game))
+      :method "post"}
+     [:button.bg-green-400.text-black.px-4.py-2.font-bold.hover:bg-green-300.transition-colors
+      {:type "submit"}
+      "Join"])]])
+
 ;; :: render a single game as a card with sections
 (defn game-card [{:keys [player game]}]
   [:a {:href (str "/app/game/" (:xt/id player))
@@ -98,9 +136,11 @@
      [:p.font-mono (:player/agents player)]]]]])
 
 ;; :: dashboard page showing all games
-(defn dashboard [{:keys [session biff/db] :as ctx}]
-  (let [games (get-user-games db (:uid session))
-        user (xt/entity db (:uid session))]
+(defn dashboard [{:keys [session biff/db params] :as ctx}]
+  (let [uid (:uid session)
+        games (get-user-games db uid)
+        open-games (get-open-games db uid)
+        user (xt/entity db uid)]
     (ui/page
      {}
      [:div.text-green-400.font-mono
@@ -115,6 +155,14 @@
          [:button.border.border-green-400.px-4.py-2.text-sm.hover:bg-green-400.hover:bg-opacity-10.transition-colors
           {:type "submit"}
           "Sign Out"])]]
+
+      ;; :: error message if join was rejected
+      (when-some [error (:error params)]
+        [:p.mb-4.text-red-500
+         (case error
+           "already-joined" "You have already joined that game."
+           "not-found"      "Game not found."
+           "An error occurred.")])
       
       ;; :: games list or empty message
       (if (empty? games)
@@ -128,4 +176,10 @@
         :method "post"}
        [:button.bg-green-400.text-black.px-4.py-2.font-bold.hover:bg-green-300.transition-colors
         {:type "submit"}
-        "Create Test Game"])])))
+        "Create Test Game"])
+
+      ;; :: open games available to join
+      (when (seq open-games)
+        [:div.mt-8
+         [:h2.text-2xl.font-bold.mb-4 "Open Games"]
+         (map join-game-card open-games)])])))
