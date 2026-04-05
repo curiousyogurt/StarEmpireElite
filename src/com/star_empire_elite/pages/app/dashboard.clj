@@ -17,26 +17,22 @@
 
 ;; :: fetch all games the current user has not yet joined
 (defn get-open-games [db uid]
-  (let [user-game-ids (->> (q db
-                              '{:find [game-id]
-                                :in [user-id]
-                                :where [[player :player/user user-id]
-                                        [player :player/game game-id]]}
-                              uid)
-                           (map first)
-                           set)
-        all-games (q db
-                     '{:find (pull game [*])
-                       :where [[game :game/name]]})]
-    (for [game all-games
-          :when (not (contains? user-game-ids (:xt/id game)))]
-      (let [player-count (count (q db
-                                   '{:find [player]
-                                     :in [game-id]
-                                     :where [[player :player/game game-id]]}
-                                   (:xt/id game)))]
-        {:game game
-         :player-count player-count}))))
+  (let [games (q db
+                 '{:find (pull game [*])
+                   :in [uid]
+                   :where [[game :game/name]
+                           (not-join [game uid]
+                             [player :player/user uid]
+                             [player :player/game game])]}
+                 uid)]
+    (mapv (fn [game]
+            {:game game
+             :player-count (count (q db
+                                     '{:find [player]
+                                       :in [game-id]
+                                       :where [[player :player/game game-id]]}
+                                     (:xt/id game)))})
+          games)))
 
 ;; :: render a joinable game as a card with a join button
 (defn join-game-card [{:keys [game player-count]}]
