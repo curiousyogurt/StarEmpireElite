@@ -17,24 +17,32 @@
 
 (defn format-number
   "Format numbers for display with hybrid approach:
-   - Small numbers (< 100K): Display as-is (e.g., 999, 1234, 99999)
-   - Large numbers (≥ 100K): Use abbreviated suffixes (e.g., 123K, 1.2M, 5.7B)
-   
-   Returns a hiccup span with title attribute for tooltip on hover.
-   Abbreviations: K (thousand), M (million), B (billion), T (trillion), Q (quadrillion)"
+  - Small numbers (< 100K absolute): Display as-is (e.g., 999, -1234, 99999)
+  - Large numbers (≥ 100K absolute): Use abbreviated suffixes (e.g., 123K, -1.2M, 5.7B)
+
+  Returns a hiccup span with title attribute for tooltip on hover.
+  Abbreviations: K (thousand), M (million), B (billion), T (trillion), Q (quadrillion)
+  Handles both positive and negative numbers."
   [n]
-  (let [formatted (cond
-                    ;; If n needs a suffix       divide by the value and round                 sym
-                    (>= n 1000000000000000) (str (/ (Math/round (/ n 100000000000000.0)) 10.0) "Q")
-                    (>= n 1000000000000)    (str (/ (Math/round (/ n 100000000000.0))    10.0) "T")
-                    (>= n 1000000000)       (str (/ (Math/round (/ n 100000000.0))       10.0) "B")
-                    (>= n 1000000)          (str (/ (Math/round (/ n 100000.0))          10.0) "M")
-                    (>= n 100000)           (str (/ (Math/round (/ n 100.0))             10.0) "K")
-                    :else (str n))
-        is-abbreviated? (>= n 100000)]
-    (if is-abbreviated?
-      [:span {:title (str n)} formatted] ; If Abbreviated: add tooltip with full number
-      formatted)))                       ; Otherwise     : just return the string
+  (when n  ; Handle nil values
+    (let [abs-n (Math/abs n)  ; Work with absolute value for formatting logic
+          is-negative? (< n 0)
+          formatted (cond
+                      ;; If abs-n needs a suffix       divide by the value and round                 sym
+                      (>= abs-n 1000000000000000) (str (/ (Math/round (/ abs-n 100000000000000.0)) 10.0) "Q")
+                      (>= abs-n 1000000000000)    (str (/ (Math/round (/ abs-n 100000000000.0))    10.0) "T")
+                      (>= abs-n 1000000000)       (str (/ (Math/round (/ abs-n 100000000.0))       10.0) "B")
+                      (>= abs-n 1000000)          (str (/ (Math/round (/ abs-n 100000.0))          10.0) "M")
+                      (>= abs-n 100000)           (str (/ (Math/round (/ abs-n 100.0))             10.0) "K")
+                      :else (str n))  ; For small numbers, use original n (with sign)
+          ;; Add negative sign for large formatted numbers
+          formatted-with-sign (if (and is-negative? (>= abs-n 100000))
+                                (str "-" formatted)
+                                formatted)
+          is-abbreviated? (>= abs-n 100000)]
+      (if is-abbreviated?
+        [:span {:title (str n)} formatted-with-sign] ; If Abbreviated: add tooltip with full number
+        formatted-with-sign))))                       ; Otherwise     : just return the string
 
 ;;; Phase progress indicator showing current position in the 6-phase turn cycle. Uses filled circles
 ;;; for completed phases, a highlighted circle for current phase, and empty circles for future phases.
@@ -120,11 +128,11 @@
 ;;; phases to display resources in a consistent format. Can highlight negative values in red.
 (defn resource-display-grid
   "Display player resources in a responsive grid layout.
-   
-   Args:
-     resources - map of resource values to display (uses either player entity or custom map)
-     title - optional title for the display section
-     highlight-negative? - if true, shows negative values in red (default false)"
+
+  Args:
+  resources - map of resource values to display (uses either player entity or custom map)
+  title - optional title for the display section
+  highlight-negative? - if true, shows negative values in red (default false)"
   ([resources title]
    (resource-display-grid resources title false))
   ([resources title highlight-negative?]
@@ -163,11 +171,11 @@
 ;;; where players need to see all their assets, not just basic resources.
 (defn extended-resource-display-grid
   "Display all player resources including units and planets in a responsive grid layout.
-   
-   Args:
-     resources - map of resource values to display (uses either player entity or custom map)
-     title - optional title for the display section
-     highlight-negative? - if true, shows negative values in red (default false)"
+
+  Args:
+  resources - map of resource values to display (uses either player entity or custom map)
+  title - optional title for the display section
+  highlight-negative? - if true, shows negative values in red (default false)"
   ([resources title]
    (extended-resource-display-grid resources title false))
   ([resources title highlight-negative?]
@@ -177,63 +185,63 @@
      [:div
       [:p.text-xs "Credits"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:credits resources) (:player/credits resources) 0) 0)) "text-red-400")}
-       (or (:credits resources) (:player/credits resources))]]
+       (format-number (or (:credits resources) (:player/credits resources) 0))]]
      [:div
       [:p.text-xs "Food"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:food resources) (:player/food resources) 0) 0)) "text-red-400")}
-       (or (:food resources) (:player/food resources))]]
+       (format-number (or (:food resources) (:player/food resources) 0))]]
      [:div
       [:p.text-xs "Fuel"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:fuel resources) (:player/fuel resources) 0) 0)) "text-red-400")}
-       (or (:fuel resources) (:player/fuel resources))]]
+       (format-number (or (:fuel resources) (:player/fuel resources) 0))]]
      [:div
       [:p.text-xs "Galaxars"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:galaxars resources) (:player/galaxars resources) 0) 0)) "text-red-400")}
-       (or (:galaxars resources) (:player/galaxars resources))]]
+       (format-number (or (:galaxars resources) (:player/galaxars resources) 0))]]
      [:div
       [:p.text-xs "Soldiers"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:soldiers resources) (:player/soldiers resources) 0) 0)) "text-red-400")}
-       (or (:soldiers resources) (:player/soldiers resources))]]
+       (format-number (or (:soldiers resources) (:player/soldiers resources) 0))]]
      [:div
       [:p.text-xs "Transports"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:transports resources) (:player/transports resources) 0) 0)) "text-red-400")}
-       (or (:transports resources) (:player/transports resources))]]
+       (format-number (or (:transports resources) (:player/transports resources) 0))]]
      [:div
       [:p.text-xs "Generals"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:generals resources) (:player/generals resources) 0) 0)) "text-red-400")}
-       (or (:generals resources) (:player/generals resources))]]
-     [:div
-      [:p.text-xs "Carriers"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:carriers resources) (:player/carriers resources) 0) 0)) "text-red-400")}
-       (or (:carriers resources) (:player/carriers resources))]]
+       (format-number (or (:generals resources) (:player/generals resources) 0))]]
      [:div
       [:p.text-xs "Fighters"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:fighters resources) (:player/fighters resources) 0) 0)) "text-red-400")}
-       (or (:fighters resources) (:player/fighters resources))]]
+       (format-number (or (:fighters resources) (:player/fighters resources) 0))]]
+     [:div
+      [:p.text-xs "Carriers"]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:carriers resources) (:player/carriers resources) 0) 0)) "text-red-400")}
+       (format-number (or (:carriers resources) (:player/carriers resources) 0))]]
      [:div
       [:p.text-xs "Admirals"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:admirals resources) (:player/admirals resources) 0) 0)) "text-red-400")}
-       (or (:admirals resources) (:player/admirals resources))]]
+       (format-number (or (:admirals resources) (:player/admirals resources) 0))]]
      [:div
       [:p.text-xs "Stations"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:stations resources) (:player/stations resources) 0) 0)) "text-red-400")}
-       (or (:stations resources) (:player/stations resources))]]
+       (format-number (or (:stations resources) (:player/stations resources) 0))]]
      [:div
       [:p.text-xs "Cmd Ships"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:cmd-ships resources) (:player/cmd-ships resources) 0) 0)) "text-red-400")}
-       (or (:cmd-ships resources) (:player/cmd-ships resources))]]
-     [:div
-      [:p.text-xs "Mil Plts"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:mil-planets resources) (:player/mil-planets resources) 0) 0)) "text-red-400")}
-       (or (:mil-planets resources) (:player/mil-planets resources))]]
-     [:div
-      [:p.text-xs "Food Plts"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:food-planets resources) (:player/food-planets resources) 0) 0)) "text-red-400")}
-       (or (:food-planets resources) (:player/food-planets resources))]]
+       (format-number (or (:cmd-ships resources) (:player/cmd-ships resources) 0))]]
      [:div
       [:p.text-xs "Ore Plts"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:ore-planets resources) (:player/ore-planets resources) 0) 0)) "text-red-400")}
-       (or (:ore-planets resources) (:player/ore-planets resources))]]]]))
+       (format-number (or (:ore-planets resources) (:player/ore-planets resources) 0))]]
+     [:div
+      [:p.text-xs "Food Plts"]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:food-planets resources) (:player/food-planets resources) 0) 0)) "text-red-400")}
+       (format-number (or (:food-planets resources) (:player/food-planets resources) 0))]]
+     [:div
+      [:p.text-xs "Mil Plts"]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:mil-planets resources) (:player/mil-planets resources) 0) 0)) "text-red-400")}
+       (format-number (or (:mil-planets resources) (:player/mil-planets resources) 0))]]]]))
 
 (defn numeric-input 
   "Creates a numeric-only input field with HTMX integration and reset button.

@@ -26,8 +26,13 @@
   "Returns map of all exchange rates from game constants"
   []
   {:soldier-sell const/soldier-sell
+   :transport-sell const/transport-sell
+   :general-sell const/general-sell
    :fighter-sell const/fighter-sell
+   :carrier-sell const/carrier-sell
+   :admiral-sell const/admiral-sell
    :station-sell const/station-sell
+   :cmd-ship-sell const/cmd-ship-sell
    :mil-planet-sell const/mil-planet-sell
    :food-planet-sell const/food-planet-sell
    :ore-planet-sell const/ore-planet-sell
@@ -42,8 +47,13 @@
   Returns map of quantities for all exchange types."
   [params]
   {:soldiers-sold (utils/parse-numeric-input (:soldiers-sold params))
+   :transports-sold (utils/parse-numeric-input (:transports-sold params))
+   :generals-sold (utils/parse-numeric-input (:generals-sold params))
    :fighters-sold (utils/parse-numeric-input (:fighters-sold params))
+   :carriers-sold (utils/parse-numeric-input (:carriers-sold params))
+   :admirals-sold (utils/parse-numeric-input (:admirals-sold params))
    :stations-sold (utils/parse-numeric-input (:stations-sold params))
+   :cmd-ships-sold (utils/parse-numeric-input (:cmd-ships-sold params))
    :mil-planets-sold (utils/parse-numeric-input (:mil-planets-sold params))
    :food-planets-sold (utils/parse-numeric-input (:food-planets-sold params))
    :ore-planets-sold (utils/parse-numeric-input (:ore-planets-sold params))
@@ -58,8 +68,13 @@
   Returns map with breakdown of credit sources."
   [quantities rates]
   (let [credits-from-sales        (+ (* (:soldiers-sold quantities)     (:soldier-sell rates))
+                                     (* (:transports-sold quantities)   (:transport-sell rates))
+                                     (* (:generals-sold quantities)     (:general-sell rates))
                                      (* (:fighters-sold quantities)     (:fighter-sell rates))
+                                     (* (:carriers-sold quantities)     (:carrier-sell rates))
+                                     (* (:admirals-sold quantities)     (:admiral-sell rates))
                                      (* (:stations-sold quantities)     (:station-sell rates))
+                                     (* (:cmd-ships-sold quantities)    (:cmd-ship-sell rates))
                                      (* (:mil-planets-sold quantities)  (:mil-planet-sell rates))
                                      (* (:food-planets-sold quantities) (:food-planet-sell rates))
                                      (* (:ore-planets-sold quantities)  (:ore-planet-sell rates)))
@@ -91,13 +106,13 @@
   [player quantities credit-changes]
   {:credits      (+ (:player/credits player)      (:total-credits credit-changes))
    :soldiers     (- (:player/soldiers player)     (:soldiers-sold quantities))
-   :transports   (:player/transports player)     ; unchanged in exchange
-   :generals     (:player/generals player)       ; unchanged in exchange
-   :carriers     (:player/carriers player)       ; unchanged in exchange
+   :transports   (- (:player/transports player)   (:transports-sold quantities))
+   :generals     (- (:player/generals player)     (:generals-sold quantities))
+   :carriers     (- (:player/carriers player)     (:carriers-sold quantities))
    :fighters     (- (:player/fighters player)     (:fighters-sold quantities))
-   :admirals     (:player/admirals player)       ; unchanged in exchange
+   :admirals     (- (:player/admirals player)     (:admirals-sold quantities))
    :stations     (- (:player/stations player)     (:stations-sold quantities))
-   :cmd-ships    (:player/cmd-ships player)      ; unchanged in exchange
+   :cmd-ships    (- (:player/cmd-ships player)    (:cmd-ships-sold quantities))
    :mil-planets  (- (:player/mil-planets player)  (:mil-planets-sold quantities))
    :food-planets (- (:player/food-planets player) (:food-planets-sold quantities))
    :ore-planets  (- (:player/ore-planets player)  (:ore-planets-sold quantities))
@@ -129,8 +144,13 @@
   "Returns map indicating which specific exchange types are invalid"
   [resources-after quantities]
   {:invalid-soldier-sale? (< (:soldiers resources-after) 0)
+   :invalid-transport-sale? (< (:transports resources-after) 0)
+   :invalid-general-sale? (< (:generals resources-after) 0)
    :invalid-fighter-sale? (< (:fighters resources-after) 0)
+   :invalid-carrier-sale? (< (:carriers resources-after) 0)
+   :invalid-admiral-sale? (< (:admirals resources-after) 0)
    :invalid-station-sale? (< (:stations resources-after) 0)
+   :invalid-cmd-ship-sale? (< (:cmd-ships resources-after) 0)
    :invalid-mil-planet-sale? (< (:mil-planets resources-after) 0)
    :invalid-food-planet-sale? (< (:food-planets resources-after) 0)
    :invalid-ore-planet-sale? (< (:ore-planets resources-after) 0)
@@ -309,8 +329,13 @@
                           :xt/id player-id
                           :player/credits (:credits resources-after)
                           :player/soldiers (:soldiers resources-after)
+                          :player/transports (:transports resources-after)
+                          :player/generals (:generals resources-after)
+                          :player/carriers (:carriers resources-after)
                           :player/fighters (:fighters resources-after)
+                          :player/admirals (:admirals resources-after)
                           :player/stations (:stations resources-after)
+                          :player/cmd-ships (:cmd-ships resources-after)
                           :player/mil-planets (:mil-planets resources-after)
                           :player/food-planets (:food-planets resources-after)
                           :player/ore-planets (:ore-planets resources-after)
@@ -333,8 +358,13 @@
 
           ;; Calculate maximums for buy quantities based on sell proceeds
           sell-quantities {:soldiers-sold (:soldiers-sold quantities)
+                           :transports-sold (:transports-sold quantities)
+                           :generals-sold (:generals-sold quantities)
                            :fighters-sold (:fighters-sold quantities)
+                           :carriers-sold (:carriers-sold quantities)
+                           :admirals-sold (:admirals-sold quantities)
                            :stations-sold (:stations-sold quantities)
+                           :cmd-ships-sold (:cmd-ships-sold quantities)
                            :mil-planets-sold (:mil-planets-sold quantities)
                            :food-planets-sold (:food-planets-sold quantities)
                            :ore-planets-sold (:ore-planets-sold quantities)
@@ -350,12 +380,27 @@
          [:span {:id "credit-soldiers-sold" :hx-swap-oob "true"
                  :class (when (zero? (* (:soldiers-sold quantities) (:soldier-sell rates))) "opacity-20")}
           [:<> "+" (ui/format-number (* (:soldiers-sold quantities) (:soldier-sell rates)))]]
+         [:span {:id "credit-transports-sold" :hx-swap-oob "true"
+                 :class (when (zero? (* (:transports-sold quantities) (:transport-sell rates))) "opacity-20")}
+          [:<> "+" (ui/format-number (* (:transports-sold quantities) (:transport-sell rates)))]]
+         [:span {:id "credit-generals-sold" :hx-swap-oob "true"
+                 :class (when (zero? (* (:generals-sold quantities) (:general-sell rates))) "opacity-20")}
+          [:<> "+" (ui/format-number (* (:generals-sold quantities) (:general-sell rates)))]]
          [:span {:id "credit-fighters-sold" :hx-swap-oob "true"
                  :class (when (zero? (* (:fighters-sold quantities) (:fighter-sell rates))) "opacity-20")}
           [:<> "+" (ui/format-number (* (:fighters-sold quantities) (:fighter-sell rates)))]]
+         [:span {:id "credit-carriers-sold" :hx-swap-oob "true"
+                 :class (when (zero? (* (:carriers-sold quantities) (:carrier-sell rates))) "opacity-20")}
+          [:<> "+" (ui/format-number (* (:carriers-sold quantities) (:carrier-sell rates)))]]
+         [:span {:id "credit-admirals-sold" :hx-swap-oob "true"
+                 :class (when (zero? (* (:admirals-sold quantities) (:admiral-sell rates))) "opacity-20")}
+          [:<> "+" (ui/format-number (* (:admirals-sold quantities) (:admiral-sell rates)))]]
          [:span {:id "credit-stations-sold" :hx-swap-oob "true"
                  :class (when (zero? (* (:stations-sold quantities) (:station-sell rates))) "opacity-20")}
           [:<> "+" (ui/format-number (* (:stations-sold quantities) (:station-sell rates)))]]
+         [:span {:id "credit-cmd-ships-sold" :hx-swap-oob "true"
+                 :class (when (zero? (* (:cmd-ships-sold quantities) (:cmd-ship-sell rates))) "opacity-20")}
+          [:<> "+" (ui/format-number (* (:cmd-ships-sold quantities) (:cmd-ship-sell rates)))]]
          [:span {:id "credit-mil-planets-sold" :hx-swap-oob "true"
                  :class (when (zero? (* (:mil-planets-sold quantities) (:mil-planet-sell rates))) "opacity-20")}
           [:<> "+" (ui/format-number (* (:mil-planets-sold quantities) (:mil-planet-sell rates)))]]
@@ -392,6 +437,36 @@
          [:div#resources-after
           (ui/extended-resource-display-grid resources-after "Resources After Exchange" true)]
 
+         ;; Warning message if exchange is invalid
+         [:div#exchange-warning.h-8.flex.items-center
+          {:hx-swap-oob "true"}
+          (when (not can-execute?)
+            (let [invalid-exchanges (identify-invalid-exchanges resources-after quantities)
+                  selling-too-much? (or (:invalid-soldier-sale? invalid-exchanges)
+                                        (:invalid-transport-sale? invalid-exchanges)
+                                        (:invalid-general-sale? invalid-exchanges)
+                                        (:invalid-fighter-sale? invalid-exchanges)
+                                        (:invalid-carrier-sale? invalid-exchanges)
+                                        (:invalid-admiral-sale? invalid-exchanges)
+                                        (:invalid-station-sale? invalid-exchanges)
+                                        (:invalid-cmd-ship-sale? invalid-exchanges)
+                                        (:invalid-mil-planet-sale? invalid-exchanges)
+                                        (:invalid-food-planet-sale? invalid-exchanges)
+                                        (:invalid-ore-planet-sale? invalid-exchanges)
+                                        (:invalid-food-sale? invalid-exchanges)
+                                        (:invalid-fuel-sale? invalid-exchanges))
+                  buying-too-much? (or (:invalid-food-purchase? invalid-exchanges)
+                                       (:invalid-fuel-purchase? invalid-exchanges))]
+              (cond
+                (and selling-too-much? buying-too-much?)
+                [:p.text-yellow-400.font-bold "WARNING: Cannot sell more than you have or buy more than you can afford!"]
+
+                selling-too-much?
+                [:p.text-yellow-400.font-bold "WARNING: Cannot sell more than you have!"]
+
+                buying-too-much?
+                [:p.text-yellow-400.font-bold "WARNING: Cannot afford to buy that much!"])))]
+
          ;; Total credits summary
          [:div#cost-summary
           {:hx-swap-oob "true"}
@@ -403,9 +478,9 @@
 ;;; Shows exchange options and input fields for player to buy/sell resources and assets
 (defn exchange-page [{:keys [player game]}]
   (let [player-id (:xt/id player)
-        hx-include "[name='soldiers-sold'],[name='fighters-sold'],[name='stations-sold'],[name='mil-planets-sold'],[name='food-planets-sold'],[name='ore-planets-sold'],[name='food-bought'],[name='food-sold'],[name='fuel-bought'],[name='fuel-sold']"
+        hx-include "[name='soldiers-sold'],[name='transports-sold'],[name='generals-sold'],[name='fighters-sold'],[name='carriers-sold'],[name='admirals-sold'],[name='stations-sold'],[name='cmd-ships-sold'],[name='mil-planets-sold'],[name='food-planets-sold'],[name='ore-planets-sold'],[name='food-bought'],[name='food-sold'],[name='fuel-bought'],[name='fuel-sold']"
         rates (get-exchange-rates)
-        max-buy-quantities (calculate-max-buy-quantities player {:soldiers-sold 0 :fighters-sold 0 :stations-sold 0 :mil-planets-sold 0 :food-planets-sold 0 :ore-planets-sold 0 :food-sold 0 :fuel-sold 0 :food-bought 0 :fuel-bought 0} rates)]
+        max-buy-quantities (calculate-max-buy-quantities player {:soldiers-sold 0 :transports-sold 0 :generals-sold 0 :fighters-sold 0 :carriers-sold 0 :admirals-sold 0 :stations-sold 0 :cmd-ships-sold 0 :mil-planets-sold 0 :food-planets-sold 0 :ore-planets-sold 0 :food-sold 0 :fuel-sold 0 :food-bought 0 :fuel-bought 0} rates)]
     (ui/page
       {}
       [:div.mx-auto.max-w-4xl.w-full.text-green-400.font-mono
@@ -458,8 +533,13 @@
 
             ;; Sell rows
             (sell-row "Soldiers" "Soldiers" "soldiers-sold" (:soldier-sell rates) 0 (:player/soldiers player) player-id hx-include)
+            (sell-row "Transports" "Transports" "transports-sold" (:transport-sell rates) 0 (:player/transports player) player-id hx-include)
+            (sell-row "Generals" "Generals" "generals-sold" (:general-sell rates) 0 (:player/generals player) player-id hx-include)
             (sell-row "Fighters" "Fighters" "fighters-sold" (:fighter-sell rates) 0 (:player/fighters player) player-id hx-include)
+            (sell-row "Carriers" "Carriers" "carriers-sold" (:carrier-sell rates) 0 (:player/carriers player) player-id hx-include)
+            (sell-row "Admirals" "Admirals" "admirals-sold" (:admiral-sell rates) 0 (:player/admirals player) player-id hx-include)
             (sell-row "Defence Stations" "Def Stns" "stations-sold" (:station-sell rates) 0 (:player/stations player) player-id hx-include)
+            (sell-row "Command Ships" "Cmd Ships" "cmd-ships-sold" (:cmd-ship-sell rates) 0 (:player/cmd-ships player) player-id hx-include)
             (sell-row "Military Planets" "Mil Plts" "mil-planets-sold" (:mil-planet-sell rates) 0 (:player/mil-planets player) player-id hx-include)
             (sell-row "Food Planets" "Food Plts" "food-planets-sold" (:food-planet-sell rates) 0 (:player/food-planets player) player-id hx-include)
             (sell-row "Ore Planets" "Ore Plts" "ore-planets-sold" (:ore-planet-sell rates) 0 (:player/ore-planets player) player-id hx-include)
@@ -502,6 +582,9 @@
          ;; Resources After Exchange (initially shows current resources)
          [:div#resources-after
           (ui/extended-resource-display-grid player "Resources After Exchange" true)]
+
+         ;; Warning message area - populated by HTMX if player tries invalid exchanges
+         [:div#exchange-warning.h-8.flex.items-center]
 
          ;; Navigation and submit buttons
          [:div.flex.gap-4

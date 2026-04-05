@@ -60,8 +60,13 @@
 ;; Rates for buying and selling resources and assets in the exchange
 
 (def soldier-sell 50)
+(def transport-sell 50)
+(def general-sell 250)
 (def fighter-sell 100)
+(def carrier-sell 500)
+(def admiral-sell 375)
 (def station-sell 150)
+(def cmd-ship-sell 1000)
 (def mil-planet-sell 500)
 (def food-planet-sell 500)
 (def ore-planet-sell 500)
