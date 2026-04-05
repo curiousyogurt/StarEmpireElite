@@ -91,8 +91,13 @@
   [player quantities credit-changes]
   {:credits      (+ (:player/credits player)      (:total-credits credit-changes))
    :soldiers     (- (:player/soldiers player)     (:soldiers-sold quantities))
+   :transports   (:player/transports player)     ; unchanged in exchange
+   :generals     (:player/generals player)       ; unchanged in exchange
+   :carriers     (:player/carriers player)       ; unchanged in exchange
    :fighters     (- (:player/fighters player)     (:fighters-sold quantities))
+   :admirals     (:player/admirals player)       ; unchanged in exchange
    :stations     (- (:player/stations player)     (:stations-sold quantities))
+   :cmd-ships    (:player/cmd-ships player)      ; unchanged in exchange
    :mil-planets  (- (:player/mil-planets player)  (:mil-planets-sold quantities))
    :food-planets (- (:player/food-planets player) (:food-planets-sold quantities))
    :ore-planets  (- (:player/ore-planets player)  (:ore-planets-sold quantities))
@@ -106,8 +111,13 @@
   [resources-after]
   (and (>= (:credits resources-after) 0)
        (>= (:soldiers resources-after) 0)
+       (>= (:transports resources-after) 0)
+       (>= (:generals resources-after) 0)
+       (>= (:carriers resources-after) 0)
        (>= (:fighters resources-after) 0)
+       (>= (:admirals resources-after) 0)
        (>= (:stations resources-after) 0)
+       (>= (:cmd-ships resources-after) 0)
        (>= (:mil-planets resources-after) 0)
        (>= (:food-planets resources-after) 0)
        (>= (:ore-planets resources-after) 0)
@@ -192,7 +202,7 @@
      [:div.text-right.font-mono.lg:pr-4
       [:span {:id credit-id
               :class (when (zero? credit-gain) "opacity-20")}
-       "+" (ui/format-number credit-gain)]]]))
+       [:<> "+" (ui/format-number credit-gain)]]]]))
 
 ;;; Buy row with single input field, CSS-only responsive styling (like building page)
 (defn buy-row
@@ -239,34 +249,33 @@
      [:div.text-right.font-mono.lg:pr-4
       [:span {:id credit-id
               :class (when (zero? credit-cost) "opacity-20")}
-       "-" (ui/format-number credit-cost)]]]))
+       [:<> "-" (ui/format-number credit-cost)]]]]))
 
 ;;; Total credits summary row
 (defn total-credits-row
   "Renders the total credits gained summary at the bottom of the table.
   Shows credits in red if player tries to sell more than they have."
   [total-credits can-execute?]
-  [:div#cost-summary.border-t-2.border-green-400.bg-green-400.bg-opacity-10
+  (let [abs-credits (Math/abs total-credits)
+        formatted-credits (ui/format-number abs-credits)
+        sign (if (>= total-credits 0) "+" "-")]
+    [:div#cost-summary.border-green-400.bg-green-400.bg-opacity-10
 
-   ;; Mobile: Compact layout
-   [:div.grid.gap-1.px-2.py-3.font-bold.text-sm.lg:hidden
-    {:style {:grid-template-columns "1.2fr 0.8fr 0.6fr 1fr 0.8fr"}}
-    [:div.col-span-4.text-right.pr-4 "Total Credits:"]
-    [:div.text-right.font-mono.text-base
-     {:class (when (and (not can-execute?) (< total-credits 0)) "text-red-400")}
-     (if (>= total-credits 0)
-       (str "+" (ui/format-number total-credits))
-       (str "-" (ui/format-number (- total-credits))))]]
+     ;; Mobile: Compact layout
+     [:div.grid.gap-1.px-2.py-3.font-bold.text-sm.lg:hidden
+      {:style {:grid-template-columns "1.2fr 0.8fr 0.6fr 1fr 0.8fr"}}
+      [:div.col-span-4.text-right.pr-4 "Credits:"]
+      [:div.text-right.font-mono.text-base
+       {:class (when (and (not can-execute?) (< total-credits 0)) "text-red-400")}
+       [:<> sign formatted-credits]]]
 
-   ;; Desktop: Full width layout
-   [:div.hidden.lg:grid.lg:gap-3.lg:px-4.lg:py-2.lg:font-bold
-    {:style {:grid-template-columns "1.5fr 1fr 1fr 1fr 1fr"}}
-    [:div.col-span-4.text-right.text-lg.pr-4 "Total Credits:"]
-    [:div.text-right.font-mono.text-xl
-     {:class (when (and (not can-execute?) (< total-credits 0)) "text-red-400")}
-     (if (>= total-credits 0)
-       (str "+" (ui/format-number total-credits))
-       (str "-" (ui/format-number (- total-credits))))]]])
+     ;; Desktop: Full width layout
+     [:div.hidden.lg:grid.lg:gap-3.lg:px-4.lg:py-2.lg:font-bold
+      {:style {:grid-template-columns "1.5fr 1fr 1fr 1fr 1fr"}}
+      [:div.col-span-4.text-right.text-lg.pr-4 "Credits:"]
+      [:div.text-right.font-mono.text-xl
+       {:class (when (and (not can-execute?) (< total-credits 0)) "text-red-400")}
+       [:<> sign formatted-credits]]]]))
 
 ;;;;
 ;;;; Actions
@@ -340,36 +349,36 @@
          ;; Update individual credits for sell rows
          [:span {:id "credit-soldiers-sold" :hx-swap-oob "true"
                  :class (when (zero? (* (:soldiers-sold quantities) (:soldier-sell rates))) "opacity-20")}
-          "+" (ui/format-number (* (:soldiers-sold quantities) (:soldier-sell rates)))]
+          [:<> "+" (ui/format-number (* (:soldiers-sold quantities) (:soldier-sell rates)))]]
          [:span {:id "credit-fighters-sold" :hx-swap-oob "true"
                  :class (when (zero? (* (:fighters-sold quantities) (:fighter-sell rates))) "opacity-20")}
-          "+" (ui/format-number (* (:fighters-sold quantities) (:fighter-sell rates)))]
+          [:<> "+" (ui/format-number (* (:fighters-sold quantities) (:fighter-sell rates)))]]
          [:span {:id "credit-stations-sold" :hx-swap-oob "true"
                  :class (when (zero? (* (:stations-sold quantities) (:station-sell rates))) "opacity-20")}
-          "+" (ui/format-number (* (:stations-sold quantities) (:station-sell rates)))]
+          [:<> "+" (ui/format-number (* (:stations-sold quantities) (:station-sell rates)))]]
          [:span {:id "credit-mil-planets-sold" :hx-swap-oob "true"
                  :class (when (zero? (* (:mil-planets-sold quantities) (:mil-planet-sell rates))) "opacity-20")}
-          "+" (ui/format-number (* (:mil-planets-sold quantities) (:mil-planet-sell rates)))]
+          [:<> "+" (ui/format-number (* (:mil-planets-sold quantities) (:mil-planet-sell rates)))]]
          [:span {:id "credit-food-planets-sold" :hx-swap-oob "true"
                  :class (when (zero? (* (:food-planets-sold quantities) (:food-planet-sell rates))) "opacity-20")}
-          "+" (ui/format-number (* (:food-planets-sold quantities) (:food-planet-sell rates)))]
+          [:<> "+" (ui/format-number (* (:food-planets-sold quantities) (:food-planet-sell rates)))]]
          [:span {:id "credit-ore-planets-sold" :hx-swap-oob "true"
                  :class (when (zero? (* (:ore-planets-sold quantities) (:ore-planet-sell rates))) "opacity-20")}
-          "+" (ui/format-number (* (:ore-planets-sold quantities) (:ore-planet-sell rates)))]
+          [:<> "+" (ui/format-number (* (:ore-planets-sold quantities) (:ore-planet-sell rates)))]]
          [:span {:id "credit-food-sold" :hx-swap-oob "true"
                  :class (when (zero? (* (:food-sold quantities) (:food-sell rates))) "opacity-20")}
-          "+" (ui/format-number (* (:food-sold quantities) (:food-sell rates)))]
+          [:<> "+" (ui/format-number (* (:food-sold quantities) (:food-sell rates)))]]
          [:span {:id "credit-fuel-sold" :hx-swap-oob "true"
                  :class (when (zero? (* (:fuel-sold quantities) (:fuel-sell rates))) "opacity-20")}
-          "+" (ui/format-number (* (:fuel-sold quantities) (:fuel-sell rates)))]
+          [:<> "+" (ui/format-number (* (:fuel-sold quantities) (:fuel-sell rates)))]]
 
          ;; Update individual credits for buy rows
          [:span {:id "credit-food-bought" :hx-swap-oob "true"
                  :class (when (zero? (* (:food-bought quantities) (:food-buy rates))) "opacity-20")}
-          "-" (ui/format-number (* (:food-bought quantities) (:food-buy rates)))]
+          [:<> "-" (ui/format-number (* (:food-bought quantities) (:food-buy rates)))]]
          [:span {:id "credit-fuel-bought" :hx-swap-oob "true"
                  :class (when (zero? (* (:fuel-bought quantities) (:fuel-buy rates))) "opacity-20")}
-          "-" (ui/format-number (* (:fuel-bought quantities) (:fuel-buy rates)))]
+          [:<> "-" (ui/format-number (* (:fuel-bought quantities) (:fuel-buy rates)))]]
 
          ;; Update buy-row maximum quantities
          [:span {:id "max-qty-food-bought" :hx-swap-oob "true"
@@ -484,8 +493,8 @@
             (buy-row "Food" "Food" "food-bought" (:food-buy rates) 0 (:max-food max-buy-quantities) player-id hx-include)
             (buy-row "Fuel" "Fuel" "fuel-bought" (:fuel-buy rates) 0 (:max-fuel max-buy-quantities) player-id hx-include)]]]
 
-         ;; Total Credits Summary
-         [:h3.font-bold.mb-4 "Total Credits"]
+         ;; Total Exchange Summary
+         [:h3.font-bold.mb-4 "Total Exchange"]
          [:div.w-full.mb-8
           [:div.border.border-green-400
            (total-credits-row 0 true)]]
