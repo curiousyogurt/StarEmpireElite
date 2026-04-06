@@ -15,6 +15,40 @@
         {:player player
          :game game}))))
 
+;; :: fetch all games the current user has NOT joined
+(defn get-available-games [db uid]
+  (let [games (q db
+                 '{:find (pull game [*])
+                   :in [user-id]
+                   :where [[game :game/name _]
+                           (not-join [game user-id]
+                             [player :player/game game]
+                             [player :player/user user-id])]}
+                 uid)]
+    (for [game games]
+      (let [player-count (count (q db
+                                   '{:find [player]
+                                     :in [game-id]
+                                     :where [[player :player/game game-id]]}
+                                   (:xt/id game)))]
+        {:game game
+         :player-count player-count}))))
+
+;; :: render a joinable game card with player count and join button
+(defn available-game-card [{:keys [game player-count]}]
+  [:div.border.border-green-400.p-4.mb-4.max-w-6xl
+   [:div.flex.justify-between.items-center
+    [:div
+     [:h3.font-bold (:game/name game)]
+     [:p.text-xs.text-green-400.text-opacity-75
+      (str player-count " player(s)")]]
+    (biff/form
+     {:action (str "/app/join-game/" (:xt/id game))
+      :method "post"}
+     [:button.bg-green-400.text-black.px-4.py-2.font-bold.hover:bg-green-300.transition-colors
+      {:type "submit"}
+      "Join Game"])]])
+
 ;; :: render a single game as a card with sections
 (defn game-card [{:keys [player game]}]
   [:a {:href (str "/app/game/" (:xt/id player))
@@ -99,7 +133,8 @@
 
 ;; :: dashboard page showing all games
 (defn dashboard [{:keys [session biff/db] :as ctx}]
-  (let [games (get-user-games db (:uid session))
+  (let [my-games (get-user-games db (:uid session))
+        available-games (get-available-games db (:uid session))
         user (xt/entity db (:uid session))]
     (ui/page
      {}
@@ -115,17 +150,23 @@
          [:button.border.border-green-400.px-4.py-2.text-sm.hover:bg-green-400.hover:bg-opacity-10.transition-colors
           {:type "submit"}
           "Sign Out"])]]
-      
-      ;; :: games list or empty message
-      (if (empty? games)
+
+      ;; :: user's active games
+      (if (empty? my-games)
         [:p.mb-6 "You are not currently in any games."]
         [:div.mb-6
-         (map game-card games)])
-      
+         (map game-card my-games)])
+
       ;; :: create test game button (always visible)
       (biff/form
        {:action "/app/create-test-game"
         :method "post"}
        [:button.bg-green-400.text-black.px-4.py-2.font-bold.hover:bg-green-300.transition-colors
         {:type "submit"}
-        "Create Test Game"])])))
+        "Create Test Game"])
+
+      ;; :: available games to join
+      (when (seq available-games)
+        [:div.mt-8
+         [:h2.text-xl.font-bold.mb-4 "Available Games"]
+         (map available-game-card available-games)])])))
