@@ -185,13 +185,13 @@
   (utils/with-player-and-game [player game player-id] ctx
     ;; Validate phase 4 (action), then show page
     (or (utils/validate-phase player 4 player-id)
-        (action/action-page {:player player :game game}))))
+        (action/action-page {:player player :game game :db (:biff/db ctx)}))))
 
 (defn espionage-handler [ctx]
   (utils/with-player-and-game [player game player-id] ctx
     ;; Validate phase 5 (espionage), then show page
     (or (utils/validate-phase player 5 player-id)
-        (espionage/espionage-page {:player player :game game}))))
+        (espionage/espionage-page {:player player :game game :db (:biff/db ctx)}))))
 
 (defn outcomes-handler [ctx]
   (utils/with-player-and-game [player game player-id] ctx

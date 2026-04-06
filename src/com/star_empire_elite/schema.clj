@@ -105,7 +105,13 @@
             ;; Diplomatic relationships
             [:player/allies {:optional true}   [:set :player/id]]
             [:player/treaties {:optional true} [:set :player/id]]
-            [:player/messages {:optional true} [:vector :message/id]]]
+            [:player/messages {:optional true} [:vector :message/id]]
+
+            ;; Combat
+            [:player/pending-attack {:optional true} :player/id]
+
+            ;; Espionage
+            [:player/pending-espionage {:optional true} :player/id]]
 
    :message/id :uuid
    :message [:map {:closed true}
