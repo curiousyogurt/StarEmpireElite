@@ -18,10 +18,9 @@
                          (:player/food-planets player)
                          (:player/ore-planets player))]
     [:tr.border-b.border-green-400
-     [:td.border-r.border-green-400.px-3.py-2 (:player/empire-name player)]
-     [:td.border-r.border-green-400.px-3.py-2.text-right total-planets]
-     [:td.border-r.border-green-400.px-3.py-2.text-right (:player/agents player)]
-     [:td.border-r.border-green-400.px-3.py-2.text-right (:player/score player)]
+     [:td.border-r.border-green-400.px-3.py-2.w-56 (:player/empire-name player)]
+     [:td.border-r.border-green-400.px-3.py-2.text-right.w-36 total-planets]
+     [:td.border-r.border-green-400.px-3.py-2.text-right.w-36 (:player/score player)]
      [:td.px-3.py-2
       (biff/form
        {:action (str "/app/game/" current-player-id "/apply-espionage")
@@ -29,7 +28,7 @@
        [:input {:type "hidden" :name "target-player-id" :value (str (:xt/id player))}]
        [:button.w-full.px-3.py-1.text-sm.font-bold.bg-black.text-green-400.border.border-green-400.hover:text-yellow-400.hover:border-yellow-400.transition-colors
         {:type "submit"}
-        "Intelligence"])]]))
+        "Infiltrate"])]]))
 
 ;; :: espionage page - choose a target to spy on or skip espionage
 (defn espionage-page [{:keys [player game db]}]
@@ -52,10 +51,9 @@
           [:table.w-full.text-sm.border.border-green-400
            [:thead
             [:tr.border-b.border-green-400
-             [:th.border-r.border-green-400.px-3.py-2.text-left "Empire"]
-             [:th.border-r.border-green-400.px-3.py-2.text-right "Planets"]
-             [:th.border-r.border-green-400.px-3.py-2.text-right "Agents"]
-             [:th.border-r.border-green-400.px-3.py-2.text-right "Score"]
+             [:th.border-r.border-green-400.px-3.py-2.text-left.w-56 "Empire"]
+             [:th.border-r.border-green-400.px-3.py-2.text-right.w-36 "Planets"]
+             [:th.border-r.border-green-400.px-3.py-2.text-right.w-36 "Score"]
              [:th.px-3.py-2 ""]]]
            [:tbody
             (for [target other-players]

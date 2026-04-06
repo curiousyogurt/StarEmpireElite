@@ -269,7 +269,30 @@
      [:div.text-right.font-mono.lg:pr-4
       [:span {:id credit-id
               :class (when (zero? credit-cost) "opacity-20")}
-       [:<> "-" (ui/format-number credit-cost)]]]]))
+       [:<> "+" (ui/format-number credit-cost)]]]]))
+
+;;; Table-level total row for sell/buy tables
+(defn table-total-row
+  "Renders a total row at the bottom of a sell or buy table.
+  Shows the total in the Credits column aligned with the Item label."
+  [row-id label total]
+  [:div {:id row-id :class "border-t-2 border-green-400 bg-green-400 bg-opacity-10"}
+   ;; Mobile
+   [:div.grid.gap-1.px-2.py-3.font-bold.text-sm.lg:hidden
+    {:style {:grid-template-columns "0.9fr 0.8fr 0.7fr 1.1fr 0.9fr"}}
+    [:div label]
+    [:div] [:div] [:div]
+    [:div.text-right.font-mono.text-base
+     {:class (when (zero? total) "opacity-20")}
+     (ui/format-number total)]]
+   ;; Desktop
+   [:div.hidden.lg:grid.lg:gap-3.lg:px-4.lg:py-2.lg:font-bold
+    {:style {:grid-template-columns "1.5fr 1fr 1fr 1fr 1fr"}}
+    [:div.text-lg label]
+    [:div] [:div] [:div]
+    [:div.text-right.font-mono.text-xl.pr-4
+     {:class (when (zero? total) "opacity-20")}
+     (ui/format-number total)]]])
 
 ;;; Total credits summary row
 (defn total-credits-row
@@ -371,7 +394,12 @@
                            :food-sold (:food-sold quantities)
                            :fuel-sold (:fuel-sold quantities)
                            :food-bought 0 :fuel-bought 0}
-          max-buy-quantities (calculate-max-buy-quantities player sell-quantities rates)]
+          max-buy-quantities (calculate-max-buy-quantities player sell-quantities rates)
+          sell-total (+ (:credits-from-sales credit-changes)
+                        (* (:food-sold quantities) (:food-sell rates))
+                        (* (:fuel-sold quantities) (:fuel-sell rates)))
+          buy-total (+ (* (:food-bought quantities) (:food-buy rates))
+                       (* (:fuel-bought quantities) (:fuel-buy rates)))]
 
       ;; Render HTMX response fragments that replace specific page elements
       (biff/render
@@ -420,10 +448,10 @@
          ;; Update individual credits for buy rows
          [:span {:id "credit-food-bought" :hx-swap-oob "true"
                  :class (when (zero? (* (:food-bought quantities) (:food-buy rates))) "opacity-20")}
-          [:<> "-" (ui/format-number (* (:food-bought quantities) (:food-buy rates)))]]
+          [:<> "+" (ui/format-number (* (:food-bought quantities) (:food-buy rates)))]]
          [:span {:id "credit-fuel-bought" :hx-swap-oob "true"
                  :class (when (zero? (* (:fuel-bought quantities) (:fuel-buy rates))) "opacity-20")}
-          [:<> "-" (ui/format-number (* (:fuel-bought quantities) (:fuel-buy rates)))]]
+          [:<> "+" (ui/format-number (* (:fuel-bought quantities) (:fuel-buy rates)))]]
 
          ;; Update buy-row maximum quantities
          [:span {:id "max-qty-food-bought" :hx-swap-oob "true"
@@ -471,6 +499,14 @@
          [:div#cost-summary
           {:hx-swap-oob "true"}
           (total-credits-row (:total-credits credit-changes) can-execute?)]
+
+         ;; Sell table total row
+         [:div {:id "sell-total" :hx-swap-oob "true"}
+          (table-total-row "sell-total" "Credits (Income)" sell-total)]
+
+         ;; Buy table total row
+         [:div {:id "buy-total" :hx-swap-oob "true"}
+          (table-total-row "buy-total" "Credits (Expense)" buy-total)]
 
          ;; Submit button - disabled if player can't execute exchanges
          (submit-button can-execute? {:hx-swap-oob "true"})]))))
@@ -544,7 +580,8 @@
             (sell-row "Food Planets" "Food Plts" "food-planets-sold" (:food-planet-sell rates) 0 (:player/food-planets player) player-id hx-include)
             (sell-row "Ore Planets" "Ore Plts" "ore-planets-sold" (:ore-planet-sell rates) 0 (:player/ore-planets player) player-id hx-include)
             (sell-row "Food" "Food" "food-sold" (:food-sell rates) 0 (:player/food player) player-id hx-include)
-            (sell-row "Fuel" "Fuel" "fuel-sold" (:fuel-sell rates) 0 (:player/fuel player) player-id hx-include)]]]
+            (sell-row "Fuel" "Fuel" "fuel-sold" (:fuel-sell rates) 0 (:player/fuel player) player-id hx-include)
+            (table-total-row "sell-total" "Total Credits" 0)]]]
 
          ;; Buying This Round Table
          [:h3.font-bold.mb-4 "Buying This Round"]
@@ -571,13 +608,8 @@
 
             ;; Buy rows
             (buy-row "Food" "Food" "food-bought" (:food-buy rates) 0 (:max-food max-buy-quantities) player-id hx-include)
-            (buy-row "Fuel" "Fuel" "fuel-bought" (:fuel-buy rates) 0 (:max-fuel max-buy-quantities) player-id hx-include)]]]
-
-         ;; Total Exchange Summary
-         [:h3.font-bold.mb-4 "Total Exchange"]
-         [:div.w-full.mb-8
-          [:div.border.border-green-400
-           (total-credits-row 0 true)]]
+            (buy-row "Fuel" "Fuel" "fuel-bought" (:fuel-buy rates) 0 (:max-fuel max-buy-quantities) player-id hx-include)
+            (table-total-row "buy-total" "Credits" 0)]]]
 
          ;; Resources After Exchange (initially shows current resources)
          [:div#resources-after

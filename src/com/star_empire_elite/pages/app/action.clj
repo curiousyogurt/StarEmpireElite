@@ -16,13 +16,10 @@
 (defn target-row [player current-player-id]
   (let [total-planets (+ (:player/mil-planets player)
                          (:player/food-planets player)
-                         (:player/ore-planets player))
-        total-military (+ (:player/soldiers player)
-                          (:player/fighters player))]
+                         (:player/ore-planets player))]
     [:tr.border-b.border-green-400
      [:td.border-r.border-green-400.px-3.py-2 (:player/empire-name player)]
      [:td.border-r.border-green-400.px-3.py-2.text-right total-planets]
-     [:td.border-r.border-green-400.px-3.py-2.text-right total-military]
      [:td.border-r.border-green-400.px-3.py-2.text-right (:player/score player)]
      [:td.px-3.py-2
       (biff/form
@@ -54,10 +51,9 @@
           [:table.w-full.text-sm.border.border-green-400
            [:thead
             [:tr.border-b.border-green-400
-             [:th.border-r.border-green-400.px-3.py-2.text-left "Empire"]
-             [:th.border-r.border-green-400.px-3.py-2.text-right "Planets"]
-             [:th.border-r.border-green-400.px-3.py-2.text-right "Military"]
-             [:th.border-r.border-green-400.px-3.py-2.text-right "Score"]
+             [:th.border-r.border-green-400.px-3.py-2.text-left.w-56 "Empire"]
+             [:th.border-r.border-green-400.px-3.py-2.text-right.w-36 "Planets"]
+             [:th.border-r.border-green-400.px-3.py-2.text-right.w-36 "Score"]
              [:th.px-3.py-2 ""]]]
            [:tbody
             (for [target other-players]

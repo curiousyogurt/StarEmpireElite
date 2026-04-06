@@ -190,8 +190,11 @@
 
    ;; Mobile: Compact layout
    [:div.grid.gap-1.px-2.py-3.font-bold.text-sm.lg:hidden
-    {:style {:grid-template-columns "1.2fr 0.8fr 0.6fr 1fr 0.8fr"}}
-    [:div.col-span-4.text-right.pr-4 "Total Cost:"]
+    {:style {:grid-template-columns "0.9fr 0.8fr 0.7fr 1.1fr 0.9fr"}}
+    [:div "Credits (Expense)"]
+    [:div]
+    [:div]
+    [:div]
     [:div.text-right.font-mono.text-base
      {:class (when (not affordable?) "text-red-400")}
      (ui/format-number total-cost)]]
@@ -199,8 +202,11 @@
    ;; Desktop: Full width layout
    [:div.hidden.lg:grid.lg:gap-3.lg:px-4.lg:py-2.lg:font-bold
     {:style {:grid-template-columns "1.5fr 1fr 1fr 1fr 1fr"}}
-    [:div.col-span-4.text-right.text-lg.pr-4 "Total Cost:"]
-    [:div.text-right.font-mono.text-xl
+    [:div.text-lg "Credits (Expense)"]
+    [:div]
+    [:div]
+    [:div]
+    [:div.text-right.font-mono.text-xl.pr-4
      {:class (when (not affordable?) "text-red-400")}
      (ui/format-number total-cost)]]])
 
