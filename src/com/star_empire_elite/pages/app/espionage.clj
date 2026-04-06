@@ -30,7 +30,7 @@
         {:type "submit"}
         "Infiltrate"])]]))
 
-;; :: espionage page - choose a target to spy on or skip espionage
+;; :: espionage page - choose a target to infiltrate or skip espionage
 (defn espionage-page [{:keys [player game db]}]
   (let [player-id (:xt/id player)
         other-players (get-other-players db (:player/game player) player-id)]
@@ -42,11 +42,11 @@
       (ui/phase-header (:player/current-phase player) "ESPIONAGE")
 
       (if (empty? other-players)
-        [:p.mb-6 "There are no other empires to spy on."]
+        [:p.mb-6 "There are no other empires to infiltrate."]
         [:div.mb-6
          [:h2.text-xl.font-bold.mb-4 "Choose a Target"]
          [:p.text-sm.mb-4.text-green-400.text-opacity-75
-          "Select an empire to spy on. Intelligence results will be revealed in the Outcomes phase."]
+          "Select an empire to infiltrate. Espionage results will be revealed in the Outcomes phase."]
          [:div.overflow-x-auto
           [:table.w-full.text-sm.border.border-green-400
            [:thead

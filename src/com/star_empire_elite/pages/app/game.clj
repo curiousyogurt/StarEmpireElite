@@ -19,7 +19,7 @@
 ;;; Responsive game header displaying critical player resources and status. Uses CSS Grid to adapt
 ;;; from 3 columns on mobile to 9 columns on large screens for optimal viewing.
 (defn game-header [{:keys [player]}]
-  [:div.grid.grid-cols-3.md:grid-cols-5.lg:grid-cols-9.gap-2.mb-6.pb-4.border-b.border-green-400
+  [:div.grid.grid-cols-3.md:grid-cols-5.lg:grid-cols-10.gap-2.mb-6.pb-4.border-b.border-green-400
  
    ;; Economic resources
    [:div
@@ -49,6 +49,9 @@
                      (:player/ore-planets player))]]
  
    ;; Game progression
+   [:div
+    [:p.text-xs "Turn"]
+    [:p.font-mono (:player/current-turn player)]]
    [:div
     [:p.text-xs "Round"]
     [:p.font-mono (:player/current-round player)]]

@@ -39,7 +39,7 @@
         :game/scheduled-end-at end-date
         :game/status 0
         :game/turns-per-day 6
-        :game/rounds-per-day 4
+        :game/rounds-per-day 10
         ;; Income generation constants
         :game/ore-planet-credits const/ore-planet-credits
         :game/ore-planet-fuel const/ore-planet-fuel

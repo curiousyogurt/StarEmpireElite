@@ -73,7 +73,7 @@
     [:h2.text-xl.font-bold (str "PHASE " current-phase ": " phase-name)]
     (phase-indicator current-phase)]
    ;; Wide screen: Horizontal with space between
-   [:div.hidden.lg:flex.lg:items-center.lg:justify-between
+   [:div.hidden.lg:flex.lg:items-center.lg:justify-between.lg:gap-8
     [:h2.text-xl.font-bold (str "PHASE " current-phase ": " phase-name)]
     (phase-indicator current-phase)]])
 
