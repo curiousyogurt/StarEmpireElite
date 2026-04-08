@@ -69,7 +69,7 @@
       
       (ui/resource-display-grid player "Resources")
       
-      [:p.mb-4.text-sm "Review your turn results above. When you're ready, click below to begin your next turn."]
+      [:p.text-sm "Review your turn results above. When you're ready, begin your next turn."]
       
       [:.h-6]
       (biff/form
@@ -77,7 +77,7 @@
         :method "post"}
        [:div.flex.gap-4
         [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-         {:href (str "/app/game/" (:xt/id player))} "Back to Game"]
+         {:href (str "/app/game/" (:xt/id player))} "Pause"]
         [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
          {:type "submit"}
-         (if will-advance-round "Next Round" "Next Turn")]])])))
+         (if will-advance-round "Continue to Next Round" "Continue to Next Turn")]])])))

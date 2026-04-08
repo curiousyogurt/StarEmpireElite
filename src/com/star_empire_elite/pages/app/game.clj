@@ -38,7 +38,7 @@
    ;; Empire metrics  
    [:div
     [:p.text-xs "Population"]
-    [:p.font-mono (:player/population player)]]
+    [:p.font-mono (str (:player/population player) "M")]]
    [:div
     [:p.text-xs "Stability"]
     [:p.font-mono (:player/stability player) "%"]]
@@ -126,5 +126,5 @@
          [:a.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
           {:href (get-phase-url (:xt/id player) (:player/current-phase player))} "Play"]
          [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-          {:href "/app"} "Back"]
+          {:href "/app"} "Back to Games"]
          ]]))))

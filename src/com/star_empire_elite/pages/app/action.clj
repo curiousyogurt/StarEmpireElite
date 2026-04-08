@@ -65,7 +65,7 @@
         :method "post"}
        [:div.flex.gap-4
         [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-         {:href (str "/app/game/" player-id)} "Back to Game"]
+         {:href (str "/app/game/" player-id)} "Pause"]
         [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
          {:type "submit"}
          "Continue to Espionage"]])])))

@@ -29,13 +29,9 @@
                         (:player/food-planets player)
                         (:player/ore-planets player))]
     {:planets-credits   (* planet-count (:game/planet-upkeep-credits game))
-     :planets-food      planet-count
-     :soldiers-credits  (Math/round (/ (* (:player/soldiers player) 
-                                          (:game/soldier-upkeep-credits game)) 
-                                       1000.0))
-     :soldiers-food     (Math/round (/ (* (:player/soldiers player) 
-                                          (:game/soldier-upkeep-food game)) 
-                                       1000.0))
+     :planets-food      (* planet-count (:game/planet-upkeep-food game))
+     :soldiers-credits  (* (:player/soldiers player) (:game/soldier-upkeep-credits game))
+     :soldiers-food     (* (:player/soldiers player) (:game/soldier-upkeep-food game))
      :fighters-credits  (* (:player/fighters player) 
                            (:game/fighter-upkeep-credits game))
      :fighters-fuel     (* (:player/fighters player) 
@@ -44,17 +40,11 @@
                            (:game/station-upkeep-credits game))
      :stations-fuel     (* (:player/stations player) 
                            (:game/station-upkeep-fuel game))
-     :agents-food       (Math/round (/ (* (:player/agents player)
-                                          (:game/agent-upkeep-food game))
-                                       1000.0))
+     :agents-food       (* (:player/agents player) (:game/agent-upkeep-food game))
      :agents-fuel       (* (:player/agents player)
                            (:game/agent-upkeep-fuel game))
-     :population-food   (Math/round (/ (* (:player/population player)
-                                          (:game/population-upkeep-food game))
-                                       1000.0))
-     :population-fuel   (Math/round (/ (* (:player/population player)
-                                          (:game/population-upkeep-fuel game))
-                                       10000.0))}))
+     :population-food   (* (:player/population player) (:game/population-upkeep-food game))
+     :population-fuel   (* (:player/population player) (:game/population-upkeep-fuel game))}))
 
 ;;; Calculate resources after paying specified expenses
 (defn calculate-resources-after-expenses 
@@ -145,9 +135,10 @@
     [:span.hidden.lg:inline category-name]]
 
    ;; Col 2: Asset count (with parentheses on mobile, formatted number)
-   [:div.text-right.font-mono.lg:pr-4
-    [:span.lg:hidden "(" (ui/format-number asset-count) ")"]
-    [:span.hidden.lg:inline (ui/format-number asset-count)]]
+   (let [count-display (if (string? asset-count) asset-count (ui/format-number asset-count))]
+     [:div.text-right.font-mono.lg:pr-4
+      [:span.lg:hidden "(" count-display ")"]
+      [:span.hidden.lg:inline count-display]])
 
    ;; Col 3: Total required (with ID for HTMX swapping, will turn red if underpaid)
    [:div.font-mono.text-xxs.lg:text-base.lg:pr-4
@@ -441,7 +432,7 @@
               required player-id hx-include)
 
             (build-expense-row
-              {:category "Population" :abbrev "Pop" :row-id "population" :count (:player/population player)
+              {:category "Population" :abbrev "Pop" :row-id "population" :count (str (:player/population player) "M")
                :food {:field-name "population-food" :required-key :population-food}
                :fuel {:field-name "population-fuel" :required-key :population-fuel}}
               required player-id hx-include)]]]
@@ -456,7 +447,7 @@
          ;; Navigation and submit buttons
          [:div.flex.gap-4
           [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-           {:href (str "/app/game/" player-id)} "Back to Game"]
+           {:href (str "/app/game/" player-id)} "Pause"]
           [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
            {:href (str "/app/game/" player-id "/exchange")} "Continue to Exchange"]
           ;; Initial button starts disabled - HTMX updates will enable it when affordable

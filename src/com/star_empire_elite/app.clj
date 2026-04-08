@@ -6,7 +6,7 @@
 ;;;  - Add a route that maps a URL to the handler
 
 (ns com.star-empire-elite.app
-  (:require [com.biffweb :as biff]
+  (:require [com.biffweb :as biff :refer [q]]
             [com.star-empire-elite.middleware :as mid]
             [com.star-empire-elite.pages.app.dashboard :as dashboard]
             [com.star-empire-elite.pages.app.game :as game]
@@ -18,6 +18,7 @@
             [com.star-empire-elite.pages.app.espionage :as espionage]
             [com.star-empire-elite.pages.app.outcomes :as outcomes]
             [com.star-empire-elite.constants :as const]
+            [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]
             [xtdb.api :as xt]))
 
@@ -25,22 +26,40 @@
 (defn app [{:keys [session biff/db] :as ctx}]
   (dashboard/dashboard ctx))
 
-;; :: create a test game and player for the current user
-(defn create-test-game [{:keys [session biff/db] :as ctx}]
+;; :: show game name prompt
+(defn create-game-page [ctx]
+  (ui/page
+   {}
+   [:div.text-green-400.font-mono
+    [:h1.text-3xl.font-bold.mb-6 "Create Game"]
+    (biff/form
+     {:action "/app/create-game"
+      :method "post"}
+     [:div.mb-4
+      [:label.block.text-xs.mb-1 "Game Name"]
+      [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.font-mono
+       {:type "text" :name "game-name" :required true :maxlength 100 :autofocus true}]]
+     [:div.flex.gap-4
+      [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+       {:href "/app"} "Cancel"]
+      [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
+       {:type "submit"} "Create"]])]))
+
+;; :: create a new game with the submitted name
+(defn create-game [{:keys [params] :as ctx}]
   (let [game-id (java.util.UUID/randomUUID)
-        player-id (java.util.UUID/randomUUID)
+        game-name (clojure.string/trim (or (:game-name params) ""))
         now (java.util.Date.)
         end-date (java.util.Date. (+ (.getTime now) (* 30 24 60 60 1000)))]
     (biff/submit-tx ctx
       [{:db/doc-type :game
         :xt/id game-id
-        :game/name "Test Game"
+        :game/name game-name
         :game/created-at now
         :game/scheduled-end-at end-date
         :game/status 0
-        :game/turns-per-day 6
-        :game/rounds-per-day 10
-        ;; Income generation constants
+        :game/turns-per-day const/turns-per-day
+        :game/rounds-per-day const/rounds-per-day
         :game/ore-planet-credits const/ore-planet-credits
         :game/ore-planet-fuel const/ore-planet-fuel
         :game/ore-planet-galaxars const/ore-planet-galaxars
@@ -49,7 +68,6 @@
         :game/mil-planet-fighters const/mil-planet-fighters
         :game/mil-planet-stations const/mil-planet-stations
         :game/mil-planet-agents const/mil-planet-agents
-        ;; Upkeep/expense constants
         :game/planet-upkeep-credits const/planet-upkeep-credits
         :game/planet-upkeep-food const/planet-upkeep-food
         :game/soldier-upkeep-credits const/soldier-upkeep-credits
@@ -62,7 +80,6 @@
         :game/agent-upkeep-fuel const/agent-upkeep-fuel
         :game/population-upkeep-food const/population-upkeep-food
         :game/population-upkeep-fuel const/population-upkeep-fuel
-        ;; Building cost constants
         :game/soldier-cost const/soldier-cost
         :game/transport-cost const/transport-cost
         :game/general-cost const/general-cost
@@ -73,78 +90,95 @@
         :game/cmd-ship-cost const/cmd-ship-cost
         :game/mil-planet-cost const/mil-planet-cost
         :game/food-planet-cost const/food-planet-cost
-        :game/ore-planet-cost const/ore-planet-cost}
-       {:db/doc-type          :player
-        :xt/id                player-id
-        :player/user          (:uid session)
-        :player/game          game-id
-        :player/empire-name   "Test Empire"
-        :player/credits       10000
-        :player/food          5000
-        :player/fuel          3000
-        :player/galaxars      1000
-        :player/mil-planets   2
-        :player/food-planets  3
-        :player/ore-planets   1
-        :player/population    1000000
-        :player/stability     75
-        :player/status        0
-        :player/score         0
-        :player/current-turn  1
-        :player/current-round 1
-        :player/current-phase 1
-        :player/turns-used    0
-        :player/generals      5
-        :player/admirals      3
-        :player/soldiers      1000
-        :player/transports    10
-        :player/stations      5
-        :player/carriers      2
-        :player/fighters      50
-        :player/cmd-ships     1
-        :player/agents        10}])
+        :game/ore-planet-cost const/ore-planet-cost}])
     {:status 303
-     :headers {"location" "/app"}}))
-
-;; :: join an existing game by creating a new player record for the current user
-(defn join-game [{:keys [session biff/db path-params] :as ctx}]
+     :headers {"location" (str "/app/join-game/" game-id)}}))
+;; :: show empire name prompt for joining a game
+(defn join-game-page [{:keys [session biff/db path-params params] :as ctx}]
   (let [game-id (java.util.UUID/fromString (:game-id path-params))
-        game (xt/entity db game-id)]
+        game (xt/entity db game-id)
+        error (:error params)]
     (if (nil? game)
       {:status 404 :body "Game not found"}
+      (ui/page
+       {}
+       [:div.text-green-400.font-mono
+        [:h1.text-3xl.font-bold.mb-6 "Join Game"]
+        [:p.mb-4 (str "Game: " (:game/name game))]
+        (when error
+          [:p.text-red-400.mb-4 error])
+        (biff/form
+         {:action (str "/app/join-game/" game-id)
+          :method "post"}
+         [:div.mb-4
+          [:label.block.text-xs.mb-1 "Empire Name"]
+          [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.font-mono
+           {:type "text" :name "empire-name" :required true :maxlength 50
+            :autofocus true}]]
+         [:div.flex.gap-4
+          [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+           {:href "/app"} "Cancel"]
+          [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
+           {:type "submit"} "Join"]])]))))
+
+;; :: create player in a game after validating empire name uniqueness
+(defn join-game [{:keys [session biff/db path-params params] :as ctx}]
+  (let [game-id (java.util.UUID/fromString (:game-id path-params))
+        game (xt/entity db game-id)
+        empire-name (clojure.string/trim (or (:empire-name params) ""))
+        uid (:uid session)]
+    (cond
+      (nil? game)
+      {:status 404 :body "Game not found"}
+
+      (clojure.string/blank? empire-name)
+      {:status 303
+       :headers {"location" (str "/app/join-game/" game-id "?error=Empire+name+cannot+be+blank")}}
+
+      ;; check if another user already has this empire name in any game
+      (seq (q db '{:find [player]
+                   :in [empire-name uid]
+                   :where [[player :player/empire-name empire-name]
+                           [player :player/user other-user]
+                           [(not= other-user uid)]]}
+              empire-name uid))
+      {:status 303
+       :headers {"location" (str "/app/join-game/" game-id "?error=That+empire+name+is+already+taken")}}
+
+      :else
       (let [player-id (java.util.UUID/randomUUID)]
         (biff/submit-tx ctx
           [{:db/doc-type          :player
             :xt/id                player-id
-            :player/user          (:uid session)
+            :player/user          uid
             :player/game          game-id
-            :player/empire-name   "New Empire"
-            :player/credits       10000
-            :player/food          5000
-            :player/fuel          3000
-            :player/galaxars      1000
-            :player/mil-planets   2
-            :player/food-planets  3
-            :player/ore-planets   1
-            :player/population    1000000
-            :player/stability     75
+            :player/empire-name   empire-name
+            :player/credits       const/starting-credits
+            :player/food          const/starting-food
+            :player/fuel          const/starting-fuel
+            :player/galaxars      const/starting-galaxars
+            :player/mil-planets   const/starting-mil-planets
+            :player/food-planets  const/starting-food-planets
+            :player/ore-planets   const/starting-ore-planets
+            :player/population    const/starting-population
+            :player/stability     const/starting-stability
             :player/status        0
             :player/score         0
             :player/current-turn  1
             :player/current-round 1
             :player/current-phase 1
             :player/turns-used    0
-            :player/generals      5
-            :player/admirals      3
-            :player/soldiers      1000
-            :player/transports    10
-            :player/stations      5
-            :player/carriers      2
-            :player/fighters      50
-            :player/cmd-ships     1
-            :player/agents        10}])
+            :player/generals      const/starting-generals
+            :player/admirals      const/starting-admirals
+            :player/soldiers      const/starting-soldiers
+            :player/transports    const/starting-transports
+            :player/stations      const/starting-stations
+            :player/carriers      const/starting-carriers
+            :player/fighters      const/starting-fighters
+            :player/cmd-ships     const/starting-cmd-ships
+            :player/agents        const/starting-agents}])
         {:status 303
-         :headers {"location" "/app"}}))))
+         :headers {"location" (str "/app/game/" player-id)}}))))
 
 ;;;;
 ;;;; Phase Handlers - Streamlined using utils/with-player-and-game
@@ -202,8 +236,8 @@
 (def module
   {:routes ["/app" {:middleware [mid/wrap-signed-in]}
             ["" {:get app}]
-            ["/create-test-game" {:post create-test-game}]
-            ["/join-game/:game-id" {:post join-game}]
+            ["/create-game" {:get create-game-page :post create-game}]
+            ["/join-game/:game-id" {:get join-game-page :post join-game}]
             ["/game/:player-id" {:get game/game-view}]
             ["/game/:player-id/income" {:get income-handler}]
             ["/game/:player-id/apply-income" {:post income/apply-income}]

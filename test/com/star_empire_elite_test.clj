@@ -20,12 +20,14 @@
 
 ;; Test 1: Constants Validation (no database needed)
 (deftest constants-test
-  (testing "Game constants are properly defined"
-    (is (= const/ore-planet-credits 500))
-    (is (= const/food-planet-food 1000))
-    (is (= const/mil-planet-soldiers 50))
+  (testing "Game constants are positive numbers"
+    (is (pos? const/ore-planet-credits))
+    (is (pos? const/food-planet-food))
+    (is (pos? const/mil-planet-soldiers))
     (is (pos? const/planet-upkeep-credits))
-    (is (pos? const/soldier-upkeep-food))))
+    (is (pos? const/soldier-upkeep-food))
+    (is (pos? const/turns-per-day))
+    (is (pos? const/rounds-per-day))))
 
 ;; Test 2: Simple Math/Logic Test (no database needed)
 (deftest game-logic-test

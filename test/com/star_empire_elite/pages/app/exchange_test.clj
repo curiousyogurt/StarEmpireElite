@@ -2,6 +2,7 @@
   (:require [clojure.test :refer :all]
             [com.star-empire-elite.pages.app.exchange :as exchange]
             [com.star-empire-elite.test-helpers :as helpers]
+            [com.star-empire-elite.constants :as const]
             [xtdb.api :as xt]
             [com.star-empire-elite.utils :as utils]
             [com.biffweb :as biff]))
@@ -20,8 +21,13 @@
    :player/game #uuid "00000000-1111-2222-3333-444444444444"
    :player/credits 5000
    :player/soldiers 100
+   :player/transports 5
+   :player/generals 2
    :player/fighters 20
+   :player/carriers 1
+   :player/admirals 1
    :player/stations 10
+   :player/cmd-ships 0
    :player/mil-planets 5
    :player/food-planets 4
    :player/ore-planets 6
@@ -53,24 +59,24 @@
     (is (= 100 (utils/parse-numeric-input "-100")))))  ; Minus sign stripped
 
 (deftest test-get-exchange-rates
-  (testing "Returns standard exchange rates"
+  (testing "Returns exchange rates matching constants"
     (let [rates (exchange/get-exchange-rates)]
-      (is (= 50 (:soldier-sell rates)))
-      (is (= 100 (:fighter-sell rates)))
-      (is (= 150 (:station-sell rates)))
-      (is (= 500 (:mil-planet-sell rates)))
-      (is (= 500 (:food-planet-sell rates)))
-      (is (= 500 (:ore-planet-sell rates)))
-      (is (= 10 (:food-buy rates)))
-      (is (= 5 (:food-sell rates)))      ; Half of buy
-      (is (= 15 (:fuel-buy rates)))
-      (is (= 7 (:fuel-sell rates))))))    ; Half of buy (rounded down)
+      (is (= const/soldier-sell    (:soldier-sell rates)))
+      (is (= const/fighter-sell    (:fighter-sell rates)))
+      (is (= const/station-sell    (:station-sell rates)))
+      (is (= const/mil-planet-sell (:mil-planet-sell rates)))
+      (is (= const/food-planet-sell (:food-planet-sell rates)))
+      (is (= const/ore-planet-sell (:ore-planet-sell rates)))
+      (is (= const/food-buy        (:food-buy rates)))
+      (is (= const/food-sell       (:food-sell rates)))
+      (is (= const/fuel-buy        (:fuel-buy rates)))
+      (is (= const/fuel-sell       (:fuel-sell rates))))))    ; Half of buy (rounded down)
 
 (deftest test-calculate-exchange-credits-sales-only
   (testing "Calculates credits correctly from selling units only"
-    (let [quantities {:soldiers-sold 10
-                     :fighters-sold 5
-                     :stations-sold 2
+    (let [quantities {:soldiers-sold 10 :transports-sold 0 :generals-sold 0
+                     :fighters-sold 5 :carriers-sold 0 :admirals-sold 0
+                     :stations-sold 2 :cmd-ships-sold 0
                      :mil-planets-sold 1
                      :food-planets-sold 1
                      :ore-planets-sold 1
@@ -79,17 +85,19 @@
                      :fuel-bought 0
                      :fuel-sold 0}
           rates (exchange/get-exchange-rates)
-          result (exchange/calculate-exchange-credits quantities rates)]
-      ;; 10*50 + 5*100 + 2*150 + 1*500 + 1*500 + 1*500 = 500 + 500 + 300 + 500 + 500 + 500 = 2800
-      (is (= 2800 (:credits-from-sales result)))
+          result (exchange/calculate-exchange-credits quantities rates)
+          expected-sales (+ (* 10 const/soldier-sell) (* 5 const/fighter-sell)
+                            (* 2 const/station-sell)  (* 1 const/mil-planet-sell)
+                            (* 1 const/food-planet-sell) (* 1 const/ore-planet-sell))]
+      (is (= expected-sales (:credits-from-sales result)))
       (is (= 0 (:credits-from-resources result)))
-      (is (= 2800 (:total-credits result))))))
+      (is (= expected-sales (:total-credits result))))))
 
 (deftest test-calculate-exchange-credits-resources-only
   (testing "Calculates credits correctly from buying/selling resources"
-    (let [quantities {:soldiers-sold 0
-                     :fighters-sold 0
-                     :stations-sold 0
+    (let [quantities {:soldiers-sold 0 :transports-sold 0 :generals-sold 0
+                     :fighters-sold 0 :carriers-sold 0 :admirals-sold 0
+                     :stations-sold 0 :cmd-ships-sold 0
                      :mil-planets-sold 0
                      :food-planets-sold 0
                      :ore-planets-sold 0
@@ -98,19 +106,18 @@
                      :fuel-bought 15
                      :fuel-sold 5}
           rates (exchange/get-exchange-rates)
-          result (exchange/calculate-exchange-credits quantities rates)]
-      ;; Spent: 20*10 + 15*15 = 200 + 225 = 425
-      ;; Gained: 10*5 + 5*7 = 50 + 35 = 85
-      ;; Net: 85 - 425 = -340
+          result (exchange/calculate-exchange-credits quantities rates)
+          expected-net (- (+ (* 10 const/food-sell) (* 5 const/fuel-sell))
+                          (+ (* 20 const/food-buy)  (* 15 const/fuel-buy)))]
       (is (= 0 (:credits-from-sales result)))
-      (is (= -340 (:credits-from-resources result)))
-      (is (= -340 (:total-credits result))))))
+      (is (= expected-net (:credits-from-resources result)))
+      (is (= expected-net (:total-credits result))))))
 
 (deftest test-calculate-exchange-credits-mixed
   (testing "Calculates credits correctly from mixed exchanges"
-    (let [quantities {:soldiers-sold 5
-                     :fighters-sold 2
-                     :stations-sold 1
+    (let [quantities {:soldiers-sold 5 :transports-sold 0 :generals-sold 0
+                     :fighters-sold 2 :carriers-sold 0 :admirals-sold 0
+                     :stations-sold 1 :cmd-ships-sold 0
                      :mil-planets-sold 0
                      :food-planets-sold 0
                      :ore-planets-sold 0
@@ -119,30 +126,39 @@
                      :fuel-bought 5
                      :fuel-sold 10}
           rates (exchange/get-exchange-rates)
-          result (exchange/calculate-exchange-credits quantities rates)]
-      ;; Sales: 5*50 + 2*100 + 1*150 = 250 + 200 + 150 = 600
-      ;; Resources spent: 10*10 + 5*15 = 100 + 75 = 175
-      ;; Resources gained: 20*5 + 10*7 = 100 + 70 = 170
-      ;; Resources net: 170 - 175 = -5
-      ;; Total: 600 + (-5) = 595
-      (is (= 600 (:credits-from-sales result)))
-      (is (= -5 (:credits-from-resources result)))
-      (is (= 595 (:total-credits result))))))
+          result (exchange/calculate-exchange-credits quantities rates)
+          expected-sales (+ (* 5 const/soldier-sell) (* 2 const/fighter-sell) (* 1 const/station-sell))
+          expected-resources (- (+ (* 20 const/food-sell) (* 10 const/fuel-sell))
+                                 (+ (* 10 const/food-buy)  (* 5  const/fuel-buy)))]
+      (is (= expected-sales (:credits-from-sales result)))
+      (is (= expected-resources (:credits-from-resources result)))
+      (is (= (+ expected-sales expected-resources) (:total-credits result))))))
 
 (deftest test-calculate-resources-after-exchange
   (testing "Calculates all resources correctly after exchange"
     (let [player {:player/credits 1000
                   :player/soldiers 100
+                  :player/transports 5
+                  :player/generals 2
                   :player/fighters 20
+                  :player/carriers 1
+                  :player/admirals 1
                   :player/stations 10
+                  :player/cmd-ships 0
                   :player/mil-planets 5
                   :player/food-planets 4
                   :player/ore-planets 6
                   :player/food 500
-                  :player/fuel 300}
+                  :player/fuel 300
+                  :player/galaxars 0}
           quantities {:soldiers-sold 10
+                     :transports-sold 0
+                     :generals-sold 0
                      :fighters-sold 5
+                     :carriers-sold 0
+                     :admirals-sold 0
                      :stations-sold 2
+                     :cmd-ships-sold 0
                      :mil-planets-sold 1
                      :food-planets-sold 1
                      :ore-planets-sold 1
@@ -162,34 +178,32 @@
       (is (= 530 (:food resources-after)))                ; 500 + 50 - 20
       (is (= 320 (:fuel resources-after))))))             ; 300 + 30 - 10
 
+(def full-resources
+  {:credits 100 :soldiers 50 :transports 5 :generals 2
+   :fighters 10 :carriers 1 :admirals 1 :stations 5 :cmd-ships 0
+   :mil-planets 2 :food-planets 3 :ore-planets 1 :food 1000 :fuel 500})
+
 (deftest test-valid-exchange
   (testing "Returns true when all resources are non-negative"
-    (is (true? (exchange/valid-exchange? {:credits 100 :soldiers 50 :fighters 10
-                                          :stations 5 :mil-planets 2 :food-planets 3
-                                          :ore-planets 1 :food 1000 :fuel 500 :galaxars 5})))
-    (is (true? (exchange/valid-exchange? {:credits 0 :soldiers 0 :fighters 0
-                                          :stations 0 :mil-planets 0 :food-planets 0
-                                          :ore-planets 0 :food 0 :fuel 0 :galaxars 0}))))
-  
+    (is (true? (exchange/valid-exchange? full-resources)))
+    (is (true? (exchange/valid-exchange? (zipmap (keys full-resources) (repeat 0))))))
+
   (testing "Returns false when any resource is negative"
-    (is (false? (exchange/valid-exchange? {:credits -1 :soldiers 50 :fighters 10
-                                           :stations 5 :mil-planets 2 :food-planets 3
-                                           :ore-planets 1 :food 1000 :fuel 500 :galaxars 5})))
-    (is (false? (exchange/valid-exchange? {:credits 100 :soldiers -1 :fighters 10
-                                           :stations 5 :mil-planets 2 :food-planets 3
-                                           :ore-planets 1 :food 1000 :fuel 500 :galaxars 5})))
-    (is (false? (exchange/valid-exchange? {:credits 100 :soldiers 50 :fighters 10
-                                           :stations 5 :mil-planets 2 :food-planets 3
-                                           :ore-planets 1 :food -1 :fuel 500 :galaxars 5})))))
+    (is (false? (exchange/valid-exchange? (assoc full-resources :credits -1))))
+    (is (false? (exchange/valid-exchange? (assoc full-resources :soldiers -1))))
+    (is (false? (exchange/valid-exchange? (assoc full-resources :food -1))))))
 
 (deftest test-identify-invalid-exchanges
   (testing "Identifies specific invalid exchanges correctly"
-    (let [resources-after {:credits -50 :soldiers -10 :fighters 15 
-                          :stations 8 :mil-planets 4 :food-planets 3 
+    (let [resources-after {:credits -50 :soldiers -10 :transports 5 :generals 2
+                          :fighters 15 :carriers 1 :admirals 1
+                          :stations 8 :cmd-ships 0
+                          :mil-planets 4 :food-planets 3
                           :ore-planets 5 :food 530 :fuel 320}
           quantities {:soldiers-sold 110  ; Oversold
-                     :fighters-sold 5
-                     :stations-sold 2
+                     :transports-sold 0 :generals-sold 0
+                     :fighters-sold 5 :carriers-sold 0 :admirals-sold 0
+                     :stations-sold 2 :cmd-ships-sold 0
                      :mil-planets-sold 1
                      :food-planets-sold 1
                      :ore-planets-sold 1
@@ -254,7 +268,9 @@
               actual-tx (first @tx-called)
               
               ;; Calculate expected values using pure functions
-              quantities {:soldiers-sold 10 :fighters-sold 5 :stations-sold 2
+              quantities {:soldiers-sold 10 :transports-sold 0 :generals-sold 0
+                         :fighters-sold 5 :carriers-sold 0 :admirals-sold 0
+                         :stations-sold 2 :cmd-ships-sold 0
                          :mil-planets-sold 1 :food-planets-sold 1 :ore-planets-sold 1
                          :food-bought 50 :food-sold 20 :fuel-bought 30 :fuel-sold 10}
               rates (exchange/get-exchange-rates)
@@ -352,8 +368,10 @@
   (testing "Correctly identifies when player can/cannot execute exchanges"
     (with-redefs [xt/entity (helpers/fake-entity [test-player])]
       ;; Test valid exchanges
-      (let [valid-params {:soldiers-sold "10" :fighters-sold "5"
-                         :stations-sold "2" :mil-planets-sold "1"
+      (let [valid-params {:soldiers-sold "10" :transports-sold "0" :generals-sold "0"
+                         :fighters-sold "5" :carriers-sold "0" :admirals-sold "0"
+                         :stations-sold "2" :cmd-ships-sold "0"
+                         :mil-planets-sold "1"
                          :food-planets-sold "1" :ore-planets-sold "1"
                          :food-bought "0" :food-sold "0"
                          :fuel-bought "0" :fuel-sold "0"}
@@ -366,7 +384,9 @@
       
       ;; Test invalid exchanges (overselling)
       (let [invalid-params {:soldiers-sold "1000"  ; More than player has
-                           :fighters-sold "0" :stations-sold "0"
+                           :transports-sold "0" :generals-sold "0"
+                           :fighters-sold "0" :carriers-sold "0" :admirals-sold "0"
+                           :stations-sold "0" :cmd-ships-sold "0"
                            :mil-planets-sold "0" :food-planets-sold "0" :ore-planets-sold "0"
                            :food-bought "0" :food-sold "0"
                            :fuel-bought "0" :fuel-sold "0"}
@@ -392,10 +412,10 @@
 (deftest test-exchange-page-uses-exchange-rates
   (testing "Exchange page displays correct exchange rates"
     (let [rates (exchange/get-exchange-rates)]
-      ;; Verify the rates are what we expect
-      (is (= 50 (:soldier-sell rates)))
-      (is (= 100 (:fighter-sell rates)))
-      (is (= 10 (:food-buy rates)))
-      (is (= 5 (:food-sell rates)))
-      (is (= 15 (:fuel-buy rates)))
-      (is (= 7 (:fuel-sell rates))))))
+      ;; Verify rates match constants
+      (is (= const/soldier-sell (:soldier-sell rates)))
+      (is (= const/fighter-sell (:fighter-sell rates)))
+      (is (= const/food-buy     (:food-buy rates)))
+      (is (= const/food-sell    (:food-sell rates)))
+      (is (= const/fuel-buy     (:fuel-buy rates)))
+      (is (= const/fuel-sell    (:fuel-sell rates))))))

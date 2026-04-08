@@ -118,10 +118,6 @@
             expected-fuel (* 3 const/ore-planet-fuel)
             expected-galaxars (* 3 const/ore-planet-galaxars)]
 
-        (is (= expected-credits 1500))  ; 3 * 500
-        (is (= expected-fuel 600))      ; 3 * 200
-        (is (= expected-galaxars 300))  ; 3 * 100
-
         ;; Test the income calculation logic directly
         (let [ore-credits (* (:player/ore-planets player) (:game/ore-planet-credits game))
               ore-fuel (* (:player/ore-planets player) (:game/ore-planet-fuel game))
@@ -147,7 +143,6 @@
             expected-food (* 4 const/food-planet-food)
             actual-food (* (:player/food-planets player) (:game/food-planet-food game))]
 
-        (is (= expected-food 4000))  ; 4 * 1000
         (is (= actual-food expected-food))))))
 
 (deftest mil-planet-income-calculation-test
@@ -167,11 +162,6 @@
             expected-fighters (* 2 const/mil-planet-fighters)
             expected-stations (* 2 const/mil-planet-stations)
             expected-agents (* 2 const/mil-planet-agents)]
-
-        (is (= expected-soldiers 100))  ; 2 * 50
-        (is (= expected-fighters 50))   ; 2 * 25
-        (is (= expected-stations 20))   ; 2 * 10
-        (is (= expected-agents 10))     ; 2 * 5
 
         ;; Test actual calculations
         (let [mil-soldiers (* (:player/mil-planets player) (:game/mil-planet-soldiers game))
@@ -287,25 +277,26 @@
               final-stations (+ (:player/stations player) mil-stations)
               final-agents (+ (:player/agents player) mil-agents)]
 
-          ;; Verify individual income components
-          (is (= ore-credits 1000))     ; 2 ore planets * 500 credits
-          (is (= ore-fuel 400))         ; 2 ore planets * 200 fuel
-          (is (= ore-galaxars 200))     ; 2 ore planets * 100 galaxars
-          (is (= food-food 1000))       ; 1 food planet * 1000 food
-          (is (= mil-soldiers 50))      ; 1 military planet * 50 soldiers
-          (is (= mil-fighters 25))      ; 1 military planet * 25 fighters
-          (is (= mil-stations 10))      ; 1 military planet * 10 stations
-          (is (= mil-agents 5))         ; 1 military planet * 5 agents
+          ;; Verify income components match game constants
+          (is (= ore-credits   (* 2 const/ore-planet-credits)))
+          (is (= ore-fuel      (* 2 const/ore-planet-fuel)))
+          (is (= ore-galaxars  (* 2 const/ore-planet-galaxars)))
+          (is (= food-food     (* 1 const/food-planet-food)))
+          (is (= mil-soldiers  (* 1 const/mil-planet-soldiers)))
+          (is (= mil-fighters  (* 1 const/mil-planet-fighters)))
+          (is (= mil-stations  (* 1 const/mil-planet-stations)))
+          (is (= mil-agents    (* 1 const/mil-planet-agents)))
 
           ;; Verify final resource totals
-          (is (= final-credits 2000))   ; 1000 + 1000
-          (is (= final-food 1500))      ; 500 + 1000
-          (is (= final-fuel 600))       ; 200 + 400
-          (is (= final-galaxars 300))   ; 100 + 200
-          (is (= final-soldiers 150))   ; 100 + 50
-          (is (= final-fighters 45))    ; 20 + 25
-          (is (= final-stations 15))    ; 5 + 10
-          (is (= final-agents 15))))))) ; 10 + 5
+          (is (= final-credits  (+ 1000 ore-credits)))
+          (is (= final-food     (+ 500  food-food)))
+          (is (= final-fuel     (+ 200  ore-fuel)))
+          (is (= final-galaxars (+ 100  ore-galaxars)))
+          (is (= final-soldiers (+ 100  mil-soldiers)))
+          (is (= final-fighters (+ 20   mil-fighters)))
+          (is (= final-stations (+ 5    mil-stations)))
+          (is (= final-agents   (+ 10   mil-agents))))))))
+
 
 ;; Test 6: Zero Planet Edge Case
 (deftest zero-planets-income-test

@@ -34,7 +34,7 @@
         {:game game
          :player-count player-count}))))
 
-;; :: render a joinable game card with player count and join button
+;; :: render a joinable game card with player count and join link
 (defn available-game-card [{:keys [game player-count]}]
   [:div.border.border-green-400.p-4.mb-4.max-w-6xl
    [:div.flex.justify-between.items-center
@@ -42,12 +42,9 @@
      [:h3.font-bold (:game/name game)]
      [:p.text-xs.text-green-400.text-opacity-75
       (str player-count " player(s)")]]
-    (biff/form
-     {:action (str "/app/join-game/" (:xt/id game))
-      :method "post"}
-     [:button.bg-green-400.text-black.px-4.py-2.font-bold.hover:bg-green-300.transition-colors
-      {:type "submit"}
-      "Join Game"])]])
+    [:a.border.border-green-400.px-4.py-2.text-sm.transition-colors.hover:border-yellow-400.hover:text-yellow-400
+     {:href (str "/app/join-game/" (:xt/id game))}
+     "Join Game"]]])
 
 ;; :: render a single game as a card with sections
 (defn game-card [{:keys [player game]}]
@@ -58,10 +55,11 @@
    ;; :: header row
    [:div.flex.justify-between.mb-3
     [:div
-     [:h3.font-bold (:player/empire-name player)]
-     [:p.text-xs.text-green-400.text-opacity-75 
-      (str "Turn " (:player/current-turn player) 
-           " | Round " (:player/current-round player) 
+     [:h3.font-bold (:game/name game)]
+     [:p.text-sm (:player/empire-name player)]
+     [:p.text-xs.text-green-400.text-opacity-75
+      (str "Turn " (:player/current-turn player)
+           " | Round " (:player/current-round player)
            " | Phase " (:player/current-phase player))]]
     [:div.flex.gap-4.text-right
      [:div
@@ -87,7 +85,7 @@
      [:p.font-mono (:player/galaxars player)]]
     [:div
      [:p.text-xs "Population"]
-     [:p.font-mono (:player/population player)]]
+     [:p.font-mono (str (:player/population player) "M")]]
     [:div
      [:p.text-xs "Stability"]
      [:p.font-mono (:player/stability player) "%"]]
@@ -157,16 +155,15 @@
         [:div.mb-6
          (map game-card my-games)])
 
-      ;; :: create test game button (always visible)
-      (biff/form
-       {:action "/app/create-test-game"
-        :method "post"}
-       [:button.bg-green-400.text-black.px-4.py-2.font-bold.hover:bg-green-300.transition-colors
-        {:type "submit"}
-        "Create Test Game"])
 
       ;; :: available games to join
       (when (seq available-games)
-        [:div.mt-8
+        [:div.mb-6
          [:h2.text-xl.font-bold.mb-4 "Available Games"]
-         (map available-game-card available-games)])])))
+         (map available-game-card available-games)])
+      
+      
+      ;; :: create game button (always visible)
+      [:a.bg-green-400.text-black.px-4.py-2.font-bold.hover:bg-green-300.transition-colors.inline-block
+       {:href "/app/create-game"}
+       "Create Game"]])))

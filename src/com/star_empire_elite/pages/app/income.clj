@@ -188,5 +188,8 @@
        ;;; validate.
        (biff/form
          {:action (str "/app/game/" (:xt/id player) "/apply-income") :method "post"}
-         [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
-          {:type "submit"} "Continue to Expenses"])])))
+         [:div.flex.gap-4
+          [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+           {:href (str "/app/game/" (:xt/id player))} "Pause"]
+          [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
+           {:type "submit"} "Continue to Expenses"]])])))
