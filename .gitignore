@@ -64,3 +64,5 @@ logs/
 .Spotlight-V100
 .Trashes
 Icon\r
+
+resources/config.edn

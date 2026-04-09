@@ -16,7 +16,7 @@
       [:span.star.text-2xl " ★"]]
  
      ;; Subtitle
-     [:p.text-lg.italic.mb-8 "Shape destiny. Write history. Become legend."]
+     [:p.text-lg.italic.mb-8 "Rule the universe with your friends. Or instead of them."]
  
      ;; Divider line
      [:div.w-96.border-t.border-green-400.mb-8]
@@ -26,33 +26,33 @@
  
      ;; Game description
      [:p.text-center.w-full.mb-12.text-sm.leading-relaxed.max-w-3xl
-      "Star Empire Elite is a turn-based strategy game where you found and manage a galactic empire. "
-      "Acquire planets, manage resources, conduct diplomacy, and use covert operations to create a "
-      "galactic dynasty."]
+      "Star Empire Elite is a turn-based strategy game where you build a galactic empire. "
+      "Acquire planets, manage resources, conduct diplomacy, and use covert operations to chart your "
+      "galactic destiny."]
  
      ;; Four game pillars in a 2x2 grid
      [:div.grid.grid-cols-2.gap-6.mb-12.w-full.max-w-2xl
   
       ;; Empire building pillar
-      [:div.border.border-green-400.p-4.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+      [:div.border.border-green-400.p-4
        [:div.text-2xl.mb-2 "🪐"]
        [:h3.font-bold.mb-2 "Empire Building"]
        [:p.text-xs "Acquire and manage planets, feed your people, and grow your economy."]]
-  
+
       ;; Military power pillar
-      [:div.border.border-green-400.p-4.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+      [:div.border.border-green-400.p-4
        [:div.text-2xl.mb-2 "🚀"]
        [:h3.font-bold.mb-2 "Military Power"]
        [:p.text-xs "Build fleets, attack rivals, and defend your territory from invasion."]]
-  
+
       ;; Diplomacy pillar
-      [:div.border.border-green-400.p-4.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+      [:div.border.border-green-400.p-4
        [:div.text-2xl.mb-2 "🎁"]
        [:h3.font-bold.mb-2 "Diplomacy"]
        [:p.text-xs "Form alliances, negotiate peace, and scheme against your enemies."]]
-  
+
       ;; Covert operations pillar
-      [:div.border.border-green-400.p-4.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+      [:div.border.border-green-400.p-4
        [:div.text-2xl.mb-2 "🔍"]
        [:h3.font-bold.mb-2 "Covert Ops"]
        [:p.text-xs "Deploy agents to spy, sabotage, and destabilize rival empires."]]]
