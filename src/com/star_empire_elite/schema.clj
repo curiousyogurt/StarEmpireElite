@@ -17,7 +17,7 @@
           [:game/scheduled-end-at          inst?]
           [:game/ended-at {:optional true} inst?]
           [:game/status                    :int]
-          [:game/turns-per-day             :int]
+          [:game/turns-per-round           :int]
           [:game/rounds-per-day            :int]
           
           ;; Income generation constants

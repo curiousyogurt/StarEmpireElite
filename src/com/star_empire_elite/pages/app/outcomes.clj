@@ -18,14 +18,14 @@
               current-turn (:player/current-turn player)
               current-round (:player/current-round player)
               game (xt/entity db (:player/game player))
-              turns-per-day (:game/turns-per-day game)
+              turns-per-round (:game/turns-per-round game)
               rounds-per-day (:game/rounds-per-day game)
               
               ;; calculate next turn and round
               turns-used (inc (:player/turns-used player))
 
               ;; check if we need to advance to next round
-              should-advance-round (>= turns-used turns-per-day)
+              should-advance-round (>= turns-used turns-per-round)
               next-turn (if should-advance-round 1 (inc current-turn))
               next-round (if should-advance-round (inc current-round) current-round)
               reset-turns-used (if should-advance-round 0 turns-used)]
@@ -49,7 +49,7 @@
 (defn outcomes-page [{:keys [player game]}]
   (let [current-turn (:player/current-turn player)
         current-round (:player/current-round player)
-        turns-per-round (:game/turns-per-day game)
+        turns-per-round (:game/turns-per-round game)
         rounds-per-day (:game/rounds-per-day game)
         will-advance-round (>= current-turn turns-per-round)]
     (ui/page

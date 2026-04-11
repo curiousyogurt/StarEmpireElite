@@ -1,5 +1,6 @@
 (ns com.star-empire-elite.pages.app.dashboard
   (:require [com.biffweb :as biff :refer [q]]
+            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [xtdb.api :as xt]))
 
@@ -35,24 +36,33 @@
          :player-count player-count}))))
 
 ;; :: render a joinable game card with player count and join link
-(defn available-game-card [{:keys [game player-count]}]
+(defn available-game-card [{:keys [game player-count admin?]}]
   [:div.border.border-green-400.p-4.mb-4.max-w-6xl
    [:div.flex.justify-between.items-center
     [:div
      [:h3.font-bold (:game/name game)]
      [:p.text-xs.text-green-400.text-opacity-75
       (str player-count " player(s)")]]
-    [:a.border.border-green-400.px-4.py-2.text-sm.transition-colors.hover:border-yellow-400.hover:text-yellow-400
-     {:href (str "/app/join-game/" (:xt/id game))}
-     "Join Game"]]])
+    [:div.flex.items-center.gap-2
+     [:a.border.border-green-400.px-4.py-2.text-sm.transition-colors.hover:border-yellow-400.hover:text-yellow-400
+      {:href (str "/app/join-game/" (:xt/id game))}
+      "Join Game"]
+     (when admin?
+       (biff/form
+        {:action (str "/app/delete-game/" (:xt/id game))
+         :method "post"
+         :onsubmit "return confirm('Delete this game and all its players?')"}
+        [:button.border.border-green-400.text-green-400.px-2.py-1.text-sm.hover:border-yellow-400.hover:text-yellow-400.transition-colors
+         {:type "submit"} "X"]))]]])
 
 ;; :: render a single game as a card with sections
-(defn game-card [{:keys [player game]}]
-  [:a {:href (str "/app/game/" (:xt/id player))
-       :class "block"}
-   [:div.border.border-green-400.p-4.mb-4.max-w-6xl.hover:bg-green-400.hover:bg-opacity-10.transition-colors.cursor-pointer
-   
-   ;; :: header row
+(defn game-card [{:keys [player game admin?]}]
+  [:div.border.border-green-400.p-4.mb-4.max-w-6xl.relative.hover:bg-green-400.hover:bg-opacity-10.transition-colors.cursor-pointer
+
+   ;; :: stretched link covers the whole card
+   [:a.absolute.inset-0 {:href (str "/app/game/" (:xt/id player))}]
+
+   ;; :: header row: info left, rank/score/delete right
    [:div.flex.justify-between.mb-3
     [:div
      [:h3.font-bold (:game/name game)]
@@ -61,79 +71,51 @@
       (str "Turn " (:player/current-turn player)
            " | Round " (:player/current-round player)
            " | Phase " (:player/current-phase player))]]
-    [:div.flex.gap-4.text-right
-     [:div
+    [:div.flex.gap-8.items-start.relative.z-10
+     [:div.text-right
       [:p.text-xs "Rank"]
       [:p.font-bold (:player/rank player)]]
-     [:div
+     [:div.text-right
       [:p.text-xs "Score"]
-      [:p.text-lg.font-bold (:player/score player)]]]]
-   
+      [:p.text-lg.font-bold (:player/score player)]]
+     (when admin?
+       (biff/form
+        {:action (str "/app/delete-game/" (:xt/id game))
+         :method "post"
+         :onsubmit "return confirm('Delete this game and all its players?')"}
+        [:button.border.border-green-400.text-green-400.px-2.py-1.text-sm.hover:border-yellow-400.hover:text-yellow-400.transition-colors
+         {:type "submit"} "X"]))]]
+
    ;; :: row 1: currencies and planets
    [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2.mb-3.pb-3.border-b.border-green-400
-    [:div
-     [:p.text-xs "Credits"]
-     [:p.font-mono (:player/credits player)]]
-    [:div
-     [:p.text-xs "Food"]
-     [:p.font-mono (:player/food player)]]
-    [:div
-     [:p.text-xs "Fuel"]
-     [:p.font-mono (:player/fuel player)]]
-    [:div
-     [:p.text-xs "Galaxars"]
-     [:p.font-mono (:player/galaxars player)]]
-    [:div
-     [:p.text-xs "Population"]
-     [:p.font-mono (str (:player/population player) "M")]]
-    [:div
-     [:p.text-xs "Stability"]
-     [:p.font-mono (:player/stability player) "%"]]
-    [:div
-     [:p.text-xs "Ore Plts"]
-     [:p.font-mono (:player/ore-planets player)]]
-    [:div
-     [:p.text-xs "Food Plts"]
-     [:p.font-mono (:player/food-planets player)]]
-    [:div
-     [:p.text-xs "Mil Plts"]
-     [:p.font-mono (:player/mil-planets player)]]]
-   
+    [:div [:p.text-xs "Credits"]    [:p.font-mono (:player/credits player)]]
+    [:div [:p.text-xs "Food"]       [:p.font-mono (:player/food player)]]
+    [:div [:p.text-xs "Fuel"]       [:p.font-mono (:player/fuel player)]]
+    [:div [:p.text-xs "Galaxars"]   [:p.font-mono (:player/galaxars player)]]
+    [:div [:p.text-xs "Population"] [:p.font-mono (str (:player/population player) "M")]]
+    [:div [:p.text-xs "Stability"]  [:p.font-mono (:player/stability player) "%"]]
+    [:div [:p.text-xs "Ore Plts"]   [:p.font-mono (:player/ore-planets player)]]
+    [:div [:p.text-xs "Food Plts"]  [:p.font-mono (:player/food-planets player)]]
+    [:div [:p.text-xs "Mil Plts"]   [:p.font-mono (:player/mil-planets player)]]]
+
    ;; :: row 2: military units and leadership
    [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2.mb-3.pb-3.border-b.border-green-400
-    [:div
-     [:p.text-xs "Generals"]
-     [:p.font-mono (:player/generals player)]]
-    [:div
-     [:p.text-xs "Soldiers"]
-     [:p.font-mono (:player/soldiers player)]]
-    [:div
-     [:p.text-xs "Transports"]
-     [:p.font-mono (:player/transports player)]]
-    [:div
-     [:p.text-xs "Admirals"]
-     [:p.font-mono (:player/admirals player)]]
-    [:div
-     [:p.text-xs "Fighters"]
-     [:p.font-mono (:player/fighters player)]]
-    [:div
-     [:p.text-xs "Carriers"]
-     [:p.font-mono (:player/carriers player)]]
-    [:div
-     [:p.text-xs "Def Stns"]
-     [:p.font-mono (:player/stations player)]]
-    [:div
-     [:p.text-xs "Cmd Ships"]
-     [:p.font-mono (:player/cmd-ships player)]]
-    [:div
-     [:p.text-xs "Agents"]
-     [:p.font-mono (:player/agents player)]]]]])
+    [:div [:p.text-xs "Generals"]   [:p.font-mono (:player/generals player)]]
+    [:div [:p.text-xs "Soldiers"]   [:p.font-mono (:player/soldiers player)]]
+    [:div [:p.text-xs "Transports"] [:p.font-mono (:player/transports player)]]
+    [:div [:p.text-xs "Admirals"]   [:p.font-mono (:player/admirals player)]]
+    [:div [:p.text-xs "Fighters"]   [:p.font-mono (:player/fighters player)]]
+    [:div [:p.text-xs "Carriers"]   [:p.font-mono (:player/carriers player)]]
+    [:div [:p.text-xs "Def Stns"]   [:p.font-mono (:player/stations player)]]
+    [:div [:p.text-xs "Cmd Ships"]  [:p.font-mono (:player/cmd-ships player)]]
+    [:div [:p.text-xs "Agents"]     [:p.font-mono (:player/agents player)]]]])
 
 ;; :: dashboard page showing all games
 (defn dashboard [{:keys [session biff/db] :as ctx}]
-  (let [my-games (get-user-games db (:uid session))
+  (let [my-games        (get-user-games db (:uid session))
         available-games (get-available-games db (:uid session))
-        user (xt/entity db (:uid session))]
+        user            (xt/entity db (:uid session))
+        admin?          (boolean (const/admin-emails (:user/email user)))]
     (ui/page
      {}
      [:div.text-green-400.font-mono
@@ -153,17 +135,16 @@
       (if (empty? my-games)
         [:p.mb-6 "You are not currently in any games."]
         [:div.mb-6
-         (map game-card my-games)])
-
+         (map #(game-card (assoc % :admin? admin?)) my-games)])
 
       ;; :: available games to join
       (when (seq available-games)
         [:div.mb-6
          [:h2.text-xl.font-bold.mb-4 "Available Games"]
-         (map available-game-card available-games)])
-      
-      
-      ;; :: create game button (always visible)
-      [:a.bg-green-400.text-black.px-4.py-2.font-bold.hover:bg-green-300.transition-colors.inline-block
-       {:href "/app/create-game"}
-       "Create Game"]])))
+         (map #(available-game-card (assoc % :admin? admin?)) available-games)])
+
+      ;; :: create game button (admin only)
+      (when admin?
+        [:a.bg-green-400.text-black.px-4.py-2.font-bold.hover:bg-green-300.transition-colors.inline-block
+         {:href "/app/create-game"}
+         "Create Game"])])))

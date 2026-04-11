@@ -27,10 +27,16 @@
 ;; ============================================================
 
 
+;; :: Admin Accounts
+;; Only these email addresses are permitted to create new games.
+
+(def admin-emails #{"darcyotto@bennington.edu"})
+
+
 ;; :: Default Game Settings
 
-(def turns-per-day 6)
-(def rounds-per-day 10)
+(def turns-per-round 6)
+(def rounds-per-day 2)
 
 
 ;; :: Starting Empire Defaults

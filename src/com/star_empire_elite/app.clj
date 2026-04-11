@@ -27,72 +27,103 @@
   (dashboard/dashboard ctx))
 
 ;; :: show game name prompt
-(defn create-game-page [ctx]
-  (ui/page
-   {}
-   [:div.text-green-400.font-mono
-    [:h1.text-3xl.font-bold.mb-6 "Create Game"]
-    (biff/form
-     {:action "/app/create-game"
-      :method "post"}
-     [:div.mb-4
-      [:label.block.text-xs.mb-1 "Game Name"]
-      [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.font-mono
-       {:type "text" :name "game-name" :required true :maxlength 100 :autofocus true}]]
-     [:div.flex.gap-4
-      [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-       {:href "/app"} "Cancel"]
-      [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
-       {:type "submit"} "Create"]])]))
+(defn create-game-page [{:keys [session biff/db] :as ctx}]
+  (let [uid  (:uid session)
+        user (xt/entity db uid)]
+    (if-not (const/admin-emails (:user/email user))
+      {:status 303 :headers {"location" "/app"}}
+      (ui/page
+       {}
+       [:div.text-green-400.font-mono
+        [:h1.text-3xl.font-bold.mb-6 "Create Game"]
+        (biff/form
+         {:action "/app/create-game"
+          :method "post"}
+         [:div.mb-4
+          [:label.block.text-xs.mb-1 "Galaxy Name"]
+          [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.font-mono
+           {:type "text" :name "game-name" :required true :maxlength 100 :autofocus true}]]
+         [:div.flex.gap-4
+          [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+           {:href "/app"} "Cancel"]
+          [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
+           {:type "submit"} "Create"]])]))))
 
 ;; :: create a new game with the submitted name
-(defn create-game [{:keys [params] :as ctx}]
-  (let [game-id (java.util.UUID/randomUUID)
-        game-name (clojure.string/trim (or (:game-name params) ""))
-        now (java.util.Date.)
-        end-date (java.util.Date. (+ (.getTime now) (* 30 24 60 60 1000)))]
-    (biff/submit-tx ctx
-      [{:db/doc-type :game
-        :xt/id game-id
-        :game/name game-name
-        :game/created-at now
-        :game/scheduled-end-at end-date
-        :game/status 0
-        :game/turns-per-day const/turns-per-day
-        :game/rounds-per-day const/rounds-per-day
-        :game/ore-planet-credits const/ore-planet-credits
-        :game/ore-planet-fuel const/ore-planet-fuel
-        :game/ore-planet-galaxars const/ore-planet-galaxars
-        :game/food-planet-food const/food-planet-food
-        :game/mil-planet-soldiers const/mil-planet-soldiers
-        :game/mil-planet-fighters const/mil-planet-fighters
-        :game/mil-planet-stations const/mil-planet-stations
-        :game/mil-planet-agents const/mil-planet-agents
-        :game/planet-upkeep-credits const/planet-upkeep-credits
-        :game/planet-upkeep-food const/planet-upkeep-food
-        :game/soldier-upkeep-credits const/soldier-upkeep-credits
-        :game/soldier-upkeep-food const/soldier-upkeep-food
-        :game/fighter-upkeep-credits const/fighter-upkeep-credits
-        :game/fighter-upkeep-fuel const/fighter-upkeep-fuel
-        :game/station-upkeep-credits const/station-upkeep-credits
-        :game/station-upkeep-fuel const/station-upkeep-fuel
-        :game/agent-upkeep-food const/agent-upkeep-food
-        :game/agent-upkeep-fuel const/agent-upkeep-fuel
-        :game/population-upkeep-food const/population-upkeep-food
-        :game/population-upkeep-fuel const/population-upkeep-fuel
-        :game/soldier-cost const/soldier-cost
-        :game/transport-cost const/transport-cost
-        :game/general-cost const/general-cost
-        :game/carrier-cost const/carrier-cost
-        :game/fighter-cost const/fighter-cost
-        :game/admiral-cost const/admiral-cost
-        :game/station-cost const/station-cost
-        :game/cmd-ship-cost const/cmd-ship-cost
-        :game/mil-planet-cost const/mil-planet-cost
-        :game/food-planet-cost const/food-planet-cost
-        :game/ore-planet-cost const/ore-planet-cost}])
-    {:status 303
-     :headers {"location" (str "/app/join-game/" game-id)}}))
+(defn create-game [{:keys [session biff/db params] :as ctx}]
+  (let [uid  (:uid session)
+        user (xt/entity db uid)]
+    (if-not (const/admin-emails (:user/email user))
+      {:status 303 :headers {"location" "/app"}}
+      (let [game-id   (java.util.UUID/randomUUID)
+            game-name (clojure.string/trim (or (:game-name params) ""))
+            now       (java.util.Date.)
+            end-date  (java.util.Date. (+ (.getTime now) (* 30 24 60 60 1000)))]
+        (biff/submit-tx ctx
+          [{:db/doc-type :game
+            :xt/id game-id
+            :game/name game-name
+            :game/created-at now
+            :game/scheduled-end-at end-date
+            :game/status 0
+            :game/turns-per-round const/turns-per-round
+            :game/rounds-per-day const/rounds-per-day
+            :game/ore-planet-credits const/ore-planet-credits
+            :game/ore-planet-fuel const/ore-planet-fuel
+            :game/ore-planet-galaxars const/ore-planet-galaxars
+            :game/food-planet-food const/food-planet-food
+            :game/mil-planet-soldiers const/mil-planet-soldiers
+            :game/mil-planet-fighters const/mil-planet-fighters
+            :game/mil-planet-stations const/mil-planet-stations
+            :game/mil-planet-agents const/mil-planet-agents
+            :game/planet-upkeep-credits const/planet-upkeep-credits
+            :game/planet-upkeep-food const/planet-upkeep-food
+            :game/soldier-upkeep-credits const/soldier-upkeep-credits
+            :game/soldier-upkeep-food const/soldier-upkeep-food
+            :game/fighter-upkeep-credits const/fighter-upkeep-credits
+            :game/fighter-upkeep-fuel const/fighter-upkeep-fuel
+            :game/station-upkeep-credits const/station-upkeep-credits
+            :game/station-upkeep-fuel const/station-upkeep-fuel
+            :game/agent-upkeep-food const/agent-upkeep-food
+            :game/agent-upkeep-fuel const/agent-upkeep-fuel
+            :game/population-upkeep-food const/population-upkeep-food
+            :game/population-upkeep-fuel const/population-upkeep-fuel
+            :game/soldier-cost const/soldier-cost
+            :game/transport-cost const/transport-cost
+            :game/general-cost const/general-cost
+            :game/carrier-cost const/carrier-cost
+            :game/fighter-cost const/fighter-cost
+            :game/admiral-cost const/admiral-cost
+            :game/station-cost const/station-cost
+            :game/cmd-ship-cost const/cmd-ship-cost
+            :game/mil-planet-cost const/mil-planet-cost
+            :game/food-planet-cost const/food-planet-cost
+            :game/ore-planet-cost const/ore-planet-cost}])
+        {:status 303
+         :headers {"location" (str "/app/join-game/" game-id)}}))))
+
+;; :: delete a game and all associated players and messages (admin only)
+(defn delete-game [{:keys [session biff/db path-params] :as ctx}]
+  (let [uid  (:uid session)
+        user (xt/entity db uid)]
+    (if-not (const/admin-emails (:user/email user))
+      {:status 303 :headers {"location" "/app"}}
+      (let [game-id  (java.util.UUID/fromString (:game-id path-params))
+            players  (q db '{:find [player]
+                             :in [game-id]
+                             :where [[player :player/game game-id]]}
+                         game-id)
+            messages (q db '{:find [msg]
+                             :in [game-id]
+                             :where [[msg :message/game game-id]]}
+                         game-id)]
+        (biff/submit-tx ctx
+          (concat
+            (for [[player-id] players] {:db/op :delete :xt/id player-id})
+            (for [[msg-id]    messages] {:db/op :delete :xt/id msg-id})
+            [{:db/op :delete :xt/id game-id}]))
+        {:status 303 :headers {"location" "/app"}}))))
+
 ;; :: show empire name prompt for joining a game
 (defn join-game-page [{:keys [session biff/db path-params params] :as ctx}]
   (let [game-id (java.util.UUID/fromString (:game-id path-params))
@@ -237,6 +268,7 @@
   {:routes ["/app" {:middleware [mid/wrap-signed-in]}
             ["" {:get app}]
             ["/create-game" {:get create-game-page :post create-game}]
+            ["/delete-game/:game-id" {:post delete-game}]
             ["/join-game/:game-id" {:get join-game-page :post join-game}]
             ["/game/:player-id" {:get game/game-view}]
             ["/game/:player-id/income" {:get income-handler}]
