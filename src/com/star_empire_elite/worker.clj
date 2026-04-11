@@ -7,8 +7,7 @@
   (iterate #(biff/add-seconds % (* 60 n)) (java.util.Date.)))
 
 (defn print-usage [{:keys [biff/db]}]
-  ;; For a real app, you can have this run once per day and send you the output
-  ;; in an email.
+  ;; For a real app, you can have this run once per day and send you the output in an email.
   (let [n-users (nth (q db
                         '{:find (count user)
                           :where [[user :user/email]]})

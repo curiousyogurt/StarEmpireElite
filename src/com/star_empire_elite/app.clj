@@ -290,11 +290,16 @@
               stored-str    (:player/last-battle-result player)
               battle-result
               (when pending-id
-                (let [stored (when stored-str (clojure.core/read-string stored-str))]
+                (let [stored   (when stored-str (clojure.core/read-string stored-str))
+                      defender (xt/entity db pending-id)]
                   (if (and stored (= (:defender-id stored) (str pending-id)))
-                    stored
-                    (let [defender (xt/entity db pending-id)
-                          result   (combat/resolve-combat game player defender)]
+                    ;; Use cached result but cap planets-transferred against defender's current state
+                    (let [pt (or (:planets-transferred stored) {:mil 0 :food 0 :ore 0})]
+                      (assoc stored :planets-transferred
+                             {:mil  (min (:mil  pt) (:player/mil-planets  defender))
+                              :food (min (:food pt) (:player/food-planets defender))
+                              :ore  (min (:ore  pt) (:player/ore-planets  defender))}))
+                    (let [result (combat/resolve-combat game player defender)]
                       (biff/submit-tx ctx
                         [{:db/doc-type :player
                           :db/op :update

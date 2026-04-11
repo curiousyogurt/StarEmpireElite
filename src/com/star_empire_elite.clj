@@ -36,20 +36,20 @@
 ;;;;
 ;;;; Key Biff Concepts:
 ;;;;
-;;;; 1. Modules: Self-contained units with routes, middleware, schemas, etc.
-;;;;    They make applications modular and easier to understand.
+;;;; 1. Modules: Self-contained units with routes, middleware, schemas, etc. They make applications 
+;;;;    modular and easier to understand.
 ;;;;
-;;;; 2. Components: Infrastructure services (database, web server, etc.)
-;;;;    that start in order and can depend on each other.
+;;;; 2. Components: Infrastructure services (database, web server, etc.) that start in order and can 
+;;;;    depend on each other.
 ;;;;
-;;;; 3. System Map: A single map containing all application state and config.
-;;;;    This makes applications easier to test and reason about.
+;;;; 3. System Map: A single map containing all application state and config. This makes applications 
+;;;;    easier to test and reason about.
 ;;;;
-;;;; 4. Hot Reloading: Code changes are reflected immediately without restart,
-;;;;    which significantly speeds up the development workflow.
+;;;; 4. Hot Reloading: Code changes are reflected immediately without restart, which significantly 
+;;;;    speeds up the development workflow.
 ;;;;
-;;;; 5. XTDB: A document database that stores immutable data with time travel
-;;;;    capabilities, perfect for audit trails and complex queries.
+;;;; 5. XTDB: A document database that stores immutable data with time travel capabilities, perfect 
+;;;;    for audit trails and complex queries.
 ;;;;
 
 ;;;;
@@ -60,11 +60,11 @@
 ;;;;
 
 (def modules
-  [app/module                           ; Main application routes and logic
-   (biff/authentication-module {})      ; Built-in Biff auth (login/logout/signup)
-   home/module                          ; Home page routes
-   schema/module                        ; Data schemas and validation
-   worker/module])                      ; Background job processing
+  [app/module                      ; Main application routes and logic
+   (biff/authentication-module {}) ; Built-in Biff auth (login/logout/signup)
+   home/module                     ; Home page routes
+   schema/module                   ; Data schemas and validation
+   worker/module])                 ; Background job processing
 
 ;;;;
 ;;;; Routing Configuration
@@ -170,14 +170,14 @@
 ;;; System components that provide infrastructure services. Each component is a function that takes
 ;;; the system map and adds functionality to it.
 (def components
-  [biff/use-aero-config        ; Configuration file loading (config.edn)
-   biff/use-xtdb               ; XTDB database setup and connection
-   biff/use-queues             ; Background job queues for async processing
-   biff/use-xtdb-tx-listener   ; Database change notifications
-   biff/use-htmx-refresh       ; HTMX development auto-refresh
-   biff/use-jetty              ; Jetty web server
-   biff/use-chime              ; Scheduled tasks (cron-like functionality)
-   biff/use-beholder])         ; File system watching for development
+  [biff/use-aero-config      ; Configuration file loading (config.edn)
+   biff/use-xtdb             ; XTDB database setup and connection
+   biff/use-queues           ; Background job queues for async processing
+   biff/use-xtdb-tx-listener ; Database change notifications
+   biff/use-htmx-refresh     ; HTMX development auto-refresh
+   biff/use-jetty            ; Jetty web server
+   biff/use-chime            ; Scheduled tasks (cron-like functionality)
+   biff/use-beholder])       ; File system watching for development
 
 ;;;;
 ;;;; System Lifecycle Functions

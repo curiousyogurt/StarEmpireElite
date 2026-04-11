@@ -80,18 +80,18 @@
   "Parse all expense payment inputs from request params.
   Returns map of payments for all expense categories."
   [params]
-  {:planets-pay         (utils/parse-numeric-input (:planets-pay params))
-   :planets-food        (utils/parse-numeric-input (:planets-food params))
-   :soldiers-credits    (utils/parse-numeric-input (:soldiers-credits params))
-   :soldiers-food       (utils/parse-numeric-input (:soldiers-food params))
-   :fighters-credits    (utils/parse-numeric-input (:fighters-credits params))
-   :fighters-fuel       (utils/parse-numeric-input (:fighters-fuel params))
-   :stations-credits    (utils/parse-numeric-input (:stations-credits params))
-   :stations-fuel       (utils/parse-numeric-input (:stations-fuel params))
-   :agents-food         (utils/parse-numeric-input (:agents-food params))
-   :agents-fuel         (utils/parse-numeric-input (:agents-fuel params))
-   :population-food     (utils/parse-numeric-input (:population-food params))
-   :population-fuel     (utils/parse-numeric-input (:population-fuel params))})
+  {:planets-pay      (utils/parse-numeric-input (:planets-pay params))
+   :planets-food     (utils/parse-numeric-input (:planets-food params))
+   :soldiers-credits (utils/parse-numeric-input (:soldiers-credits params))
+   :soldiers-food    (utils/parse-numeric-input (:soldiers-food params))
+   :fighters-credits (utils/parse-numeric-input (:fighters-credits params))
+   :fighters-fuel    (utils/parse-numeric-input (:fighters-fuel params))
+   :stations-credits (utils/parse-numeric-input (:stations-credits params))
+   :stations-fuel    (utils/parse-numeric-input (:stations-fuel params))
+   :agents-food      (utils/parse-numeric-input (:agents-food params))
+   :agents-fuel      (utils/parse-numeric-input (:agents-fuel params))
+   :population-food  (utils/parse-numeric-input (:population-food params))
+   :population-fuel  (utils/parse-numeric-input (:population-fuel params))})
 
 ;;;;
 ;;;; UI Components
@@ -259,37 +259,39 @@
           affordable? (can-afford-expenses? resources-after)
 
           ;; Helper to render required display with red text if underpaid
-          render-required (fn [row-id required-text credits-paid credits-req food-paid food-req fuel-paid fuel-req]
-                            (let [underpaid? (or (and credits-req (< credits-paid credits-req))
-                                                 (and food-req (< food-paid food-req))
-                                                 (and fuel-req (< fuel-paid fuel-req)))]
-                              [:div.font-mono.text-xxs.lg:text-base.lg:pr-4
-                               {:id (str "required-" row-id)
-                                :hx-swap-oob "true"
-                                :class (when underpaid? "text-red-400")}
-                               required-text]))
+          render-required
+          (fn [row-id required-text credits-paid credits-req food-paid food-req fuel-paid fuel-req]
+            (let [underpaid? (or (and credits-req (< credits-paid credits-req))
+                                 (and food-req (< food-paid food-req))
+                                 (and fuel-req (< fuel-paid fuel-req)))]
+              [:div.font-mono.text-xxs.lg:text-base.lg:pr-4
+               {:id (str "required-" row-id)
+                :hx-swap-oob "true"
+                :class (when underpaid? "text-red-400")}
+               required-text]))
 
           ;; Helper to build render-required call from same spec format as build-expense-row
-          build-render-required (fn [spec]
-                                  (let [{:keys [row-id credits food fuel]} spec
-                                        ;; Build required display as "credits/food/fuel" format
-                                        credits-val (if credits (get required (:required-key credits)) 0)
-                                        food-val (if food (get required (:required-key food)) 0)
-                                        fuel-val (if fuel (get required (:required-key fuel)) 0)
-                                        required-text (str credits-val "/" food-val "/" fuel-val)
+          build-render-required
+          (fn [spec]
+            (let [{:keys [row-id credits food fuel]} spec
+                  ;; Build required display as "credits/food/fuel" format
+                  credits-val (if credits (get required (:required-key credits)) 0)
+                  food-val (if food (get required (:required-key food)) 0)
+                  fuel-val (if fuel (get required (:required-key fuel)) 0)
+                  required-text (str credits-val "/" food-val "/" fuel-val)
 
-                                        ;; Get payment and required values for each resource type
-                                        credits-paid (when credits (get payments (keyword (:field-name credits))))
-                                        credits-req (when credits (get required (:required-key credits)))
-                                        food-paid (when food (get payments (keyword (:field-name food))))
-                                        food-req (when food (get required (:required-key food)))
-                                        fuel-paid (when fuel (get payments (keyword (:field-name fuel))))
-                                        fuel-req (when fuel (get required (:required-key fuel)))]
+                  ;; Get payment and required values for each resource type
+                  credits-paid (when credits (get payments (keyword (:field-name credits))))
+                  credits-req (when credits (get required (:required-key credits)))
+                  food-paid (when food (get payments (keyword (:field-name food))))
+                  food-req (when food (get required (:required-key food)))
+                  fuel-paid (when fuel (get payments (keyword (:field-name fuel))))
+                  fuel-req (when fuel (get required (:required-key fuel)))]
 
-                                    (render-required row-id required-text 
-                                                     credits-paid credits-req 
-                                                     food-paid food-req 
-                                                     fuel-paid fuel-req)))]
+              (render-required row-id required-text 
+                               credits-paid credits-req 
+                               food-paid food-req 
+                               fuel-paid fuel-req)))]
 
       ;; Render htmx response fragments that replace specific page elements
       (biff/render
@@ -316,24 +318,30 @@
          (submit-button affordable? {:hx-swap-oob "true"})
 
          ;; Update required displays with red highlighting if underpaid - using same specs as build-expense-row
-         (build-render-required {:row-id "planets"
-                                 :credits {:field-name "planets-pay" :required-key :planets-credits}
-                                 :food {:field-name "planets-food" :required-key :planets-food}})
-         (build-render-required {:row-id "soldiers"
-                                 :credits {:field-name "soldiers-credits" :required-key :soldiers-credits}
-                                 :food {:field-name "soldiers-food" :required-key :soldiers-food}})
-         (build-render-required {:row-id "fighters"
-                                 :credits {:field-name "fighters-credits" :required-key :fighters-credits}
-                                 :fuel {:field-name "fighters-fuel" :required-key :fighters-fuel}})
-         (build-render-required {:row-id "stations"
-                                 :credits {:field-name "stations-credits" :required-key :stations-credits}
-                                 :fuel {:field-name "stations-fuel" :required-key :stations-fuel}})
-         (build-render-required {:row-id "agents"
-                                 :food {:field-name "agents-food" :required-key :agents-food}
-                                 :fuel {:field-name "agents-fuel" :required-key :agents-fuel}})
-         (build-render-required {:row-id "population"
-                                 :food {:field-name "population-food" :required-key :population-food}
-                                 :fuel {:field-name "population-fuel" :required-key :population-fuel}})
+         (build-render-required
+           {:row-id "planets"
+            :credits {:field-name "planets-pay" :required-key :planets-credits}
+            :food {:field-name "planets-food" :required-key :planets-food}})
+         (build-render-required
+           {:row-id "soldiers"
+            :credits {:field-name "soldiers-credits" :required-key :soldiers-credits}
+            :food {:field-name "soldiers-food" :required-key :soldiers-food}})
+         (build-render-required
+           {:row-id "fighters"
+            :credits {:field-name "fighters-credits" :required-key :fighters-credits}
+            :fuel {:field-name "fighters-fuel" :required-key :fighters-fuel}})
+         (build-render-required
+           {:row-id "stations"
+            :credits {:field-name "stations-credits" :required-key :stations-credits}
+            :fuel {:field-name "stations-fuel" :required-key :stations-fuel}})
+         (build-render-required
+           {:row-id "agents"
+            :food {:field-name "agents-food" :required-key :agents-food}
+            :fuel {:field-name "agents-fuel" :required-key :agents-fuel}})
+         (build-render-required
+           {:row-id "population"
+            :food {:field-name "population-food" :required-key :population-food}
+            :fuel {:field-name "population-fuel" :required-key :population-fuel}})
          ]))))
 
 ;;; Shows expense requirements and input fields for player to choose how much to pay

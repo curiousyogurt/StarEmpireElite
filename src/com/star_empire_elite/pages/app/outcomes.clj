@@ -38,11 +38,16 @@
               pt-ore        (when raw-pt (min (:ore  raw-pt) (:player/ore-planets  defender)))
 
               ;; attacker unit counts after casualties
-              att-soldiers  (if al (max 0 (- (:player/soldiers  player) (:soldiers-lost  al))) (:player/soldiers  player))
-              att-fighters  (if al (max 0 (- (:player/fighters  player) (:fighters-lost  al))) (:player/fighters  player))
-              att-cmd-ships (if al (max 0 (- (:player/cmd-ships player) (:cmd-ships-lost al))) (:player/cmd-ships player))
-              att-generals  (if al (max 0 (- (:player/generals  player) (:generals-lost  al))) (:player/generals  player))
-              att-admirals  (if al (max 0 (- (:player/admirals  player) (:admirals-lost  al))) (:player/admirals  player))
+              att-soldiers  (if al (max 0 (- (:player/soldiers  player) (:soldiers-lost  al)))
+                              (:player/soldiers  player))
+              att-fighters  (if al (max 0 (- (:player/fighters  player) (:fighters-lost  al)))
+                              (:player/fighters  player))
+              att-cmd-ships (if al (max 0 (- (:player/cmd-ships player) (:cmd-ships-lost al)))
+                              (:player/cmd-ships player))
+              att-generals  (if al (max 0 (- (:player/generals  player) (:generals-lost  al)))
+                              (:player/generals  player))
+              att-admirals  (if al (max 0 (- (:player/admirals  player) (:admirals-lost  al)))
+                              (:player/admirals  player))
 
               ;; attacker planet counts after captures
               att-mil-planets  (+ (:player/mil-planets  player) (or pt-mil  0))
@@ -50,39 +55,40 @@
               att-ore-planets  (+ (:player/ore-planets  player) (or pt-ore  0))
 
               ;; attacker transaction — always includes all modified fields
-              attacker-tx (merge {:db/doc-type          :player
-                                  :db/op                :update
-                                  :xt/id                player-id
-                                  :player/current-turn  next-turn
-                                  :player/current-round next-round
-                                  :player/turns-used    reset-used
-                                  :player/current-phase 1
-                                  :player/last-turn-at  now
-                                  :player/soldiers      att-soldiers
-                                  :player/fighters      att-fighters
-                                  :player/cmd-ships     att-cmd-ships
-                                  :player/generals      att-generals
-                                  :player/admirals      att-admirals
-                                  :player/mil-planets   att-mil-planets
-                                  :player/food-planets  att-food-planets
-                                  :player/ore-planets   att-ore-planets}
+              attacker-tx (merge {:db/doc-type                :player
+                                  :db/op                      :update
+                                  :xt/id                      player-id
+                                  :player/current-turn        next-turn
+                                  :player/current-round       next-round
+                                  :player/turns-used          reset-used
+                                  :player/current-phase       1
+                                  :player/last-turn-at        now
+                                  :player/last-battle-result  nil
+                                  :player/soldiers            att-soldiers
+                                  :player/fighters            att-fighters
+                                  :player/cmd-ships           att-cmd-ships
+                                  :player/generals            att-generals
+                                  :player/admirals            att-admirals
+                                  :player/mil-planets         att-mil-planets
+                                  :player/food-planets        att-food-planets
+                                  :player/ore-planets         att-ore-planets}
                                  (when end-round?
                                    {:player/last-round-completed-at now}))
 
               ;; defender transaction (only if battle happened)
               defender-tx (when battle-result
-                            {:db/doc-type          :player
-                             :db/op                :update
-                             :xt/id                (:xt/id defender)
-                             :player/soldiers      (max 0 (- (:player/soldiers  defender) (:soldiers-lost  dl)))
-                             :player/fighters      (max 0 (- (:player/fighters  defender) (:fighters-lost  dl)))
-                             :player/cmd-ships     (max 0 (- (:player/cmd-ships defender) (:cmd-ships-lost dl)))
-                             :player/generals      (max 0 (- (:player/generals  defender) (:generals-lost  dl)))
-                             :player/admirals      (max 0 (- (:player/admirals  defender) (:admirals-lost  dl)))
-                             :player/stations      (max 0 (- (:player/stations  defender) (:stations-lost  dl)))
-                             :player/mil-planets   (max 0 (- (:player/mil-planets  defender) (or pt-mil  0)))
-                             :player/food-planets  (max 0 (- (:player/food-planets defender) (or pt-food 0)))
-                             :player/ore-planets   (max 0 (- (:player/ore-planets  defender) (or pt-ore  0)))})]
+                            {:db/doc-type         :player
+                             :db/op               :update
+                             :xt/id               (:xt/id defender)
+                             :player/soldiers     (max 0 (- (:player/soldiers  defender) (:soldiers-lost  dl)))
+                             :player/fighters     (max 0 (- (:player/fighters  defender) (:fighters-lost  dl)))
+                             :player/cmd-ships    (max 0 (- (:player/cmd-ships defender) (:cmd-ships-lost dl)))
+                             :player/generals     (max 0 (- (:player/generals  defender) (:generals-lost  dl)))
+                             :player/admirals     (max 0 (- (:player/admirals  defender) (:admirals-lost  dl)))
+                             :player/stations     (max 0 (- (:player/stations  defender) (:stations-lost  dl)))
+                             :player/mil-planets  (max 0 (- (:player/mil-planets  defender) (or pt-mil  0)))
+                             :player/food-planets (max 0 (- (:player/food-planets defender) (or pt-food 0)))
+                             :player/ore-planets  (max 0 (- (:player/ore-planets  defender) (or pt-ore  0)))})]
 
           ;; submit everything atomically
           (biff/submit-tx ctx (remove nil? [attacker-tx defender-tx]))
@@ -125,32 +131,32 @@
            [:div.grid.grid-cols-2.gap-4.mb-3
             [:div
              [:p.text-xs.font-bold.mb-2 "Your forces"]
-             [:p.text-xs (str "Soldiers: "   (get-in battle-result [:attacker-forces :soldiers]))]
-             [:p.text-xs (str "Fighters: "   (get-in battle-result [:attacker-forces :fighters]))]
+             [:p.text-xs (str "Soldiers:  "   (get-in battle-result [:attacker-forces :soldiers]))]
+             [:p.text-xs (str "Fighters:  "   (get-in battle-result [:attacker-forces :fighters]))]
              [:p.text-xs (str "Cmd Ships: "  (get-in battle-result [:attacker-forces :cmd-ships]))]
-             [:p.text-xs (str "Generals: "   (get-in battle-result [:attacker-forces :generals]))]
-             [:p.text-xs (str "Admirals: "   (get-in battle-result [:attacker-forces :admirals]))]]
+             [:p.text-xs (str "Generals:  "   (get-in battle-result [:attacker-forces :generals]))]
+             [:p.text-xs (str "Admirals:  "   (get-in battle-result [:attacker-forces :admirals]))]]
             [:div
              [:p.text-xs.font-bold.mb-2 (str (:defender-name battle-result) "'s forces")]
-             [:p.text-xs (str "Soldiers: "   (get-in battle-result [:defender-forces :soldiers]))]
-             [:p.text-xs (str "Fighters: "   (get-in battle-result [:defender-forces :fighters]))]
+             [:p.text-xs (str "Soldiers:     "   (get-in battle-result [:defender-forces :soldiers]))]
+             [:p.text-xs (str "Fighters:     "   (get-in battle-result [:defender-forces :fighters]))]
              [:p.text-xs (str "Def Stations: " (get-in battle-result [:defender-forces :stations]))]
-             [:p.text-xs (str "Cmd Ships: "  (get-in battle-result [:defender-forces :cmd-ships]))]
-             [:p.text-xs (str "Generals: "   (get-in battle-result [:defender-forces :generals]))]
-             [:p.text-xs (str "Admirals: "   (get-in battle-result [:defender-forces :admirals]))]]
+             [:p.text-xs (str "Cmd Ships:    "  (get-in battle-result [:defender-forces :cmd-ships]))]
+             [:p.text-xs (str "Generals:     "   (get-in battle-result [:defender-forces :generals]))]
+             [:p.text-xs (str "Admirals:     "   (get-in battle-result [:defender-forces :admirals]))]]
            [:div.border-t.border-yellow-400.pt-3
             [:p.text-xs.mb-1 "Casualties"]
             [:p.text-xs (str "Your losses — soldiers: " (:soldiers-lost att-l)
-                             ", fighters: " (:fighters-lost att-l)
+                             ", fighters:  " (:fighters-lost att-l)
                              ", cmd ships: " (:cmd-ships-lost att-l)
-                             ", generals: " (:generals-lost att-l)
-                             ", admirals: " (:admirals-lost att-l))]
+                             ", generals:  " (:generals-lost att-l)
+                             ", admirals:  " (:admirals-lost att-l))]
             [:p.text-xs (str (:defender-name battle-result) " losses — soldiers: " (:soldiers-lost def-l)
-                             ", fighters: " (:fighters-lost def-l)
-                             ", stations: " (:stations-lost def-l)
+                             ", fighters:  " (:fighters-lost def-l)
+                             ", stations:  " (:stations-lost def-l)
                              ", cmd ships: " (:cmd-ships-lost def-l)
-                             ", generals: " (:generals-lost def-l)
-                             ", admirals: " (:admirals-lost def-l))]
+                             ", generals:  " (:generals-lost def-l)
+                             ", admirals:  " (:admirals-lost def-l))]
             (let [pt    (or (:planets-transferred battle-result) {:mil 0 :food 0 :ore 0})
                   total (+ (:mil pt) (:food pt) (:ore pt))]
               (when (pos? total)
@@ -164,7 +170,7 @@
 
       (ui/resource-display-grid player "Resources")
 
-      [:p.text-sm "Review your turn results above. When you're ready, begin your next turn."]
+      [:p.text-sm "Review your turn results above. When you're ready, continue to your next turn."]
 
       [:.h-6]
       (biff/form

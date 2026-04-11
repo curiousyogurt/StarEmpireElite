@@ -102,7 +102,6 @@
   (base
     ctx
     [:.flex-grow]
-    ;; CORRECTED: All classes are now on one line, attached to :div
     [:div.min-h-screen.flex.flex-col.items-center.justify-center.mx-auto.text-green-400.font-mono.p-4.border-8.border-green-400.rounded-lg.bg-black.bg-opacity-10
      (merge
        {:class "m-2 w-full sm:m-4 md:m-10 md:w-11/12"}
@@ -259,38 +258,41 @@
   [name value player-id hx-post-path hx-include & [{:keys [display-only? input-class sync-key]}]]
   [:div.relative
    [:input
-    (cond-> {:type "text"
-             :value value
-             :autocomplete "off"
-             :autocapitalize "off"
-             :autocorrect "off"
-             :spellcheck "false"
-             :data-lpignore "true"
-             :data-form-type "other"
-             :class (str "w-full bg-black border border-green-400 text-green-400 "
-                         "p-2 pr-6 font-mono "
-                         (or input-class ""))
-             ;; Strip non-numeric characters immediately while preserving cursor position
-             :oninput (str
-                        "let start=this.selectionStart;"
-                        "let end=this.selectionEnd;"
-                        "let oldVal=this.value;"
-                        "let newVal=oldVal.replace(/[^0-9]/g,'');"
-                        "if(oldVal!==newVal){"
-                                             "  this.value=newVal;"
-                                             "  let diff=oldVal.length-newVal.length;"
-                                             "  this.setSelectionRange(start-diff,end-diff);"
-                                             "}"
-                        ;; Optional sync to matching proxy inputs
-                        (when sync-key
-                          (str "if(window.seeSyncBuildingField){"
-                                                                "  window.seeSyncBuildingField('" sync-key "', this);"
-                                                                "}")))
-             :onblur (str
-                       "let val=this.value.replace(/[^0-9]/g,'');"
-                       "if(val===''||val==='0'){val='0';}"
-                       "else{val=String(parseInt(val,10));}"
-                       "this.value=val;")}
+    (cond->
+      {:type "text"
+       :value value
+       :autocomplete "off"
+       :autocapitalize "off"
+       :autocorrect "off"
+       :spellcheck "false"
+       :data-lpignore "true"
+       :data-form-type "other"
+       :class (str "w-full bg-black border border-green-400 text-green-400 "
+                   "p-2 pr-6 font-mono "
+                   (or input-class ""))
+       ;; Strip non-numeric characters immediately while preserving cursor position
+       :oninput
+       (str
+         "let start=this.selectionStart;"
+         "let end=this.selectionEnd;"
+         "let oldVal=this.value;"
+         "let newVal=oldVal.replace(/[^0-9]/g,'');"
+         "if(oldVal!==newVal){"
+         "  this.value=newVal;"
+         "  let diff=oldVal.length-newVal.length;"
+         "  this.setSelectionRange(start-diff,end-diff);"
+         "}"
+         ;; Optional sync to matching proxy inputs
+         (when sync-key
+           (str "if(window.seeSyncBuildingField){"
+                "  window.seeSyncBuildingField('" sync-key "', this);"
+                "}")))
+       :onblur
+       (str
+         "let val=this.value.replace(/[^0-9]/g,'');"
+         "if(val===''||val==='0'){val='0';}"
+         "else{val=String(parseInt(val,10));}"
+         "this.value=val;")}
       ;; Only real, HTMX-enabled input gets name + hx-*
       (not display-only?)
       (merge {:name name
