@@ -37,6 +37,7 @@
 
 (def turns-per-round 6)
 (def rounds-per-day 2)
+(def hours-between-rounds 2)
 
 
 ;; :: Starting Empire Defaults

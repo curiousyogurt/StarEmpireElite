@@ -1,6 +1,7 @@
 (ns com.star-empire-elite.pages.app.game
   (:require [com.biffweb :as biff :refer [q]]
             [com.star-empire-elite.ui :as ui]
+            [com.star-empire-elite.utils :as utils]
             [xtdb.api :as xt]))
 
 ;;; Helper function to generate URLs for different game phases. Each phase represents a different
@@ -107,7 +108,8 @@
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
         player (xt/entity db player-id)
         game (xt/entity db (:player/game player))
-        players (get-game-players db (:xt/id game))]
+        players (get-game-players db (:xt/id game))
+        cooldown-ms (utils/round-cooldown-ms player game)]
     (if (nil? player)
       {:status 404
        :body "Game not found"}
@@ -123,8 +125,10 @@
         [:.h-6]
         ;; Action buttons
         [:div.flex.gap-4
-         [:a.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
-          {:href (get-phase-url (:xt/id player) (:player/current-phase player))} "Play"]
+         (if cooldown-ms
+           [:div.border.border-yellow-400.px-6.py-2.text-yellow-400
+            (str "Next round starts in " (utils/format-cooldown-duration cooldown-ms))]
+           [:a.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
+            {:href (get-phase-url (:xt/id player) (:player/current-phase player))} "Play"])
          [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-          {:href "/app"} "Back to Games"]
-         ]]))))
+          {:href "/app"} "Back to Games"]]]))))

@@ -40,6 +40,37 @@
      :headers {"location" (str "/app/game/" player-id)}}))
 
 ;;;;
+;;;; Round Cooldown
+;;;;
+
+(defn round-cooldown-ms
+  "Returns ms remaining in cooldown if player is blocked from starting a new round, or nil if
+   the player may proceed. Blocked when: turn=1, turns-used=0 (fresh round start),
+   last-round-completed-at is set (not first-ever round), and cooldown hasn't expired."
+  [player game]
+  (let [turn-1?     (= (:player/current-turn player) 1)
+        unused?     (= (:player/turns-used player) 0)
+        completed   (:player/last-round-completed-at player)
+        hours       (or (:game/hours-between-rounds game) 0)
+        cooldown-ms (* hours 60 60 1000)]
+    (when (and turn-1? unused? completed (pos? cooldown-ms))
+      (let [remaining (- cooldown-ms (- (.getTime (java.util.Date.)) (.getTime completed)))]
+        (when (pos? remaining) remaining)))))
+
+(defn format-cooldown-duration
+  "Format a millisecond duration as a human-readable string.
+   Examples: 26280000 -> '7h 18m', 900000 -> '15m 0s', 42000 -> '42s'"
+  [ms]
+  (let [total-s (quot ms 1000)
+        h       (quot total-s 3600)
+        m       (quot (rem total-s 3600) 60)
+        s       (rem total-s 60)]
+    (cond
+      (pos? h) (str h "h " m "m")
+      (pos? m) (str m "m " s "s")
+      :else    (str s "s"))))
+
+;;;;
 ;;;; Entity Loading
 ;;;;
 

@@ -19,6 +19,7 @@
           [:game/status                    :int]
           [:game/turns-per-round           :int]
           [:game/rounds-per-day            :int]
+          [:game/hours-between-rounds      :int]
           
           ;; Income generation constants
           [:game/ore-planet-credits        :int]
@@ -87,6 +88,8 @@
             [:player/current-phase         :int]
             [:player/turns-used            :int]
             [:player/last-turn-at
+             {:optional true}              inst?]
+            [:player/last-round-completed-at
              {:optional true}              inst?]
  
             ;; Leadership

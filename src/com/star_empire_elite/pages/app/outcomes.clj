@@ -22,24 +22,27 @@
               rounds-per-day (:game/rounds-per-day game)
               
               ;; calculate next turn and round
+              now (java.util.Date.)
               turns-used (inc (:player/turns-used player))
 
-              ;; check if we need to advance to next round
-              should-advance-round (>= turns-used turns-per-round)
-              next-turn (if should-advance-round 1 (inc current-turn))
-              next-round (if should-advance-round (inc current-round) current-round)
-              reset-turns-used (if should-advance-round 0 turns-used)]
-          
+              ;; check if this turn ends the current round
+              end-current-round? (>= turns-used turns-per-round)
+              next-turn (if end-current-round? 1 (inc current-turn))
+              next-round (if end-current-round? (inc current-round) current-round)
+              reset-turns-used (if end-current-round? 0 turns-used)]
+
           ;; submit transaction to advance turn/round and reset to phase 1
           (biff/submit-tx ctx
-            [{:db/doc-type :player
-              :db/op :update
-              :xt/id player-id
-              :player/current-turn next-turn
-              :player/current-round next-round
-              :player/turns-used reset-turns-used
-              :player/current-phase 1
-              :player/last-turn-at (java.util.Date.)}])
+            [(cond-> {:db/doc-type :player
+                      :db/op :update
+                      :xt/id player-id
+                      :player/current-turn next-turn
+                      :player/current-round next-round
+                      :player/turns-used reset-turns-used
+                      :player/current-phase 1
+                      :player/last-turn-at now}
+               end-current-round?
+               (assoc :player/last-round-completed-at now))])
           
           ;; redirect to income page
           {:status 303
@@ -51,7 +54,7 @@
         current-round (:player/current-round player)
         turns-per-round (:game/turns-per-round game)
         rounds-per-day (:game/rounds-per-day game)
-        will-advance-round (>= current-turn turns-per-round)]
+        end-current-round? (>= current-turn turns-per-round)]
     (ui/page
      {}
      [:div.text-green-400.font-mono
@@ -64,8 +67,8 @@
        [:div.space-y-2
         [:p (str "Turn: " current-turn " of " turns-per-round)]
         [:p (str "Round: " current-round " of " rounds-per-day)]
-        (when will-advance-round
-          [:p.text-yellow-400.font-bold "⚠ Completing this turn will advance you to the next round!"])]]
+        (when end-current-round?
+          [:p.text-yellow-400.font-bold "⚠ Completing this turn will end the current round!"])]]
       
       (ui/resource-display-grid player "Resources")
       
@@ -80,4 +83,4 @@
          {:href (str "/app/game/" (:xt/id player))} "Pause"]
         [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
          {:type "submit"}
-         (if will-advance-round "Continue to Next Round" "Continue to Next Turn")]])])))
+         (if end-current-round? "End the Current Round" "Continue to Next Turn")]])])))
