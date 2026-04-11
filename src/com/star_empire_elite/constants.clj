@@ -40,6 +40,18 @@
 (def hours-between-rounds 2)
 
 
+;; :: Combat Power Values
+;; Power contribution of each unit type per unit
+
+(def soldier-power   1)
+(def fighter-power   3)
+(def cmd-ship-power  20)
+(def station-power   5)   ; defender only
+(def general-power   5)
+(def admiral-power   10)
+(def combat-variance 0.15) ; ±15% random factor
+
+
 ;; :: Starting Empire Defaults
 ;; Resources and units a new player begins with
 

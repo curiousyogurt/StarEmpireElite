@@ -20,7 +20,15 @@
           [:game/turns-per-round           :int]
           [:game/rounds-per-day            :int]
           [:game/hours-between-rounds      :int]
-          
+
+          ;; Combat power constants
+          [:game/soldier-power             :int]
+          [:game/fighter-power             :int]
+          [:game/cmd-ship-power            :int]
+          [:game/station-power             :int]
+          [:game/general-power             :int]
+          [:game/admiral-power             :int]
+
           ;; Income generation constants
           [:game/ore-planet-credits        :int]
           [:game/ore-planet-fuel           :int]
@@ -91,7 +99,9 @@
              {:optional true}              inst?]
             [:player/last-round-completed-at
              {:optional true}              inst?]
- 
+            [:player/last-battle-result
+             {:optional true}             [:maybe :string]]
+
             ;; Leadership
 
             ;; Military units
@@ -111,10 +121,10 @@
             [:player/messages {:optional true} [:vector :message/id]]
 
             ;; Combat
-            [:player/pending-attack {:optional true} :player/id]
+            [:player/pending-attack {:optional true} [:maybe :player/id]]
 
             ;; Espionage
-            [:player/pending-espionage {:optional true} :player/id]]
+            [:player/pending-espionage {:optional true} [:maybe :player/id]]]
 
    :message/id :uuid
    :message [:map {:closed true}

@@ -83,11 +83,11 @@
         (let [target-str (:target-player-id params)
               target-id (when (and target-str (not (empty? target-str)))
                           (java.util.UUID/fromString target-str))
-              tx-map (cond-> {:db/doc-type :player
-                              :db/op :update
-                              :xt/id player-id
-                              :player/current-phase 5}
-                       target-id (assoc :player/pending-attack target-id))]
+              tx-map {:db/doc-type :player
+                      :db/op :update
+                      :xt/id player-id
+                      :player/current-phase 5
+                      :player/pending-attack target-id}]
           (biff/submit-tx ctx [tx-map])
           {:status 303
            :headers {"location" (str "/app/game/" player-id "/espionage")}})))))

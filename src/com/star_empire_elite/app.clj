@@ -17,6 +17,7 @@
             [com.star-empire-elite.pages.app.action :as action]
             [com.star-empire-elite.pages.app.espionage :as espionage]
             [com.star-empire-elite.pages.app.outcomes :as outcomes]
+            [com.star-empire-elite.combat :as combat]
             [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]
@@ -69,6 +70,12 @@
             :game/turns-per-round const/turns-per-round
             :game/rounds-per-day const/rounds-per-day
             :game/hours-between-rounds const/hours-between-rounds
+            :game/soldier-power  const/soldier-power
+            :game/fighter-power  const/fighter-power
+            :game/cmd-ship-power const/cmd-ship-power
+            :game/station-power  const/station-power
+            :game/general-power  const/general-power
+            :game/admiral-power  const/admiral-power
             :game/ore-planet-credits const/ore-planet-credits
             :game/ore-planet-fuel const/ore-planet-fuel
             :game/ore-planet-galaxars const/ore-planet-galaxars
@@ -276,11 +283,25 @@
     (or (utils/validate-phase player 5 player-id)
         (espionage/espionage-page {:player player :game game :db (:biff/db ctx)}))))
 
-(defn outcomes-handler [ctx]
+(defn outcomes-handler [{:keys [biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
-    ;; Validate phase 6 (outcomes), then show page
     (or (utils/validate-phase player 6 player-id)
-        (outcomes/outcomes-page {:player player :game game}))))
+        (let [pending-id    (:player/pending-attack player)
+              stored-str    (:player/last-battle-result player)
+              battle-result
+              (when pending-id
+                (let [stored (when stored-str (clojure.core/read-string stored-str))]
+                  (if (and stored (= (:defender-id stored) (str pending-id)))
+                    stored
+                    (let [defender (xt/entity db pending-id)
+                          result   (combat/resolve-combat game player defender)]
+                      (biff/submit-tx ctx
+                        [{:db/doc-type :player
+                          :db/op :update
+                          :xt/id player-id
+                          :player/last-battle-result (pr-str result)}])
+                      result))))]
+          (outcomes/outcomes-page {:player player :game game :battle-result battle-result})))))
 
 (def module
   {:routes ["/app" {:middleware [mid/wrap-signed-in]}
