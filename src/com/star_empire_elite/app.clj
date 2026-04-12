@@ -286,27 +286,46 @@
 (defn outcomes-handler [{:keys [biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (or (utils/validate-phase player 6 player-id)
-        (let [pending-id    (:player/pending-attack player)
-              stored-str    (:player/last-battle-result player)
+        (let [;; --- combat ---
+              pending-attack (:player/pending-attack player)
+              stored-battle  (when-let [s (:player/last-battle-result player)]
+                               (clojure.core/read-string s))
               battle-result
-              (when pending-id
-                (let [stored   (when stored-str (clojure.core/read-string stored-str))
-                      defender (xt/entity db pending-id)]
-                  (if (and stored (= (:defender-id stored) (str pending-id)))
-                    ;; Use cached result but cap planets-transferred against defender's current state
-                    (let [pt (or (:planets-transferred stored) {:mil 0 :food 0 :ore 0})]
-                      (assoc stored :planets-transferred
+              (when pending-attack
+                (let [defender (xt/entity db pending-attack)]
+                  (if (and stored-battle (= (:defender-id stored-battle) (str pending-attack)))
+                    (let [pt (or (:planets-transferred stored-battle) {:mil 0 :food 0 :ore 0})]
+                      (assoc stored-battle :planets-transferred
                              {:mil  (min (:mil  pt) (:player/mil-planets  defender))
                               :food (min (:food pt) (:player/food-planets defender))
                               :ore  (min (:ore  pt) (:player/ore-planets  defender))}))
                     (let [result (combat/resolve-combat game player defender)]
-                      (biff/submit-tx ctx
-                        [{:db/doc-type :player
-                          :db/op :update
-                          :xt/id player-id
-                          :player/last-battle-result (pr-str result)}])
+                      (biff/submit-tx ctx [{:db/doc-type :player
+                                            :db/op :update
+                                            :xt/id player-id
+                                            :player/last-battle-result (pr-str result)}])
+                      result))))
+
+              ;; --- espionage ---
+              pending-espionage (:player/pending-espionage player)
+              stored-espionage  (when-let [s (:player/last-espionage-result player)]
+                                  (clojure.core/read-string s))
+              espionage-result
+              (when pending-espionage
+                (let [target (xt/entity db pending-espionage)]
+                  (if (and stored-espionage (= (:defender-id stored-espionage) (str pending-espionage)))
+                    stored-espionage
+                    (let [result (combat/resolve-espionage player target)]
+                      (biff/submit-tx ctx [{:db/doc-type :player
+                                            :db/op :update
+                                            :xt/id player-id
+                                            :player/last-espionage-result (pr-str result)}])
                       result))))]
-          (outcomes/outcomes-page {:player player :game game :battle-result battle-result})))))
+
+          (outcomes/outcomes-page {:player          player
+                                   :game            game
+                                   :battle-result   battle-result
+                                   :espionage-result espionage-result})))))
 
 (def module
   {:routes ["/app" {:middleware [mid/wrap-signed-in]}

@@ -55,15 +55,17 @@
               att-ore-planets  (+ (:player/ore-planets  player) (or pt-ore  0))
 
               ;; attacker transaction — always includes all modified fields
-              attacker-tx (merge {:db/doc-type                :player
-                                  :db/op                      :update
-                                  :xt/id                      player-id
-                                  :player/current-turn        next-turn
-                                  :player/current-round       next-round
-                                  :player/turns-used          reset-used
-                                  :player/current-phase       1
-                                  :player/last-turn-at        now
-                                  :player/last-battle-result  nil
+              attacker-tx (merge {:db/doc-type                  :player
+                                  :db/op                        :update
+                                  :xt/id                        player-id
+                                  :player/current-turn          next-turn
+                                  :player/current-round         next-round
+                                  :player/turns-used            reset-used
+                                  :player/current-phase         1
+                                  :player/last-turn-at          now
+                                  :player/last-battle-result    nil
+                                  :player/last-espionage-result nil
+                                  :player/pending-espionage     nil
                                   :player/soldiers            att-soldiers
                                   :player/fighters            att-fighters
                                   :player/cmd-ships           att-cmd-ships
@@ -97,7 +99,7 @@
            :headers {"location" (str "/app/game/" player-id "/income")}})))))
 
 ;; :: outcomes page - review turn results and advance to next turn
-(defn outcomes-page [{:keys [player game battle-result]}]
+(defn outcomes-page [{:keys [player game battle-result espionage-result]}]
   (let [current-turn (:player/current-turn player)
         current-round (:player/current-round player)
         turns-per-round (:game/turns-per-round game)
@@ -116,15 +118,15 @@
         [:p (str "Turn: " current-turn " of " turns-per-round)]
         [:p (str "Round: " current-round " of " rounds-per-day)]
         (when end-current-round?
-          [:p.text-yellow-400.font-bold "Warning: Completing this turn will end the current round!"])]]
+          [:p.font-bold "Warning: Completing this turn will end the current round!"])]]
 
       ;; Battle result section (only shown when an attack was declared)
       (when battle-result
         (let [att-wins? (:attacker-wins? battle-result)
               att-l     (:attacker-losses battle-result)
               def-l     (:defender-losses battle-result)]
-          [:div.border.border-yellow-400.p-4.mb-4.bg-yellow-400.bg-opacity-5
-           [:h3.font-bold.mb-2.text-yellow-400
+          [:div.border.border-green-400.p-4.mb-4
+           [:h3.font-bold.mb-2
             (if att-wins?
               (str "Victory against " (:defender-name battle-result))
               (str "Defeat by " (:defender-name battle-result)))]
@@ -144,7 +146,7 @@
              [:p.text-xs (str "Cmd Ships:    "  (get-in battle-result [:defender-forces :cmd-ships]))]
              [:p.text-xs (str "Generals:     "   (get-in battle-result [:defender-forces :generals]))]
              [:p.text-xs (str "Admirals:     "   (get-in battle-result [:defender-forces :admirals]))]]
-           [:div.border-t.border-yellow-400.pt-3
+           [:div.border-t.border-green-400.pt-3
             [:p.text-xs.mb-1 "Casualties"]
             [:p.text-xs (str "Your losses — soldiers: " (:soldiers-lost att-l)
                              ", fighters:  " (:fighters-lost att-l)
@@ -167,6 +169,29 @@
                           [(when (pos? (:mil  pt)) (str (:mil  pt) " military"))
                            (when (pos? (:food pt)) (str (:food pt) " food"))
                            (when (pos? (:ore  pt)) (str (:ore  pt) " ore"))])))]))]]]))
+
+      ;; Espionage result section (only shown when an infiltration was declared)
+      (when espionage-result
+        (let [won? (:attacker-wins? espionage-result)
+              intel (:intel espionage-result)]
+          [:div.border.border-green-400.p-4.mb-4
+           [:h3.font-bold.mb-2
+            (if won?
+              (str "Infiltration of " (:defender-name espionage-result) " succeeded")
+              (str "Infiltration of " (:defender-name espionage-result) " failed — agents discovered"))]
+           (if won?
+             [:div.grid.grid-cols-2.gap-x-8.gap-y-1
+              [:p.text-xs.font-bold.col-span-2.mb-1 (str (:defender-name espionage-result) "'s military")]
+              [:p.text-xs (str "Soldiers:   " (:soldiers   intel))]
+              [:p.text-xs (str "Transports: " (:transports intel))]
+              [:p.text-xs (str "Generals:   " (:generals   intel))]
+              [:p.text-xs (str "Fighters:   " (:fighters   intel))]
+              [:p.text-xs (str "Carriers:   " (:carriers   intel))]
+              [:p.text-xs (str "Admirals:   " (:admirals   intel))]
+              [:p.text-xs (str "Stations:   " (:stations   intel))]
+              [:p.text-xs (str "Cmd Ships:  " (:cmd-ships  intel))]
+              [:p.text-xs (str "Agents:     " (:agents     intel))]]
+             [:p.text-xs "Your agents were unable to obtain useful intelligence."])]))
 
       (ui/resource-display-grid player "Resources")
 

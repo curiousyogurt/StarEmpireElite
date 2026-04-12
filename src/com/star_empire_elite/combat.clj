@@ -34,7 +34,7 @@
        (* (or (:stations forces) 0)
           (get game :game/station-power const/station-power)))))
 
-(defn- random-factor []
+(defn random-factor []
   (+ (- 1.0 const/combat-variance)
      (* (rand) (* 2 const/combat-variance))))
 
@@ -56,6 +56,27 @@
     {:mil  (get taken :mil  0)
      :food (get taken :food 0)
      :ore  (get taken :ore  0)}))
+
+;;; Espionage resolution — agents vs agents with the same ±15% variance as combat.
+;;; If attacker wins, returns a snapshot of the defender's military units as :intel.
+(defn resolve-espionage [attacker defender]
+  (let [att-roll (* (:player/agents attacker) (random-factor))
+        def-roll (* (:player/agents defender)  (random-factor))
+        att-wins? (> att-roll def-roll)]
+    {:attacker-id   (str (:xt/id attacker))
+     :defender-id   (str (:xt/id defender))
+     :defender-name (:player/empire-name defender)
+     :attacker-wins? att-wins?
+     :intel (when att-wins?
+              {:soldiers  (:player/soldiers  defender)
+               :transports (:player/transports defender)
+               :generals  (:player/generals  defender)
+               :fighters  (:player/fighters  defender)
+               :carriers  (:player/carriers  defender)
+               :admirals  (:player/admirals  defender)
+               :stations  (:player/stations  defender)
+               :cmd-ships (:player/cmd-ships defender)
+               :agents    (:player/agents    defender)})}))
 
 ;;; Returns the full battle result map. UUIDs stored as strings for safe pr-str round-trip.
 (defn resolve-combat [game attacker defender]

@@ -101,6 +101,8 @@
              {:optional true}              inst?]
             [:player/last-battle-result
              {:optional true}             [:maybe :string]]
+            [:player/last-espionage-result
+             {:optional true}             [:maybe :string]]
 
             ;; Leadership
 
