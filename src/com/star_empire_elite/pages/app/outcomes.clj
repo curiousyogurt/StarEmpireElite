@@ -98,13 +98,28 @@
           {:status 303
            :headers {"location" (str "/app/game/" player-id "/income")}})))))
 
+(defn- battle-row [label af al dl att-key loss-key att-only? separator-below?]
+  [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
+   [:td.py-1 label]
+   [:td.text-right.px-3 (if att-only? "—" (get af att-key))]
+   [:td.text-right.px-3 (if att-only? "—" (get al loss-key))]
+   [:td.text-right (get dl loss-key)]])
+
+(defn- planet-row [label enemy-losses att-wins? separator-below?]
+  [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
+   [:td.py-1 label]
+   [:td.text-right.px-3 "—"]
+   [:td.text-right.px-3 "—"]
+   [:td.text-right (if att-wins? enemy-losses "—")]])
+
 ;; :: outcomes page - review turn results and advance to next turn
 (defn outcomes-page [{:keys [player game battle-result espionage-result]}]
-  (let [current-turn (:player/current-turn player)
-        current-round (:player/current-round player)
+  (let [current-turn    (:player/current-turn player)
+        current-round   (:player/current-round player)
         turns-per-round (:game/turns-per-round game)
-        rounds-per-day (:game/rounds-per-day game)
-        end-current-round? (>= current-turn turns-per-round)]
+        rounds-per-day  (:game/rounds-per-day game)
+        end-current-round?  (>= current-turn turns-per-round)
+        one-turn-left?      (= current-turn (dec turns-per-round))]
     (ui/page
      {}
      [:div.mx-auto.max-w-4xl.w-full.text-green-400.font-mono
@@ -117,62 +132,46 @@
        [:div.space-y-2
         [:p (str "Turn: " current-turn " of " turns-per-round)]
         [:p (str "Round: " current-round " of " rounds-per-day)]
+        (when one-turn-left?
+          [:p.font-bold "Warning: One turn remaining this round."])
         (when end-current-round?
           [:p.font-bold "Warning: Completing this turn will end the current round!"])]]
 
       ;; Battle result section (only shown when an attack was declared)
       (when battle-result
         (let [att-wins? (:attacker-wins? battle-result)
-              att-l     (:attacker-losses battle-result)
-              def-l     (:defender-losses battle-result)]
+              af        (:attacker-forces battle-result)
+              df        (:defender-forces battle-result)
+              al        (:attacker-losses battle-result)
+              dl        (:defender-losses battle-result)
+              def-name  (:defender-name battle-result)
+              pt        (or (:planets-transferred battle-result) {:mil 0 :food 0 :ore 0})
+              pt-total  (+ (:mil pt) (:food pt) (:ore pt))]
           [:div.border.border-green-400.p-4.mb-4
-           [:h3.font-bold.mb-2
-            (if att-wins?
-              (str "Victory against " (:defender-name battle-result))
-              (str "Defeat by " (:defender-name battle-result)))]
-           [:div.grid.grid-cols-2.gap-4.mb-3
-            [:div
-             [:p.text-xs.font-bold.mb-2 "Your forces"]
-             [:p.text-xs (str "Soldiers:  "   (get-in battle-result [:attacker-forces :soldiers]))]
-             [:p.text-xs (str "Fighters:  "   (get-in battle-result [:attacker-forces :fighters]))]
-             [:p.text-xs (str "Cmd Ships: "  (get-in battle-result [:attacker-forces :cmd-ships]))]
-             [:p.text-xs (str "Generals:  "   (get-in battle-result [:attacker-forces :generals]))]
-             [:p.text-xs (str "Admirals:  "   (get-in battle-result [:attacker-forces :admirals]))]]
-            [:div
-             [:p.text-xs.font-bold.mb-2 (str (:defender-name battle-result) "'s forces")]
-             [:p.text-xs (str "Soldiers:     "   (get-in battle-result [:defender-forces :soldiers]))]
-             [:p.text-xs (str "Fighters:     "   (get-in battle-result [:defender-forces :fighters]))]
-             [:p.text-xs (str "Def Stations: " (get-in battle-result [:defender-forces :stations]))]
-             [:p.text-xs (str "Cmd Ships:    "  (get-in battle-result [:defender-forces :cmd-ships]))]
-             [:p.text-xs (str "Generals:     "   (get-in battle-result [:defender-forces :generals]))]
-             [:p.text-xs (str "Admirals:     "   (get-in battle-result [:defender-forces :admirals]))]]
-           [:div.border-t.border-green-400.pt-3
-            [:p.text-xs.mb-1 "Casualties"]
-            [:p.text-xs (str "Your losses — soldiers: " (:soldiers-lost att-l)
-                             ", fighters:  " (:fighters-lost att-l)
-                             ", cmd ships: " (:cmd-ships-lost att-l)
-                             ", generals:  " (:generals-lost att-l)
-                             ", admirals:  " (:admirals-lost att-l))]
-            [:p.text-xs (str (:defender-name battle-result) " losses — soldiers: " (:soldiers-lost def-l)
-                             ", fighters:  " (:fighters-lost def-l)
-                             ", stations:  " (:stations-lost def-l)
-                             ", cmd ships: " (:cmd-ships-lost def-l)
-                             ", generals:  " (:generals-lost def-l)
-                             ", admirals:  " (:admirals-lost def-l))]
-            (let [pt    (or (:planets-transferred battle-result) {:mil 0 :food 0 :ore 0})
-                  total (+ (:mil pt) (:food pt) (:ore pt))]
-              (when (pos? total)
-                [:p.text-xs.mt-2
-                 (str "Planets captured: "
-                      (clojure.string/join ", "
-                        (remove nil?
-                          [(when (pos? (:mil  pt)) (str (:mil  pt) " military"))
-                           (when (pos? (:food pt)) (str (:food pt) " food"))
-                           (when (pos? (:ore  pt)) (str (:ore  pt) " ore"))])))]))]]]))
-
+           [:h3.font-bold.mb-3
+            (if att-wins? (str "Victory against " def-name) (str "Defeat by " def-name))]
+           [:div.overflow-x-auto
+            [:table.w-full.text-xs.table-fixed
+             [:thead
+              [:tr.border-b.border-green-400
+               [:th.text-left.py-1   {:style {:width "10%"}} "Item"]
+               [:th.text-right.py-1  {:style {:width "30%"}} "Your Forces"]
+               [:th.text-right.py-1  {:style {:width "30%"}} "Your Losses"]
+               [:th.text-right.py-1  {:style {:width "30%"}} (str def-name " Losses")]]]
+             [:tbody
+              (battle-row "Soldiers"  af al dl :soldiers  :soldiers-lost  false false)
+              (battle-row "Fighters"  af al dl :fighters  :fighters-lost  false false)
+              (battle-row "Cmd Ships" af al dl :cmd-ships :cmd-ships-lost false false)
+              (battle-row "Generals"  af al dl :generals  :generals-lost  false false)
+              (battle-row "Admirals"  af al dl :admirals  :admirals-lost  false false)
+              (battle-row "Stations"  af al dl :stations  :stations-lost  true  true)
+              (planet-row "Ore"       (:ore  pt) att-wins? false)
+              (planet-row "Food"      (:food pt) att-wins? false)
+              (planet-row "Military"  (:mil  pt) att-wins? true)]]]]
+        ))
       ;; Espionage result section (only shown when an infiltration was declared)
       (when espionage-result
-        (let [won? (:attacker-wins? espionage-result)
+        (let [won?  (:attacker-wins? espionage-result)
               intel (:intel espionage-result)]
           [:div.border.border-green-400.p-4.mb-4
            [:h3.font-bold.mb-2
