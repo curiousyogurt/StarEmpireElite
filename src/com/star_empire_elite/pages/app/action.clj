@@ -12,23 +12,39 @@
                    game-id current-player-id)]
     (sort-by :player/score > (seq players))))
 
-;; :: render a single row in the targets table with an attack button
-(defn target-row [player current-player-id]
+;; JS run after every radio click to sync the warning banner and button label.
+;; Reads the current checked state rather than inferring it, so it's always accurate.
+(def ^:private sync-ui
+  (str "var c=document.querySelector('[name=target-player-id]:checked');"
+       "document.getElementById('attack-warning').style.visibility=c?'visible':'hidden';"
+       "document.getElementById('cancel-btn').style.display=c?'':'none';"))
+
+;; :: render a single row in the targets table with a radio-button attack selector.
+;; The radio input is visually hidden; its label renders as the attack button.
+;; peer-checked: Tailwind variants handle yellow highlight when selected.
+;; A tiny onclick handles deselect (radio buttons don't natively uncheck on re-click).
+(defn target-row [player]
   (let [total-planets (+ (:player/mil-planets player)
                          (:player/food-planets player)
-                         (:player/ore-planets player))]
+                         (:player/ore-planets player))
+        player-id-str (str (:xt/id player))]
     [:tr.border-b.border-green-400
      [:td.border-r.border-green-400.px-3.py-2 (:player/empire-name player)]
      [:td.border-r.border-green-400.px-3.py-2.text-right total-planets]
      [:td.border-r.border-green-400.px-3.py-2.text-right (:player/score player)]
      [:td.px-3.py-2
-      (biff/form
-       {:action (str "/app/game/" current-player-id "/apply-action")
-        :method "post"}
-       [:input {:type "hidden" :name "target-player-id" :value (str (:xt/id player))}]
-       [:button.w-full.px-3.py-1.text-sm.font-bold.bg-black.text-green-400.border.border-green-400.hover:text-yellow-400.hover:border-yellow-400.transition-colors
-        {:type "submit"}
-        "Attack"])]]))
+      [:label.block.cursor-pointer
+       [:input.peer.sr-only
+        {:type "radio"
+         :name "target-player-id"
+         :value player-id-str
+         :onclick (str "var p=this.dataset.was==='true';"
+                       "document.querySelectorAll('[name=target-player-id]').forEach(function(r){r.dataset.was='false';});"
+                       "if(p){this.checked=false;}else{this.dataset.was='true';}"
+                       sync-ui)}]
+       [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
+        {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
+        "Attack"]]]]))
 
 ;; :: action page - choose a target to attack or skip combat
 (defn action-page [{:keys [player game db]}]
@@ -41,31 +57,42 @@
 
       (ui/phase-header (:player/current-phase player) "ACTION")
 
-      (if (empty? other-players)
-        [:p.mb-6 "There are no other empires in the galaxy to attack."]
-        [:div.mb-6
-         [:h2.text-xl.font-bold.mb-4 "Choose a Target"]
-         [:p.text-sm.mb-4.text-green-400.text-opacity-75
-          "Select an empire to attack. Your attack will be resolved in the Outcomes phase."]
-         [:div.overflow-x-auto
-          [:table.w-full.text-sm.border.border-green-400
-           [:thead
-            [:tr.border-b.border-green-400
-             [:th.border-r.border-green-400.px-3.py-2.text-left.w-56 "Empire"]
-             [:th.border-r.border-green-400.px-3.py-2.text-right.w-36 "Planets"]
-             [:th.border-r.border-green-400.px-3.py-2.text-right.w-36 "Score"]
-             [:th.px-3.py-2 ""]]]
-           [:tbody
-            (for [target other-players]
-              (target-row target player-id))]]]])
-
-      [:.h-6]
       (biff/form
        {:action (str "/app/game/" player-id "/apply-action")
         :method "post"}
+
+       (if (empty? other-players)
+         [:p.mb-6 "There are no other empires in the galaxy to attack."]
+         [:div.mb-6
+          [:h2.text-xl.font-bold.mb-4 "Choose a Target"]
+          [:p.text-sm.mb-4.text-green-400.text-opacity-75
+           "Select an empire to attack. Your attack will be resolved in the Outcomes phase."]
+          [:div.overflow-x-auto
+           [:table.w-full.text-sm.border.border-green-400
+            [:thead
+             [:tr.border-b.border-green-400
+              [:th.border-r.border-green-400.px-3.py-2.text-left.w-56 "Empire"]
+              [:th.border-r.border-green-400.px-3.py-2.text-right.w-36 "Planets"]
+              [:th.border-r.border-green-400.px-3.py-2.text-right.w-36 "Score"]
+              [:th.px-3.py-2 ""]]]
+            [:tbody
+             (for [target other-players]
+               (target-row target))]]]])
+
+       ;; Warning banner — always occupies h-8 so buttons don't shift; visibility toggled by JS.
+       [:div#attack-warning.h-8.flex.items-center
+        {:style {:visibility "hidden"}}
+        [:p.text-yellow-400 "\u26a0 Attack queued for Outcomes phase."]]
+
        [:div.flex.gap-4
         [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
          {:href (str "/app/game/" player-id)} "Pause"]
+        [:button#cancel-btn.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+         {:type "button"
+          :style {:display "none"}
+          :onclick (str "document.querySelectorAll('[name=target-player-id]').forEach(function(r){r.checked=false;r.dataset.was='false';});"
+                        sync-ui)}
+         "Cancel Attack"]
         [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
          {:type "submit"}
          "Continue to Espionage"]])])))
