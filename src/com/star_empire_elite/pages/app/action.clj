@@ -12,13 +12,6 @@
                    game-id current-player-id)]
     (sort-by :player/score > (seq players))))
 
-;; JS run after every radio click to sync the warning banner and button label.
-;; Reads the current checked state rather than inferring it, so it's always accurate.
-(def ^:private sync-ui
-  (str "var c=document.querySelector('[name=target-player-id]:checked');"
-       "document.getElementById('attack-warning').style.visibility=c?'visible':'hidden';"
-       "document.getElementById('cancel-btn').style.display=c?'':'none';"))
-
 ;; :: render a single row in the targets table with a radio-button attack selector.
 ;; The radio input is visually hidden; its label renders as the attack button.
 ;; peer-checked: Tailwind variants handle yellow highlight when selected.
@@ -40,8 +33,7 @@
          :value player-id-str
          :onclick (str "var p=this.dataset.was==='true';"
                        "document.querySelectorAll('[name=target-player-id]').forEach(function(r){r.dataset.was='false';});"
-                       "if(p){this.checked=false;}else{this.dataset.was='true';}"
-                       sync-ui)}]
+                       "if(p){this.checked=false;}else{this.dataset.was='true';}")}]
        [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
         {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
         "Attack"]]]]))
@@ -79,19 +71,18 @@
              (for [target other-players]
                (target-row target))]]]])
 
-       ;; Warning banner — always occupies h-8 so buttons don't shift; visibility toggled by JS.
-       [:div#attack-warning.h-8.flex.items-center
-        {:style {:visibility "hidden"}}
+       ;; Warning banner — shown by CSS when a target radio is selected
+       [:div.queued-warning.items-center
         [:p.text-yellow-400 "\u26a0 Attack queued for Outcomes phase."]]
+
+       (ui/incoming-alert player)
 
        [:div.flex.gap-4
         [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
          {:href (str "/app/game/" player-id)} "Pause"]
-        [:button#cancel-btn.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+        [:button.cancel-target.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
          {:type "button"
-          :style {:display "none"}
-          :onclick (str "document.querySelectorAll('[name=target-player-id]').forEach(function(r){r.checked=false;r.dataset.was='false';});"
-                        sync-ui)}
+          :onclick "document.querySelectorAll('[name=target-player-id]').forEach(function(r){r.checked=false;r.dataset.was='false';});"}
          "Cancel Attack"]
         [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
          {:type "submit"}

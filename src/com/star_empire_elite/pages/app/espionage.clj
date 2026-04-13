@@ -12,11 +12,6 @@
                    game-id current-player-id)]
     (sort-by :player/score > (seq players))))
 
-(def ^:private sync-ui
-  (str "var c=document.querySelector('[name=target-player-id]:checked');"
-       "document.getElementById('infiltrate-warning').style.visibility=c?'visible':'hidden';"
-       "document.getElementById('cancel-btn').style.display=c?'':'none';"))
-
 ;; :: render a single row in the targets table with a radio-button infiltrate selector
 (defn target-row [player]
   (let [total-planets (+ (:player/mil-planets player)
@@ -35,8 +30,7 @@
          :value player-id-str
          :onclick (str "var p=this.dataset.was==='true';"
                        "document.querySelectorAll('[name=target-player-id]').forEach(function(r){r.dataset.was='false';});"
-                       "if(p){this.checked=false;}else{this.dataset.was='true';}"
-                       sync-ui)}]
+                       "if(p){this.checked=false;}else{this.dataset.was='true';}")}]
        [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
         {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
         "Infiltrate"]]]]))
@@ -56,8 +50,15 @@
        {:action (str "/app/game/" player-id "/apply-espionage")
         :method "post"}
 
-       (if (empty? other-players)
+       (cond
+         (zero? (or (:player/agents player) 0))
+         [:p.text-yellow-400.mb-6
+          "\u26a0 You have no agents. You cannot undertake espionage operations this turn."]
+
+         (empty? other-players)
          [:p.mb-6 "There are no other empires to infiltrate."]
+
+         :else
          [:div.mb-6
           [:h2.text-xl.font-bold.mb-4 "Choose a Target"]
           [:p.text-sm.mb-4.text-green-400.text-opacity-75
@@ -74,18 +75,18 @@
              (for [target other-players]
                (target-row target))]]]])
 
-       [:div#infiltrate-warning.h-8.flex.items-center
-        {:style {:visibility "hidden"}}
+       ;; Warning banner — shown by CSS when a target radio is selected
+       [:div.queued-warning.items-center
         [:p.text-yellow-400 "\u26a0 Infiltration queued for Outcomes phase."]]
+
+       (ui/incoming-alert player)
 
        [:div.flex.gap-4
         [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
          {:href (str "/app/game/" player-id)} "Pause"]
-        [:button#cancel-btn.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+        [:button.cancel-target.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
          {:type "button"
-          :style {:display "none"}
-          :onclick (str "document.querySelectorAll('[name=target-player-id]').forEach(function(r){r.checked=false;r.dataset.was='false';});"
-                        sync-ui)}
+          :onclick "document.querySelectorAll('[name=target-player-id]').forEach(function(r){r.checked=false;r.dataset.was='false';});"}
          "Cancel Infiltration"]
         [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
          {:type "submit"}

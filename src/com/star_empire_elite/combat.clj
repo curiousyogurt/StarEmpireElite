@@ -99,6 +99,7 @@
         planets-count (if att-wins? (long (* margin def-total-planets)) 0)
         planets-transferred (select-planets defender planets-count)]
     {:attacker-id          (str (:xt/id attacker))
+     :attacker-name        (:player/empire-name attacker)
      :defender-id          (str (:xt/id defender))
      :defender-name        (:player/empire-name defender)
      :attacker-forces      att-forces

@@ -3,7 +3,23 @@
             [com.star-empire-elite.ui :as ui]
             [xtdb.api :as xt]))
 
-;; :: apply outcomes - advance to next round/turn, apply combat casualties, reset to phase 1
+;; :: score = planets (dominant) + military (power-weighted) + credits (tiebreaker)
+(defn- calculate-score [player]
+  (+ (* (:player/mil-planets  player) 500)
+     (* (:player/food-planets player) 300)
+     (* (:player/ore-planets  player) 200)
+     (* (:player/soldiers     player) 1)
+     (* (:player/fighters     player) 3)
+     (* (:player/cmd-ships    player) 20)
+     (* (:player/stations     player) 5)
+     (* (:player/generals     player) 50)
+     (* (:player/admirals     player) 100)
+     (quot (max 0 (or (:player/credits player) 0)) 1000)))
+
+;; :: apply outcomes - advance turn/round/phase and clear stored results.
+;; All stat changes (combat casualties, planet transfers, notifications) were already
+;; applied when the player loaded the outcomes page (GET). This POST only handles
+;; turn progression and cleanup.
 (defn apply-outcomes [{:keys [path-params biff/db] :as ctx}]
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
         player    (xt/entity db player-id)]
@@ -18,86 +34,70 @@
               end-round?      (>= turns-used turns-per-round)
               next-turn       (if end-round? 1 (inc (:player/current-turn player)))
               next-round      (if end-round? (inc (:player/current-round player)) (:player/current-round player))
-              reset-used      (if end-round? 0 turns-used)
-
-              ;; read stored battle result (if any)
-              stored-str    (:player/last-battle-result player)
-              battle-result (when stored-str (clojure.core/read-string stored-str))
-              al            (when battle-result (:attacker-losses battle-result))
-
-              ;; load defender now so we can cap planet transfers against live counts
-              defender      (when battle-result
-                              (xt/entity db (java.util.UUID/fromString (:defender-id battle-result))))
-              dl            (when battle-result (:defender-losses battle-result))
-
-              ;; planet transfers — cap each type at what defender currently holds
-              raw-pt        (when battle-result
-                              (or (:planets-transferred battle-result) {:mil 0 :food 0 :ore 0}))
-              pt-mil        (when raw-pt (min (:mil  raw-pt) (:player/mil-planets  defender)))
-              pt-food       (when raw-pt (min (:food raw-pt) (:player/food-planets defender)))
-              pt-ore        (when raw-pt (min (:ore  raw-pt) (:player/ore-planets  defender)))
-
-              ;; attacker unit counts after casualties
-              att-soldiers  (if al (max 0 (- (:player/soldiers  player) (:soldiers-lost  al)))
-                              (:player/soldiers  player))
-              att-fighters  (if al (max 0 (- (:player/fighters  player) (:fighters-lost  al)))
-                              (:player/fighters  player))
-              att-cmd-ships (if al (max 0 (- (:player/cmd-ships player) (:cmd-ships-lost al)))
-                              (:player/cmd-ships player))
-              att-generals  (if al (max 0 (- (:player/generals  player) (:generals-lost  al)))
-                              (:player/generals  player))
-              att-admirals  (if al (max 0 (- (:player/admirals  player) (:admirals-lost  al)))
-                              (:player/admirals  player))
-
-              ;; attacker planet counts after captures
-              att-mil-planets  (+ (:player/mil-planets  player) (or pt-mil  0))
-              att-food-planets (+ (:player/food-planets player) (or pt-food 0))
-              att-ore-planets  (+ (:player/ore-planets  player) (or pt-ore  0))
-
-              ;; attacker transaction — always includes all modified fields
-              attacker-tx (merge {:db/doc-type                  :player
-                                  :db/op                        :update
-                                  :xt/id                        player-id
-                                  :player/current-turn          next-turn
-                                  :player/current-round         next-round
-                                  :player/turns-used            reset-used
-                                  :player/current-phase         1
-                                  :player/last-turn-at          now
-                                  :player/last-battle-result    nil
-                                  :player/last-espionage-result nil
-                                  :player/pending-espionage     nil
-                                  :player/soldiers            att-soldiers
-                                  :player/fighters            att-fighters
-                                  :player/cmd-ships           att-cmd-ships
-                                  :player/generals            att-generals
-                                  :player/admirals            att-admirals
-                                  :player/mil-planets         att-mil-planets
-                                  :player/food-planets        att-food-planets
-                                  :player/ore-planets         att-ore-planets}
-                                 (when end-round?
-                                   {:player/last-round-completed-at now}))
-
-              ;; defender transaction (only if battle happened)
-              defender-tx (when battle-result
-                            {:db/doc-type         :player
-                             :db/op               :update
-                             :xt/id               (:xt/id defender)
-                             :player/soldiers     (max 0 (- (:player/soldiers  defender) (:soldiers-lost  dl)))
-                             :player/fighters     (max 0 (- (:player/fighters  defender) (:fighters-lost  dl)))
-                             :player/cmd-ships    (max 0 (- (:player/cmd-ships defender) (:cmd-ships-lost dl)))
-                             :player/generals     (max 0 (- (:player/generals  defender) (:generals-lost  dl)))
-                             :player/admirals     (max 0 (- (:player/admirals  defender) (:admirals-lost  dl)))
-                             :player/stations     (max 0 (- (:player/stations  defender) (:stations-lost  dl)))
-                             :player/mil-planets  (max 0 (- (:player/mil-planets  defender) (or pt-mil  0)))
-                             :player/food-planets (max 0 (- (:player/food-planets defender) (or pt-food 0)))
-                             :player/ore-planets  (max 0 (- (:player/ore-planets  defender) (or pt-ore  0)))})]
-
-          ;; submit everything atomically
-          (biff/submit-tx ctx (remove nil? [attacker-tx defender-tx]))
-
+              reset-used      (if end-round? 0 turns-used)]
+          (biff/submit-tx ctx
+            [(merge {:db/doc-type                     :player
+                     :db/op                           :update
+                     :xt/id                           player-id
+                     :player/current-turn             next-turn
+                     :player/current-round            next-round
+                     :player/turns-used               reset-used
+                     :player/current-phase            1
+                     :player/last-turn-at             now
+                     :player/last-battle-result       nil
+                     :player/last-espionage-result    nil
+                     :player/pending-espionage        nil
+                     :player/incoming-attacks         nil
+                     :player/incoming-espionage-fails 0
+                     :player/score                    (calculate-score player)}
+                    (when end-round?
+                      {:player/last-round-completed-at now}))])
           {:status 303
            :headers {"location" (str "/app/game/" player-id "/income")}})))))
 
+;; :: incoming attack helpers — defender's perspective (Item | Your Losses | Attacker Losses)
+(defn- incoming-battle-row [label dl al loss-key def-only? separator-below?]
+  [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
+   [:td.py-1 label]
+   [:td.text-right.px-3 (get dl loss-key)]
+   [:td.text-right (if def-only? "—" (get al loss-key))]])
+
+(defn- incoming-planet-row [label def-losses separator-below?]
+  [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
+   [:td.py-1 label]
+   [:td.text-right.px-3 def-losses]
+   [:td.text-right "—"]])
+
+(defn- incoming-attack-section [result]
+  (let [att-wins? (:attacker-wins? result)
+        att-name  (:attacker-name result)
+        al        (:attacker-losses result)
+        dl        (:defender-losses result)
+        pt        (or (:planets-transferred result) {:mil 0 :food 0 :ore 0})]
+    [:div.border.border-green-400.p-4.mb-4
+     [:h3.font-bold.mb-3
+      (if att-wins?
+        (str "Attacked by " att-name " — defeat")
+        (str "Attacked by " att-name " — repelled"))]
+     [:div.overflow-x-auto
+      [:table.w-full.text-xs.table-fixed
+       [:thead
+        [:tr.border-b.border-green-400
+         [:th.text-left.py-1  {:style {:width "10%"}} "Item"]
+         [:th.text-right.py-1 {:style {:width "45%"}} "Your Losses"]
+         [:th.text-right.py-1 {:style {:width "45%"}} (str att-name " Losses")]]]
+       [:tbody
+        (incoming-battle-row "Soldiers"  dl al :soldiers-lost  false false)
+        (incoming-battle-row "Fighters"  dl al :fighters-lost  false false)
+        (incoming-battle-row "Cmd Ships" dl al :cmd-ships-lost false false)
+        (incoming-battle-row "Generals"  dl al :generals-lost  false false)
+        (incoming-battle-row "Admirals"  dl al :admirals-lost  false false)
+        (incoming-battle-row "Stations"  dl al :stations-lost  true  true)
+        (incoming-planet-row "Ore"      (:ore  pt) false)
+        (incoming-planet-row "Food"     (:food pt) false)
+        (incoming-planet-row "Military" (:mil  pt) true)]]]]))
+
+;; :: outgoing attack helpers
 (defn- battle-row [label af al dl att-key loss-key att-only? separator-below?]
   [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
    [:td.py-1 label]
@@ -127,15 +127,16 @@
 
       (ui/phase-header (:player/current-phase player) "OUTCOMES")
 
-      [:h3.font-bold.mb-2 "Summary"]
-      [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
-       [:div.space-y-2
-        [:p (str "Turn: " current-turn " of " turns-per-round)]
-        [:p (str "Round: " current-round " of " rounds-per-day)]
-        (when one-turn-left?
-          [:p.font-bold "Warning: One turn remaining this round."])
-        (when end-current-round?
-          [:p.font-bold "Warning: Completing this turn will end the current round!"])]]
+      ;; Incoming attacks section (attacks received from other players this turn)
+      (let [incoming (seq (:player/incoming-attacks player))
+            esp-fails (or (:player/incoming-espionage-fails player) 0)]
+        (when (or incoming (pos? esp-fails))
+          [:div
+           (for [r incoming]
+             (incoming-attack-section (clojure.core/read-string r)))
+           (when (pos? esp-fails)
+             [:div.border.border-green-400.p-4.mb-4
+              [:p.font-bold (str esp-fails " infiltration attempt(s) against your empire were discovered and neutralized.")]])]))
 
       ;; Battle result section (only shown when an attack was declared)
       (when battle-result
@@ -192,15 +193,12 @@
               [:p.text-xs (str "Agents:     " (:agents     intel))]]
              [:p.text-xs "Your agents were unable to obtain useful intelligence."])]))
 
-      (ui/resource-display-grid player "Resources")
+      (ui/extended-resource-display-grid player "Resources" false game)
 
-      [:p.text-sm "Review your turn results above. When you're ready, continue to your next turn."]
-
-      [:.h-6]
       (biff/form
        {:action (str "/app/game/" (:xt/id player) "/apply-outcomes")
         :method "post"}
-       [:div.flex.gap-4
+       [:div.flex.gap-4.mt-6
         [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
          {:href (str "/app/game/" (:xt/id player))} "Pause"]
         [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors

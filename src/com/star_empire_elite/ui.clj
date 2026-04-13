@@ -132,9 +132,9 @@
   resources - map of resource values to display (uses either player entity or custom map)
   title - optional title for the display section
   highlight-negative? - if true, shows negative values in red (default false)"
-  ([resources title]
-   (resource-display-grid resources title false))
-  ([resources title highlight-negative?]
+  ([resources title] (resource-display-grid resources title false nil))
+  ([resources title highlight-negative?] (resource-display-grid resources title highlight-negative? nil))
+  ([resources title highlight-negative? game]
    [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
     [:h3.font-bold.mb-4 title]
     [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
@@ -164,7 +164,15 @@
       [:p.font-mono (format-number (or (:stations resources) (:player/stations resources)))]]
      [:div
       [:p.text-xs "Agents"]
-      [:p.font-mono (format-number (or (:agents resources) (:player/agents resources)))]]]]))
+      [:p.font-mono (format-number (or (:agents resources) (:player/agents resources)))]]
+     (when-let [turn (or (:current-turn resources) (:player/current-turn resources))]
+       [:div
+        [:p.text-xs "Turn"]
+        [:p.font-mono (str turn (when game (str "/" (:game/turns-per-round game))))]])
+     (when-let [round (or (:current-round resources) (:player/current-round resources))]
+       [:div
+        [:p.text-xs "Round"]
+        [:p.font-mono (str round (when game (str "/" (:game/rounds-per-day game))))]])]]))
 
 ;;; Extended resource display grid including all unit types and planets. Used in building phase
 ;;; where players need to see all their assets, not just basic resources.
@@ -175,9 +183,9 @@
   resources - map of resource values to display (uses either player entity or custom map)
   title - optional title for the display section
   highlight-negative? - if true, shows negative values in red (default false)"
-  ([resources title]
-   (extended-resource-display-grid resources title false))
-  ([resources title highlight-negative?]
+  ([resources title] (extended-resource-display-grid resources title false nil))
+  ([resources title highlight-negative?] (extended-resource-display-grid resources title highlight-negative? nil))
+  ([resources title highlight-negative? game]
    [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
     [:h3.font-bold.mb-4 title]
     [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
@@ -230,6 +238,10 @@
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:cmd-ships resources) (:player/cmd-ships resources) 0) 0)) "text-red-400")}
        (format-number (or (:cmd-ships resources) (:player/cmd-ships resources) 0))]]
      [:div
+      [:p.text-xs "Agents"]
+      [:p.font-mono {:class (when (and highlight-negative? (< (or (:agents resources) (:player/agents resources) 0) 0)) "text-red-400")}
+       (format-number (or (:agents resources) (:player/agents resources) 0))]]
+     [:div
       [:p.text-xs "Ore Plts"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:ore-planets resources) (:player/ore-planets resources) 0) 0)) "text-red-400")}
        (format-number (or (:ore-planets resources) (:player/ore-planets resources) 0))]]
@@ -240,7 +252,37 @@
      [:div
       [:p.text-xs "Mil Plts"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:mil-planets resources) (:player/mil-planets resources) 0) 0)) "text-red-400")}
-       (format-number (or (:mil-planets resources) (:player/mil-planets resources) 0))]]]]))
+       (format-number (or (:mil-planets resources) (:player/mil-planets resources) 0))]]
+     (when-let [turn (or (:current-turn resources) (:player/current-turn resources))]
+       [:div
+        [:p.text-xs "Turn"]
+        [:p.font-mono (str turn (when game (str "/" (:game/turns-per-round game))))]])
+     (when-let [round (or (:current-round resources) (:player/current-round resources))]
+       [:div
+        [:p.text-xs "Round"]
+        [:p.font-mono (str round (when game (str "/" (:game/rounds-per-day game))))]])]]))
+
+(defn incoming-alert-content [player]
+  (let [attacks   (seq (:player/incoming-attacks player))
+        esp-fails (or (:player/incoming-espionage-fails player) 0)]
+    (when (or attacks (pos? esp-fails))
+      [:p.mb-4.text-red-400.text-sm
+       (str "\u26a0 "
+            (when attacks "Your empire was attacked. ")
+            (when (pos? esp-fails) "Espionage against your empire was discovered. ")
+            "See details in Outcomes phase.")])))
+
+(defn incoming-alert [player]
+  (let [has-alerts? (or (seq (:player/incoming-attacks player))
+                        (pos? (or (:player/incoming-espionage-fails player) 0)))
+        player-id   (:xt/id player)]
+    [:div#incoming-alert
+     {:hx-get     (str "/app/game/" player-id "/alerts")
+      :hx-trigger "every 10s"
+      :hx-swap    "innerHTML"
+      :hx-include "this"}
+     [:input {:type "hidden" :name "had-alerts" :value (if has-alerts? "true" "false")}]
+     (incoming-alert-content player)]))
 
 (defn numeric-input 
   "Creates a numeric-only input field with HTMX integration and reset button.

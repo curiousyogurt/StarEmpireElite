@@ -85,3 +85,8 @@
 }
 
 .grecaptcha-badge { visibility: hidden; }
+
+/* Show queued-action warning and cancel button when a target radio is selected */
+.queued-warning, .cancel-target { display: none; }
+form:has([name=target-player-id]:checked) .queued-warning { display: flex; }
+form:has([name=target-player-id]:checked) .cancel-target  { display: inline-block; }

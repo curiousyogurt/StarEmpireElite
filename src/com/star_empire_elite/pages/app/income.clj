@@ -135,7 +135,7 @@
        ;;; Current resources display:
        ;;; Shows starting position before income is applied, helping players understand what they have
        ;;; available for the upcoming expenses phase.
-       (ui/resource-display-grid player "Resources Before Income")
+       (ui/resource-display-grid player "Resources Before Income" false game)
 
        ;;; Income breakdown table:
        ;;; Displays as spreadsheet: normal on wide screen; compressed on mobile
@@ -169,26 +169,28 @@
        ;;; Final resource totals:
        ;;; Shows what the player will have after income is applied. This preview helps players
        ;;; anticipate actions that they might want or need to take in the subsequent phases.
-       (ui/resource-display-grid 
-         {:credits  (+ (:player/credits player)  (:ore-credits income))
-          :food     (+ (:player/food player)     (:food-food income))
-          :fuel     (+ (:player/fuel player)     (:ore-fuel income))
-          :galaxars (+ (:player/galaxars player) (:ore-galaxars income))
-          :soldiers (+ (:player/soldiers player) (:mil-soldiers income))
-          :fighters (+ (:player/fighters player) (:mil-fighters income))
-          :stations (+ (:player/stations player) (:mil-stations income))
-          :agents   (+ (:player/agents player)   (:mil-agents income))}
-         "Resources After Income")
-
-       [:.h-6]
+       (ui/resource-display-grid
+         {:credits              (+ (:player/credits player)  (:ore-credits income))
+          :food                 (+ (:player/food player)     (:food-food income))
+          :fuel                 (+ (:player/fuel player)     (:ore-fuel income))
+          :galaxars             (+ (:player/galaxars player) (:ore-galaxars income))
+          :soldiers             (+ (:player/soldiers player) (:mil-soldiers income))
+          :fighters             (+ (:player/fighters player) (:mil-fighters income))
+          :stations             (+ (:player/stations player) (:mil-stations income))
+          :agents               (+ (:player/agents player)   (:mil-agents income))
+          :player/current-turn  (:player/current-turn player)
+          :player/current-round (:player/current-round player)}
+         "Resources After Income" false game)
 
        ;;; Phase Advance Form:
        ;;; Simple form submission with no validation needed. Income is always valid and beneficial.
-       ;;; No htmx dynamic updates (unlike later phases) since there are no player choices to 
+       ;;; No htmx dynamic updates (unlike later phases) since there are no player choices to
        ;;; validate.
+       (ui/incoming-alert player)
+
        (biff/form
          {:action (str "/app/game/" (:xt/id player) "/apply-income") :method "post"}
-         [:div.flex.gap-4
+         [:div.flex.gap-4.mt-6
           [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
            {:href (str "/app/game/" (:xt/id player))} "Pause"]
           [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors

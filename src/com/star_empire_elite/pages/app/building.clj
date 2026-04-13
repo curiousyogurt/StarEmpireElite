@@ -11,9 +11,13 @@
 
 (ns com.star-empire-elite.pages.app.building
   (:require [com.biffweb :as biff]
+            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]
             [xtdb.api :as xt]))
+
+(defn- enrich-game [game]
+  (merge {:game/agent-cost const/agent-cost} game))
 
 ;;;;
 ;;;; Calculations
@@ -32,6 +36,7 @@
    :admirals     (utils/parse-numeric-input (:admirals params))
    :stations     (utils/parse-numeric-input (:stations params))
    :cmd-ships    (utils/parse-numeric-input (:cmd-ships params))
+   :agents       (utils/parse-numeric-input (:agents params))
    :ore-planets  (utils/parse-numeric-input (:ore-planets params))
    :food-planets (utils/parse-numeric-input (:food-planets params))
    :mil-planets  (utils/parse-numeric-input (:mil-planets params))})
@@ -49,6 +54,7 @@
                       (* (:admirals quantities)     (:game/admiral-cost game))
                       (* (:stations quantities)     (:game/station-cost game))
                       (* (:cmd-ships quantities)    (:game/cmd-ship-cost game))
+                      (* (:agents quantities)       (:game/agent-cost game))
                       (* (:ore-planets quantities)  (:game/ore-planet-cost game))
                       (* (:food-planets quantities) (:game/food-planet-cost game))
                       (* (:mil-planets quantities)  (:game/mil-planet-cost game)))]
@@ -68,6 +74,7 @@
    :admirals     (+ (:player/admirals player)     (:admirals quantities))
    :stations     (+ (:player/stations player)     (:stations quantities))
    :cmd-ships    (+ (:player/cmd-ships player)    (:cmd-ships quantities))
+   :agents       (+ (:player/agents player)       (:agents quantities))
    :ore-planets  (+ (:player/ore-planets player)  (:ore-planets quantities))
    :food-planets (+ (:player/food-planets player) (:food-planets quantities))
    :mil-planets  (+ (:player/mil-planets player)  (:mil-planets quantities))})
@@ -98,6 +105,7 @@
                              (* (:admirals quantities)     (:game/admiral-cost game))
                              (* (:stations quantities)     (:game/station-cost game))
                              (* (:cmd-ships quantities)    (:game/cmd-ship-cost game))
+                             (* (:agents quantities)       (:game/agent-cost game))
                              (* (:ore-planets quantities)  (:game/ore-planet-cost game))
                              (* (:food-planets quantities) (:game/food-planet-cost game))
                              (* (:mil-planets quantities)  (:game/mil-planet-cost game)))
@@ -110,6 +118,7 @@
      :admirals     (quot remaining-credits (:game/admiral-cost game))
      :stations     (quot remaining-credits (:game/station-cost game))
      :cmd-ships    (quot remaining-credits (:game/cmd-ship-cost game))
+     :agents       (quot remaining-credits (:game/agent-cost game))
      :ore-planets  (quot remaining-credits (:game/ore-planet-cost game))
      :food-planets (quot remaining-credits (:game/food-planet-cost game))
      :mil-planets  (quot remaining-credits (:game/mil-planet-cost game))}))
@@ -218,7 +227,8 @@
   (utils/with-player-and-game [player game player-id] ctx
     (if-let [redirect (utils/validate-phase player 3 player-id)]
       redirect
-      (let [quantities      (parse-purchase-quantities params)
+      (let [game            (enrich-game game)
+            quantities      (parse-purchase-quantities params)
             cost-info       (calculate-purchase-cost quantities game)
             resources-after (calculate-resources-after-purchases player quantities cost-info)]
         (if (not (can-afford-purchases? resources-after))
@@ -238,6 +248,7 @@
                               :player/admirals     (:admirals resources-after)
                               :player/stations     (:stations resources-after)
                               :player/cmd-ships    (:cmd-ships resources-after)
+                              :player/agents       (:agents resources-after)
                               :player/ore-planets  (:ore-planets resources-after)
                               :player/food-planets (:food-planets resources-after)
                               :player/mil-planets  (:mil-planets resources-after)
@@ -247,7 +258,8 @@
 
 (defn calculate-building [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
-    (let [quantities      (parse-purchase-quantities params)
+    (let [game            (enrich-game game)
+          quantities      (parse-purchase-quantities params)
           cost-info       (calculate-purchase-cost quantities game)
           resources-after (calculate-resources-after-purchases player quantities cost-info)
           affordable?     (can-afford-purchases? resources-after)
@@ -260,6 +272,7 @@
                            :admirals     (* (:admirals quantities)     (:game/admiral-cost game))
                            :stations     (* (:stations quantities)     (:game/station-cost game))
                            :cmd-ships    (* (:cmd-ships quantities)    (:game/cmd-ship-cost game))
+                           :agents       (* (:agents quantities)       (:game/agent-cost game))
                            :ore-planets  (* (:ore-planets quantities)  (:game/ore-planet-cost game))
                            :food-planets (* (:food-planets quantities) (:game/food-planet-cost game))
                            :mil-planets  (* (:mil-planets quantities)  (:game/mil-planet-cost game))}]
@@ -268,11 +281,12 @@
          [:div#resources-after
           (ui/extended-resource-display-grid
             (assoc resources-after
-                   :food (:player/food player)
-                   :fuel (:player/fuel player)
-                   :galaxars (:player/galaxars player))
-            "Resources After Building"
-            true)]
+                   :food                 (:player/food player)
+                   :fuel                 (:player/fuel player)
+                   :galaxars             (:player/galaxars player)
+                   :player/current-turn  (:player/current-turn player)
+                   :player/current-round (:player/current-round player))
+            "Resources After Building" true game)]
          [:div#cost-summary
           {:hx-swap-oob "true"}
           (total-cost-row (:total-cost cost-info) affordable?)]
@@ -288,15 +302,16 @@
                    :key item-key
                    :class (when (zero? cost) "opacity-20")}
             "+" (ui/format-number cost)])
-         [:div#building-warning.h-8.flex.items-center
+         [:div#building-warning.flex.items-center
           {:hx-swap-oob "true"}
           (when (not affordable?)
             [:p.text-yellow-400.font-bold "WARNING: Insufficient credits for purchases!"])]
          (submit-button affordable? {:hx-swap-oob "true"})]))))
 
 (defn building-page [{:keys [player game]}]
-  (let [player-id  (:xt/id player)
-        hx-include "[name='soldiers'],[name='transports'],[name='generals'],[name='carriers'],[name='fighters'],[name='admirals'],[name='stations'],[name='cmd-ships'],[name='ore-planets'],[name='food-planets'],[name='mil-planets']"]
+  (let [game       (enrich-game game)
+        player-id  (:xt/id player)
+        hx-include "[name='soldiers'],[name='transports'],[name='generals'],[name='carriers'],[name='fighters'],[name='admirals'],[name='stations'],[name='cmd-ships'],[name='agents'],[name='ore-planets'],[name='food-planets'],[name='mil-planets']"]
     (ui/page
       {}
       [:div.mx-auto.max-w-4xl.w-full.text-green-400.font-mono
@@ -317,7 +332,7 @@
        (ui/phase-header (:player/current-phase player) "BUILDING")
 
        ;; Current resources before building
-       (ui/extended-resource-display-grid player "Resources Before Building")
+       (ui/extended-resource-display-grid player "Resources Before Building" false game)
 
        (biff/form
          {:action (str "/app/game/" player-id "/apply-building")
@@ -356,6 +371,7 @@
             (purchase-row "Admirals" "Admirals" :admirals :game/admiral-cost 0 0 game player-id hx-include)
             (purchase-row "Defence Stations" "Def Stns" :stations :game/station-cost 0 0 game player-id hx-include)
             (purchase-row "Command Ships" "Cmd Ships" :cmd-ships :game/cmd-ship-cost 0 0 game player-id hx-include)
+            (purchase-row "Agents"        "Agents"    :agents    :game/agent-cost     0 0 game player-id hx-include)
             (purchase-row "Ore Planets" "Ore Plts" :ore-planets :game/ore-planet-cost 0 0 game player-id hx-include)
             (purchase-row "Food Planets" "Food Plts" :food-planets :game/food-planet-cost 0 0 game player-id hx-include)
             (purchase-row "Military Planets" "Mil Plts" :mil-planets :game/mil-planet-cost 0 0 game player-id hx-include)
@@ -364,13 +380,15 @@
 
          ;; Resources after purchases - initial copy, updated via HTMX
          [:div#resources-after
-          (ui/extended-resource-display-grid player "Resources After Purchases")]
+          (ui/extended-resource-display-grid player "Resources After Purchases" false game)]
 
          ;; Warning message area - populated by HTMX if player can't afford purchases
-         [:div#building-warning.h-8.flex.items-center]
+         [:div#building-warning.flex.items-center]
+
+         (ui/incoming-alert player)
 
          ;; Navigation and submit buttons
-         [:div.flex.gap-4
+         [:div.flex.gap-4.mt-2
           [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
            {:href (str "/app/game/" player-id)} "Pause"]
           (submit-button false)])])))

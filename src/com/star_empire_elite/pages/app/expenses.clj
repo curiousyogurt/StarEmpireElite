@@ -298,18 +298,19 @@
         [:div
          ;; Resources display with red highlighting for negative values; use shared component
          [:div#resources-after
-          (ui/resource-display-grid 
-            (assoc resources-after 
-                   :galaxars (:player/galaxars player)
-                   :soldiers (:player/soldiers player)
-                   :fighters (:player/fighters player)
-                   :stations (:player/stations player)
-                   :agents (:player/agents player))
-            "Resources After Expenses"
-            true)]  ; Enable negative highlighting
+          (ui/resource-display-grid
+            (assoc resources-after
+                   :galaxars             (:player/galaxars player)
+                   :soldiers             (:player/soldiers player)
+                   :fighters             (:player/fighters player)
+                   :stations             (:player/stations player)
+                   :agents               (:player/agents player)
+                   :player/current-turn  (:player/current-turn player)
+                   :player/current-round (:player/current-round player))
+            "Resources After Expenses" true game)]
 
          ;; Warning message if expenses exceed available resources
-         [:div#expense-warning.h-8.flex.items-center
+         [:div#expense-warning.flex.items-center
           {:hx-swap-oob "true"}
           (when (not affordable?)
             [:p.text-yellow-400.font-bold "WARNING: Insufficient resources to pay expenses!"])]
@@ -376,7 +377,7 @@
        (ui/phase-header (:player/current-phase player) "EXPENSES")
 
        ;; Current resources before expenses
-       (ui/resource-display-grid player "Resources Before Expenses")
+       (ui/resource-display-grid player "Resources Before Expenses" false game)
 
        (biff/form
          {:action (str "/app/game/" player-id "/apply-expenses")
@@ -447,13 +448,15 @@
 
          ;; Resources after expenses - initial copy, updated via HTMX
          [:div#resources-after
-          (ui/resource-display-grid player "Resources After Expenses")]
+          (ui/resource-display-grid player "Resources After Expenses" false game)]
 
          ;; Warning message area - populated by HTMX if player can't afford expenses
-         [:div#expense-warning.h-8.flex.items-center]
+         [:div#expense-warning.flex.items-center]
+
+         (ui/incoming-alert player)
 
          ;; Navigation and submit buttons
-         [:div.flex.gap-4
+         [:div.flex.gap-4.mt-2
           [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
            {:href (str "/app/game/" player-id)} "Pause"]
           [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors

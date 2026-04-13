@@ -62,6 +62,7 @@
           [:game/admiral-cost            :int]
           [:game/station-cost            :int]
           [:game/cmd-ship-cost           :int]
+          [:game/agent-cost              :int]
           [:game/mil-planet-cost         :int]
           [:game/food-planet-cost        :int]
           [:game/ore-planet-cost         :int]]
@@ -126,7 +127,11 @@
             [:player/pending-attack {:optional true} [:maybe :player/id]]
 
             ;; Espionage
-            [:player/pending-espionage {:optional true} [:maybe :player/id]]]
+            [:player/pending-espionage {:optional true} [:maybe :player/id]]
+
+            ;; Incoming events (set by attackers, displayed on defender's outcomes page)
+            [:player/incoming-attacks        {:optional true} [:maybe [:vector :string]]]
+            [:player/incoming-espionage-fails {:optional true} [:maybe :int]]]
 
    :message/id :uuid
    :message [:map {:closed true}

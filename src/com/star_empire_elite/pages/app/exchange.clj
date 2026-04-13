@@ -463,10 +463,14 @@
 
          ;; Resources display with red highlighting for negative values
          [:div#resources-after
-          (ui/extended-resource-display-grid resources-after "Resources After Exchange" true)]
+          (ui/extended-resource-display-grid
+            (assoc resources-after
+                   :player/current-turn  (:player/current-turn player)
+                   :player/current-round (:player/current-round player))
+            "Resources After Exchange" true game)]
 
          ;; Warning message if exchange is invalid
-         [:div#exchange-warning.h-8.flex.items-center
+         [:div#exchange-warning.flex.items-center
           {:hx-swap-oob "true"}
           (when (not can-execute?)
             (let [invalid-exchanges (identify-invalid-exchanges resources-after quantities)
@@ -537,7 +541,7 @@
        (ui/phase-header (:player/current-phase player) "EXCHANGE")
 
        ;; Current resources before exchange
-       (ui/extended-resource-display-grid player "Resources Before Exchange")
+       (ui/extended-resource-display-grid player "Resources Before Exchange" false game)
 
        ;; Exchange Input Form
        (biff/form
@@ -613,13 +617,15 @@
 
          ;; Resources After Exchange (initially shows current resources)
          [:div#resources-after
-          (ui/extended-resource-display-grid player "Resources After Exchange" true)]
+          (ui/extended-resource-display-grid player "Resources After Exchange" true game)]
 
          ;; Warning message area - populated by HTMX if player tries invalid exchanges
-         [:div#exchange-warning.h-8.flex.items-center]
+         [:div#exchange-warning.flex.items-center]
+
+         (ui/incoming-alert player)
 
          ;; Navigation and submit buttons
-         [:div.flex.gap-4
+         [:div.flex.gap-4.mt-2
           [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
            {:href (str "/app/game/" player-id "/expenses")} "Cancel Exchange"]
           ;; Initial button starts disabled - HTMX updates will enable it when valid
