@@ -26,7 +26,7 @@
     (is (pos? const/mil-planet-soldiers))
     (is (pos? const/planet-upkeep-credits))
     (is (pos? const/soldier-upkeep-food))
-    (is (pos? const/turns-per-day))
+    (is (pos? const/turns-per-round))
     (is (pos? const/rounds-per-day))))
 
 ;; Test 2: Simple Math/Logic Test (no database needed)
@@ -64,8 +64,16 @@
             :game/created-at now
             :game/scheduled-end-at end-date
             :game/status 0
-            :game/turns-per-day 6
+            :game/turns-per-round 6
             :game/rounds-per-day 4
+            :game/hours-between-rounds 2
+            ;; Combat power constants
+            :game/soldier-power const/soldier-power
+            :game/fighter-power const/fighter-power
+            :game/cmd-ship-power const/cmd-ship-power
+            :game/station-power const/station-power
+            :game/general-power const/general-power
+            :game/admiral-power const/admiral-power
             ;; All the required income generation constants
             :game/ore-planet-credits const/ore-planet-credits
             :game/ore-planet-fuel const/ore-planet-fuel
@@ -99,7 +107,8 @@
             :game/cmd-ship-cost const/cmd-ship-cost
             :game/mil-planet-cost const/mil-planet-cost
             :game/food-planet-cost const/food-planet-cost
-            :game/ore-planet-cost const/ore-planet-cost}])
+            :game/ore-planet-cost const/ore-planet-cost
+            :game/agent-cost const/agent-cost}])
 
         (let [db (xt/db node)
               game (xt/entity db game-id)]
@@ -176,8 +185,16 @@
                 :game/created-at now
                 :game/scheduled-end-at end-date
                 :game/status 0
-                :game/turns-per-day 6
+                :game/turns-per-round 6
                 :game/rounds-per-day 4
+                :game/hours-between-rounds 2
+                ;; Combat power constants
+                :game/soldier-power const/soldier-power
+                :game/fighter-power const/fighter-power
+                :game/cmd-ship-power const/cmd-ship-power
+                :game/station-power const/station-power
+                :game/general-power const/general-power
+                :game/admiral-power const/admiral-power
                 ;; Income generation constants
                 :game/ore-planet-credits const/ore-planet-credits
                 :game/ore-planet-fuel const/ore-planet-fuel
@@ -211,7 +228,8 @@
                 :game/cmd-ship-cost const/cmd-ship-cost
                 :game/mil-planet-cost const/mil-planet-cost
                 :game/food-planet-cost const/food-planet-cost
-                :game/ore-planet-cost const/ore-planet-cost}
+                :game/ore-planet-cost const/ore-planet-cost
+                :game/agent-cost const/agent-cost}
                {:db/doc-type :player
                 :xt/id player-id
                 :player/user (:xt/id user)

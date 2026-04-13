@@ -26,8 +26,16 @@
                    :game/created-at now
                    :game/scheduled-end-at end-date
                    :game/status 0
-                   :game/turns-per-day 6
+                   :game/turns-per-round 6
                    :game/rounds-per-day 4
+                   :game/hours-between-rounds 2
+                   ;; Combat power constants
+                   :game/soldier-power const/soldier-power
+                   :game/fighter-power const/fighter-power
+                   :game/cmd-ship-power const/cmd-ship-power
+                   :game/station-power const/station-power
+                   :game/general-power const/general-power
+                   :game/admiral-power const/admiral-power
                    :game/ore-planet-credits const/ore-planet-credits
                    :game/ore-planet-fuel const/ore-planet-fuel
                    :game/ore-planet-galaxars const/ore-planet-galaxars
@@ -59,7 +67,8 @@
                    :game/cmd-ship-cost const/cmd-ship-cost
                    :game/mil-planet-cost const/mil-planet-cost
                    :game/food-planet-cost const/food-planet-cost
-                   :game/ore-planet-cost const/ore-planet-cost}
+                   :game/ore-planet-cost const/ore-planet-cost
+                   :game/agent-cost const/agent-cost}
 
         base-player {:db/doc-type :player
                      :xt/id player-id

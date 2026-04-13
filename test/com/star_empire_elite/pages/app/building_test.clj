@@ -27,7 +27,8 @@
    :game/cmd-ship-cost 80
    :game/mil-planet-cost 700
    :game/food-planet-cost 800
-   :game/ore-planet-cost 900})
+   :game/ore-planet-cost 900
+   :game/agent-cost 90})
 
 ;; Sample player, phase 3 and with enough initial resources to buy
 (def test-player
@@ -43,6 +44,7 @@
    :player/admirals 0
    :player/stations 3
    :player/cmd-ships 1
+   :player/agents 0
    :player/mil-planets 2
    :player/food-planets 2
    :player/ore-planets 2

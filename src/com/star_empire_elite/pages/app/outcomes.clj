@@ -55,22 +55,25 @@
           {:status 303
            :headers {"location" (str "/app/game/" player-id "/income")}})))))
 
-;; :: incoming attack helpers — defender's perspective (Item | Your Losses | Attacker Losses)
-(defn- incoming-battle-row [label dl al loss-key def-only? separator-below?]
+;; :: incoming attack helpers — defender's perspective (Item | Your Forces | Your Losses | Attacker Losses)
+(defn- incoming-battle-row [label dc dl al unit-key loss-key def-only? separator-below?]
   [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
    [:td.py-1 label]
+   [:td.text-right.px-3 (get dc unit-key)]
    [:td.text-right.px-3 (get dl loss-key)]
    [:td.text-right (if def-only? "—" (get al loss-key))]])
 
 (defn- incoming-planet-row [label def-losses separator-below?]
   [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
    [:td.py-1 label]
+   [:td.text-right.px-3 "—"]
    [:td.text-right.px-3 def-losses]
    [:td.text-right "—"]])
 
 (defn- incoming-attack-section [result]
   (let [att-wins? (:attacker-wins? result)
         att-name  (:attacker-name result)
+        dc        (or (:defender-counts result) (:defender-forces result))
         al        (:attacker-losses result)
         dl        (:defender-losses result)
         pt        (or (:planets-transferred result) {:mil 0 :food 0 :ore 0})]
@@ -84,15 +87,18 @@
        [:thead
         [:tr.border-b.border-green-400
          [:th.text-left.py-1  {:style {:width "10%"}} "Item"]
-         [:th.text-right.py-1 {:style {:width "45%"}} "Your Losses"]
-         [:th.text-right.py-1 {:style {:width "45%"}} (str att-name " Losses")]]]
+         [:th.text-right.py-1 {:style {:width "30%"}} "Your Forces"]
+         [:th.text-right.py-1 {:style {:width "30%"}} "Your Losses"]
+         [:th.text-right.py-1 {:style {:width "30%"}} (str att-name " Losses")]]]
        [:tbody
-        (incoming-battle-row "Soldiers"  dl al :soldiers-lost  false false)
-        (incoming-battle-row "Fighters"  dl al :fighters-lost  false false)
-        (incoming-battle-row "Cmd Ships" dl al :cmd-ships-lost false false)
-        (incoming-battle-row "Generals"  dl al :generals-lost  false false)
-        (incoming-battle-row "Admirals"  dl al :admirals-lost  false false)
-        (incoming-battle-row "Stations"  dl al :stations-lost  true  true)
+        (incoming-battle-row "Soldiers"   dc dl al :soldiers   :soldiers-lost   false false)
+        (incoming-battle-row "Transports" dc dl al :transports :transports-lost false false)
+        (incoming-battle-row "Generals"   dc dl al :generals   :generals-lost   false false)
+        (incoming-battle-row "Fighters"   dc dl al :fighters   :fighters-lost   false false)
+        (incoming-battle-row "Carriers"   dc dl al :carriers   :carriers-lost   false false)
+        (incoming-battle-row "Admirals"   dc dl al :admirals   :admirals-lost   false false)
+        (incoming-battle-row "Cmd Ships"  dc dl al :cmd-ships  :cmd-ships-lost  false false)
+        (incoming-battle-row "Stations"   dc dl al :stations   :stations-lost   true  true)
         (incoming-planet-row "Ore"      (:ore  pt) false)
         (incoming-planet-row "Food"     (:food pt) false)
         (incoming-planet-row "Military" (:mil  pt) true)]]]]))
@@ -125,7 +131,8 @@
      [:div.mx-auto.max-w-4xl.w-full.text-green-400.font-mono
       [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
 
-      (ui/phase-header (:player/current-phase player) "OUTCOMES")
+      (ui/phase-header (:player/current-phase player) "OUTCOMES"
+                       (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
 
       ;; Incoming attacks section (attacks received from other players this turn)
       (let [incoming (seq (:player/incoming-attacks player))
@@ -141,7 +148,7 @@
       ;; Battle result section (only shown when an attack was declared)
       (when battle-result
         (let [att-wins? (:attacker-wins? battle-result)
-              af        (:attacker-forces battle-result)
+              ac        (or (:attacker-counts battle-result) (:attacker-forces battle-result))
               df        (:defender-forces battle-result)
               al        (:attacker-losses battle-result)
               dl        (:defender-losses battle-result)
@@ -160,12 +167,14 @@
                [:th.text-right.py-1  {:style {:width "30%"}} "Your Losses"]
                [:th.text-right.py-1  {:style {:width "30%"}} (str def-name " Losses")]]]
              [:tbody
-              (battle-row "Soldiers"  af al dl :soldiers  :soldiers-lost  false false)
-              (battle-row "Fighters"  af al dl :fighters  :fighters-lost  false false)
-              (battle-row "Cmd Ships" af al dl :cmd-ships :cmd-ships-lost false false)
-              (battle-row "Generals"  af al dl :generals  :generals-lost  false false)
-              (battle-row "Admirals"  af al dl :admirals  :admirals-lost  false false)
-              (battle-row "Stations"  af al dl :stations  :stations-lost  true  true)
+              (battle-row "Soldiers"   ac al dl :soldiers   :soldiers-lost   false false)
+              (battle-row "Transports" ac al dl :transports :transports-lost false false)
+              (battle-row "Generals"   ac al dl :generals   :generals-lost   false false)
+              (battle-row "Fighters"   ac al dl :fighters   :fighters-lost   false false)
+              (battle-row "Carriers"   ac al dl :carriers   :carriers-lost   false false)
+              (battle-row "Admirals"   ac al dl :admirals   :admirals-lost   false false)
+              (battle-row "Cmd Ships"  ac al dl :cmd-ships  :cmd-ships-lost  false false)
+              (battle-row "Stations"   ac al dl :stations   :stations-lost   true  true)
               (planet-row "Ore"       (:ore  pt) att-wins? false)
               (planet-row "Food"      (:food pt) att-wins? false)
               (planet-row "Military"  (:mil  pt) att-wins? true)]]]]

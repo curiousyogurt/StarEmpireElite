@@ -4,25 +4,29 @@
 ;;; Pure combat functions — no DB access, no side effects.
 
 (defn effective-attacking-forces [player]
-  {:soldiers  (min (:player/soldiers player)
-                   (* (:player/transports player) const/soldiers-per-transport)
-                   (* (:player/generals player) const/soldiers-per-general))
-   :fighters  (min (:player/fighters player)
-                   (* (:player/carriers player) const/fighters-per-carrier)
-                   (* (:player/admirals player) const/fighters-per-admiral))
-   :cmd-ships (:player/cmd-ships player)
-   :generals  (:player/generals player)
-   :admirals  (:player/admirals player)})
+  {:soldiers   (min (:player/soldiers   player)
+                    (* (:player/transports player) const/soldiers-per-transport)
+                    (* (:player/generals  player) const/soldiers-per-general))
+   :transports (:player/transports player)
+   :generals   (:player/generals   player)
+   :fighters   (min (:player/fighters player)
+                    (* (:player/carriers player) const/fighters-per-carrier)
+                    (* (:player/admirals player) const/fighters-per-admiral))
+   :carriers   (:player/carriers   player)
+   :admirals   (:player/admirals   player)
+   :cmd-ships  (:player/cmd-ships  player)})
 
 (defn effective-defending-forces [player]
-  {:soldiers  (min (:player/soldiers player)
-                   (* (:player/generals player) const/soldiers-per-general))
-   :fighters  (min (:player/fighters player)
-                   (* (:player/admirals player) const/fighters-per-admiral))
-   :cmd-ships (:player/cmd-ships player)
-   :generals  (:player/generals player)
-   :admirals  (:player/admirals player)
-   :stations  (:player/stations player)})
+  {:soldiers   (min (:player/soldiers player)
+                    (* (:player/generals player) const/soldiers-per-general))
+   :transports (:player/transports player)
+   :generals   (:player/generals   player)
+   :fighters   (min (:player/fighters player)
+                    (* (:player/admirals player) const/fighters-per-admiral))
+   :carriers   (:player/carriers   player)
+   :admirals   (:player/admirals   player)
+   :cmd-ships  (:player/cmd-ships  player)
+   :stations   (:player/stations   player)})
 
 (defn base-power [game forces attacker?]
   (+ (* (:soldiers  forces) (get game :game/soldier-power  const/soldier-power))
@@ -39,12 +43,14 @@
      (* (rand) (* 2 const/combat-variance))))
 
 (defn- compute-losses [forces rate]
-  {:soldiers-lost  (max 0 (long (* (:soldiers  forces) rate)))
-   :fighters-lost  (max 0 (long (* (:fighters  forces) rate)))
-   :cmd-ships-lost (max 0 (long (* (:cmd-ships forces) rate)))
-   :generals-lost  (max 0 (long (* (:generals  forces) rate)))
-   :admirals-lost  (max 0 (long (* (:admirals  forces) rate)))
-   :stations-lost  (max 0 (long (* (or (:stations forces) 0) rate)))})
+  {:soldiers-lost   (max 0 (long (* (or (:soldiers   forces) 0) rate)))
+   :transports-lost (max 0 (long (* (or (:transports forces) 0) rate)))
+   :generals-lost   (max 0 (long (* (or (:generals   forces) 0) rate)))
+   :fighters-lost   (max 0 (long (* (or (:fighters   forces) 0) rate)))
+   :carriers-lost   (max 0 (long (* (or (:carriers   forces) 0) rate)))
+   :admirals-lost   (max 0 (long (* (or (:admirals   forces) 0) rate)))
+   :cmd-ships-lost  (max 0 (long (* (or (:cmd-ships  forces) 0) rate)))
+   :stations-lost   (max 0 (long (* (or (:stations   forces) 0) rate)))})
 
 ;;; Randomly select n planets from a pool built from the defender's planet counts.
 ;;; Returns a map {:mil n :food n :ore n} of how many of each type are transferred.
@@ -102,6 +108,21 @@
      :attacker-name        (:player/empire-name attacker)
      :defender-id          (str (:xt/id defender))
      :defender-name        (:player/empire-name defender)
+     :attacker-counts      {:soldiers   (:player/soldiers   attacker)
+                            :transports (:player/transports attacker)
+                            :generals   (:player/generals   attacker)
+                            :fighters   (:player/fighters   attacker)
+                            :carriers   (:player/carriers   attacker)
+                            :admirals   (:player/admirals   attacker)
+                            :cmd-ships  (:player/cmd-ships  attacker)}
+     :defender-counts      {:soldiers   (:player/soldiers   defender)
+                            :transports (:player/transports defender)
+                            :generals   (:player/generals   defender)
+                            :fighters   (:player/fighters   defender)
+                            :carriers   (:player/carriers   defender)
+                            :admirals   (:player/admirals   defender)
+                            :cmd-ships  (:player/cmd-ships  defender)
+                            :stations   (:player/stations   defender)}
      :attacker-forces      att-forces
      :defender-forces      def-forces
      :attacker-roll        att-roll

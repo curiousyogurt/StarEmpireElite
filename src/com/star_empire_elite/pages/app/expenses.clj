@@ -374,7 +374,8 @@
 
        [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
 
-       (ui/phase-header (:player/current-phase player) "EXPENSES")
+       (ui/phase-header (:player/current-phase player) "EXPENSES"
+                        (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
 
        ;; Current resources before expenses
        (ui/resource-display-grid player "Resources Before Expenses" false game)

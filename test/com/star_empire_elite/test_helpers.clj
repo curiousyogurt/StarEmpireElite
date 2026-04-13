@@ -30,8 +30,17 @@
    :game/created-at                (now)
    :game/scheduled-end-at          (plus-days (now) 30)
    :game/status                    0
-   :game/turns-per-day             6
+   :game/turns-per-round           6
    :game/rounds-per-day            4
+   :game/hours-between-rounds      2
+
+   ;; Combat power constants
+   :game/soldier-power             1
+   :game/fighter-power             3
+   :game/cmd-ship-power            20
+   :game/station-power             5
+   :game/general-power             5
+   :game/admiral-power             10
 
    ;; required fields seen in your error report:
    :game/soldier-upkeep-credits    0
@@ -53,7 +62,8 @@
    :game/mil-planet-stations  0
    :game/mil-planet-fighters  0
    :game/mil-planet-soldiers  0
-   :game/mil-planet-agents    0})
+   :game/mil-planet-agents    0
+   :game/agent-cost           0})
 
 (defn make-game [sys overrides]
   (let [doc (merge game-defaults overrides)]

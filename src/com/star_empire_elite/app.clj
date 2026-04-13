@@ -311,32 +311,38 @@
                           pt-food (min (:food raw-pt) (:player/food-planets defender))
                           pt-ore  (min (:ore  raw-pt) (:player/ore-planets  defender))
                           capped  (assoc result :planets-transferred {:mil pt-mil :food pt-food :ore pt-ore})
-                          att-soldiers  (max 0 (- (:player/soldiers  player) (:soldiers-lost  al)))
-                          att-fighters  (max 0 (- (:player/fighters  player) (:fighters-lost  al)))
-                          att-cmd-ships (max 0 (- (:player/cmd-ships player) (:cmd-ships-lost al)))
-                          att-generals  (max 0 (- (:player/generals  player) (:generals-lost  al)))
-                          att-admirals  (max 0 (- (:player/admirals  player) (:admirals-lost  al)))
-                          att-mil-plts  (+ (:player/mil-planets  player) pt-mil)
-                          att-food-plts (+ (:player/food-planets player) pt-food)
-                          att-ore-plts  (+ (:player/ore-planets  player) pt-ore)]
+                          att-soldiers   (max 0 (- (:player/soldiers   player) (:soldiers-lost   al)))
+                          att-transports (max 0 (- (:player/transports player) (:transports-lost  al)))
+                          att-generals   (max 0 (- (:player/generals   player) (:generals-lost   al)))
+                          att-fighters   (max 0 (- (:player/fighters   player) (:fighters-lost   al)))
+                          att-carriers   (max 0 (- (:player/carriers   player) (:carriers-lost   al)))
+                          att-admirals   (max 0 (- (:player/admirals   player) (:admirals-lost   al)))
+                          att-cmd-ships  (max 0 (- (:player/cmd-ships  player) (:cmd-ships-lost  al)))
+                          att-mil-plts   (+ (:player/mil-planets  player) pt-mil)
+                          att-food-plts  (+ (:player/food-planets player) pt-food)
+                          att-ore-plts   (+ (:player/ore-planets  player) pt-ore)]
                       (biff/submit-tx ctx
                         [{:db/doc-type :player :db/op :update :xt/id player-id
                           :player/last-battle-result (pr-str capped)
                           :player/soldiers     att-soldiers
-                          :player/fighters     att-fighters
-                          :player/cmd-ships    att-cmd-ships
+                          :player/transports   att-transports
                           :player/generals     att-generals
+                          :player/fighters     att-fighters
+                          :player/carriers     att-carriers
                           :player/admirals     att-admirals
+                          :player/cmd-ships    att-cmd-ships
                           :player/mil-planets  att-mil-plts
                           :player/food-planets att-food-plts
                           :player/ore-planets  att-ore-plts}
                          {:db/doc-type :player :db/op :update :xt/id (:xt/id defender)
-                          :player/soldiers     (max 0 (- (:player/soldiers  defender) (:soldiers-lost  dl)))
-                          :player/fighters     (max 0 (- (:player/fighters  defender) (:fighters-lost  dl)))
-                          :player/cmd-ships    (max 0 (- (:player/cmd-ships defender) (:cmd-ships-lost dl)))
-                          :player/generals     (max 0 (- (:player/generals  defender) (:generals-lost  dl)))
-                          :player/admirals     (max 0 (- (:player/admirals  defender) (:admirals-lost  dl)))
-                          :player/stations     (max 0 (- (:player/stations  defender) (:stations-lost  dl)))
+                          :player/soldiers     (max 0 (- (:player/soldiers   defender) (:soldiers-lost   dl)))
+                          :player/transports   (max 0 (- (:player/transports defender) (:transports-lost dl)))
+                          :player/generals     (max 0 (- (:player/generals   defender) (:generals-lost   dl)))
+                          :player/fighters     (max 0 (- (:player/fighters   defender) (:fighters-lost   dl)))
+                          :player/carriers     (max 0 (- (:player/carriers   defender) (:carriers-lost   dl)))
+                          :player/admirals     (max 0 (- (:player/admirals   defender) (:admirals-lost   dl)))
+                          :player/cmd-ships    (max 0 (- (:player/cmd-ships  defender) (:cmd-ships-lost  dl)))
+                          :player/stations     (max 0 (- (:player/stations   defender) (:stations-lost   dl)))
                           :player/mil-planets  (max 0 (- (:player/mil-planets  defender) pt-mil))
                           :player/food-planets (max 0 (- (:player/food-planets defender) pt-food))
                           :player/ore-planets  (max 0 (- (:player/ore-planets  defender) pt-ore))
@@ -344,10 +350,12 @@
                           (conj (or (:player/incoming-attacks defender) []) (pr-str capped))}])
                       ;; Build locally updated player for accurate resource display this request
                       [capped (merge player {:player/soldiers     att-soldiers
-                                             :player/fighters     att-fighters
-                                             :player/cmd-ships    att-cmd-ships
+                                             :player/transports   att-transports
                                              :player/generals     att-generals
+                                             :player/fighters     att-fighters
+                                             :player/carriers     att-carriers
                                              :player/admirals     att-admirals
+                                             :player/cmd-ships    att-cmd-ships
                                              :player/mil-planets  att-mil-plts
                                              :player/food-planets att-food-plts
                                              :player/ore-planets  att-ore-plts})]))))

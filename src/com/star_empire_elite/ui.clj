@@ -64,18 +64,25 @@
       (when (< phase 6)
         [:span.text-green-400.text-xs.ml-1 "→"])])])
 
-;;; Complete phase header with title on the left and progress indicator on the right. Takes current 
+;;; Complete phase header with title on the left and progress indicator on the right. Takes current
 ;;; phase number and phase name string to generate the full header with progress visualization.
-(defn phase-header [current-phase phase-name]
-  [:div.mb-6
-   ;; Mobile: Stack vertically
-   [:div.flex.flex-col.gap-3.lg:hidden
-    [:h2.text-xl.font-bold (str "PHASE " current-phase ": " phase-name)]
-    (phase-indicator current-phase)]
-   ;; Wide screen: Horizontal with space between
-   [:div.hidden.lg:flex.lg:items-center.lg:justify-between.lg:gap-8
-    [:h2.text-xl.font-bold (str "PHASE " current-phase ": " phase-name)]
-    (phase-indicator current-phase)]])
+;;; Optional info-str appears as small text to the right of the phase name.
+(defn phase-header
+  ([current-phase phase-name] (phase-header current-phase phase-name nil))
+  ([current-phase phase-name info-str]
+   [:div.mb-6
+    ;; Mobile: Stack vertically
+    [:div.flex.flex-col.gap-3.lg:hidden
+     [:div.flex.items-baseline.gap-3
+      [:h2.text-xl.font-bold (str "PHASE " current-phase ": " phase-name)]
+      (when info-str [:span.text-xs.text-green-400.text-opacity-75 info-str])]
+     (phase-indicator current-phase)]
+    ;; Wide screen: Horizontal with space between
+    [:div.hidden.lg:flex.lg:items-center.lg:justify-between.lg:gap-8
+     [:div.flex.items-baseline.gap-3
+      [:h2.text-xl.font-bold (str "PHASE " current-phase ": " phase-name)]
+      (when info-str [:span.text-xs.text-green-400.text-opacity-75 info-str])]
+     (phase-indicator current-phase)]]))
 
 (defn base [{:keys [::recaptcha] :as ctx} & body]
   (apply

@@ -28,6 +28,7 @@
    :player/admirals 1
    :player/stations 10
    :player/cmd-ships 0
+   :player/agents 5
    :player/mil-planets 5
    :player/food-planets 4
    :player/ore-planets 6
@@ -180,7 +181,7 @@
 
 (def full-resources
   {:credits 100 :soldiers 50 :transports 5 :generals 2
-   :fighters 10 :carriers 1 :admirals 1 :stations 5 :cmd-ships 0
+   :fighters 10 :carriers 1 :admirals 1 :stations 5 :cmd-ships 0 :agents 5
    :mil-planets 2 :food-planets 3 :ore-planets 1 :food 1000 :fuel 500})
 
 (deftest test-valid-exchange
@@ -197,7 +198,7 @@
   (testing "Identifies specific invalid exchanges correctly"
     (let [resources-after {:credits -50 :soldiers -10 :transports 5 :generals 2
                           :fighters 15 :carriers 1 :admirals 1
-                          :stations 8 :cmd-ships 0
+                          :stations 8 :cmd-ships 0 :agents 5
                           :mil-planets 4 :food-planets 3
                           :ore-planets 5 :food 530 :fuel 320}
           quantities {:soldiers-sold 110  ; Oversold

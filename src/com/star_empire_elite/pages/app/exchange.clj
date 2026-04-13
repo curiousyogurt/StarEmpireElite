@@ -33,6 +33,7 @@
    :admiral-sell const/admiral-sell
    :station-sell const/station-sell
    :cmd-ship-sell const/cmd-ship-sell
+   :agent-sell const/agent-sell
    :mil-planet-sell const/mil-planet-sell
    :food-planet-sell const/food-planet-sell
    :ore-planet-sell const/ore-planet-sell
@@ -54,6 +55,7 @@
    :admirals-sold (utils/parse-numeric-input (:admirals-sold params))
    :stations-sold (utils/parse-numeric-input (:stations-sold params))
    :cmd-ships-sold (utils/parse-numeric-input (:cmd-ships-sold params))
+   :agents-sold (utils/parse-numeric-input (:agents-sold params))
    :mil-planets-sold (utils/parse-numeric-input (:mil-planets-sold params))
    :food-planets-sold (utils/parse-numeric-input (:food-planets-sold params))
    :ore-planets-sold (utils/parse-numeric-input (:ore-planets-sold params))
@@ -75,6 +77,7 @@
                                      (* (:admirals-sold quantities)     (:admiral-sell rates))
                                      (* (:stations-sold quantities)     (:station-sell rates))
                                      (* (:cmd-ships-sold quantities)    (:cmd-ship-sell rates))
+                                     (* (or (:agents-sold quantities) 0) (:agent-sell rates))
                                      (* (:mil-planets-sold quantities)  (:mil-planet-sell rates))
                                      (* (:food-planets-sold quantities) (:food-planet-sell rates))
                                      (* (:ore-planets-sold quantities)  (:ore-planet-sell rates)))
@@ -113,6 +116,7 @@
    :admirals     (- (:player/admirals player)     (:admirals-sold quantities))
    :stations     (- (:player/stations player)     (:stations-sold quantities))
    :cmd-ships    (- (:player/cmd-ships player)    (:cmd-ships-sold quantities))
+   :agents       (- (or (:player/agents player) 0) (or (:agents-sold quantities) 0))
    :mil-planets  (- (:player/mil-planets player)  (:mil-planets-sold quantities))
    :food-planets (- (:player/food-planets player) (:food-planets-sold quantities))
    :ore-planets  (- (:player/ore-planets player)  (:ore-planets-sold quantities))
@@ -133,6 +137,7 @@
        (>= (:admirals resources-after) 0)
        (>= (:stations resources-after) 0)
        (>= (:cmd-ships resources-after) 0)
+       (>= (:agents resources-after) 0)
        (>= (:mil-planets resources-after) 0)
        (>= (:food-planets resources-after) 0)
        (>= (:ore-planets resources-after) 0)
@@ -151,6 +156,7 @@
    :invalid-admiral-sale? (< (:admirals resources-after) 0)
    :invalid-station-sale? (< (:stations resources-after) 0)
    :invalid-cmd-ship-sale? (< (:cmd-ships resources-after) 0)
+   :invalid-agent-sale? (< (:agents resources-after) 0)
    :invalid-mil-planet-sale? (< (:mil-planets resources-after) 0)
    :invalid-food-planet-sale? (< (:food-planets resources-after) 0)
    :invalid-ore-planet-sale? (< (:ore-planets resources-after) 0)
@@ -359,6 +365,7 @@
                           :player/admirals (:admirals resources-after)
                           :player/stations (:stations resources-after)
                           :player/cmd-ships (:cmd-ships resources-after)
+                          :player/agents (:agents resources-after)
                           :player/mil-planets (:mil-planets resources-after)
                           :player/food-planets (:food-planets resources-after)
                           :player/ore-planets (:ore-planets resources-after)
@@ -388,6 +395,7 @@
                            :admirals-sold (:admirals-sold quantities)
                            :stations-sold (:stations-sold quantities)
                            :cmd-ships-sold (:cmd-ships-sold quantities)
+                           :agents-sold (or (:agents-sold quantities) 0)
                            :mil-planets-sold (:mil-planets-sold quantities)
                            :food-planets-sold (:food-planets-sold quantities)
                            :ore-planets-sold (:ore-planets-sold quantities)
@@ -429,6 +437,9 @@
          [:span {:id "credit-cmd-ships-sold" :hx-swap-oob "true"
                  :class (when (zero? (* (:cmd-ships-sold quantities) (:cmd-ship-sell rates))) "opacity-20")}
           [:<> "+" (ui/format-number (* (:cmd-ships-sold quantities) (:cmd-ship-sell rates)))]]
+         [:span {:id "credit-agents-sold" :hx-swap-oob "true"
+                 :class (when (zero? (* (or (:agents-sold quantities) 0) (:agent-sell rates))) "opacity-20")}
+          [:<> "+" (ui/format-number (* (or (:agents-sold quantities) 0) (:agent-sell rates)))]]
          [:span {:id "credit-mil-planets-sold" :hx-swap-oob "true"
                  :class (when (zero? (* (:mil-planets-sold quantities) (:mil-planet-sell rates))) "opacity-20")}
           [:<> "+" (ui/format-number (* (:mil-planets-sold quantities) (:mil-planet-sell rates)))]]
@@ -482,6 +493,7 @@
                                         (:invalid-admiral-sale? invalid-exchanges)
                                         (:invalid-station-sale? invalid-exchanges)
                                         (:invalid-cmd-ship-sale? invalid-exchanges)
+                                        (:invalid-agent-sale? invalid-exchanges)
                                         (:invalid-mil-planet-sale? invalid-exchanges)
                                         (:invalid-food-planet-sale? invalid-exchanges)
                                         (:invalid-ore-planet-sale? invalid-exchanges)
@@ -518,9 +530,9 @@
 ;;; Shows exchange options and input fields for player to buy/sell resources and assets
 (defn exchange-page [{:keys [player game]}]
   (let [player-id (:xt/id player)
-        hx-include "[name='soldiers-sold'],[name='transports-sold'],[name='generals-sold'],[name='fighters-sold'],[name='carriers-sold'],[name='admirals-sold'],[name='stations-sold'],[name='cmd-ships-sold'],[name='mil-planets-sold'],[name='food-planets-sold'],[name='ore-planets-sold'],[name='food-bought'],[name='food-sold'],[name='fuel-bought'],[name='fuel-sold']"
+        hx-include "[name='soldiers-sold'],[name='transports-sold'],[name='generals-sold'],[name='fighters-sold'],[name='carriers-sold'],[name='admirals-sold'],[name='stations-sold'],[name='cmd-ships-sold'],[name='agents-sold'],[name='mil-planets-sold'],[name='food-planets-sold'],[name='ore-planets-sold'],[name='food-bought'],[name='food-sold'],[name='fuel-bought'],[name='fuel-sold']"
         rates (get-exchange-rates)
-        max-buy-quantities (calculate-max-buy-quantities player {:soldiers-sold 0 :transports-sold 0 :generals-sold 0 :fighters-sold 0 :carriers-sold 0 :admirals-sold 0 :stations-sold 0 :cmd-ships-sold 0 :mil-planets-sold 0 :food-planets-sold 0 :ore-planets-sold 0 :food-sold 0 :fuel-sold 0 :food-bought 0 :fuel-bought 0} rates)]
+        max-buy-quantities (calculate-max-buy-quantities player {:soldiers-sold 0 :transports-sold 0 :generals-sold 0 :fighters-sold 0 :carriers-sold 0 :admirals-sold 0 :stations-sold 0 :cmd-ships-sold 0 :agents-sold 0 :mil-planets-sold 0 :food-planets-sold 0 :ore-planets-sold 0 :food-sold 0 :fuel-sold 0 :food-bought 0 :fuel-bought 0} rates)]
     (ui/page
       {}
       [:div.mx-auto.max-w-4xl.w-full.text-green-400.font-mono
@@ -538,7 +550,8 @@
 
        [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
 
-       (ui/phase-header (:player/current-phase player) "EXCHANGE")
+       (ui/phase-header (:player/current-phase player) "EXCHANGE"
+                        (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
 
        ;; Current resources before exchange
        (ui/extended-resource-display-grid player "Resources Before Exchange" false game)
@@ -580,6 +593,7 @@
             (sell-row "Admirals" "Admirals" "admirals-sold" (:admiral-sell rates) 0 (:player/admirals player) player-id hx-include)
             (sell-row "Defence Stations" "Def Stns" "stations-sold" (:station-sell rates) 0 (:player/stations player) player-id hx-include)
             (sell-row "Command Ships" "Cmd Ships" "cmd-ships-sold" (:cmd-ship-sell rates) 0 (:player/cmd-ships player) player-id hx-include)
+            (sell-row "Agents" "Agents" "agents-sold" (:agent-sell rates) 0 (or (:player/agents player) 0) player-id hx-include)
             (sell-row "Military Planets" "Mil Plts" "mil-planets-sold" (:mil-planet-sell rates) 0 (:player/mil-planets player) player-id hx-include)
             (sell-row "Food Planets" "Food Plts" "food-planets-sold" (:food-planet-sell rates) 0 (:player/food-planets player) player-id hx-include)
             (sell-row "Ore Planets" "Ore Plts" "ore-planets-sold" (:ore-planet-sell rates) 0 (:player/ore-planets player) player-id hx-include)

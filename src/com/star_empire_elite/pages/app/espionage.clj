@@ -44,7 +44,8 @@
      [:div.text-green-400.font-mono
       [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
 
-      (ui/phase-header (:player/current-phase player) "ESPIONAGE")
+      (ui/phase-header (:player/current-phase player) "ESPIONAGE"
+                       (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
 
       (biff/form
        {:action (str "/app/game/" player-id "/apply-espionage")

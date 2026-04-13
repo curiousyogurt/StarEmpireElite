@@ -54,7 +54,7 @@
                       (* (:admirals quantities)     (:game/admiral-cost game))
                       (* (:stations quantities)     (:game/station-cost game))
                       (* (:cmd-ships quantities)    (:game/cmd-ship-cost game))
-                      (* (:agents quantities)       (:game/agent-cost game))
+                      (* (or (:agents quantities) 0) (or (:game/agent-cost game) 0))
                       (* (:ore-planets quantities)  (:game/ore-planet-cost game))
                       (* (:food-planets quantities) (:game/food-planet-cost game))
                       (* (:mil-planets quantities)  (:game/mil-planet-cost game)))]
@@ -74,7 +74,7 @@
    :admirals     (+ (:player/admirals player)     (:admirals quantities))
    :stations     (+ (:player/stations player)     (:stations quantities))
    :cmd-ships    (+ (:player/cmd-ships player)    (:cmd-ships quantities))
-   :agents       (+ (:player/agents player)       (:agents quantities))
+   :agents       (+ (or (:player/agents player) 0) (or (:agents quantities) 0))
    :ore-planets  (+ (:player/ore-planets player)  (:ore-planets quantities))
    :food-planets (+ (:player/food-planets player) (:food-planets quantities))
    :mil-planets  (+ (:player/mil-planets player)  (:mil-planets quantities))})
@@ -105,7 +105,7 @@
                              (* (:admirals quantities)     (:game/admiral-cost game))
                              (* (:stations quantities)     (:game/station-cost game))
                              (* (:cmd-ships quantities)    (:game/cmd-ship-cost game))
-                             (* (:agents quantities)       (:game/agent-cost game))
+                             (* (or (:agents quantities) 0) (or (:game/agent-cost game) 0))
                              (* (:ore-planets quantities)  (:game/ore-planet-cost game))
                              (* (:food-planets quantities) (:game/food-planet-cost game))
                              (* (:mil-planets quantities)  (:game/mil-planet-cost game)))
@@ -272,7 +272,7 @@
                            :admirals     (* (:admirals quantities)     (:game/admiral-cost game))
                            :stations     (* (:stations quantities)     (:game/station-cost game))
                            :cmd-ships    (* (:cmd-ships quantities)    (:game/cmd-ship-cost game))
-                           :agents       (* (:agents quantities)       (:game/agent-cost game))
+                           :agents       (* (or (:agents quantities) 0) (or (:game/agent-cost game) 0))
                            :ore-planets  (* (:ore-planets quantities)  (:game/ore-planet-cost game))
                            :food-planets (* (:food-planets quantities) (:game/food-planet-cost game))
                            :mil-planets  (* (:mil-planets quantities)  (:game/mil-planet-cost game))}]
@@ -329,7 +329,8 @@
 
        [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
 
-       (ui/phase-header (:player/current-phase player) "BUILDING")
+       (ui/phase-header (:player/current-phase player) "BUILDING"
+                        (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
 
        ;; Current resources before building
        (ui/extended-resource-display-grid player "Resources Before Building" false game)

@@ -12,8 +12,16 @@
                      :where [[player :player/user user-id]]}
                    uid)]
     (for [player players]
-      (let [game (xt/entity db (:player/game player))]
-        {:player player
+      (let [game         (xt/entity db (:player/game player))
+            game-scores  (map :player/score
+                              (q db
+                                 '{:find (pull p [:player/score])
+                                   :in [game-id]
+                                   :where [[p :player/game game-id]]}
+                                 (:player/game player)))
+            player-score (or (:player/score player) 0)
+            rank         (inc (count (filter #(> % player-score) game-scores)))]
+        {:player (assoc player :player/rank rank)
          :game game}))))
 
 ;; :: fetch all games the current user has NOT joined

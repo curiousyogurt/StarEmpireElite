@@ -130,7 +130,8 @@
        [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
 
        ;;; Current phase display:
-       (ui/phase-header (:player/current-phase player) "INCOME")
+       (ui/phase-header (:player/current-phase player) "INCOME"
+                        (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
 
        ;;; Current resources display:
        ;;; Shows starting position before income is applied, helping players understand what they have
