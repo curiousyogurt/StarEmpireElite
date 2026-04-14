@@ -100,22 +100,29 @@
     ;; Phase validation prevents players from applying income multiple times or out of order
     (if-let [redirect (utils/validate-phase player 1 player-id)]
       redirect
-      (let [income (calculate-income player game)]
+      (let [income         (calculate-income player game)
+            ;; Reset to round 1 if last-round-completed-at is from a previous UTC calendar day.
+            ;; This handles both: (a) player used all rounds last day, (b) player skipped rounds.
+            last-completed (:player/last-round-completed-at player)
+            day-reset?     (and (> (:player/current-round player) 1)
+                                last-completed
+                                (not (utils/same-calendar-day? last-completed)))]
         ;; Single atomic transaction updates resources and advances the phase all at once. This
         ;; prevents partial updates if something fails midway through.
         (biff/submit-tx ctx      ; Submit a db transaction using Biff framework
-                        [{:db/doc-type :player ; Document type is player
-                          :db/op :update       ; Update operation
-                          :xt/id player-id     ; Target has id player-id
-                          :player/credits  (+ (:player/credits player)  (:ore-credits income))
-                          :player/food     (+ (:player/food player)     (:food-food income))
-                          :player/fuel     (+ (:player/fuel player)     (:ore-fuel income))
-                          :player/galaxars (+ (:player/galaxars player) (:ore-galaxars income))
-                          :player/soldiers (+ (:player/soldiers player) (:mil-soldiers income))
-                          :player/fighters (+ (:player/fighters player) (:mil-fighters income))
-                          :player/stations (+ (:player/stations player) (:mil-stations income))
-                          :player/agents   (+ (:player/agents player)   (:mil-agents income))
-                          :player/current-phase 2}]) ; Move player to next phase
+                        [(cond-> {:db/doc-type :player ; Document type is player
+                                  :db/op :update       ; Update operation
+                                  :xt/id player-id     ; Target has id player-id
+                                  :player/credits  (+ (:player/credits player)  (:ore-credits income))
+                                  :player/food     (+ (:player/food player)     (:food-food income))
+                                  :player/fuel     (+ (:player/fuel player)     (:ore-fuel income))
+                                  :player/galaxars (+ (:player/galaxars player) (:ore-galaxars income))
+                                  :player/soldiers (+ (:player/soldiers player) (:mil-soldiers income))
+                                  :player/fighters (+ (:player/fighters player) (:mil-fighters income))
+                                  :player/stations (+ (:player/stations player) (:mil-stations income))
+                                  :player/agents   (+ (:player/agents player)   (:mil-agents income))
+                                  :player/current-phase 2}
+                                 day-reset? (assoc :player/current-round 1))]) ; Move player to next phase
         ;; Set 303 status, which tells the browser to redirect to the expenses page
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/expenses")}}))))

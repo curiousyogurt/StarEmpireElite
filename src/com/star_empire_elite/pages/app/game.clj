@@ -127,7 +127,9 @@
         [:div.flex.gap-4
          (if cooldown-ms
            [:div.border.border-yellow-400.px-6.py-2.text-yellow-400
-            (str "Next round starts in " (utils/format-cooldown-duration cooldown-ms))]
+            (if (utils/day-exhausted? player game)
+              (str "Rounds reset in " (utils/format-cooldown-duration cooldown-ms))
+              (str "Next round starts in " (utils/format-cooldown-duration cooldown-ms)))]
            [:a.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
             {:href (get-phase-url (:xt/id player) (:player/current-phase player))} "Play"])
          [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors

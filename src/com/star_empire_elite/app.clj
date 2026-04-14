@@ -233,19 +233,23 @@
 ;;;;
 
 (defn- cooldown-page [{:keys [player game remaining-ms]}]
-  (ui/page
-   {}
-   [:div.text-green-400.font-mono
-    [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
-    [:div.border.border-yellow-400.p-6.mb-6.bg-yellow-400.bg-opacity-5
-     [:h2.text-xl.font-bold.mb-4.text-yellow-400 "ROUND COOLDOWN"]
-     [:p.mb-4 "Your empire needs time to consolidate before the next round."]
-     [:p.text-2xl.font-bold.text-yellow-400.mb-2
-      (utils/format-cooldown-duration remaining-ms)]
-     [:p.text-sm "Time remaining before next round"]
-     [:p.text-xs.mt-2 (str "Cooldown: " (:game/hours-between-rounds game) " hours between rounds.")]]
-    [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-     {:href (str "/app/game/" (:xt/id player))} "Back to Overview"]]))
+  (let [day-exhausted? (utils/day-exhausted? player game)]
+    (ui/page
+     {}
+     [:div.text-green-400.font-mono
+      [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
+      [:div.border.border-yellow-400.p-6.mb-6.bg-yellow-400.bg-opacity-5
+       [:h2.text-xl.font-bold.mb-4.text-yellow-400 (if day-exhausted? "ALL ROUNDS COMPLETE" "ROUND COOLDOWN")]
+       [:p.mb-4 (if day-exhausted?
+                  "You have played all rounds for today. Rounds reset at midnight UTC."
+                  "Your empire needs time to consolidate before the next round.")]
+       [:p.text-2xl.font-bold.text-yellow-400.mb-2
+        (utils/format-cooldown-duration remaining-ms)]
+       [:p.text-sm (if day-exhausted? "Time remaining until midnight UTC" "Time remaining before next round")]
+       (when-not day-exhausted?
+         [:p.text-xs.mt-2 (str "Minimum " (:game/hours-between-rounds game) " hours between rounds.")])]
+      [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+       {:href (str "/app/game/" (:xt/id player))} "Back to Overview"]])))
 
 (defn income-handler [ctx]
   (utils/with-player-and-game [player game player-id] ctx

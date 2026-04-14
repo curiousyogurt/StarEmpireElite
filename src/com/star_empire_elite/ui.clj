@@ -172,14 +172,7 @@
      [:div
       [:p.text-xs "Agents"]
       [:p.font-mono (format-number (or (:agents resources) (:player/agents resources)))]]
-     (when-let [turn (or (:current-turn resources) (:player/current-turn resources))]
-       [:div
-        [:p.text-xs "Turn"]
-        [:p.font-mono (str turn (when game (str "/" (:game/turns-per-round game))))]])
-     (when-let [round (or (:current-round resources) (:player/current-round resources))]
-       [:div
-        [:p.text-xs "Round"]
-        [:p.font-mono (str round (when game (str "/" (:game/rounds-per-day game))))]])]]))
+]]))
 
 ;;; Extended resource display grid including all unit types and planets. Used in building phase
 ;;; where players need to see all their assets, not just basic resources.
@@ -260,14 +253,7 @@
       [:p.text-xs "Mil Plts"]
       [:p.font-mono {:class (when (and highlight-negative? (< (or (:mil-planets resources) (:player/mil-planets resources) 0) 0)) "text-red-400")}
        (format-number (or (:mil-planets resources) (:player/mil-planets resources) 0))]]
-     (when-let [turn (or (:current-turn resources) (:player/current-turn resources))]
-       [:div
-        [:p.text-xs "Turn"]
-        [:p.font-mono (str turn (when game (str "/" (:game/turns-per-round game))))]])
-     (when-let [round (or (:current-round resources) (:player/current-round resources))]
-       [:div
-        [:p.text-xs "Round"]
-        [:p.font-mono (str round (when game (str "/" (:game/rounds-per-day game))))]])]]))
+]]))
 
 (defn incoming-alert-content [player]
   (let [attacks   (seq (:player/incoming-attacks player))

@@ -43,19 +43,59 @@
 ;;;; Round Cooldown
 ;;;;
 
-(defn round-cooldown-ms
-  "Returns ms remaining in cooldown if player is blocked from starting a new round, or nil if
-   the player may proceed. Blocked when: turn=1, turns-used=0 (fresh round start),
-   last-round-completed-at is set (not first-ever round), and cooldown hasn't expired."
+(defn same-calendar-day?
+  "Returns true if the given Date falls on today's UTC calendar day."
+  [^java.util.Date d]
+  (let [cal (doto (java.util.Calendar/getInstance (java.util.TimeZone/getTimeZone "UTC"))
+              (.setTime (java.util.Date.))
+              (.set java.util.Calendar/HOUR_OF_DAY 0)
+              (.set java.util.Calendar/MINUTE 0)
+              (.set java.util.Calendar/SECOND 0)
+              (.set java.util.Calendar/MILLISECOND 0))]
+    (>= (.getTime d) (.getTimeInMillis cal))))
+
+(defn- ms-until-midnight
+  "Returns milliseconds until the next UTC midnight."
+  []
+  (let [cal (doto (java.util.Calendar/getInstance (java.util.TimeZone/getTimeZone "UTC"))
+              (.setTime (java.util.Date.))
+              (.set java.util.Calendar/HOUR_OF_DAY 0)
+              (.set java.util.Calendar/MINUTE 0)
+              (.set java.util.Calendar/SECOND 0)
+              (.set java.util.Calendar/MILLISECOND 0)
+              (.add java.util.Calendar/DAY_OF_MONTH 1))]
+    (- (.getTimeInMillis cal) (.getTime (java.util.Date.)))))
+
+(defn day-exhausted?
+  "Returns true if the player has used all rounds-per-day rounds for today's UTC calendar day."
   [player game]
-  (let [turn-1?     (= (:player/current-turn player) 1)
-        unused?     (= (:player/turns-used player) 0)
-        completed   (:player/last-round-completed-at player)
-        hours       (or (:game/hours-between-rounds game) 0)
-        cooldown-ms (* hours 60 60 1000)]
-    (when (and turn-1? unused? completed (pos? cooldown-ms))
-      (let [remaining (- cooldown-ms (- (.getTime (java.util.Date.)) (.getTime completed)))]
-        (when (pos? remaining) remaining)))))
+  (let [completed      (:player/last-round-completed-at player)
+        current-round  (:player/current-round player)
+        rounds-per-day (:game/rounds-per-day game)]
+    (and (> current-round rounds-per-day)
+         completed
+         (same-calendar-day? completed))))
+
+(defn round-cooldown-ms
+  "Returns ms remaining in cooldown if player is blocked from starting a new round, or nil.
+   Two blocking conditions:
+   1. Day exhausted: all rounds-per-day used today → blocked until midnight UTC.
+   2. Between-round cooldown: minimum hours-between-rounds since last completed round."
+  [player game]
+  (let [completed (:player/last-round-completed-at player)]
+    (cond
+      (day-exhausted? player game)
+      (ms-until-midnight)
+
+      (and (= (:player/current-turn player) 1)
+           (= (:player/turns-used player) 0)
+           completed)
+      (let [hours       (or (:game/hours-between-rounds game) 0)
+            cooldown-ms (* hours 60 60 1000)
+            remaining   (- cooldown-ms (- (.getTime (java.util.Date.)) (.getTime completed)))]
+        (when (pos? remaining) remaining))
+
+      :else nil)))
 
 (defn format-cooldown-duration
   "Format a millisecond duration as a human-readable string.
