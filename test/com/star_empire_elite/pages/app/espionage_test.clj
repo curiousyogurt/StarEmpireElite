@@ -1,0 +1,162 @@
+(ns com.star-empire-elite.pages.app.espionage-test
+  (:require [clojure.test :refer :all]
+            [com.star-empire-elite.pages.app.espionage :as espionage]
+            [com.star-empire-elite.test-helpers :as helpers]
+            [xtdb.api :as xt]
+            [com.biffweb :as biff]))
+
+;;;;
+;;;; Fixtures
+;;;;
+
+(def test-player-id #uuid "00000000-0000-0000-0000-000000000011")
+(def test-game-id   #uuid "00000000-0000-0000-0000-000000000021")
+(def test-target-id #uuid "00000000-0000-0000-0000-000000000031")
+
+(def test-player
+  {:xt/id               test-player-id
+   :player/game         test-game-id
+   :player/empire-name  "Test Empire"
+   :player/current-phase 5
+   :player/score        1000
+   :player/agents       3})
+
+;; Player with no agents — cannot perform espionage.
+(def agent-less-player
+  (assoc test-player :player/agents 0))
+
+(def test-target
+  {:xt/id              test-target-id
+   :player/game        test-game-id
+   :player/empire-name "Enemy Empire"
+   :player/score       500
+   :player/mil-planets 2
+   :player/food-planets 1
+   :player/ore-planets 3})
+
+;;;;
+;;;; get-other-players Tests
+;;;;
+;;;; get-other-players queries the database and sorts by score descending.
+;;;; Tests mock biff/q to avoid a live database connection.
+;;;;
+
+(deftest test-get-other-players-sorted-by-score
+  (testing "Returns other players sorted by score descending"
+    (let [higher {:xt/id (java.util.UUID/randomUUID) :player/score 900}
+          lower  {:xt/id (java.util.UUID/randomUUID) :player/score 100}]
+      (with-redefs [biff/q (fn [_ _ & _] [lower higher])]
+        (let [result (espionage/get-other-players nil test-game-id test-player-id)]
+          (is (= 2 (count result)))
+          ;; Higher score first.
+          (is (= 900 (:player/score (first  result))))
+          (is (= 100 (:player/score (second result)))))))))
+
+(deftest test-get-other-players-empty
+  (testing "Returns empty seq when no other players exist"
+    (with-redefs [biff/q (fn [_ _ & _] [])]
+      (is (empty? (espionage/get-other-players nil test-game-id test-player-id))))))
+
+;;;;
+;;;; target-row Tests
+;;;;
+
+(deftest test-target-row-renders
+  (testing "Returns a hiccup table row"
+    (let [result (espionage/target-row test-target)]
+      (is (vector? result))
+      (is (= :tr.border-b.border-green-400 (first result)))))
+
+  (testing "Displays correct total planet count"
+    ;; test-target: 2 mil + 1 food + 3 ore = 6 planets.
+    (let [planet-td (nth (espionage/target-row test-target) 2)]
+      (is (= 6 (second planet-td))))))
+
+;;;;
+;;;; espionage-page Tests
+;;;;
+;;;; espionage-page is a pure UI function. Tests verify it renders correctly in the
+;;;; key scenarios: with agents available, without agents, and with no targets.
+;;;;
+
+(deftest test-espionage-page-renders-with-agents-and-targets
+  (testing "Returns a hiccup vector when player has agents and targets exist"
+    (with-redefs [biff/q (fn [_ _ & _] [test-target])]
+      (is (vector? (espionage/espionage-page {:player test-player :game {} :db nil}))))))
+
+(deftest test-espionage-page-renders-without-agents
+  (testing "Returns a hiccup vector with a warning when player has no agents"
+    ;; When agents == 0 the page shows a warning instead of the target table.
+    (with-redefs [biff/q (fn [_ _ & _] [test-target])]
+      (is (vector? (espionage/espionage-page {:player agent-less-player :game {} :db nil}))))))
+
+(deftest test-espionage-page-renders-without-targets
+  (testing "Returns a hiccup vector when no other players exist"
+    (with-redefs [biff/q (fn [_ _ & _] [])]
+      (is (vector? (espionage/espionage-page {:player test-player :game {} :db nil}))))))
+
+;;;;
+;;;; apply-espionage Tests
+;;;;
+;;;; apply-espionage writes to the database and redirects. xt/entity and biff/submit-tx
+;;;; are replaced with test doubles.
+;;;;
+
+(deftest test-apply-espionage-player-not-found
+  (testing "Returns 404 when player is not in the database"
+    (with-redefs [xt/entity (fn [_ _] nil)]
+      (let [result (espionage/apply-espionage {:path-params {:player-id (str test-player-id)}
+                                               :params {} :biff/db nil})]
+        (is (= 404 (:status result)))
+        (is (= "Player not found" (:body result)))))))
+
+(deftest test-apply-espionage-wrong-phase
+  (testing "Redirects to game overview when player is not in phase 5"
+    (let [player (assoc test-player :player/current-phase 4)]
+      (with-redefs [xt/entity (helpers/fake-entity [player])]
+        (let [result (espionage/apply-espionage {:path-params {:player-id (str test-player-id)}
+                                                 :params {} :biff/db nil})]
+          (is (= 303 (:status result)))
+          (is (= (str "/app/game/" test-player-id) (get-in result [:headers "location"]))))))))
+
+(deftest test-apply-espionage-with-target
+  (testing "Records pending-espionage as target UUID and advances to phase 6"
+    (let [tx-atom (atom nil)]
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player])
+                    biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
+        (let [result (espionage/apply-espionage {:path-params {:player-id (str test-player-id)}
+                                                 :params {:target-player-id (str test-target-id)}
+                                                 :biff/db nil})
+              tx     (first @tx-atom)]
+          ;; Redirect to outcomes
+          (is (= 303 (:status result)))
+          (is (= (str "/app/game/" test-player-id "/outcomes") (get-in result [:headers "location"])))
+          ;; Transaction
+          (is (= :player       (:db/doc-type tx)))
+          (is (= :update        (:db/op tx)))
+          (is (= test-player-id (:xt/id tx)))
+          ;; Advances phase and records target
+          (is (= 6 (:player/current-phase tx)))
+          (is (= test-target-id (:player/pending-espionage tx))))))))
+
+(deftest test-apply-espionage-without-target
+  (testing "Records nil pending-espionage when no target is selected"
+    ;; Players may choose to skip espionage. pending-espionage is explicitly set to nil
+    ;; so a previous round's value is not carried forward.
+    (let [tx-atom (atom nil)]
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player])
+                    biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
+        (espionage/apply-espionage {:path-params {:player-id (str test-player-id)}
+                                    :params {} :biff/db nil})
+        (let [tx (first @tx-atom)]
+          (is (= 6 (:player/current-phase tx)))
+          (is (nil? (:player/pending-espionage tx))))))))
+
+(deftest test-apply-espionage-empty-target-string
+  (testing "Treats an empty target-player-id string as no target (nil pending-espionage)"
+    (let [tx-atom (atom nil)]
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player])
+                    biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
+        (espionage/apply-espionage {:path-params {:player-id (str test-player-id)}
+                                    :params {:target-player-id ""} :biff/db nil})
+        (is (nil? (:player/pending-espionage (first @tx-atom))))))))

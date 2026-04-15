@@ -29,28 +29,27 @@
    :stations   (:player/stations   player)})
 
 (defn base-power [game forces attacker?]
-  (+ (* (:soldiers  forces) (get game :game/soldier-power  const/soldier-power))
-     (* (:fighters  forces) (get game :game/fighter-power  const/fighter-power))
-     (* (:cmd-ships forces) (get game :game/cmd-ship-power const/cmd-ship-power))
-     (* (:generals  forces) (get game :game/general-power  const/general-power))
-     (* (:admirals  forces) (get game :game/admiral-power  const/admiral-power))
+  (+ (* (:soldiers  forces) (:game/soldier-power  game))
+     (* (:fighters  forces) (:game/fighter-power  game))
+     (* (:cmd-ships forces) (:game/cmd-ship-power game))
+     (* (:generals  forces) (:game/general-power  game))
+     (* (:admirals  forces) (:game/admiral-power  game))
      (if attacker? 0
-       (* (or (:stations forces) 0)
-          (get game :game/station-power const/station-power)))))
+       (* (:stations forces) (:game/station-power game)))))
 
 (defn random-factor []
   (+ (- 1.0 const/combat-variance)
      (* (rand) (* 2 const/combat-variance))))
 
 (defn- compute-losses [forces rate]
-  {:soldiers-lost   (max 0 (long (* (or (:soldiers   forces) 0) rate)))
-   :transports-lost (max 0 (long (* (or (:transports forces) 0) rate)))
-   :generals-lost   (max 0 (long (* (or (:generals   forces) 0) rate)))
-   :fighters-lost   (max 0 (long (* (or (:fighters   forces) 0) rate)))
-   :carriers-lost   (max 0 (long (* (or (:carriers   forces) 0) rate)))
-   :admirals-lost   (max 0 (long (* (or (:admirals   forces) 0) rate)))
-   :cmd-ships-lost  (max 0 (long (* (or (:cmd-ships  forces) 0) rate)))
-   :stations-lost   (max 0 (long (* (or (:stations   forces) 0) rate)))})
+  {:soldiers-lost   (max 0 (long (* (:soldiers   forces) rate)))
+   :transports-lost (max 0 (long (* (:transports forces) rate)))
+   :generals-lost   (max 0 (long (* (:generals   forces) rate)))
+   :fighters-lost   (max 0 (long (* (:fighters   forces) rate)))
+   :carriers-lost   (max 0 (long (* (:carriers   forces) rate)))
+   :admirals-lost   (max 0 (long (* (:admirals   forces) rate)))
+   :cmd-ships-lost  (max 0 (long (* (:cmd-ships  forces) rate)))
+   :stations-lost   (max 0 (long (* (or (:stations forces) 0) rate)))})
 
 ;;; Randomly select n planets from a pool built from the defender's planet counts.
 ;;; Returns a map {:mil n :food n :ore n} of how many of each type are transferred.

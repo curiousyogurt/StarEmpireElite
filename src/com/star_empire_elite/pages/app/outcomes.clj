@@ -3,8 +3,11 @@
             [com.star-empire-elite.ui :as ui]
             [xtdb.api :as xt]))
 
-;; :: score = planets (dominant) + military (power-weighted) + credits (tiebreaker)
-(defn- calculate-score [player]
+(defn- calculate-score
+  "Compute player score: planets (dominant) + military (power-weighted) + credits (tiebreaker).
+
+  [player player-map] -> int"
+  [player]
   (+ (* (:player/mil-planets  player) 500)
      (* (:player/food-planets player) 300)
      (* (:player/ore-planets  player) 200)
@@ -14,13 +17,15 @@
      (* (:player/stations     player) 5)
      (* (:player/generals     player) 50)
      (* (:player/admirals     player) 100)
-     (quot (max 0 (or (:player/credits player) 0)) 1000)))
+     (quot (max 0 (:player/credits player)) 1000)))
 
-;; :: apply outcomes - advance turn/round/phase and clear stored results.
-;; All stat changes (combat casualties, planet transfers, notifications) were already
-;; applied when the player loaded the outcomes page (GET). This POST only handles
-;; turn progression and cleanup.
-(defn apply-outcomes [{:keys [path-params biff/db] :as ctx}]
+(defn apply-outcomes
+  "Advance turn/round/phase and clear stored battle and espionage results.
+  All stat changes were applied when the player loaded the outcomes page (GET);
+  this POST only handles turn progression and cleanup.
+
+  [ctx ring-ctx] -> ring-response (303 redirect to income)"
+  [{:keys [path-params biff/db] :as ctx}]
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
         player    (xt/entity db player-id)]
     (if (nil? player)
@@ -55,7 +60,6 @@
           {:status 303
            :headers {"location" (str "/app/game/" player-id "/income")}})))))
 
-;; :: incoming attack helpers — defender's perspective (Item | Your Forces | Your Losses | Attacker Losses)
 (defn- incoming-battle-row [label dc dl al unit-key loss-key def-only? separator-below?]
   [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
    [:td.py-1 label]
@@ -73,10 +77,10 @@
 (defn- incoming-attack-section [result]
   (let [att-wins? (:attacker-wins? result)
         att-name  (:attacker-name result)
-        dc        (or (:defender-counts result) (:defender-forces result))
+        dc        (:defender-counts result)
         al        (:attacker-losses result)
         dl        (:defender-losses result)
-        pt        (or (:planets-transferred result) {:mil 0 :food 0 :ore 0})]
+        pt        (:planets-transferred result)]
     [:div.border.border-green-400.p-4.mb-4
      [:h3.font-bold.mb-3
       (if att-wins?
@@ -103,7 +107,6 @@
         (incoming-planet-row "Food"     (:food pt) false)
         (incoming-planet-row "Military" (:mil  pt) true)]]]]))
 
-;; :: outgoing attack helpers
 (defn- battle-row [label af al dl att-key loss-key att-only? separator-below?]
   [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
    [:td.py-1 label]
@@ -118,14 +121,14 @@
    [:td.text-right.px-3 "—"]
    [:td.text-right (if att-wins? enemy-losses "—")]])
 
-;; :: outcomes page - review turn results and advance to next turn
-(defn outcomes-page [{:keys [player game battle-result espionage-result]}]
-  (let [current-turn    (:player/current-turn player)
-        current-round   (:player/current-round player)
-        turns-per-round (:game/turns-per-round game)
-        rounds-per-day  (:game/rounds-per-day game)
-        end-current-round?  (>= current-turn turns-per-round)
-        one-turn-left?      (= current-turn (dec turns-per-round))]
+(defn outcomes-page
+  "Show turn results (combat, espionage) and the advance button for the next turn.
+
+  [{:keys [player game battle-result espionage-result]}] -> hiccup"
+  [{:keys [player game battle-result espionage-result]}]
+  (let [current-turn        (:player/current-turn player)
+        turns-per-round     (:game/turns-per-round game)
+        end-current-round?  (>= current-turn turns-per-round)]
     (ui/page
      {}
      [:div.mx-auto.max-w-4xl.w-full.text-green-400.font-mono
@@ -148,12 +151,11 @@
       ;; Battle result section (only shown when an attack was declared)
       (when battle-result
         (let [att-wins? (:attacker-wins? battle-result)
-              ac        (or (:attacker-counts battle-result) (:attacker-forces battle-result))
-              df        (:defender-forces battle-result)
+              ac        (:attacker-counts battle-result)
               al        (:attacker-losses battle-result)
               dl        (:defender-losses battle-result)
               def-name  (:defender-name battle-result)
-              pt        (or (:planets-transferred battle-result) {:mil 0 :food 0 :ore 0})
+              pt        (:planets-transferred battle-result)
               pt-total  (+ (:mil pt) (:food pt) (:ore pt))]
           [:div.border.border-green-400.p-4.mb-4
            [:h3.font-bold.mb-3
@@ -202,7 +204,7 @@
               [:p.text-xs (str "Agents:     " (:agents     intel))]]
              [:p.text-xs "Your agents were unable to obtain useful intelligence."])]))
 
-      (ui/extended-resource-display-grid player "Resources" false game)
+      (ui/extended-resource-display-grid player "Resources" false)
 
       (biff/form
        {:action (str "/app/game/" (:xt/id player) "/apply-outcomes")

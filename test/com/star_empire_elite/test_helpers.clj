@@ -63,7 +63,25 @@
    :game/mil-planet-fighters  0
    :game/mil-planet-soldiers  0
    :game/mil-planet-agents    0
-   :game/agent-cost           0})
+   :game/agent-cost           0
+
+   ;; Exchange sell/buy rates
+   :game/soldier-sell         0
+   :game/transport-sell       0
+   :game/general-sell         0
+   :game/fighter-sell         0
+   :game/carrier-sell         0
+   :game/admiral-sell         0
+   :game/station-sell         0
+   :game/cmd-ship-sell        0
+   :game/agent-sell           0
+   :game/mil-planet-sell      0
+   :game/food-planet-sell     0
+   :game/ore-planet-sell      0
+   :game/food-buy             1
+   :game/food-sell            0
+   :game/fuel-buy             1
+   :game/fuel-sell            0})
 
 (defn make-game [sys overrides]
   (let [doc (merge game-defaults overrides)]

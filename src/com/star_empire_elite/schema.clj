@@ -5,9 +5,7 @@
    :user [:map {:closed true}
           [:xt/id                          :user/id]
           [:user/email                     :string]
-          [:user/joined-at                 inst?]
-          [:user/foo {:optional true}      :string]
-          [:user/bar {:optional true}      :string]]
+          [:user/joined-at                 inst?]]
 
    :game/id :uuid
    :game [:map {:closed true}
@@ -65,7 +63,25 @@
           [:game/agent-cost              :int]
           [:game/mil-planet-cost         :int]
           [:game/food-planet-cost        :int]
-          [:game/ore-planet-cost         :int]]
+          [:game/ore-planet-cost         :int]
+
+          ;; Exchange sell/buy rates
+          [:game/soldier-sell            :int]
+          [:game/transport-sell          :int]
+          [:game/general-sell            :int]
+          [:game/fighter-sell            :int]
+          [:game/carrier-sell            :int]
+          [:game/admiral-sell            :int]
+          [:game/station-sell            :int]
+          [:game/cmd-ship-sell           :int]
+          [:game/agent-sell              :int]
+          [:game/mil-planet-sell         :int]
+          [:game/food-planet-sell        :int]
+          [:game/ore-planet-sell         :int]
+          [:game/food-buy                :int]
+          [:game/food-sell               :int]
+          [:game/fuel-buy                :int]
+          [:game/fuel-sell               :int]]
 
    :player/id :uuid
    :player [:map {:closed true}

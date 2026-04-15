@@ -3,8 +3,11 @@
             [com.star-empire-elite.ui :as ui]
             [xtdb.api :as xt]))
 
-;; :: fetch all other players in the same game, sorted by score descending
-(defn get-other-players [db game-id current-player-id]
+(defn get-other-players
+  "Fetch all other players in the same game, sorted by score descending.
+
+  [db xtdb-db, game-id uuid, current-player-id uuid] -> seq of player maps"
+  [db game-id current-player-id]
   (let [players (q db '{:find (pull player [*])
                         :in [game-id current-player-id]
                         :where [[player :player/game game-id]
@@ -12,8 +15,11 @@
                    game-id current-player-id)]
     (sort-by :player/score > (seq players))))
 
-;; :: render a single row in the targets table with a radio-button infiltrate selector
-(defn target-row [player]
+(defn target-row
+  "Render a single row in the targets table with a radio-button infiltrate selector.
+
+  [player player-map] -> hiccup"
+  [player]
   (let [total-planets (+ (:player/mil-planets player)
                          (:player/food-planets player)
                          (:player/ore-planets player))
@@ -35,8 +41,11 @@
         {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
         "Infiltrate"]]]]))
 
-;; :: espionage page - choose a target to infiltrate or skip espionage
-(defn espionage-page [{:keys [player game db]}]
+(defn espionage-page
+  "Show the espionage phase: choose a target empire to infiltrate, or skip espionage.
+
+  [{:keys [player game db]}] -> hiccup"
+  [{:keys [player game db]}]
   (let [player-id (:xt/id player)
         other-players (get-other-players db (:player/game player) player-id)]
     (ui/page
@@ -52,7 +61,7 @@
         :method "post"}
 
        (cond
-         (zero? (or (:player/agents player) 0))
+         (zero? (:player/agents player))
          [:p.text-yellow-400.mb-6
           "\u26a0 You have no agents. You cannot undertake espionage operations this turn."]
 
@@ -93,8 +102,11 @@
          {:type "submit"}
          "Continue to Outcomes"]])])))
 
-;; :: apply espionage - store pending espionage target (if any) and advance to phase 6
-(defn apply-espionage [{:keys [path-params params biff/db] :as ctx}]
+(defn apply-espionage
+  "Store the pending espionage target (nil if none chosen) and advance to outcomes phase.
+
+  [ctx ring-ctx] -> ring-response (303 redirect to outcomes)"
+  [{:keys [path-params params biff/db] :as ctx}]
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
         player (xt/entity db player-id)]
     (if (nil? player)

@@ -178,14 +178,11 @@
 ;;; where players need to see all their assets, not just basic resources.
 (defn extended-resource-display-grid
   "Display all player resources including units and planets in a responsive grid layout.
+  Accepts either a player entity (uses :player/credits etc.) or a plain resource map (:credits etc.).
 
-  Args:
-  resources - map of resource values to display (uses either player entity or custom map)
-  title - optional title for the display section
-  highlight-negative? - if true, shows negative values in red (default false)"
-  ([resources title] (extended-resource-display-grid resources title false nil))
-  ([resources title highlight-negative?] (extended-resource-display-grid resources title highlight-negative? nil))
-  ([resources title highlight-negative? game]
+  ([resources title]) ([resources title highlight-negative? bool]) -> hiccup"
+  ([resources title] (extended-resource-display-grid resources title false))
+  ([resources title highlight-negative?]
    [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
     [:h3.font-bold.mb-4 title]
     [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2

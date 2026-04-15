@@ -3,8 +3,11 @@
             [com.star-empire-elite.ui :as ui]
             [xtdb.api :as xt]))
 
-;; :: fetch all other players in the same game, sorted by score descending
-(defn get-other-players [db game-id current-player-id]
+(defn get-other-players
+  "Fetch all other players in the same game, sorted by score descending.
+
+  [db xtdb-db, game-id uuid, current-player-id uuid] -> seq of player maps"
+  [db game-id current-player-id]
   (let [players (q db '{:find (pull player [*])
                         :in [game-id current-player-id]
                         :where [[player :player/game game-id]
@@ -12,11 +15,13 @@
                    game-id current-player-id)]
     (sort-by :player/score > (seq players))))
 
-;; :: render a single row in the targets table with a radio-button attack selector.
-;; The radio input is visually hidden; its label renders as the attack button.
-;; peer-checked: Tailwind variants handle yellow highlight when selected.
-;; A tiny onclick handles deselect (radio buttons don't natively uncheck on re-click).
-(defn target-row [player]
+(defn target-row
+  "Render a single row in the targets table with a radio-button attack selector.
+  The radio input is visually hidden; its label renders as the attack button.
+  A small onclick handler enables deselect, since radio buttons don't natively uncheck on re-click.
+
+  [player player-map] -> hiccup"
+  [player]
   (let [total-planets (+ (:player/mil-planets player)
                          (:player/food-planets player)
                          (:player/ore-planets player))
@@ -38,8 +43,11 @@
         {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
         "Attack"]]]]))
 
-;; :: action page - choose a target to attack or skip combat
-(defn action-page [{:keys [player game db]}]
+(defn action-page
+  "Show the action phase: choose a target empire to attack, or skip combat.
+
+  [{:keys [player game db]}] -> hiccup"
+  [{:keys [player game db]}]
   (let [player-id (:xt/id player)
         other-players (get-other-players db (:player/game player) player-id)]
     (ui/page
@@ -89,8 +97,11 @@
          {:type "submit"}
          "Continue to Espionage"]])])))
 
-;; :: apply action - store pending attack (if any) and advance to phase 5
-(defn apply-action [{:keys [path-params params biff/db] :as ctx}]
+(defn apply-action
+  "Store the pending attack target (nil if none chosen) and advance to espionage phase.
+
+  [ctx ring-ctx] -> ring-response (303 redirect to espionage)"
+  [{:keys [path-params params biff/db] :as ctx}]
   (let [player-id (java.util.UUID/fromString (:player-id path-params))
         player (xt/entity db player-id)]
     (if (nil? player)

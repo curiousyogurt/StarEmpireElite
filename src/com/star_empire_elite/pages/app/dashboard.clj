@@ -19,7 +19,7 @@
                                    :in [game-id]
                                    :where [[p :player/game game-id]]}
                                  (:player/game player)))
-            player-score (or (:player/score player) 0)
+            player-score (:player/score player)
             rank         (inc (count (filter #(> % player-score) game-scores)))]
         {:player (assoc player :player/rank rank)
          :game game}))))

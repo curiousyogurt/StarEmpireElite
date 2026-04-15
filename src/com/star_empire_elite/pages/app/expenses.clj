@@ -13,17 +13,21 @@
 (ns com.star-empire-elite.pages.app.expenses
   (:require [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]
-            [com.star-empire-elite.utils :as utils]
-            [xtdb.api :as xt]))
+            [com.star-empire-elite.utils :as utils]))
 
 ;;;;
 ;;;; Calculations
 ;;;;
 
-;;; Calculate required upkeep costs for all empire assets using game constants
-(defn calculate-required-expenses 
-  "Calculate total required upkeep costs based on player's assets and game constants.
-  Returns map with expense categories and their costs."
+(defn calculate-required-expenses
+  "Calculate required upkeep costs for all empire assets using game constants.
+
+  [player game] -> {:planets-credits int, :planets-food int,
+                    :soldiers-credits int, :soldiers-food int,
+                    :fighters-credits int, :fighters-fuel int,
+                    :stations-credits int, :stations-fuel int,
+                    :agents-food int, :agents-fuel int,
+                    :population-food int, :population-fuel int}"
   [player game]
   (let [planet-count (+ (:player/mil-planets player)
                         (:player/food-planets player)
@@ -46,10 +50,10 @@
      :population-food   (* (:player/population player) (:game/population-upkeep-food game))
      :population-fuel   (* (:player/population player) (:game/population-upkeep-fuel game))}))
 
-;;; Calculate resources after paying specified expenses
-(defn calculate-resources-after-expenses 
+(defn calculate-resources-after-expenses
   "Calculate player resources after deducting expense payments.
-  Returns map of {:credits :food :fuel} after expenses."
+
+  [player payments] -> {:credits int, :food int, :fuel int}"
   [player payments]
   {:credits (- (:player/credits player)
                (:planets-pay payments)
@@ -67,18 +71,22 @@
                (:agents-fuel payments)
                (:population-fuel payments))})
 
-;;; Check if player can afford the expenses
-(defn can-afford-expenses? 
-  "Returns true if all resource values are non-negative"
+(defn can-afford-expenses?
+  "Returns true if all resource values after expenses are non-negative.
+
+  [resources-after {:credits int, :food int, :fuel int}] -> boolean"
   [resources-after]
   (and (>= (:credits resources-after) 0)
        (>= (:food resources-after) 0)
        (>= (:fuel resources-after) 0)))
 
-;;; Parse expense payment inputs from request parameters
 (defn parse-expense-payments
-  "Parse all expense payment inputs from request params.
-  Returns map of payments for all expense categories."
+  "Parse all expense payment inputs from request params. Invalid or missing values default to 0.
+
+  [params ring-params] -> {:planets-pay int, :planets-food int, :soldiers-credits int,
+                           :soldiers-food int, :fighters-credits int, :fighters-fuel int,
+                           :stations-credits int, :stations-fuel int, :agents-food int,
+                           :agents-fuel int, :population-food int, :population-fuel int}"
   [params]
   {:planets-pay      (utils/parse-numeric-input (:planets-pay params))
    :planets-food     (utils/parse-numeric-input (:planets-food params))
@@ -97,11 +105,11 @@
 ;;;; UI Components
 ;;;;
 
-;;; Submit button component - extracted to avoid duplication
 (defn submit-button
-  "Renders the submit button with dynamic disabled state based on affordability.
-  Used in both initial page render and HTMX updates.
-  Accepts optional extra-attrs map for additional HTML attributes."
+  "Render the submit button, disabled when the player cannot afford expenses.
+  extra-attrs is merged into the button attributes — used to add hx-swap-oob in HTMX responses.
+
+  ([affordable?] | [affordable? extra-attrs map]) -> hiccup"
   ([affordable?] (submit-button affordable? {}))
   ([affordable? extra-attrs]
    [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
@@ -111,21 +119,14 @@
            extra-attrs)
     "Continue to Building"]))
 
-;;; Expense row with responsive layout - compact on mobile, table on desktop
 (defn expense-row
-  "Renders an expense row that adapts from mobile card to desktop table row.
+  "Render a responsive expense row: compact on mobile, full table row on desktop.
+  credits-field, food-field, and fuel-field are either {:field-name str, :default-value int,
+  :required int} or nil when that resource type is not applicable to this category.
 
-  Parameters:
-  - category-name: Display name (e.g. 'Planets', 'Soldiers')
-  - category-name-mobile: Abbreviated name for mobile (e.g. 'Plnts', 'Sold')
-  - row-id: Unique identifier for this row (e.g. 'planets', 'soldiers')
-  - asset-count: Asset count value (numeric, will be formatted)
-  - required-display: Total required display (e.g. '50 crd, 5 food')
-  - credits-field: Map with :field-name, :default-value, and :required, or nil if not used
-  - food-field: Map with :field-name, :default-value, and :required, or nil if not used
-  - fuel-field: Map with :field-name, :default-value, and :required, or nil if not used
-  - player-id: Player UUID
-  - hx-include: HTMX include selector string"
+  [category-name str, category-name-mobile str, row-id str, asset-count int|str,
+   required-display str, credits-field map|nil, food-field map|nil, fuel-field map|nil,
+   player-id uuid, hx-include str] -> hiccup"
   [category-name category-name-mobile row-id asset-count required-display credits-field food-field fuel-field player-id hx-include]
   [:div.border-b.border-green-400.last:border-b-0.grid.items-center.gap-1.px-2.py-2.text-xs.leading-tight.lg:gap-3.lg:px-4.lg:py-2.lg:text-base.expense-row-grid
 
@@ -169,23 +170,14 @@
                         {:input-class "py-0.5 text-xs lg:py-1 lg:text-sm"})
       [:div.font-mono.opacity-30 "0"])]])
 
-;;; Helper function to build expense row from simplified specification
 (defn build-expense-row
-  "Builds an expense-row call from a simplified specification map.
+  "Build an expense-row from a spec map, deriving required values and input fields from it.
+  Spec keys: :category str, :abbrev str, :row-id str, :count int|str,
+             :credits {:field-name str, :required-key kw} or nil,
+             :food   {:field-name str, :required-key kw} or nil,
+             :fuel   {:field-name str, :required-key kw} or nil.
 
-  Spec map keys:
-  - :category - Full category name (e.g. 'Planets')
-  - :abbrev - Abbreviated name (e.g. 'Plnts')
-  - :row-id - Unique row identifier (e.g. 'planets')
-  - :count - Asset count value (numeric, e.g. planet-count or (:player/soldiers player))
-  - :credits - Map with :field-name and :required-key, or nil
-  - :food - Map with :field-name and :required-key, or nil
-  - :fuel - Map with :field-name and :required-key, or nil
-
-  Example:
-  {:category 'Planets' :abbrev 'Plnts' :row-id 'planets' :count planet-count
-   :credits {:field-name 'planets-pay' :required-key :planets-credits}
-   :food {:field-name 'planets-food' :required-key :planets-food}}"
+  [spec map, required map, player-id uuid, hx-include str] -> hiccup"
   [spec required player-id hx-include]
   (let [{:keys [category abbrev row-id count credits food fuel]} spec
         ;; Build required display as "credits/food/fuel" format
@@ -214,15 +206,15 @@
 ;;;;
 ;;;; Actions
 ;;;;
-;;;; There are three parts to the actions for this phase: (i) expenses-page, which shows the
-;;;; costs and input fields, (ii) calculate-expenses which provides htmx dynamic updates as the user 
-;;;; changes values, and (iii) apply-expenses which commits the payments to the database and advances 
-;;;; to the next phase.
+;;;; expenses-page shows costs and input fields. calculate-expenses handles HTMX dynamic updates
+;;;; as the player changes values. apply-expenses commits payments and advances to building phase.
 ;;;;
 
-;;; Applies expense payments and advances to the next phase. Uses calculations to determine resource 
-;;; changes, then commits them in a single transaction.
-(defn apply-expenses [{:keys [path-params params biff/db] :as ctx}]
+(defn apply-expenses
+  "Commit expense payments to the database and advance to the building phase.
+
+  [ctx ring-ctx] -> ring-response (303 redirect to building)"
+  [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     ;; Phase validation prevents players from applying expenses multiple times or out of order
     (if-let [redirect (utils/validate-phase player 2 player-id)]
@@ -246,9 +238,12 @@
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/building")}}))))
 
-;;; Provides htmx dynamic updates showing resources after expenses as user changes input values.
-;;; This gives immediate feedback on whether the player can afford their selected expenses.
-(defn calculate-expenses [{:keys [path-params params biff/db] :as ctx}]
+(defn calculate-expenses
+  "Return HTMX out-of-band fragments updating the resources display, warning, submit button,
+  and required-display cells in real time as the player adjusts expense inputs.
+
+  [ctx ring-ctx] -> hiccup (HTMX oob fragments)"
+  [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     ;; Parse expense payment inputs using extracted function
     (let [payments (parse-expense-payments params)
@@ -300,14 +295,12 @@
          [:div#resources-after
           (ui/resource-display-grid
             (assoc resources-after
-                   :galaxars             (:player/galaxars player)
-                   :soldiers             (:player/soldiers player)
-                   :fighters             (:player/fighters player)
-                   :stations             (:player/stations player)
-                   :agents               (:player/agents player)
-                   :player/current-turn  (:player/current-turn player)
-                   :player/current-round (:player/current-round player))
-            "Resources After Expenses" true game)]
+                   :galaxars (:player/galaxars player)
+                   :soldiers (:player/soldiers player)
+                   :fighters (:player/fighters player)
+                   :stations (:player/stations player)
+                   :agents   (:player/agents player))
+            "Resources After Expenses" true)]
 
          ;; Warning message if expenses exceed available resources
          [:div#expense-warning.flex.items-center
@@ -345,8 +338,11 @@
             :fuel {:field-name "population-fuel" :required-key :population-fuel}})
          ]))))
 
-;;; Shows expense requirements and input fields for player to choose how much to pay
-(defn expenses-page [{:keys [player game]}]
+(defn expenses-page
+  "Show expense requirements and input fields for the player to choose payment amounts.
+
+  [{:keys [player game]}] -> hiccup"
+  [{:keys [player game]}]
   (let [required (calculate-required-expenses player game)
         player-id (:xt/id player)
         hx-include "[name='planets-pay'],[name='planets-food'],[name='soldiers-credits'],[name='soldiers-food'],[name='fighters-credits'],[name='fighters-fuel'],[name='stations-credits'],[name='stations-fuel'],[name='agents-food'],[name='agents-fuel'],[name='population-food'],[name='population-fuel']"
@@ -378,7 +374,7 @@
                         (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
 
        ;; Current resources before expenses
-       (ui/resource-display-grid player "Resources Before Expenses" false game)
+       (ui/resource-display-grid player "Resources Before Expenses")
 
        (biff/form
          {:action (str "/app/game/" player-id "/apply-expenses")
@@ -449,7 +445,7 @@
 
          ;; Resources after expenses - initial copy, updated via HTMX
          [:div#resources-after
-          (ui/resource-display-grid player "Resources After Expenses" false game)]
+          (ui/resource-display-grid player "Resources After Expenses")]
 
          ;; Warning message area - populated by HTMX if player can't afford expenses
          [:div#expense-warning.flex.items-center]

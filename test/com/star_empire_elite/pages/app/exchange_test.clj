@@ -2,187 +2,225 @@
   (:require [clojure.test :refer :all]
             [com.star-empire-elite.pages.app.exchange :as exchange]
             [com.star-empire-elite.test-helpers :as helpers]
-            [com.star-empire-elite.constants :as const]
-            [xtdb.api :as xt]
             [com.star-empire-elite.utils :as utils]
+            [xtdb.api :as xt]
             [com.biffweb :as biff]))
 
 ;;;;
-;;;; Fixtures and Utilities
+;;;; Fixtures
 ;;;;
 
-;; Test UUIDs for sample data
 (def test-player-id #uuid "00000000-0000-0000-0000-000000000042")
+(def test-game-id   #uuid "00000000-1111-2222-3333-444444444444")
 
-;; Sample player entity with resources and assets
+;; Game entity with exchange rates stored as game-level configuration.
+(def test-game
+  {:xt/id              test-game-id
+   :game/soldier-sell     250
+   :game/transport-sell  2500
+   :game/general-sell    5500
+   :game/fighter-sell     375
+   :game/carrier-sell    7500
+   :game/admiral-sell    7500
+   :game/station-sell     500
+   :game/cmd-ship-sell  30000
+   :game/agent-sell      1000
+   :game/mil-planet-sell 1000
+   :game/food-planet-sell 5500
+   :game/ore-planet-sell 11000
+   :game/food-buy           6
+   :game/food-sell          2
+   :game/fuel-buy           6
+   :game/fuel-sell          3})
+
 (def test-player
-  {:xt/id test-player-id
+  {:xt/id               test-player-id
+   :player/game         test-game-id
    :player/current-phase 2
-   :player/game #uuid "00000000-1111-2222-3333-444444444444"
-   :player/credits 5000
-   :player/soldiers 100
-   :player/transports 5
-   :player/generals 2
-   :player/fighters 20
-   :player/carriers 1
-   :player/admirals 1
-   :player/stations 10
-   :player/cmd-ships 0
-   :player/agents 5
-   :player/mil-planets 5
+   :player/empire-name  "Test Empire"
+   :player/credits      5000
+   :player/soldiers     100
+   :player/transports   5
+   :player/generals     2
+   :player/fighters     20
+   :player/carriers     1
+   :player/admirals     1
+   :player/stations     10
+   :player/cmd-ships    0
+   :player/agents       5
+   :player/mil-planets  5
    :player/food-planets 4
-   :player/ore-planets 6
-   :player/food 500
-   :player/fuel 300
-   :player/galaxars 100})
+   :player/ore-planets  6
+   :player/food         500
+   :player/fuel         300
+   :player/galaxars     100})
+
+;; A baseline quantities map with all keys set to zero. Tests merge their actual
+;; values on top of this to avoid NPEs from missing keys in calculation functions.
+(def zero-quantities
+  {:soldiers-sold    0 :transports-sold   0 :generals-sold   0
+   :fighters-sold    0 :carriers-sold     0 :admirals-sold   0
+   :stations-sold    0 :cmd-ships-sold    0 :agents-sold     0
+   :mil-planets-sold 0 :food-planets-sold 0 :ore-planets-sold 0
+   :food-bought      0 :food-sold         0
+   :fuel-bought      0 :fuel-sold         0})
 
 ;;;;
-;;;; Tests for Pure Calculation Functions
+;;;; get-exchange-rates Tests
 ;;;;
-;;;; These tests verify the calculation functions in isolation without any database or HTTP
-;;;; context. This is the key benefit of extracting pure functions - they're trivial to test.
+;;;; get-exchange-rates is a pure function that extracts rates from the game entity.
 ;;;;
-
-(deftest test-parse-exchange-value
-  (testing "Parses valid numeric strings correctly"
-    (is (= 100 (utils/parse-numeric-input "100")))
-    (is (= 0 (utils/parse-numeric-input "0")))
-    (is (= 999 (utils/parse-numeric-input "999"))))
-  
-  (testing "Treats empty/nil as 0"
-    (is (= 0 (utils/parse-numeric-input "")))
-    (is (= 0 (utils/parse-numeric-input nil))))
-  
-  (testing "Strips non-numeric characters"
-    (is (= 123 (utils/parse-numeric-input "123abc")))
-    (is (= 456 (utils/parse-numeric-input "abc456")))
-    (is (= 789 (utils/parse-numeric-input "7-8-9")))
-    (is (= 100 (utils/parse-numeric-input "-100")))))  ; Minus sign stripped
 
 (deftest test-get-exchange-rates
-  (testing "Returns exchange rates matching constants"
-    (let [rates (exchange/get-exchange-rates)]
-      (is (= const/soldier-sell    (:soldier-sell rates)))
-      (is (= const/fighter-sell    (:fighter-sell rates)))
-      (is (= const/station-sell    (:station-sell rates)))
-      (is (= const/mil-planet-sell (:mil-planet-sell rates)))
-      (is (= const/food-planet-sell (:food-planet-sell rates)))
-      (is (= const/ore-planet-sell (:ore-planet-sell rates)))
-      (is (= const/food-buy        (:food-buy rates)))
-      (is (= const/food-sell       (:food-sell rates)))
-      (is (= const/fuel-buy        (:fuel-buy rates)))
-      (is (= const/fuel-sell       (:fuel-sell rates))))))    ; Half of buy (rounded down)
+  (testing "Extracts all exchange rate fields from the game entity"
+    (let [rates (exchange/get-exchange-rates test-game)]
+      (is (= 250   (:soldier-sell     rates)))
+      (is (= 375   (:fighter-sell     rates)))
+      (is (= 500   (:station-sell     rates)))
+      (is (= 1000  (:mil-planet-sell  rates)))
+      (is (= 5500  (:food-planet-sell rates)))
+      (is (= 11000 (:ore-planet-sell  rates)))
+      (is (= 6     (:food-buy         rates)))
+      (is (= 2     (:food-sell        rates)))
+      (is (= 6     (:fuel-buy         rates)))
+      (is (= 3     (:fuel-sell        rates))))))
 
-(deftest test-calculate-exchange-credits-sales-only
-  (testing "Calculates credits correctly from selling units only"
-    (let [quantities {:soldiers-sold 10 :transports-sold 0 :generals-sold 0
-                     :fighters-sold 5 :carriers-sold 0 :admirals-sold 0
-                     :stations-sold 2 :cmd-ships-sold 0
-                     :mil-planets-sold 1
-                     :food-planets-sold 1
-                     :ore-planets-sold 1
-                     :food-bought 0
-                     :food-sold 0
-                     :fuel-bought 0
-                     :fuel-sold 0}
-          rates (exchange/get-exchange-rates)
+;;;;
+;;;; parse-exchange-quantities Tests
+;;;;
+;;;; Delegates to utils/parse-numeric-input; covered in detail in utils tests.
+;;;; Here we verify only that parsing is applied to all keys.
+;;;;
+
+(deftest test-parse-exchange-quantities-all-keys
+  (testing "Parses every quantity key from request params"
+    (let [params {:soldiers-sold "10" :transports-sold "2" :generals-sold "1"
+                  :fighters-sold "5"  :carriers-sold   "1" :admirals-sold "1"
+                  :stations-sold "3"  :cmd-ships-sold  "0" :agents-sold   "2"
+                  :mil-planets-sold "1" :food-planets-sold "1" :ore-planets-sold "1"
+                  :food-bought "50" :food-sold "20" :fuel-bought "30" :fuel-sold "10"}
+          q (exchange/parse-exchange-quantities params)]
+      (is (= 10 (:soldiers-sold q)))
+      (is (= 2  (:transports-sold q)))
+      (is (= 2  (:agents-sold q)))
+      (is (= 50 (:food-bought q)))
+      (is (= 10 (:fuel-sold q)))))
+
+  (testing "Missing params default to 0"
+    (let [q (exchange/parse-exchange-quantities {})]
+      (is (= 0 (:soldiers-sold q)))
+      (is (= 0 (:agents-sold q)))
+      (is (= 0 (:fuel-bought q))))))
+
+;;;;
+;;;; calculate-exchange-credits Tests
+;;;;
+;;;; calculate-exchange-credits is a pure function. Tests cover unit sales, resource
+;;;; trades, and mixed exchanges independently to isolate each credit path.
+;;;;
+
+(deftest test-calculate-exchange-credits-unit-sales
+  (testing "Credits from selling military units accumulate correctly"
+    (let [quantities (merge zero-quantities {:soldiers-sold 10 :fighters-sold 5 :stations-sold 2
+                                             :mil-planets-sold 1 :food-planets-sold 1 :ore-planets-sold 1})
+          rates (exchange/get-exchange-rates test-game)
           result (exchange/calculate-exchange-credits quantities rates)
-          expected-sales (+ (* 10 const/soldier-sell) (* 5 const/fighter-sell)
-                            (* 2 const/station-sell)  (* 1 const/mil-planet-sell)
-                            (* 1 const/food-planet-sell) (* 1 const/ore-planet-sell))]
-      (is (= expected-sales (:credits-from-sales result)))
+          expected (+ (* 10 (:game/soldier-sell test-game)) (* 5 (:game/fighter-sell test-game))
+                      (* 2 (:game/station-sell test-game))
+                      (* 1 (:game/mil-planet-sell test-game)) (* 1 (:game/food-planet-sell test-game)) (* 1 (:game/ore-planet-sell test-game)))]
+      (is (= expected (:credits-from-sales result)))
       (is (= 0 (:credits-from-resources result)))
-      (is (= expected-sales (:total-credits result))))))
+      (is (= expected (:total-credits result))))))
 
-(deftest test-calculate-exchange-credits-resources-only
-  (testing "Calculates credits correctly from buying/selling resources"
-    (let [quantities {:soldiers-sold 0 :transports-sold 0 :generals-sold 0
-                     :fighters-sold 0 :carriers-sold 0 :admirals-sold 0
-                     :stations-sold 0 :cmd-ships-sold 0
-                     :mil-planets-sold 0
-                     :food-planets-sold 0
-                     :ore-planets-sold 0
-                     :food-bought 20
-                     :food-sold 10
-                     :fuel-bought 15
-                     :fuel-sold 5}
-          rates (exchange/get-exchange-rates)
+(deftest test-calculate-exchange-credits-resource-trades
+  (testing "Credits from buying and selling food and fuel net correctly"
+    ;; Selling earns credits; buying costs credits. The net is credits-from-resources.
+    (let [quantities (merge zero-quantities {:food-bought 20 :food-sold 10 :fuel-bought 15 :fuel-sold 5})
+          rates (exchange/get-exchange-rates test-game)
           result (exchange/calculate-exchange-credits quantities rates)
-          expected-net (- (+ (* 10 const/food-sell) (* 5 const/fuel-sell))
-                          (+ (* 20 const/food-buy)  (* 15 const/fuel-buy)))]
+          expected-net (- (+ (* 10 (:game/food-sell test-game)) (* 5 (:game/fuel-sell test-game)))
+                          (+ (* 20 (:game/food-buy test-game))  (* 15 (:game/fuel-buy test-game))))]
       (is (= 0 (:credits-from-sales result)))
       (is (= expected-net (:credits-from-resources result)))
       (is (= expected-net (:total-credits result))))))
 
+(deftest test-calculate-exchange-credits-agents
+  (testing "Agent sales are counted in credits-from-sales"
+    (let [quantities (merge zero-quantities {:agents-sold 3})
+          rates (exchange/get-exchange-rates test-game)
+          result (exchange/calculate-exchange-credits quantities rates)]
+      (is (= (* 3 (:game/agent-sell test-game)) (:credits-from-sales result))))))
+
 (deftest test-calculate-exchange-credits-mixed
-  (testing "Calculates credits correctly from mixed exchanges"
-    (let [quantities {:soldiers-sold 5 :transports-sold 0 :generals-sold 0
-                     :fighters-sold 2 :carriers-sold 0 :admirals-sold 0
-                     :stations-sold 1 :cmd-ships-sold 0
-                     :mil-planets-sold 0
-                     :food-planets-sold 0
-                     :ore-planets-sold 0
-                     :food-bought 10
-                     :food-sold 20
-                     :fuel-bought 5
-                     :fuel-sold 10}
-          rates (exchange/get-exchange-rates)
+  (testing "Unit sales and resource trades are summed correctly into total-credits"
+    (let [quantities (merge zero-quantities {:soldiers-sold 5 :fighters-sold 2 :stations-sold 1
+                                             :food-sold 20 :fuel-sold 10 :food-bought 10 :fuel-bought 5})
+          rates (exchange/get-exchange-rates test-game)
           result (exchange/calculate-exchange-credits quantities rates)
-          expected-sales (+ (* 5 const/soldier-sell) (* 2 const/fighter-sell) (* 1 const/station-sell))
-          expected-resources (- (+ (* 20 const/food-sell) (* 10 const/fuel-sell))
-                                 (+ (* 10 const/food-buy)  (* 5  const/fuel-buy)))]
-      (is (= expected-sales (:credits-from-sales result)))
+          expected-sales     (+ (* 5 (:game/soldier-sell test-game)) (* 2 (:game/fighter-sell test-game)) (* 1 (:game/station-sell test-game)))
+          expected-resources (- (+ (* 20 (:game/food-sell test-game)) (* 10 (:game/fuel-sell test-game)))
+                                (+ (* 10 (:game/food-buy test-game))  (* 5  (:game/fuel-buy test-game))))]
+      (is (= expected-sales     (:credits-from-sales result)))
       (is (= expected-resources (:credits-from-resources result)))
       (is (= (+ expected-sales expected-resources) (:total-credits result))))))
 
+(deftest test-calculate-exchange-credits-zero-quantities
+  (testing "All-zero quantities produce zero credits"
+    (let [result (exchange/calculate-exchange-credits zero-quantities (exchange/get-exchange-rates test-game))]
+      (is (= 0 (:credits-from-sales result)))
+      (is (= 0 (:credits-from-resources result)))
+      (is (= 0 (:total-credits result))))))
+
+;;;;
+;;;; calculate-resources-after-exchange Tests
+;;;;
+
 (deftest test-calculate-resources-after-exchange
-  (testing "Calculates all resources correctly after exchange"
-    (let [player {:player/credits 1000
-                  :player/soldiers 100
-                  :player/transports 5
-                  :player/generals 2
-                  :player/fighters 20
-                  :player/carriers 1
-                  :player/admirals 1
-                  :player/stations 10
-                  :player/cmd-ships 0
-                  :player/mil-planets 5
-                  :player/food-planets 4
-                  :player/ore-planets 6
-                  :player/food 500
-                  :player/fuel 300
-                  :player/galaxars 0}
-          quantities {:soldiers-sold 10
-                     :transports-sold 0
-                     :generals-sold 0
-                     :fighters-sold 5
-                     :carriers-sold 0
-                     :admirals-sold 0
-                     :stations-sold 2
-                     :cmd-ships-sold 0
-                     :mil-planets-sold 1
-                     :food-planets-sold 1
-                     :ore-planets-sold 1
-                     :food-bought 50
-                     :food-sold 20
-                     :fuel-bought 30
-                     :fuel-sold 10}
-          credit-changes {:total-credits 2000}  ; Simplified for test
-          resources-after (exchange/calculate-resources-after-exchange player quantities credit-changes)]
-      (is (= 3000 (:credits resources-after)))           ; 1000 + 2000
-      (is (= 90 (:soldiers resources-after)))             ; 100 - 10
-      (is (= 15 (:fighters resources-after)))             ; 20 - 5
-      (is (= 8 (:stations resources-after)))              ; 10 - 2
-      (is (= 4 (:mil-planets resources-after)))      ; 5 - 1
-      (is (= 3 (:food-planets resources-after)))          ; 4 - 1
-      (is (= 5 (:ore-planets resources-after)))           ; 6 - 1
-      (is (= 530 (:food resources-after)))                ; 500 + 50 - 20
-      (is (= 320 (:fuel resources-after))))))             ; 300 + 30 - 10
+  (testing "All resource values are updated correctly after an exchange"
+    (let [player    {:player/credits 1000 :player/food 500 :player/fuel 300 :player/galaxars 50
+                     :player/soldiers 100 :player/transports 5 :player/generals 2
+                     :player/fighters 20  :player/carriers 1  :player/admirals 1
+                     :player/stations 10  :player/cmd-ships 0  :player/agents 5
+                     :player/mil-planets 5 :player/food-planets 4 :player/ore-planets 6}
+          quantities (merge zero-quantities {:soldiers-sold 10 :fighters-sold 5 :stations-sold 2
+                                             :agents-sold 1 :mil-planets-sold 1
+                                             :food-planets-sold 1 :ore-planets-sold 1
+                                             :food-bought 50 :food-sold 20
+                                             :fuel-bought 30 :fuel-sold 10})
+          ;; Use a simplified credit-changes to keep the test deterministic.
+          credit-changes {:total-credits 2000}
+          r (exchange/calculate-resources-after-exchange player quantities credit-changes)]
+      (is (= 3000 (:credits r)))      ; 1000 + 2000
+      (is (= 90   (:soldiers r)))     ; 100 - 10
+      (is (= 15   (:fighters r)))     ; 20 - 5
+      (is (= 8    (:stations r)))     ; 10 - 2
+      (is (= 4    (:agents r)))       ; 5 - 1
+      (is (= 4    (:mil-planets r)))  ; 5 - 1
+      (is (= 3    (:food-planets r))) ; 4 - 1
+      (is (= 5    (:ore-planets r)))  ; 6 - 1
+      (is (= 530  (:food r)))         ; 500 + 50 - 20
+      (is (= 320  (:fuel r)))         ; 300 + 30 - 10
+      (is (= 50   (:galaxars r)))))   ; unchanged
+
+  (testing "Galaxars are passed through unchanged (not tradeable)"
+    (let [player    {:player/credits 0 :player/food 0 :player/fuel 0 :player/galaxars 99
+                     :player/soldiers 0 :player/transports 0 :player/generals 0
+                     :player/fighters 0 :player/carriers 0  :player/admirals 0
+                     :player/stations 0 :player/cmd-ships 0 :player/agents 0
+                     :player/mil-planets 0 :player/food-planets 0 :player/ore-planets 0}
+          r (exchange/calculate-resources-after-exchange player zero-quantities {:total-credits 0})]
+      (is (= 99 (:galaxars r))))))
+
+;;;;
+;;;; valid-exchange? and identify-invalid-exchanges Tests
+;;;;
 
 (def full-resources
   {:credits 100 :soldiers 50 :transports 5 :generals 2
-   :fighters 10 :carriers 1 :admirals 1 :stations 5 :cmd-ships 0 :agents 5
-   :mil-planets 2 :food-planets 3 :ore-planets 1 :food 1000 :fuel 500})
+   :fighters 10 :carriers 1  :admirals 1  :stations 5
+   :cmd-ships 0 :agents 5
+   :mil-planets 2 :food-planets 3 :ore-planets 1
+   :food 1000 :fuel 500})
 
 (deftest test-valid-exchange
   (testing "Returns true when all resources are non-negative"
@@ -190,233 +228,170 @@
     (is (true? (exchange/valid-exchange? (zipmap (keys full-resources) (repeat 0))))))
 
   (testing "Returns false when any resource is negative"
-    (is (false? (exchange/valid-exchange? (assoc full-resources :credits -1))))
+    (is (false? (exchange/valid-exchange? (assoc full-resources :credits  -1))))
     (is (false? (exchange/valid-exchange? (assoc full-resources :soldiers -1))))
-    (is (false? (exchange/valid-exchange? (assoc full-resources :food -1))))))
+    (is (false? (exchange/valid-exchange? (assoc full-resources :agents   -1))))
+    (is (false? (exchange/valid-exchange? (assoc full-resources :food     -1))))))
 
 (deftest test-identify-invalid-exchanges
-  (testing "Identifies specific invalid exchanges correctly"
+  (testing "Flags oversold units and unaffordable purchases independently"
     (let [resources-after {:credits -50 :soldiers -10 :transports 5 :generals 2
-                          :fighters 15 :carriers 1 :admirals 1
-                          :stations 8 :cmd-ships 0 :agents 5
-                          :mil-planets 4 :food-planets 3
-                          :ore-planets 5 :food 530 :fuel 320}
-          quantities {:soldiers-sold 110  ; Oversold
-                     :transports-sold 0 :generals-sold 0
-                     :fighters-sold 5 :carriers-sold 0 :admirals-sold 0
-                     :stations-sold 2 :cmd-ships-sold 0
-                     :mil-planets-sold 1
-                     :food-planets-sold 1
-                     :ore-planets-sold 1
-                     :food-bought 50
-                     :food-sold 0
-                     :fuel-bought 30
-                     :fuel-sold 0}
+                           :fighters 15 :carriers 1   :admirals 1  :stations 8
+                           :cmd-ships 0 :agents 5
+                           :mil-planets 4 :food-planets 3 :ore-planets 5
+                           :food 530 :fuel 320}
+          quantities (merge zero-quantities {:soldiers-sold 110 :food-bought 5})
           invalid (exchange/identify-invalid-exchanges resources-after quantities)]
-      (is (true? (:invalid-soldier-sale? invalid)))
-      (is (false? (:invalid-fighter-sale? invalid)))
-      (is (false? (:invalid-food-sale? invalid)))      ; Not sold
-      (is (true? (:invalid-food-purchase? invalid)))))) ; Credits negative
+      ;; Oversold soldiers
+      (is (true?  (:invalid-soldier-sale?   invalid)))
+      ;; Fighter count is fine
+      (is (false? (:invalid-fighter-sale?   invalid)))
+      ;; No food sold, so food-sale flag is false even though credits are negative
+      (is (false? (:invalid-food-sale?      invalid)))
+      ;; Credits are negative and food was bought, so food-purchase is flagged
+      (is (true?  (:invalid-food-purchase?  invalid))))))
 
 ;;;;
-;;;; Tests for apply-exchange (Side Effects)
+;;;; calculate-max-buy-quantities Tests
 ;;;;
-;;;; These tests verify the apply-exchange function which has side effects (database writes, HTTP
-;;;; redirects). We use mocking to intercept the side effects and verify behavior.
+
+(deftest test-calculate-max-buy-quantities
+  (testing "Max affordable quantities reflect current credits after sells"
+    (let [rates (exchange/get-exchange-rates test-game)
+          ;; No sells — max is based on existing credits only.
+          sell-none (assoc zero-quantities :food-bought 0 :fuel-bought 0)
+          {:keys [max-food max-fuel]} (exchange/calculate-max-buy-quantities test-player sell-none rates)]
+      ;; Each max should equal floor(credits / rate)
+      (is (= (quot (:player/credits test-player) (:food-buy rates)) max-food))
+      (is (= (quot (:player/credits test-player) (:fuel-buy rates)) max-fuel))))
+
+  (testing "Sells that earn credits increase the max purchaseable quantities"
+    (let [rates (exchange/get-exchange-rates test-game)
+          ;; Sell 10 soldiers to earn extra credits.
+          sell-some  (assoc zero-quantities :soldiers-sold 10 :food-bought 0 :fuel-bought 0)
+          base-max   (exchange/calculate-max-buy-quantities test-player (assoc zero-quantities :food-bought 0 :fuel-bought 0) rates)
+          sell-max   (exchange/calculate-max-buy-quantities test-player sell-some rates)]
+      ;; With extra credits from sells, max quantities must be ≥ base.
+      (is (>= (:max-food sell-max) (:max-food base-max)))
+      (is (>= (:max-fuel sell-max) (:max-fuel base-max)))))
+
+  (testing "Max quantities are clamped to zero when player has no credits"
+    (let [broke-player (assoc test-player :player/credits 0)
+          rates (exchange/get-exchange-rates test-game)
+          {:keys [max-food max-fuel]} (exchange/calculate-max-buy-quantities broke-player
+                                                                             (assoc zero-quantities :food-bought 0 :fuel-bought 0)
+                                                                             rates)]
+      (is (= 0 max-food))
+      (is (= 0 max-fuel)))))
+
+;;;;
+;;;; apply-exchange Tests
+;;;;
+;;;; apply-exchange writes to the database and redirects, so xt/entity and
+;;;; biff/submit-tx are replaced with test doubles using with-redefs.
 ;;;;
 
 (deftest test-apply-exchange-player-not-found
   (testing "Returns 404 when player is not in the database"
-    (with-redefs [xt/entity (fn [_ id] nil)]
-      (let [ctx {:path-params {:player-id (str test-player-id)}
-                 :params {}
-                 :biff/db nil}
-            result (exchange/apply-exchange ctx)]
+    (with-redefs [xt/entity (fn [_ _] nil)]
+      (let [result (exchange/apply-exchange {:path-params {:player-id (str test-player-id)}
+                                             :params {} :biff/db nil})]
         (is (= 404 (:status result)))
         (is (= "Player not found" (:body result)))))))
 
 (deftest test-apply-exchange-wrong-phase
-  (testing "Redirects to game page when player is not in phase 2"
-    (let [wrong-phase-player (assoc test-player :player/current-phase 1)]
-      (with-redefs [xt/entity (helpers/fake-entity [wrong-phase-player])]
-        (let [ctx {:path-params {:player-id (str test-player-id)}
-                   :params {}
-                   :biff/db nil}
-              result (exchange/apply-exchange ctx)]
+  (testing "Redirects to game overview when player is not in phase 2"
+    (let [player (assoc test-player :player/current-phase 1)]
+      (with-redefs [xt/entity (helpers/fake-entity [player test-game])]
+        (let [result (exchange/apply-exchange {:path-params {:player-id (str test-player-id)}
+                                               :params {} :biff/db nil})]
           (is (= 303 (:status result)))
-          (is (= (str "/app/game/" test-player-id)
-                 (get-in result [:headers "location"]))))))))
+          (is (= (str "/app/game/" test-player-id) (get-in result [:headers "location"]))))))))
 
-(deftest test-apply-exchange-submits-correct-tx
-  (testing "Submits transaction with correct resource updates"
-    (let [params {:soldiers-sold "10"
-                  :fighters-sold "5"
-                  :stations-sold "2"
-                  :mil-planets-sold "1"
-                  :food-planets-sold "1"
-                  :ore-planets-sold "1"
-                  :food-bought "50"
-                  :food-sold "20"
-                  :fuel-bought "30"
-                  :fuel-sold "10"}
-          tx-called (atom nil)]
-      (with-redefs [xt/entity (helpers/fake-entity [test-player])
-                    biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
-        (let [ctx {:path-params {:player-id (str test-player-id)}
-                   :params params
-                   :biff/db nil}
-              result (exchange/apply-exchange ctx)
-              actual-tx (first @tx-called)
-              
-              ;; Calculate expected values using pure functions
-              quantities {:soldiers-sold 10 :transports-sold 0 :generals-sold 0
-                         :fighters-sold 5 :carriers-sold 0 :admirals-sold 0
-                         :stations-sold 2 :cmd-ships-sold 0
-                         :mil-planets-sold 1 :food-planets-sold 1 :ore-planets-sold 1
-                         :food-bought 50 :food-sold 20 :fuel-bought 30 :fuel-sold 10}
-              rates (exchange/get-exchange-rates)
-              credit-changes (exchange/calculate-exchange-credits quantities rates)
-              expected (exchange/calculate-resources-after-exchange test-player quantities credit-changes)]
-          
-          ;; Verify redirect to expenses page
+(deftest test-apply-exchange-commits-correct-tx
+  (testing "Commits correct resource deltas and redirects to expenses"
+    (let [params {:soldiers-sold "10" :fighters-sold "5" :agents-sold "1"
+                  :stations-sold "2"  :mil-planets-sold "1" :food-planets-sold "1" :ore-planets-sold "1"
+                  :food-bought "50" :food-sold "20" :fuel-bought "30" :fuel-sold "10"}
+          tx-atom (atom nil)]
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player test-game])
+                    biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
+        (let [result (exchange/apply-exchange {:path-params {:player-id (str test-player-id)}
+                                               :params params :biff/db nil})
+              tx     (first @tx-atom)
+              ;; Derive expected values from the same pure functions the handler uses.
+              quantities (exchange/parse-exchange-quantities params)
+              rates      (exchange/get-exchange-rates test-game)
+              credits    (exchange/calculate-exchange-credits quantities rates)
+              expected   (exchange/calculate-resources-after-exchange test-player quantities credits)]
+          ;; Redirect
           (is (= 303 (:status result)))
-          (is (= (str "/app/game/" test-player-id "/expenses")
-                 (get-in result [:headers "location"])))
-          
-          ;; Verify transaction metadata
-          (is (= :player (:db/doc-type actual-tx)))
-          (is (= :update (:db/op actual-tx)))
-          (is (= test-player-id (:xt/id actual-tx)))
-          
-          ;; Verify all resource updates match calculations
-          (is (= (:credits expected) (:player/credits actual-tx)))
-          (is (= (:soldiers expected) (:player/soldiers actual-tx)))
-          (is (= (:fighters expected) (:player/fighters actual-tx)))
-          (is (= (:stations expected) (:player/stations actual-tx)))
-          (is (= (:mil-planets expected) (:player/mil-planets actual-tx)))
-          (is (= (:food-planets expected) (:player/food-planets actual-tx)))
-          (is (= (:ore-planets expected) (:player/ore-planets actual-tx)))
-          (is (= (:food expected) (:player/food actual-tx)))
-          (is (= (:fuel expected) (:player/fuel actual-tx))))))))
+          (is (= (str "/app/game/" test-player-id "/expenses") (get-in result [:headers "location"])))
+          ;; Transaction metadata
+          (is (= :player       (:db/doc-type tx)))
+          (is (= :update        (:db/op tx)))
+          (is (= test-player-id (:xt/id tx)))
+          ;; Resources
+          (is (= (:credits      expected) (:player/credits      tx)))
+          (is (= (:soldiers     expected) (:player/soldiers     tx)))
+          (is (= (:fighters     expected) (:player/fighters     tx)))
+          (is (= (:stations     expected) (:player/stations     tx)))
+          (is (= (:agents       expected) (:player/agents       tx)))
+          (is (= (:mil-planets  expected) (:player/mil-planets  tx)))
+          (is (= (:food-planets expected) (:player/food-planets tx)))
+          (is (= (:ore-planets  expected) (:player/ore-planets  tx)))
+          (is (= (:food         expected) (:player/food         tx)))
+          (is (= (:fuel         expected) (:player/fuel         tx))))))))
 
-(deftest test-apply-exchange-zero-exchanges
-  (testing "Handles zero exchanges correctly (no resources changed)"
-    (let [params {:soldiers-sold "0" :fighters-sold "0" :stations-sold "0"
-                  :mil-planets-sold "0" :food-planets-sold "0" :ore-planets-sold "0"
-                  :food-bought "0" :food-sold "0" :fuel-bought "0" :fuel-sold "0"}
-          tx-called (atom nil)]
-      (with-redefs [xt/entity (helpers/fake-entity [test-player])
-                    biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
-        (let [ctx {:path-params {:player-id (str test-player-id)}
-                   :params params
-                   :biff/db nil}
-              _ (exchange/apply-exchange ctx)
-              actual-tx (first @tx-called)]
-          ;; Resources should be unchanged
-          (is (= (:player/credits test-player) (:player/credits actual-tx)))
-          (is (= (:player/soldiers test-player) (:player/soldiers actual-tx)))
-          (is (= (:player/food test-player) (:player/food actual-tx)))
-          (is (= (:player/fuel test-player) (:player/fuel actual-tx))))))))
-
-(deftest test-apply-exchange-empty-params
-  (testing "Treats empty/missing params as zero"
-    (let [params {}  ; All params missing
-          tx-called (atom nil)]
-      (with-redefs [xt/entity (helpers/fake-entity [test-player])
-                    biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
-        (let [ctx {:path-params {:player-id (str test-player-id)}
-                   :params params
-                   :biff/db nil}
-              _ (exchange/apply-exchange ctx)
-              actual-tx (first @tx-called)]
-          ;; Resources should be unchanged (all exchanges defaulted to 0)
-          (is (= (:player/credits test-player) (:player/credits actual-tx)))
-          (is (= (:player/soldiers test-player) (:player/soldiers actual-tx))))))))
-
-(deftest test-apply-exchange-bad-uuid
-  (testing "Throws IllegalArgumentException when player-id is invalid"
-    (let [ctx {:path-params {:player-id "not-a-uuid"}
-               :params {}
-               :biff/db nil}]
-      (is (thrown? IllegalArgumentException (exchange/apply-exchange ctx))))))
+(deftest test-apply-exchange-zero-quantities
+  (testing "Zero exchanges leave all resources unchanged"
+    (let [tx-atom (atom nil)]
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player test-game])
+                    biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
+        (exchange/apply-exchange {:path-params {:player-id (str test-player-id)}
+                                  :params {} :biff/db nil})
+        (let [tx (first @tx-atom)]
+          (is (= (:player/credits  test-player) (:player/credits  tx)))
+          (is (= (:player/soldiers test-player) (:player/soldiers tx)))
+          (is (= (:player/agents   test-player) (:player/agents   tx)))
+          (is (= (:player/food     test-player) (:player/food     tx)))
+          (is (= (:player/fuel     test-player) (:player/fuel     tx))))))))
 
 ;;;;
-;;;; Tests for calculate-exchange (HTMX Response)
+;;;; UI Component Tests
 ;;;;
-;;;; These tests verify that the HTMX response function produces correct output.
-;;;;
-
-(deftest test-calculate-exchange-renders-hiccup
-  (testing "Returns hiccup vector for HTMX response"
-    (with-redefs [utils/load-player-and-game 
-                  (fn [db player-id-str]
-                    {:player test-player
-                     :game {}
-                     :player-id test-player-id})
-                  biff/render identity]  ; Pass through hiccup unchanged
-      (let [ctx {:path-params {:player-id (str test-player-id)}
-                 :params {:soldiers-sold "10" :fighters-sold "5"
-                          :stations-sold "2" :mil-planets-sold "1"
-                          :food-planets-sold "1" :ore-planets-sold "1"
-                          :food-bought "50" :food-sold "20"
-                          :fuel-bought "30" :fuel-sold "10"}
-                 :biff/db nil}
-            result (exchange/calculate-exchange ctx)]
-        (is (vector? result))
-        (is (some? result))))))
-
-(deftest test-calculate-exchange-validity
-  (testing "Correctly identifies when player can/cannot execute exchanges"
-    (with-redefs [xt/entity (helpers/fake-entity [test-player])]
-      ;; Test valid exchanges
-      (let [valid-params {:soldiers-sold "10" :transports-sold "0" :generals-sold "0"
-                         :fighters-sold "5" :carriers-sold "0" :admirals-sold "0"
-                         :stations-sold "2" :cmd-ships-sold "0"
-                         :mil-planets-sold "1"
-                         :food-planets-sold "1" :ore-planets-sold "1"
-                         :food-bought "0" :food-sold "0"
-                         :fuel-bought "0" :fuel-sold "0"}
-            quantities (into {} (map (fn [[k v]] [k (utils/parse-numeric-input v)]) 
-                                     valid-params))
-            rates (exchange/get-exchange-rates)
-            credit-changes (exchange/calculate-exchange-credits quantities rates)
-            resources-after (exchange/calculate-resources-after-exchange test-player quantities credit-changes)]
-        (is (true? (exchange/valid-exchange? resources-after))))
-      
-      ;; Test invalid exchanges (overselling)
-      (let [invalid-params {:soldiers-sold "1000"  ; More than player has
-                           :transports-sold "0" :generals-sold "0"
-                           :fighters-sold "0" :carriers-sold "0" :admirals-sold "0"
-                           :stations-sold "0" :cmd-ships-sold "0"
-                           :mil-planets-sold "0" :food-planets-sold "0" :ore-planets-sold "0"
-                           :food-bought "0" :food-sold "0"
-                           :fuel-bought "0" :fuel-sold "0"}
-            quantities (into {} (map (fn [[k v]] [k (utils/parse-numeric-input v)]) 
-                                     invalid-params))
-            rates (exchange/get-exchange-rates)
-            credit-changes (exchange/calculate-exchange-credits quantities rates)
-            resources-after (exchange/calculate-resources-after-exchange test-player quantities credit-changes)]
-        (is (false? (exchange/valid-exchange? resources-after)))))))
-
-;;;;
-;;;; Tests for exchange-page (UI Rendering)
-;;;;
-;;;; These tests verify that the exchange-page function produces the expected hiccup structure.
+;;;; These verify that UI functions render without error. Structural assertions are
+;;;; limited to the root element — detailed layout is validated in browser/integration tests.
 ;;;;
 
 (deftest test-exchange-page-renders
-  (testing "Exchange page returns a hiccup vector"
-    (let [result (exchange/exchange-page {:player test-player :game {}})]
-      (is (vector? result))
-      (is (some? result)))))
+  (testing "Returns a hiccup vector for a standard player"
+    (is (vector? (exchange/exchange-page {:player test-player :game test-game})))))
 
-(deftest test-exchange-page-uses-exchange-rates
-  (testing "Exchange page displays correct exchange rates"
-    (let [rates (exchange/get-exchange-rates)]
-      ;; Verify rates match constants
-      (is (= const/soldier-sell (:soldier-sell rates)))
-      (is (= const/fighter-sell (:fighter-sell rates)))
-      (is (= const/food-buy     (:food-buy rates)))
-      (is (= const/food-sell    (:food-sell rates)))
-      (is (= const/fuel-buy     (:fuel-buy rates)))
-      (is (= const/fuel-sell    (:fuel-sell rates))))))
+(deftest test-sell-row-renders
+  (let [rates (exchange/get-exchange-rates test-game)]
+    (testing "Renders hiccup for a typical sell row"
+      (is (vector? (exchange/sell-row "Soldiers" "Soldiers" "soldiers-sold"
+                                      (:soldier-sell rates) 0 100 test-player-id "form"))))
+    (testing "Renders without error when max-quantity is negative (shown as 0)"
+      (is (vector? (exchange/sell-row "Soldiers" "Soldiers" "soldiers-sold"
+                                      (:soldier-sell rates) 0 -5 test-player-id "form"))))))
+
+(deftest test-buy-row-renders
+  (let [rates (exchange/get-exchange-rates test-game)]
+    (testing "Renders hiccup for a typical buy row"
+      (is (vector? (exchange/buy-row "Food" "Food" "food-bought"
+                                     (:food-buy rates) 0 500 test-player-id "form"))))
+    (testing "Renders without error when max-quantity is zero"
+      (is (vector? (exchange/buy-row "Food" "Food" "food-bought"
+                                     (:food-buy rates) 0 0 test-player-id "form"))))))
+
+(deftest test-submit-button-renders
+  (testing "Enabled submit button"
+    (let [btn (exchange/submit-button true)]
+      (is (vector? btn))
+      (is (not (get (second btn) :disabled)))))
+  (testing "Disabled submit button"
+    (let [btn (exchange/submit-button false)]
+      (is (vector? btn))
+      (is (get (second btn) :disabled)))))

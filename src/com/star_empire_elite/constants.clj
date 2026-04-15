@@ -91,24 +91,11 @@
 (def soldier-upkeep-credits   25)
 (def soldier-upkeep-food      10)
 
-(def transport-upkeep-credits 75)
-(def transport-upkeep-fuel    8)
-
-(def general-upkeep-credits   10)
-
 (def fighter-upkeep-credits   100)
 (def fighter-upkeep-fuel      10)
 
-(def carrier-upkeep-credits   250)
-(def carrier-upkeep-fuel      25)
-
-(def admiral-upkeep-credits   20)
-
 (def station-upkeep-credits   100)
 (def station-upkeep-fuel      10)
-
-(def cmd-ship-upkeep-credits  500)
-(def cmd-ship-upkeep-fuel     50)
 
 (def agent-upkeep-food        10)
 (def agent-upkeep-fuel        10)

@@ -108,7 +108,24 @@
             :game/mil-planet-cost const/mil-planet-cost
             :game/food-planet-cost const/food-planet-cost
             :game/ore-planet-cost const/ore-planet-cost
-            :game/agent-cost const/agent-cost}])
+            :game/agent-cost const/agent-cost
+            ;; Exchange sell/buy rates
+            :game/soldier-sell    const/soldier-sell
+            :game/transport-sell  const/transport-sell
+            :game/general-sell    const/general-sell
+            :game/fighter-sell    const/fighter-sell
+            :game/carrier-sell    const/carrier-sell
+            :game/admiral-sell    const/admiral-sell
+            :game/station-sell    const/station-sell
+            :game/cmd-ship-sell   const/cmd-ship-sell
+            :game/agent-sell      const/agent-sell
+            :game/mil-planet-sell const/mil-planet-sell
+            :game/food-planet-sell const/food-planet-sell
+            :game/ore-planet-sell const/ore-planet-sell
+            :game/food-buy        const/food-buy
+            :game/food-sell       const/food-sell
+            :game/fuel-buy        const/fuel-buy
+            :game/fuel-sell       const/fuel-sell}])
 
         (let [db (xt/db node)
               game (xt/entity db game-id)]
@@ -229,7 +246,24 @@
                 :game/mil-planet-cost const/mil-planet-cost
                 :game/food-planet-cost const/food-planet-cost
                 :game/ore-planet-cost const/ore-planet-cost
-                :game/agent-cost const/agent-cost}
+                :game/agent-cost const/agent-cost
+                ;; Exchange sell/buy rates
+                :game/soldier-sell    const/soldier-sell
+                :game/transport-sell  const/transport-sell
+                :game/general-sell    const/general-sell
+                :game/fighter-sell    const/fighter-sell
+                :game/carrier-sell    const/carrier-sell
+                :game/admiral-sell    const/admiral-sell
+                :game/station-sell    const/station-sell
+                :game/cmd-ship-sell   const/cmd-ship-sell
+                :game/agent-sell      const/agent-sell
+                :game/mil-planet-sell const/mil-planet-sell
+                :game/food-planet-sell const/food-planet-sell
+                :game/ore-planet-sell const/ore-planet-sell
+                :game/food-buy        const/food-buy
+                :game/food-sell       const/food-sell
+                :game/fuel-buy        const/fuel-buy
+                :game/fuel-sell       const/fuel-sell}
                {:db/doc-type :player
                 :xt/id player-id
                 :player/user (:xt/id user)

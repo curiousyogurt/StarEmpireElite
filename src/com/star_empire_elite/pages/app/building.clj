@@ -11,22 +11,17 @@
 
 (ns com.star-empire-elite.pages.app.building
   (:require [com.biffweb :as biff]
-            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
-            [com.star-empire-elite.utils :as utils]
-            [xtdb.api :as xt]))
-
-(defn- enrich-game [game]
-  (merge {:game/agent-cost const/agent-cost} game))
+            [com.star-empire-elite.utils :as utils]))
 
 ;;;;
 ;;;; Calculations
 ;;;;
 
-;;; Parse purchase quantities from request parameters
 (defn parse-purchase-quantities
   "Parse all purchase quantity inputs from request params.
-  Returns map of quantities for all purchasable items."
+
+  [params ring-params] -> {:soldiers int, :transports int, ...}"
   [params]
   {:soldiers     (utils/parse-numeric-input (:soldiers params))
    :transports   (utils/parse-numeric-input (:transports params))
@@ -41,10 +36,10 @@
    :food-planets (utils/parse-numeric-input (:food-planets params))
    :mil-planets  (utils/parse-numeric-input (:mil-planets params))})
 
-;;; Calculate total cost of purchases using game constants
 (defn calculate-purchase-cost
   "Calculate total credits needed for all purchases based on game constants.
-  Returns map with total cost."
+
+  [quantities purchase-quantities, game game-map] -> {:total-cost int}"
   [quantities game]
   (let [total-cost (+ (* (:soldiers quantities)     (:game/soldier-cost game))
                       (* (:transports quantities)   (:game/transport-cost game))
@@ -54,16 +49,16 @@
                       (* (:admirals quantities)     (:game/admiral-cost game))
                       (* (:stations quantities)     (:game/station-cost game))
                       (* (:cmd-ships quantities)    (:game/cmd-ship-cost game))
-                      (* (or (:agents quantities) 0) (or (:game/agent-cost game) 0))
+                      (* (:agents quantities)       (:game/agent-cost game))
                       (* (:ore-planets quantities)  (:game/ore-planet-cost game))
                       (* (:food-planets quantities) (:game/food-planet-cost game))
                       (* (:mil-planets quantities)  (:game/mil-planet-cost game)))]
     {:total-cost total-cost}))
 
-;;; Calculate all resources after purchases
 (defn calculate-resources-after-purchases
   "Calculate player resources after executing purchases.
-  Returns map of all resource values after purchases."
+
+  [player player-map, quantities purchase-quantities, cost-info {:total-cost int}] -> {:credits int, :soldiers int, ...}"
   [player quantities cost-info]
   {:credits      (- (:player/credits player)      (:total-cost cost-info))
    :soldiers     (+ (:player/soldiers player)     (:soldiers quantities))
@@ -74,28 +69,23 @@
    :admirals     (+ (:player/admirals player)     (:admirals quantities))
    :stations     (+ (:player/stations player)     (:stations quantities))
    :cmd-ships    (+ (:player/cmd-ships player)    (:cmd-ships quantities))
-   :agents       (+ (or (:player/agents player) 0) (or (:agents quantities) 0))
+   :agents       (+ (:player/agents player) (:agents quantities))
    :ore-planets  (+ (:player/ore-planets player)  (:ore-planets quantities))
    :food-planets (+ (:player/food-planets player) (:food-planets quantities))
    :mil-planets  (+ (:player/mil-planets player)  (:mil-planets quantities))})
 
-;;; Validate purchase is affordable
 (defn can-afford-purchases?
-  "Returns true if player has enough credits for all purchases"
+  "Returns true if player has enough credits for all purchases.
+
+  [resources-after purchase-resources-map] -> boolean"
   [resources-after]
   (>= (:credits resources-after) 0))
 
-;;; Calculate maximum affordable quantity for each item type
 (defn calculate-max-quantities
-  "Calculate the maximum quantity of each item that can be purchased with remaining credits.
-  Takes into account credits already spent on other items in current selections.
+  "Calculate the maximum quantity of each item that can be purchased with remaining credits,
+  taking into account credits already committed to other items in the current selection.
 
-  Parameters:
-  - player: Player entity with current credits
-  - quantities: Map of current purchase quantities
-  - game: Game entity with cost constants
-
-  Returns: Map of item-key to max affordable quantity"
+  [player player-map, quantities purchase-quantities, game game-map] -> {:soldiers int, :transports int, ...}"
   [player quantities game]
   (let [total-cost-so-far (+ (* (:soldiers quantities)     (:game/soldier-cost game))
                              (* (:transports quantities)   (:game/transport-cost game))
@@ -105,7 +95,7 @@
                              (* (:admirals quantities)     (:game/admiral-cost game))
                              (* (:stations quantities)     (:game/station-cost game))
                              (* (:cmd-ships quantities)    (:game/cmd-ship-cost game))
-                             (* (or (:agents quantities) 0) (or (:game/agent-cost game) 0))
+                             (* (:agents quantities)       (:game/agent-cost game))
                              (* (:ore-planets quantities)  (:game/ore-planet-cost game))
                              (* (:food-planets quantities) (:game/food-planet-cost game))
                              (* (:mil-planets quantities)  (:game/mil-planet-cost game)))
@@ -130,7 +120,8 @@
 (defn submit-button
   "Renders the submit button with dynamic disabled state based on affordability.
   Used in both initial page render and HTMX updates.
-  Accepts optional extra-attrs map for additional HTML attributes."
+
+  ([affordable? bool]) ([affordable? bool, extra-attrs map]) -> hiccup"
   ([affordable?] (submit-button affordable? {}))
   ([affordable? extra-attrs]
    [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
@@ -141,21 +132,11 @@
     "Continue to Action"]))
 
 
-;;; Purchase row with single input field, CSS-only responsive styling
 (defn purchase-row
-  "Renders a purchase row with ONE input field that's just restyled for mobile vs desktop.
-  Uses responsive CSS grid - no duplicate inputs, no JavaScript sync needed.
+  "Renders a purchase row with a single responsive input field for mobile and desktop.
 
-  Parameters:
-  - unit-name: Full display name (e.g. 'Defence Stations')
-  - unit-name-mobile: Abbreviated name for mobile (e.g. 'Def Stns')
-  - unit-key: Form field key (e.g. :stations)
-  - cost-key: Game constant key (e.g. :game/station-cost)
-  - current-quantity: Current input value
-  - max-quantity: Maximum affordable quantity
-  - game: Game entity with cost constants
-  - player-id: Player UUID
-  - hx-include: HTMX include selector string"
+  [unit-name str, unit-name-mobile str, unit-key keyword, cost-key keyword,
+   current-quantity int, max-quantity int, game game-map, player-id uuid, hx-include str] -> hiccup"
   [unit-name unit-name-mobile unit-key cost-key current-quantity max-quantity game player-id hx-include]
   (let [cost-per-unit (get game cost-key)
         item-cost (* cost-per-unit current-quantity)
@@ -190,10 +171,11 @@
               :class (when (zero? item-cost) "opacity-20")}
        "+" (ui/format-number item-cost)]]]))
 
-;;; Total cost summary row
 (defn total-cost-row
   "Renders the total cost summary at the bottom of the table.
-  Shows cost in red if it exceeds available credits."
+  Shows cost in red if it exceeds available credits.
+
+  [total-cost int, affordable? bool] -> hiccup"
   [total-cost affordable?]
   [:div#cost-summary.border-t-2.border-green-400.bg-green-400.bg-opacity-10
 
@@ -223,12 +205,15 @@
 ;;;; Actions
 ;;;;
 
-(defn apply-building [{:keys [path-params params biff/db] :as ctx}]
+(defn apply-building
+  "Commit purchases to the database, advance to action phase, and redirect.
+
+  [ctx ring-ctx] -> ring-response (303 redirect to action, or 400 if unaffordable)"
+  [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (if-let [redirect (utils/validate-phase player 3 player-id)]
       redirect
-      (let [game            (enrich-game game)
-            quantities      (parse-purchase-quantities params)
+      (let [quantities      (parse-purchase-quantities params)
             cost-info       (calculate-purchase-cost quantities game)
             resources-after (calculate-resources-after-purchases player quantities cost-info)]
         (if (not (can-afford-purchases? resources-after))
@@ -256,10 +241,13 @@
             {:status 303
              :headers {"location" (str "/app/game/" player-id "/action")}}))))))
 
-(defn calculate-building [{:keys [path-params params biff/db] :as ctx}]
+(defn calculate-building
+  "Provide HTMX out-of-band updates showing resources after purchases as user changes input values.
+
+  [ctx ring-ctx] -> hiccup (via biff/render)"
+  [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
-    (let [game            (enrich-game game)
-          quantities      (parse-purchase-quantities params)
+    (let [quantities      (parse-purchase-quantities params)
           cost-info       (calculate-purchase-cost quantities game)
           resources-after (calculate-resources-after-purchases player quantities cost-info)
           affordable?     (can-afford-purchases? resources-after)
@@ -272,7 +260,7 @@
                            :admirals     (* (:admirals quantities)     (:game/admiral-cost game))
                            :stations     (* (:stations quantities)     (:game/station-cost game))
                            :cmd-ships    (* (:cmd-ships quantities)    (:game/cmd-ship-cost game))
-                           :agents       (* (or (:agents quantities) 0) (or (:game/agent-cost game) 0))
+                           :agents       (* (:agents quantities) (:game/agent-cost game))
                            :ore-planets  (* (:ore-planets quantities)  (:game/ore-planet-cost game))
                            :food-planets (* (:food-planets quantities) (:game/food-planet-cost game))
                            :mil-planets  (* (:mil-planets quantities)  (:game/mil-planet-cost game))}]
@@ -281,12 +269,10 @@
          [:div#resources-after
           (ui/extended-resource-display-grid
             (assoc resources-after
-                   :food                 (:player/food player)
-                   :fuel                 (:player/fuel player)
-                   :galaxars             (:player/galaxars player)
-                   :player/current-turn  (:player/current-turn player)
-                   :player/current-round (:player/current-round player))
-            "Resources After Building" true game)]
+                   :food     (:player/food player)
+                   :fuel     (:player/fuel player)
+                   :galaxars (:player/galaxars player))
+            "Resources After Building" true)]
          [:div#cost-summary
           {:hx-swap-oob "true"}
           (total-cost-row (:total-cost cost-info) affordable?)]
@@ -308,9 +294,12 @@
             [:p.text-yellow-400.font-bold "WARNING: Insufficient credits for purchases!"])]
          (submit-button affordable? {:hx-swap-oob "true"})]))))
 
-(defn building-page [{:keys [player game]}]
-  (let [game       (enrich-game game)
-        player-id  (:xt/id player)
+(defn building-page
+  "Show purchase options and input fields for buying units and planets.
+
+  [{:keys [player game]}] -> hiccup"
+  [{:keys [player game]}]
+  (let [player-id  (:xt/id player)
         hx-include "[name='soldiers'],[name='transports'],[name='generals'],[name='carriers'],[name='fighters'],[name='admirals'],[name='stations'],[name='cmd-ships'],[name='agents'],[name='ore-planets'],[name='food-planets'],[name='mil-planets']"]
     (ui/page
       {}
@@ -333,7 +322,7 @@
                         (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
 
        ;; Current resources before building
-       (ui/extended-resource-display-grid player "Resources Before Building" false game)
+       (ui/extended-resource-display-grid player "Resources Before Building" false)
 
        (biff/form
          {:action (str "/app/game/" player-id "/apply-building")
@@ -381,7 +370,7 @@
 
          ;; Resources after purchases - initial copy, updated via HTMX
          [:div#resources-after
-          (ui/extended-resource-display-grid player "Resources After Purchases" false game)]
+          (ui/extended-resource-display-grid player "Resources After Purchases" false)]
 
          ;; Warning message area - populated by HTMX if player can't afford purchases
          [:div#building-warning.flex.items-center]

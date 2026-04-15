@@ -17,27 +17,13 @@
    :planet-upkeep-credits  const/planet-upkeep-credits
    :planet-upkeep-food     const/planet-upkeep-food
 
-   ;; Ground unit upkeep (literal units, no scaling)
+   ;; Unit upkeep (transports, generals, carriers, admirals, cmd-ships are free)
    :soldier-upkeep-credits const/soldier-upkeep-credits
    :soldier-upkeep-food    const/soldier-upkeep-food
-   :transport-upkeep-credits const/transport-upkeep-credits
-   :transport-upkeep-fuel    const/transport-upkeep-fuel
-   :general-upkeep-credits const/general-upkeep-credits
-
-   ;; Air/space unit upkeep
    :fighter-upkeep-credits const/fighter-upkeep-credits
    :fighter-upkeep-fuel    const/fighter-upkeep-fuel
-   :carrier-upkeep-credits const/carrier-upkeep-credits
-   :carrier-upkeep-fuel    const/carrier-upkeep-fuel
-   :admiral-upkeep-credits const/admiral-upkeep-credits
-
-   ;; Station and command ship upkeep
    :station-upkeep-credits const/station-upkeep-credits
    :station-upkeep-fuel    const/station-upkeep-fuel
-   :cmd-ship-upkeep-credits const/cmd-ship-upkeep-credits
-   :cmd-ship-upkeep-fuel    const/cmd-ship-upkeep-fuel
-
-   ;; Agent upkeep
    :agent-upkeep-food      const/agent-upkeep-food
    :agent-upkeep-fuel      const/agent-upkeep-fuel
 
@@ -114,19 +100,11 @@
          food-in (* food-planets (:food-planet-food c))
          fuel-in (* ore-planets  (:ore-planet-fuel c))
 
-         ;; Expenses — credits
-         ;; Soldiers, generals, transports: ground force
-         ;; Fighters, admirals, carriers:   space force
-         ;; Stations, command ships:        infrastructure
+         ;; Expenses — credits (transports, generals, carriers, admirals, cmd-ships are free)
          credits-out (+ (* total-planets (:planet-upkeep-credits c))
-                        (* soldiers   (:soldier-upkeep-credits c))
-                        (* generals   (:general-upkeep-credits c))
-                        (* transports (:transport-upkeep-credits c))
-                        (* fighters   (:fighter-upkeep-credits c))
-                        (* admirals   (:admiral-upkeep-credits c))
-                        (* carriers   (:carrier-upkeep-credits c))
-                        (* stations   (:station-upkeep-credits c))
-                        (* cmd-ships  (:cmd-ship-upkeep-credits c)))
+                        (* soldiers  (:soldier-upkeep-credits c))
+                        (* fighters  (:fighter-upkeep-credits c))
+                        (* stations  (:station-upkeep-credits c)))
 
          ;; Expenses — food
          food-out (+ (* total-planets (:planet-upkeep-food c))
@@ -134,13 +112,10 @@
                      (* agents     (:agent-upkeep-food c))
                      (* population (:population-upkeep-food c)))
 
-         ;; Expenses — fuel
-         fuel-out (+ (* transports (:transport-upkeep-fuel c))
-                     (* fighters   (:fighter-upkeep-fuel c))
-                     (* carriers   (:carrier-upkeep-fuel c))
-                     (* stations   (:station-upkeep-fuel c))
-                     (* cmd-ships  (:cmd-ship-upkeep-fuel c))
-                     (* agents     (:agent-upkeep-fuel c))
+         ;; Expenses — fuel (transports, carriers, cmd-ships are free)
+         fuel-out (+ (* fighters  (:fighter-upkeep-fuel c))
+                     (* stations  (:station-upkeep-fuel c))
+                     (* agents    (:agent-upkeep-fuel c))
                      (* population (:population-upkeep-fuel c)))
 
          net-credits (- credits-in credits-out)

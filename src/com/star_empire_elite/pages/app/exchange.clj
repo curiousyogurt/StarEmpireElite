@@ -13,61 +13,60 @@
 (ns com.star-empire-elite.pages.app.exchange
   (:require [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]
-            [com.star-empire-elite.utils :as utils]
-            [com.star-empire-elite.constants :as const]
-            [xtdb.api :as xt]))
+            [com.star-empire-elite.utils :as utils]))
 
 ;;;;
 ;;;; Calculations
 ;;;;
 
-;;; Get exchange rates from constants
 (defn get-exchange-rates
-  "Returns map of all exchange rates from game constants"
-  []
-  {:soldier-sell const/soldier-sell
-   :transport-sell const/transport-sell
-   :general-sell const/general-sell
-   :fighter-sell const/fighter-sell
-   :carrier-sell const/carrier-sell
-   :admiral-sell const/admiral-sell
-   :station-sell const/station-sell
-   :cmd-ship-sell const/cmd-ship-sell
-   :agent-sell const/agent-sell
-   :mil-planet-sell const/mil-planet-sell
-   :food-planet-sell const/food-planet-sell
-   :ore-planet-sell const/ore-planet-sell
-   :food-buy const/food-buy
-   :food-sell const/food-sell
-   :fuel-buy const/fuel-buy
-   :fuel-sell const/fuel-sell})
+  "Extract exchange rates from the game entity.
 
-;;; Parse exchange quantities from request parameters
+  [game game-map] -> {:soldier-sell int, :transport-sell int, ...}"
+  [game]
+  {:soldier-sell     (:game/soldier-sell     game)
+   :transport-sell   (:game/transport-sell   game)
+   :general-sell     (:game/general-sell     game)
+   :fighter-sell     (:game/fighter-sell     game)
+   :carrier-sell     (:game/carrier-sell     game)
+   :admiral-sell     (:game/admiral-sell     game)
+   :station-sell     (:game/station-sell     game)
+   :cmd-ship-sell    (:game/cmd-ship-sell    game)
+   :agent-sell       (:game/agent-sell       game)
+   :mil-planet-sell  (:game/mil-planet-sell  game)
+   :food-planet-sell (:game/food-planet-sell game)
+   :ore-planet-sell  (:game/ore-planet-sell  game)
+   :food-buy         (:game/food-buy         game)
+   :food-sell        (:game/food-sell        game)
+   :fuel-buy         (:game/fuel-buy         game)
+   :fuel-sell        (:game/fuel-sell        game)})
+
 (defn parse-exchange-quantities
   "Parse all exchange quantity inputs from request params.
-  Returns map of quantities for all exchange types."
-  [params]
-  {:soldiers-sold (utils/parse-numeric-input (:soldiers-sold params))
-   :transports-sold (utils/parse-numeric-input (:transports-sold params))
-   :generals-sold (utils/parse-numeric-input (:generals-sold params))
-   :fighters-sold (utils/parse-numeric-input (:fighters-sold params))
-   :carriers-sold (utils/parse-numeric-input (:carriers-sold params))
-   :admirals-sold (utils/parse-numeric-input (:admirals-sold params))
-   :stations-sold (utils/parse-numeric-input (:stations-sold params))
-   :cmd-ships-sold (utils/parse-numeric-input (:cmd-ships-sold params))
-   :agents-sold (utils/parse-numeric-input (:agents-sold params))
-   :mil-planets-sold (utils/parse-numeric-input (:mil-planets-sold params))
-   :food-planets-sold (utils/parse-numeric-input (:food-planets-sold params))
-   :ore-planets-sold (utils/parse-numeric-input (:ore-planets-sold params))
-   :food-bought (utils/parse-numeric-input (:food-bought params))
-   :food-sold (utils/parse-numeric-input (:food-sold params))
-   :fuel-bought (utils/parse-numeric-input (:fuel-bought params))
-   :fuel-sold (utils/parse-numeric-input (:fuel-sold params))})
 
-;;; Calculate credit changes from all exchanges
+  [params ring-params] -> {:soldiers-sold int, :transports-sold int, ...}"
+  [params]
+  {:soldiers-sold     (utils/parse-numeric-input (:soldiers-sold params))
+   :transports-sold   (utils/parse-numeric-input (:transports-sold params))
+   :generals-sold     (utils/parse-numeric-input (:generals-sold params))
+   :fighters-sold     (utils/parse-numeric-input (:fighters-sold params))
+   :carriers-sold     (utils/parse-numeric-input (:carriers-sold params))
+   :admirals-sold     (utils/parse-numeric-input (:admirals-sold params))
+   :stations-sold     (utils/parse-numeric-input (:stations-sold params))
+   :cmd-ships-sold    (utils/parse-numeric-input (:cmd-ships-sold params))
+   :agents-sold       (utils/parse-numeric-input (:agents-sold params))
+   :mil-planets-sold  (utils/parse-numeric-input (:mil-planets-sold params))
+   :food-planets-sold (utils/parse-numeric-input (:food-planets-sold params))
+   :ore-planets-sold  (utils/parse-numeric-input (:ore-planets-sold params))
+   :food-bought       (utils/parse-numeric-input (:food-bought params))
+   :food-sold         (utils/parse-numeric-input (:food-sold params))
+   :fuel-bought       (utils/parse-numeric-input (:fuel-bought params))
+   :fuel-sold         (utils/parse-numeric-input (:fuel-sold params))})
+
 (defn calculate-exchange-credits
   "Calculate net credit change from selling units/planets and buying/selling resources.
-  Returns map with breakdown of credit sources."
+
+  [quantities exchange-quantities, rates exchange-rates] -> {:credits-from-sales int, :credits-from-resources int, :total-credits int}"
   [quantities rates]
   (let [credits-from-sales        (+ (* (:soldiers-sold quantities)     (:soldier-sell rates))
                                      (* (:transports-sold quantities)   (:transport-sell rates))
@@ -77,7 +76,7 @@
                                      (* (:admirals-sold quantities)     (:admiral-sell rates))
                                      (* (:stations-sold quantities)     (:station-sell rates))
                                      (* (:cmd-ships-sold quantities)    (:cmd-ship-sell rates))
-                                     (* (or (:agents-sold quantities) 0) (:agent-sell rates))
+                                     (* (:agents-sold quantities)       (:agent-sell rates))
                                      (* (:mil-planets-sold quantities)  (:mil-planet-sell rates))
                                      (* (:food-planets-sold quantities) (:food-planet-sell rates))
                                      (* (:ore-planets-sold quantities)  (:ore-planet-sell rates)))
@@ -89,23 +88,21 @@
      :credits-from-resources credits-from-resources
      :total-credits (+ credits-from-sales credits-from-resources)}))
 
-;;; Calculate maximum quantities that can be bought based on available credits after selling
 (defn calculate-max-buy-quantities
   "Calculate maximum quantities that can be purchased with available credits after all sales.
-  Returns map with max quantities for each buyable item."
+
+  [player player-map, sell-quantities exchange-quantities, rates exchange-rates] -> {:max-food int, :max-fuel int}"
   [player sell-quantities rates]
   (let [sell-credit-changes (calculate-exchange-credits
-                              (assoc sell-quantities
-                                     :food-bought 0 :fuel-bought 0)
-                              rates)
+                              (assoc sell-quantities :food-bought 0 :fuel-bought 0) rates)
         total-available-credits (+ (:player/credits player) (:total-credits sell-credit-changes))]
     {:max-food (max 0 (quot total-available-credits (:food-buy rates)))
      :max-fuel (max 0 (quot total-available-credits (:fuel-buy rates)))}))
 
-;;; Calculate all resources after exchange
 (defn calculate-resources-after-exchange
   "Calculate all player resources after executing exchanges.
-  Returns map of all resource values after exchange."
+
+  [player player-map, quantities exchange-quantities, credit-changes exchange-credit-changes] -> {:credits int, :soldiers int, ...}"
   [player quantities credit-changes]
   {:credits      (+ (:player/credits player)      (:total-credits credit-changes))
    :soldiers     (- (:player/soldiers player)     (:soldiers-sold quantities))
@@ -116,7 +113,7 @@
    :admirals     (- (:player/admirals player)     (:admirals-sold quantities))
    :stations     (- (:player/stations player)     (:stations-sold quantities))
    :cmd-ships    (- (:player/cmd-ships player)    (:cmd-ships-sold quantities))
-   :agents       (- (or (:player/agents player) 0) (or (:agents-sold quantities) 0))
+   :agents       (- (:player/agents player) (:agents-sold quantities))
    :mil-planets  (- (:player/mil-planets player)  (:mil-planets-sold quantities))
    :food-planets (- (:player/food-planets player) (:food-planets-sold quantities))
    :ore-planets  (- (:player/ore-planets player)  (:ore-planets-sold quantities))
@@ -124,29 +121,31 @@
    :fuel (+ (:player/fuel player) (:fuel-bought quantities) (- (:fuel-sold quantities)))
    :galaxars (:player/galaxars player)})
 
-;;; Validate exchange is legal
 (defn valid-exchange?
-  "Returns true if player can execute the exchange (all resources non-negative)"
-  [resources-after]
-  (and (>= (:credits resources-after) 0)
-       (>= (:soldiers resources-after) 0)
-       (>= (:transports resources-after) 0)
-       (>= (:generals resources-after) 0)
-       (>= (:carriers resources-after) 0)
-       (>= (:fighters resources-after) 0)
-       (>= (:admirals resources-after) 0)
-       (>= (:stations resources-after) 0)
-       (>= (:cmd-ships resources-after) 0)
-       (>= (:agents resources-after) 0)
-       (>= (:mil-planets resources-after) 0)
-       (>= (:food-planets resources-after) 0)
-       (>= (:ore-planets resources-after) 0)
-       (>= (:food resources-after) 0)
-       (>= (:fuel resources-after) 0)))
+  "Returns true if player can execute the exchange (all resources non-negative).
 
-;;; Identify which specific exchanges are invalid (for UI highlighting)
+  [resources-after exchange-resources-map] -> boolean"
+  [resources-after]
+  (and (>= (:credits      resources-after) 0)
+       (>= (:soldiers     resources-after) 0)
+       (>= (:transports   resources-after) 0)
+       (>= (:generals     resources-after) 0)
+       (>= (:carriers     resources-after) 0)
+       (>= (:fighters     resources-after) 0)
+       (>= (:admirals     resources-after) 0)
+       (>= (:stations     resources-after) 0)
+       (>= (:cmd-ships    resources-after) 0)
+       (>= (:agents       resources-after) 0)
+       (>= (:mil-planets  resources-after) 0)
+       (>= (:food-planets resources-after) 0)
+       (>= (:ore-planets  resources-after) 0)
+       (>= (:food         resources-after) 0)
+       (>= (:fuel         resources-after) 0)))
+
 (defn identify-invalid-exchanges
-  "Returns map indicating which specific exchange types are invalid"
+  "Returns map indicating which specific exchange types are invalid.
+
+  [resources-after exchange-resources-map, quantities exchange-quantities] -> {:invalid-soldier-sale? bool, ...}"
   [resources-after quantities]
   {:invalid-soldier-sale? (< (:soldiers resources-after) 0)
    :invalid-transport-sale? (< (:transports resources-after) 0)
@@ -169,11 +168,11 @@
 ;;;; UI Components for Table-Based Layout
 ;;;;
 
-;;; Submit button component - extracted to avoid duplication
 (defn submit-button
   "Renders the submit button with dynamic disabled state based on validity.
   Used in both initial page render and HTMX updates.
-  Accepts optional extra-attrs map for additional HTML attributes."
+
+  ([can-execute? bool]) ([can-execute? bool, extra-attrs map]) -> hiccup"
   ([can-execute?] (submit-button can-execute? {}))
   ([can-execute? extra-attrs]
    [:button#submit-button.bg-green-400.text-black.px-6.py-2.font-bold.transition-colors
@@ -183,20 +182,11 @@
            extra-attrs)
     "Make Exchange"]))
 
-;;; Sell row with single input field, CSS-only responsive styling (like building page)
 (defn sell-row
-  "Renders a sell row with ONE input field that's just restyled for mobile vs desktop.
-  Uses responsive CSS grid - no duplicate inputs, no JavaScript sync needed.
+  "Renders a sell row with a single responsive input field for mobile and desktop.
 
-  Parameters:
-  - item-name: Full display name (e.g. 'Soldiers', 'Defence Stations')
-  - item-name-mobile: Abbreviated name for mobile (e.g. 'Soldiers', 'Def Stns')
-  - field-key: Form field key (e.g. 'soldiers-sold')
-  - price-per-unit: Credits received per unit sold
-  - current-quantity: Current input value
-  - max-quantity: Maximum quantity available to sell
-  - player-id: Player UUID
-  - hx-include: HTMX include selector string"
+  [item-name str, item-name-mobile str, field-key str, price-per-unit int,
+  current-quantity int, max-quantity int, player-id uuid, hx-include str] -> hiccup"
   [item-name item-name-mobile field-key price-per-unit current-quantity max-quantity player-id hx-include]
   (let [credit-gain (* price-per-unit current-quantity)
         credit-id (str "credit-" field-key)
@@ -230,20 +220,11 @@
               :class (when (zero? credit-gain) "opacity-20")}
        [:<> "+" (ui/format-number credit-gain)]]]]))
 
-;;; Buy row with single input field, CSS-only responsive styling (like building page)
 (defn buy-row
-  "Renders a buy row with ONE input field that's just restyled for mobile vs desktop.
-  Uses responsive CSS grid - no duplicate inputs, no JavaScript sync needed.
+  "Renders a buy row with a single responsive input field for mobile and desktop.
 
-  Parameters:
-  - item-name: Full display name (e.g. 'Food', 'Fuel')
-  - item-name-mobile: Abbreviated name for mobile (e.g. 'Food', 'Fuel')
-  - field-key: Form field key (e.g. 'food-bought')
-  - price-per-unit: Credits per unit cost
-  - current-quantity: Current input value
-  - max-quantity: Maximum quantity affordable
-  - player-id: Player UUID
-  - hx-include: HTMX include selector string"
+  [item-name str, item-name-mobile str, field-key str, price-per-unit int,
+  current-quantity int, max-quantity int, player-id uuid, hx-include str] -> hiccup"
   [item-name item-name-mobile field-key price-per-unit current-quantity max-quantity player-id hx-include]
   (let [credit-cost (* price-per-unit current-quantity)
         credit-id (str "credit-" field-key)
@@ -277,10 +258,10 @@
               :class (when (zero? credit-cost) "opacity-20")}
        [:<> "+" (ui/format-number credit-cost)]]]]))
 
-;;; Table-level total row for sell/buy tables
 (defn table-total-row
   "Renders a total row at the bottom of a sell or buy table.
-  Shows the total in the Credits column aligned with the Item label."
+
+  [row-id str, label str, total int] -> hiccup"
   [row-id label total]
   [:div {:id row-id :class "border-t-2 border-green-400 bg-green-400 bg-opacity-10"}
    ;; Mobile
@@ -300,10 +281,11 @@
      {:class (when (zero? total) "opacity-20")}
      (ui/format-number total)]]])
 
-;;; Total credits summary row
 (defn total-credits-row
   "Renders the total credits gained summary at the bottom of the table.
-  Shows credits in red if player tries to sell more than they have."
+  Shows credits in red if player tries to buy more than they can afford.
+
+  [total-credits int, can-execute? bool] -> hiccup"
   [total-credits can-execute?]
   (let [abs-credits (Math/abs total-credits)
         formatted-credits (ui/format-number abs-credits)
@@ -329,15 +311,16 @@
 ;;;;
 ;;;; Actions
 ;;;;
-;;;; There are three parts to the actions for this phase: (i) exchange-page, which shows the
-;;;; exchange options and input fields, (ii) calculate-exchange which provides HTMX dynamic updates
-;;;; as the user changes values, and (iii) apply-exchange which commits the exchanges to the database
-;;;; (staying in phase 2 to allow additional exchanges).
+;;;; Three handlers: exchange-page (show form), calculate-exchange (HTMX dynamic updates),
+;;;; apply-exchange (commit to DB, stay in phase 2 for multiple exchanges).
 ;;;;
 
-;;; Applies exchanges and redirects back to expenses page. Uses pure calculation functions to
-;;; determine resource changes, then commits them in a single transaction.
-(defn apply-exchange [{:keys [path-params params biff/db] :as ctx}]
+(defn apply-exchange
+  "Commit exchanges to the database and redirect back to expenses. Stays in phase 2 to allow
+  additional exchanges. Uses pure calculation functions to determine resource changes.
+
+  [ctx ring-ctx] -> ring-response (303 redirect to expenses)"
+  [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     ;; Phase validation - only allow exchange if player is in phase 2
     (if-let [redirect (utils/validate-phase player 2 player-id)]
@@ -346,7 +329,7 @@
       (let [quantities (parse-exchange-quantities params)
 
             ;; Use pure calculation functions to determine final resource values
-            rates (get-exchange-rates)
+            rates (get-exchange-rates game)
             credit-changes (calculate-exchange-credits quantities rates)
             resources-after (calculate-resources-after-exchange player quantities credit-changes)]
 
@@ -374,14 +357,17 @@
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/expenses")}}))))
 
-;;; Provides HTMX dynamic updates showing resources after exchange as user changes input values.
-(defn calculate-exchange [{:keys [path-params params biff/db] :as ctx}]
+(defn calculate-exchange
+  "Provide HTMX out-of-band updates showing resources after exchange as user changes input values.
+
+  [ctx ring-ctx] -> hiccup (via biff/render)"
+  [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (let [;; Parse all exchange inputs using extracted function
           quantities (parse-exchange-quantities params)
 
           ;; Use pure calculation functions
-          rates (get-exchange-rates)
+          rates (get-exchange-rates game)
           credit-changes (calculate-exchange-credits quantities rates)
           resources-after (calculate-resources-after-exchange player quantities credit-changes)
           can-execute? (valid-exchange? resources-after)
@@ -395,7 +381,7 @@
                            :admirals-sold (:admirals-sold quantities)
                            :stations-sold (:stations-sold quantities)
                            :cmd-ships-sold (:cmd-ships-sold quantities)
-                           :agents-sold (or (:agents-sold quantities) 0)
+                           :agents-sold (:agents-sold quantities)
                            :mil-planets-sold (:mil-planets-sold quantities)
                            :food-planets-sold (:food-planets-sold quantities)
                            :ore-planets-sold (:ore-planets-sold quantities)
@@ -438,8 +424,8 @@
                  :class (when (zero? (* (:cmd-ships-sold quantities) (:cmd-ship-sell rates))) "opacity-20")}
           [:<> "+" (ui/format-number (* (:cmd-ships-sold quantities) (:cmd-ship-sell rates)))]]
          [:span {:id "credit-agents-sold" :hx-swap-oob "true"
-                 :class (when (zero? (* (or (:agents-sold quantities) 0) (:agent-sell rates))) "opacity-20")}
-          [:<> "+" (ui/format-number (* (or (:agents-sold quantities) 0) (:agent-sell rates)))]]
+                 :class (when (zero? (* (:agents-sold quantities) (:agent-sell rates))) "opacity-20")}
+          [:<> "+" (ui/format-number (* (:agents-sold quantities) (:agent-sell rates)))]]
          [:span {:id "credit-mil-planets-sold" :hx-swap-oob "true"
                  :class (when (zero? (* (:mil-planets-sold quantities) (:mil-planet-sell rates))) "opacity-20")}
           [:<> "+" (ui/format-number (* (:mil-planets-sold quantities) (:mil-planet-sell rates)))]]
@@ -474,11 +460,7 @@
 
          ;; Resources display with red highlighting for negative values
          [:div#resources-after
-          (ui/extended-resource-display-grid
-            (assoc resources-after
-                   :player/current-turn  (:player/current-turn player)
-                   :player/current-round (:player/current-round player))
-            "Resources After Exchange" true game)]
+          (ui/extended-resource-display-grid resources-after "Resources After Exchange" true)]
 
          ;; Warning message if exchange is invalid
          [:div#exchange-warning.flex.items-center
@@ -527,11 +509,14 @@
          ;; Submit button - disabled if player can't execute exchanges
          (submit-button can-execute? {:hx-swap-oob "true"})]))))
 
-;;; Shows exchange options and input fields for player to buy/sell resources and assets
-(defn exchange-page [{:keys [player game]}]
+(defn exchange-page
+  "Show exchange options and input fields for buying/selling resources and assets.
+
+  [{:keys [player game]}] -> hiccup"
+  [{:keys [player game]}]
   (let [player-id (:xt/id player)
         hx-include "[name='soldiers-sold'],[name='transports-sold'],[name='generals-sold'],[name='fighters-sold'],[name='carriers-sold'],[name='admirals-sold'],[name='stations-sold'],[name='cmd-ships-sold'],[name='agents-sold'],[name='mil-planets-sold'],[name='food-planets-sold'],[name='ore-planets-sold'],[name='food-bought'],[name='food-sold'],[name='fuel-bought'],[name='fuel-sold']"
-        rates (get-exchange-rates)
+        rates (get-exchange-rates game)
         max-buy-quantities (calculate-max-buy-quantities player {:soldiers-sold 0 :transports-sold 0 :generals-sold 0 :fighters-sold 0 :carriers-sold 0 :admirals-sold 0 :stations-sold 0 :cmd-ships-sold 0 :agents-sold 0 :mil-planets-sold 0 :food-planets-sold 0 :ore-planets-sold 0 :food-sold 0 :fuel-sold 0 :food-bought 0 :fuel-bought 0} rates)]
     (ui/page
       {}
@@ -539,14 +524,14 @@
        ;; CSS for responsive grid layout
        [:style "
         .exchange-row-grid {
-                            grid-template-columns: 0.9fr 0.8fr 0.7fr 1.1fr 0.9fr;
-                            }
-        @media (min-width: 1024px) {
-                                    .exchange-row-grid {
-                                                        grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
-                                                        }
-                                    }
-        "]
+               grid-template-columns: 0.9fr 0.8fr 0.7fr 1.1fr 0.9fr;
+               }
+               @media (min-width: 1024px) {
+               .exchange-row-grid {
+               grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
+               }
+               }
+               "]
 
        [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
 
@@ -554,7 +539,7 @@
                         (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
 
        ;; Current resources before exchange
-       (ui/extended-resource-display-grid player "Resources Before Exchange" false game)
+       (ui/extended-resource-display-grid player "Resources Before Exchange" false)
 
        ;; Exchange Input Form
        (biff/form
@@ -593,7 +578,7 @@
             (sell-row "Admirals" "Admirals" "admirals-sold" (:admiral-sell rates) 0 (:player/admirals player) player-id hx-include)
             (sell-row "Defence Stations" "Def Stns" "stations-sold" (:station-sell rates) 0 (:player/stations player) player-id hx-include)
             (sell-row "Command Ships" "Cmd Ships" "cmd-ships-sold" (:cmd-ship-sell rates) 0 (:player/cmd-ships player) player-id hx-include)
-            (sell-row "Agents" "Agents" "agents-sold" (:agent-sell rates) 0 (or (:player/agents player) 0) player-id hx-include)
+            (sell-row "Agents" "Agents" "agents-sold" (:agent-sell rates) 0 (:player/agents player) player-id hx-include)
             (sell-row "Military Planets" "Mil Plts" "mil-planets-sold" (:mil-planet-sell rates) 0 (:player/mil-planets player) player-id hx-include)
             (sell-row "Food Planets" "Food Plts" "food-planets-sold" (:food-planet-sell rates) 0 (:player/food-planets player) player-id hx-include)
             (sell-row "Ore Planets" "Ore Plts" "ore-planets-sold" (:ore-planet-sell rates) 0 (:player/ore-planets player) player-id hx-include)
@@ -631,7 +616,7 @@
 
          ;; Resources After Exchange (initially shows current resources)
          [:div#resources-after
-          (ui/extended-resource-display-grid player "Resources After Exchange" true game)]
+          (ui/extended-resource-display-grid player "Resources After Exchange" true)]
 
          ;; Warning message area - populated by HTMX if player tries invalid exchanges
          [:div#exchange-warning.flex.items-center]
