@@ -38,11 +38,12 @@
    :player/generals                 2
    :player/admirals                 1
    ;; Fields cleared by apply-outcomes
-   :player/last-battle-result       "some-result"
-   :player/last-espionage-result    "some-result"
-   :player/pending-espionage        test-game-id ; non-nil to verify it is cleared
-   :player/incoming-attacks         ["attack-1"]
-   :player/incoming-espionage-fails 2})
+   :player/last-battle-result        "some-result"
+   :player/last-espionage-result     "some-result"
+   :player/last-population-growth    3
+   :player/pending-espionage         test-game-id ; non-nil to verify it is cleared
+   :player/incoming-attacks          ["attack-1"]
+   :player/incoming-espionage-fails  2})
 
 ;;;;
 ;;;; calculate-score Tests
@@ -168,10 +169,11 @@
         (outcomes/apply-outcomes {:path-params {:player-id (str test-player-id)}
                                   :biff/db nil})
         (let [tx (first @tx-atom)]
-          (is (nil? (:player/last-battle-result    tx)))
-          (is (nil? (:player/last-espionage-result tx)))
-          (is (nil? (:player/pending-espionage     tx)))
-          (is (nil? (:player/incoming-attacks      tx)))
+          (is (nil? (:player/last-battle-result       tx)))
+          (is (nil? (:player/last-espionage-result    tx)))
+          (is (nil? (:player/last-population-growth   tx)))
+          (is (nil? (:player/pending-espionage        tx)))
+          (is (nil? (:player/incoming-attacks         tx)))
           (is (= 0  (:player/incoming-espionage-fails tx))))))))
 
 (deftest test-apply-outcomes-records-score
@@ -258,3 +260,17 @@
                                      :player/incoming-espionage-fails 1)]
       (is (vector? (outcomes/outcomes-page {:player player-with-attacks :game test-game
                                             :battle-result nil :espionage-result nil}))))))
+
+(deftest test-outcomes-page-with-pop-growth
+  (testing "Renders population growth message when pop-growth is positive"
+    (is (vector? (outcomes/outcomes-page {:player test-player :game test-game
+                                          :battle-result nil :espionage-result nil
+                                          :pop-growth 2}))))
+  (testing "Renders held-steady message when pop-growth is zero"
+    (is (vector? (outcomes/outcomes-page {:player test-player :game test-game
+                                          :battle-result nil :espionage-result nil
+                                          :pop-growth 0}))))
+  (testing "Does not render population section when pop-growth is nil (mid-round)"
+    (is (vector? (outcomes/outcomes-page {:player test-player :game test-game
+                                          :battle-result nil :espionage-result nil
+                                          :pop-growth nil})))))

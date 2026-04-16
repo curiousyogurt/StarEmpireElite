@@ -49,9 +49,10 @@
                      :player/turns-used               reset-used
                      :player/current-phase            1
                      :player/last-turn-at             now
-                     :player/last-battle-result       nil
-                     :player/last-espionage-result    nil
-                     :player/pending-espionage        nil
+                     :player/last-battle-result        nil
+                     :player/last-espionage-result     nil
+                     :player/last-population-growth    nil
+                     :player/pending-espionage         nil
                      :player/incoming-attacks         nil
                      :player/incoming-espionage-fails 0
                      :player/score                    (calculate-score player)}
@@ -122,10 +123,10 @@
    [:td.text-right (if att-wins? enemy-losses "—")]])
 
 (defn outcomes-page
-  "Show turn results (combat, espionage) and the advance button for the next turn.
+  "Show turn results (combat, espionage, population growth) and the advance button for the next turn.
 
-  [{:keys [player game battle-result espionage-result]}] -> hiccup"
-  [{:keys [player game battle-result espionage-result]}]
+  [{:keys [player game battle-result espionage-result pop-growth]}] -> hiccup"
+  [{:keys [player game battle-result espionage-result pop-growth]}]
   (let [current-turn        (:player/current-turn player)
         turns-per-round     (:game/turns-per-round game)
         end-current-round?  (>= current-turn turns-per-round)]
@@ -203,6 +204,13 @@
               [:p.text-xs (str "Cmd Ships:  " (:cmd-ships  intel))]
               [:p.text-xs (str "Agents:     " (:agents     intel))]]
              [:p.text-xs "Your agents were unable to obtain useful intelligence."])]))
+
+      ;; Population growth section (only shown at end of round)
+      (when (some? pop-growth)
+        [:div.border.border-green-400.p-4.mb-4
+         (if (pos? pop-growth)
+           [:p.font-bold (str "Population grew by " pop-growth " million this round.")]
+           [:p.font-bold "Population held steady this round."])])
 
       (ui/extended-resource-display-grid player "Resources" false)
 

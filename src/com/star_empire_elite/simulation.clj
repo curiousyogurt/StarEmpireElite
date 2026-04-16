@@ -6,12 +6,10 @@
   {;; Planet income
    :ore-planet-credits     const/ore-planet-credits
    :ore-planet-fuel        const/ore-planet-fuel
-   :ore-planet-galaxars    const/ore-planet-galaxars
    :food-planet-food       const/food-planet-food
    :mil-planet-soldiers    const/mil-planet-soldiers
    :mil-planet-fighters    const/mil-planet-fighters
    :mil-planet-stations    const/mil-planet-stations
-   :mil-planet-agents      const/mil-planet-agents
 
    ;; Planet upkeep
    :planet-upkeep-credits  const/planet-upkeep-credits
@@ -85,15 +83,13 @@
          mil-soldiers-produced (* mil-planets (:mil-planet-soldiers c))
          mil-fighters-produced (* mil-planets (:mil-planet-fighters c))
          mil-stations-produced (* mil-planets (:mil-planet-stations c))
-         mil-agents-produced   (* mil-planets (:mil-planet-agents c))
 
          ;; Income
          credits-from-ore         (* ore-planets (:ore-planet-credits c))
          credits-from-liquidation (if liquidate?
                                     (+ (* mil-soldiers-produced (:soldier-sell c))
                                        (* mil-fighters-produced (:fighter-sell c))
-                                       (* mil-stations-produced (:station-sell c))
-                                       (* mil-agents-produced   (:agent-sell c)))
+                                       (* mil-stations-produced (:station-sell c)))
                                     0)
          credits-in (+ credits-from-ore credits-from-liquidation)
 
@@ -175,7 +171,6 @@
       :mil-soldiers-produced       mil-soldiers-produced
       :mil-fighters-produced       mil-fighters-produced
       :mil-stations-produced       mil-stations-produced
-      :mil-agents-produced         mil-agents-produced
       :rounds-until-bankrupt       rounds-until-bankrupt
       :rounds-until-food-shortage  rounds-until-food-shortage
       :rounds-until-fuel-shortage  rounds-until-fuel-shortage
@@ -229,10 +224,10 @@
     (println (format "  Fuel     in/out/net: %,d / %,d / %,d"
                      (:fuel-in r) (:fuel-out r) (:net-fuel r)))
     (when (pos? (+ (:mil-soldiers-produced r) (:mil-fighters-produced r)
-                   (:mil-stations-produced r) (:mil-agents-produced r)))
-      (println (format "  Mil output/round   : %,d soldiers  %,d fighters  %,d stations  %,d agents"
+                   (:mil-stations-produced r)))
+      (println (format "  Mil output/round   : %,d soldiers  %,d fighters  %,d stations"
                        (:mil-soldiers-produced r) (:mil-fighters-produced r)
-                       (:mil-stations-produced r) (:mil-agents-produced r))))
+                       (:mil-stations-produced r))))
     (println (str   "  Balanced?          : " (:balanced? r)))
     (println (str   "  Viable?            : " (:viable? r)))
     (when (:rounds-until-bankrupt r)

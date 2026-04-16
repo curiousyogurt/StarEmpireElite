@@ -57,13 +57,14 @@
    :game/planet-upkeep-food        0
    :game/ore-planet-credits        0
    :game/ore-planet-fuel           0
-   :game/ore-planet-galaxars       0
    :game/food-planet-food          0
    :game/mil-planet-stations  0
    :game/mil-planet-fighters  0
    :game/mil-planet-soldiers  0
-   :game/mil-planet-agents    0
    :game/agent-cost           0
+
+   ;; Population tax
+   :game/population-tax-credits 0
 
    ;; Exchange sell/buy rates
    :game/soldier-sell         0
@@ -123,7 +124,9 @@
    ;; planet summaries
    :player/ore-planets        1
    :player/food-planets       3
-   :player/mil-planets   2})
+   :player/mil-planets        2
+
+   :player/last-population-growth nil})
 
 (defn make-player [sys game-id overrides]
   (let [doc (-> player-defaults

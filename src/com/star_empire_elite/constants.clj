@@ -24,6 +24,16 @@
 (def combat-variance 0.15) ; ±15% random factor
 
 
+;; Population Growth
+;; Applied at the end of each round in outcomes
+
+(def pop-growth-rate       0.02)  ; 2% of current population per round
+(def pop-growth-per-planet 0.02)  ; +20,000 per planet per round (in millions)
+(def pop-capacity-per-planet 10.0) ; max 10 million population per planet
+(def pop-random-min        0.9)
+(def pop-random-max        1.1)
+
+
 ;; Starting Empire Defaults
 ;; Resources and units a new player begins with
 
@@ -63,7 +73,6 @@
 
 (def ore-planet-credits  10000)
 (def ore-planet-fuel     50)
-(def ore-planet-galaxars 0)
 (def food-planet-food    3500)
 
 ;; Military planets provide modest ongoing military support.
@@ -71,11 +80,13 @@
 (def mil-planet-soldiers 5)
 (def mil-planet-fighters 2)
 (def mil-planet-stations 1)
-(def mil-planet-agents   1)
 
 
 ;; :: Population / Tax Defaults
 ;; Population is stored in millions, so these are per-population-unit.
+
+;; Tax revenue
+(def population-tax-credits 2000) ; credits per million population per round
 
 ;; Civilian consumption
 (def population-upkeep-food 250)

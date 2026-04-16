@@ -17,23 +17,22 @@
 ;;;;
 
 (defn calculate-income
-  "Calculate income from all planet types using game constants.
+  "Calculate income from all sources using game constants.
 
-  [player game] -> {:ore-credits int, :ore-fuel int, :ore-galaxars int,
+  [player game] -> {:ore-credits int, :ore-fuel int,
                     :food-food int, :mil-soldiers int, :mil-fighters int,
-                    :mil-stations int, :mil-agents int}"
+                    :mil-stations int, :tax-credits int}"
   [player game]
   ;; Keys such as :player/ore-planets are fully qualified keys in the player map.
   ;; That is, there is a key in the player map named :player/ore-planets, etc.
   ;;             (* resource-count-for-player     resource-value-in-game)
   {:ore-credits  (* (:player/ore-planets player)  (:game/ore-planet-credits game))
    :ore-fuel     (* (:player/ore-planets player)  (:game/ore-planet-fuel game))
-   :ore-galaxars (* (:player/ore-planets player)  (:game/ore-planet-galaxars game))
    :food-food    (* (:player/food-planets player) (:game/food-planet-food game))
    :mil-soldiers (* (:player/mil-planets player)  (:game/mil-planet-soldiers game))
    :mil-fighters (* (:player/mil-planets player)  (:game/mil-planet-fighters game))
    :mil-stations (* (:player/mil-planets player)  (:game/mil-planet-stations game))
-   :mil-agents   (* (:player/mil-planets player)  (:game/mil-planet-agents game))})
+   :tax-credits  (* (:player/population player)   (:game/population-tax-credits game))})
 
 ;;;;
 ;;;; UI Components
@@ -62,9 +61,9 @@
 
     ;; Resources - all in one column, spaced out
     [:div.flex.gap-3.justify-start.flex-wrap
-     (for [[k label] [[:credits "Crds"] [:fuel "Fuel"] [:galaxars "Glxrs"] 
-                      [:food "Food"] [:soldiers "Sold"] [:fighters "Fghts"] 
-                      [:stations "Stns"] [:agents "Agnts"]]
+     (for [[k label] [[:credits "Crds"] [:fuel "Fuel"]
+                      [:food "Food"] [:soldiers "Sold"] [:fighters "Fghts"]
+                      [:stations "Stns"]]
            :let [v (or (k income-map) 0)]
            :when (pos? v)]
        [:div.whitespace-nowrap {:key k}
@@ -73,10 +72,10 @@
 
    ;; Desktop: Full table row with formatted planet count
    [:div.hidden.lg:grid.lg:gap-4.lg:items-center.lg:px-4.lg:py-3
-    {:style {:grid-template-columns "repeat(10, minmax(0, 1fr))"}}
+    {:style {:grid-template-columns "repeat(8, minmax(0, 1fr))"}}
     [:div planet-type-name]
     [:div (ui/format-number planet-count)]
-    (for [k [:credits :fuel :galaxars :food :soldiers :fighters :stations :agents]
+    (for [k [:credits :fuel :food :soldiers :fighters :stations]
           :let [v (or (k income-map) 0)]]
       [:div {:key k}
        [:span.font-mono {:style {:word-spacing "-0.2em"}
@@ -109,14 +108,12 @@
           [(cond-> {:db/doc-type          :player
                     :db/op                :update
                     :xt/id                player-id
-                    :player/credits       (+ (:player/credits player)  (:ore-credits income))
+                    :player/credits       (+ (:player/credits player)  (:ore-credits income) (:tax-credits income))
                     :player/food          (+ (:player/food player)     (:food-food income))
                     :player/fuel          (+ (:player/fuel player)     (:ore-fuel income))
-                    :player/galaxars      (+ (:player/galaxars player) (:ore-galaxars income))
                     :player/soldiers      (+ (:player/soldiers player) (:mil-soldiers income))
                     :player/fighters      (+ (:player/fighters player) (:mil-fighters income))
                     :player/stations      (+ (:player/stations player) (:mil-stations income))
-                    :player/agents        (+ (:player/agents player)   (:mil-agents income))
                     :player/current-phase 2}
                    day-reset? (assoc :player/current-round 1))])
         {:status 303
@@ -149,41 +146,43 @@
        [:h3.font-bold.mb-4 "Income"]
        [:div.border.border-green-400.mb-8
         ;; Header row (only visible on wide screens)
-        (ui/phase-table-header ["Planet"   "Count"    "Credits"  "Fuel" "Galaxars" "Food"
-                                "Soldiers" "Fighters" "Stations" "Agents"])
+        (ui/phase-table-header ["Source" "Count" "Credits" "Fuel" "Food" "Soldiers" "Fighters" "Stations"])
 
-        ;; Ore planets generate economic resources: credits, fuel, and galaxars (the premium currency)
-        (income-row "Ore" 
+        ;; Ore planets generate economic resources: credits and fuel
+        (income-row "Ore"
                     (:player/ore-planets player)
                     {:credits (:ore-credits income)
-                     :fuel (:ore-fuel income)
-                     :galaxars (:ore-galaxars income)})
+                     :fuel    (:ore-fuel income)})
 
         ;; Food planets have a single output: food for feeding the population and the military
         (income-row "Food"
                     (:player/food-planets player)
                     {:food (:food-food income)})
 
-        ;; Military planets generate military units: soldiers, fighters, stations, and agents
+        ;; Military planets generate military units: soldiers, fighters, and stations
         (income-row "Mil"
                     (:player/mil-planets player)
                     {:soldiers (:mil-soldiers income)
                      :fighters (:mil-fighters income)
-                     :stations (:mil-stations income)
-                     :agents (:mil-agents income)})]
+                     :stations (:mil-stations income)})
+
+        ;; Population generates tax revenue in credits (population stored in millions)
+        (income-row "Pop"
+                    (* (:player/population player) 1000000)
+                    {:credits (:tax-credits income)})]
 
        ;;; Final resource totals:
        ;;; Shows what the player will have after income is applied. This preview helps players
        ;;; anticipate actions that they might want or need to take in the subsequent phases.
        (ui/resource-display-grid
-         {:credits  (+ (:player/credits player)  (:ore-credits income))
+         {:credits  (+ (:player/credits player)  (:ore-credits income) (:tax-credits income))
           :food     (+ (:player/food player)     (:food-food income))
           :fuel     (+ (:player/fuel player)     (:ore-fuel income))
-          :galaxars (+ (:player/galaxars player) (:ore-galaxars income))
+          :galaxars (:player/galaxars player)
           :soldiers (+ (:player/soldiers player) (:mil-soldiers income))
           :fighters (+ (:player/fighters player) (:mil-fighters income))
           :stations (+ (:player/stations player) (:mil-stations income))
-          :agents   (+ (:player/agents player)   (:mil-agents income))}
+          :agents   (:player/agents player)}
          "Resources After Income")
 
        ;;; Phase Advance Form:

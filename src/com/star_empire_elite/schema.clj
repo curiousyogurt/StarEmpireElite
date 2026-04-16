@@ -30,13 +30,14 @@
           ;; Income generation constants
           [:game/ore-planet-credits        :int]
           [:game/ore-planet-fuel           :int]
-          [:game/ore-planet-galaxars       :int]
           [:game/food-planet-food          :int]
-          [:game/mil-planet-soldiers  :int]
-          [:game/mil-planet-fighters  :int]
-          [:game/mil-planet-stations  :int]
-          [:game/mil-planet-agents    :int]
+          [:game/mil-planet-soldiers       :int]
+          [:game/mil-planet-fighters       :int]
+          [:game/mil-planet-stations       :int]
           
+          ;; Population tax
+          [:game/population-tax-credits    :int]
+
           ;; Upkeep/expense constants
           [:game/planet-upkeep-credits     :int]
           [:game/planet-upkeep-food        :int]
@@ -120,6 +121,7 @@
              {:optional true}             [:maybe :string]]
             [:player/last-espionage-result
              {:optional true}             [:maybe :string]]
+            [:player/last-population-growth  [:maybe :int]]
 
             ;; Leadership
 

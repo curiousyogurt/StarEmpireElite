@@ -77,12 +77,10 @@
             ;; All the required income generation constants
             :game/ore-planet-credits const/ore-planet-credits
             :game/ore-planet-fuel const/ore-planet-fuel
-            :game/ore-planet-galaxars const/ore-planet-galaxars
             :game/food-planet-food const/food-planet-food
             :game/mil-planet-soldiers const/mil-planet-soldiers
             :game/mil-planet-fighters const/mil-planet-fighters
             :game/mil-planet-stations const/mil-planet-stations
-            :game/mil-planet-agents const/mil-planet-agents
             ;; All the required upkeep constants
             :game/planet-upkeep-credits const/planet-upkeep-credits
             :game/planet-upkeep-food const/planet-upkeep-food
@@ -109,6 +107,7 @@
             :game/food-planet-cost const/food-planet-cost
             :game/ore-planet-cost const/ore-planet-cost
             :game/agent-cost const/agent-cost
+            :game/population-tax-credits const/population-tax-credits
             ;; Exchange sell/buy rates
             :game/soldier-sell    const/soldier-sell
             :game/transport-sell  const/transport-sell
@@ -176,7 +175,8 @@
             :player/cmd-ships 1
             :player/generals 5
             :player/admirals 3
-            :player/agents 10}])
+            :player/agents 10
+            :player/last-population-growth nil}])
         
         (let [db (xt/db node)
               player (xt/entity db player-id)]
@@ -215,12 +215,10 @@
                 ;; Income generation constants
                 :game/ore-planet-credits const/ore-planet-credits
                 :game/ore-planet-fuel const/ore-planet-fuel
-                :game/ore-planet-galaxars const/ore-planet-galaxars
                 :game/food-planet-food const/food-planet-food
                 :game/mil-planet-soldiers const/mil-planet-soldiers
                 :game/mil-planet-fighters const/mil-planet-fighters
                 :game/mil-planet-stations const/mil-planet-stations
-                :game/mil-planet-agents const/mil-planet-agents
                 ;; Upkeep/expense constants
                 :game/planet-upkeep-credits const/planet-upkeep-credits
                 :game/planet-upkeep-food const/planet-upkeep-food
@@ -247,6 +245,7 @@
                 :game/food-planet-cost const/food-planet-cost
                 :game/ore-planet-cost const/ore-planet-cost
                 :game/agent-cost const/agent-cost
+                :game/population-tax-credits const/population-tax-credits
                 ;; Exchange sell/buy rates
                 :game/soldier-sell    const/soldier-sell
                 :game/transport-sell  const/transport-sell
@@ -292,7 +291,8 @@
                 :player/carriers 2
                 :player/fighters 50
                 :player/cmd-ships 1
-                :player/agents 10}])
+                :player/agents 10
+                :player/last-population-growth nil}])
           db (xt/db node)
           game (xt/entity db game-id)
           player (xt/entity db player-id)]

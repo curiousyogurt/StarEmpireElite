@@ -13,15 +13,14 @@
 (def test-player-id #uuid "00000000-0000-0000-0000-000000000002")
 
 (def test-game
-  {:xt/id                    test-game-id
-   :game/ore-planet-credits  100
-   :game/ore-planet-fuel     50
-   :game/ore-planet-galaxars 10
-   :game/food-planet-food    200
-   :game/mil-planet-soldiers 25
-   :game/mil-planet-fighters 15
-   :game/mil-planet-stations 5
-   :game/mil-planet-agents   8})
+  {:xt/id                       test-game-id
+   :game/ore-planet-credits     100
+   :game/ore-planet-fuel        50
+   :game/food-planet-food       200
+   :game/mil-planet-soldiers    25
+   :game/mil-planet-fighters    15
+   :game/mil-planet-stations    5
+   :game/population-tax-credits 100})
 
 ;; Base player in phase 1, turn 1, round 1 with no previous round completed.
 (def test-player
@@ -40,6 +39,7 @@
    :player/food                    500
    :player/fuel                    300
    :player/galaxars                50
+   :player/population              5
    :player/soldiers                100
    :player/fighters                75
    :player/stations                20
@@ -55,19 +55,19 @@
 ;;;;
 
 (deftest test-calculate-income-basic
-  (testing "Calculates income correctly for all three planet types"
+  (testing "Calculates income correctly for all sources"
     (let [income (income/calculate-income test-player test-game)]
       ;; Ore: 3 planets * game rates
       (is (= 300 (:ore-credits income)))   ; 3 * 100
       (is (= 150 (:ore-fuel income)))      ; 3 * 50
-      (is (= 30  (:ore-galaxars income)))  ; 3 * 10
       ;; Food: 2 planets * game rate
       (is (= 400 (:food-food income)))     ; 2 * 200
       ;; Military: 4 planets * game rates
       (is (= 100 (:mil-soldiers income)))  ; 4 * 25
       (is (= 60  (:mil-fighters income)))  ; 4 * 15
       (is (= 20  (:mil-stations income)))  ; 4 * 5
-      (is (= 32  (:mil-agents income))))))  ; 4 * 8
+      ;; Population tax: 5 million * 100 rate
+      (is (= 500 (:tax-credits income))))))
 
 (deftest test-calculate-income-zero-planets
   (testing "Returns zero for all resources when player has no planets"
@@ -77,12 +77,10 @@
           income (income/calculate-income player test-game)]
       (is (= 0 (:ore-credits income)))
       (is (= 0 (:ore-fuel income)))
-      (is (= 0 (:ore-galaxars income)))
       (is (= 0 (:food-food income)))
       (is (= 0 (:mil-soldiers income)))
       (is (= 0 (:mil-fighters income)))
-      (is (= 0 (:mil-stations income)))
-      (is (= 0 (:mil-agents income))))))
+      (is (= 0 (:mil-stations income))))))
 
 (deftest test-calculate-income-single-planet-type
   (testing "Calculates correctly when player has only one planet type"
@@ -92,25 +90,24 @@
           income (income/calculate-income player test-game)]
       (is (= 500 (:ore-credits income)))  ; 5 * 100
       (is (= 250 (:ore-fuel income)))     ; 5 * 50
-      (is (= 50  (:ore-galaxars income))) ; 5 * 10
       (is (= 0   (:food-food income)))
       (is (= 0   (:mil-soldiers income))))))
 
 (deftest test-calculate-income-zero-rates
   (testing "Returns zero income when all game rates are zero"
     (let [zero-game (assoc test-game
-                           :game/ore-planet-credits  0
-                           :game/ore-planet-fuel     0
-                           :game/ore-planet-galaxars 0
-                           :game/food-planet-food    0
-                           :game/mil-planet-soldiers 0
-                           :game/mil-planet-fighters 0
-                           :game/mil-planet-stations 0
-                           :game/mil-planet-agents   0)
+                           :game/ore-planet-credits     0
+                           :game/ore-planet-fuel        0
+                           :game/food-planet-food       0
+                           :game/mil-planet-soldiers    0
+                           :game/mil-planet-fighters    0
+                           :game/mil-planet-stations    0
+                           :game/population-tax-credits 0)
           income (income/calculate-income test-player zero-game)]
       (is (= 0 (:ore-credits income)))
       (is (= 0 (:food-food income)))
-      (is (= 0 (:mil-soldiers income))))))
+      (is (= 0 (:mil-soldiers income)))
+      (is (= 0 (:tax-credits income))))))
 
 (deftest test-calculate-income-custom-rates
   (testing "Handles custom per-game income rates"
@@ -124,6 +121,26 @@
       (is (= 1000 (:ore-credits income)))   ; 2 * 500
       (is (= 3000 (:food-food income)))     ; 3 * 1000
       (is (= 100  (:mil-soldiers income))))))  ; 1 * 100
+
+(deftest test-calculate-income-population-tax
+  (testing "Tax credits scale linearly with population and game rate"
+    ;; 10 million people at 250/million = 2500 credits
+    (let [player (assoc test-player :player/population 10)
+          game   (assoc test-game :game/population-tax-credits 250)
+          income (income/calculate-income player game)]
+      (is (= 2500 (:tax-credits income)))))
+
+  (testing "Zero population yields zero tax credits"
+    (let [player (assoc test-player :player/population 0)
+          income (income/calculate-income player test-game)]
+      (is (= 0 (:tax-credits income)))))
+
+  (testing "Tax income is independent of planet counts"
+    ;; Same population, different planet counts — tax is unchanged
+    (let [no-planets   (assoc test-player :player/ore-planets 0 :player/food-planets 0 :player/mil-planets 0)
+          many-planets (assoc test-player :player/ore-planets 10 :player/food-planets 10 :player/mil-planets 10)]
+      (is (= (:tax-credits (income/calculate-income no-planets test-game))
+             (:tax-credits (income/calculate-income many-planets test-game)))))))
 
 (deftest test-calculate-income-large-planet-counts
   (testing "Handles large planet counts without integer overflow"
@@ -180,17 +197,15 @@
           (is (= test-player-id (:xt/id tx)))
           (is (= 2              (:player/current-phase tx)))
           ;; Resource deltas
-          (is (= (+ (:player/credits  test-player) (:ore-credits  income)) (:player/credits  tx)))
+          (is (= (+ (:player/credits  test-player) (:ore-credits  income) (:tax-credits income)) (:player/credits  tx)))
           (is (= (+ (:player/food     test-player) (:food-food    income)) (:player/food     tx)))
           (is (= (+ (:player/fuel     test-player) (:ore-fuel     income)) (:player/fuel     tx)))
-          (is (= (+ (:player/galaxars test-player) (:ore-galaxars income)) (:player/galaxars tx)))
           (is (= (+ (:player/soldiers test-player) (:mil-soldiers income)) (:player/soldiers tx)))
           (is (= (+ (:player/fighters test-player) (:mil-fighters income)) (:player/fighters tx)))
-          (is (= (+ (:player/stations test-player) (:mil-stations income)) (:player/stations tx)))
-          (is (= (+ (:player/agents   test-player) (:mil-agents   income)) (:player/agents   tx))))))))
+          (is (= (+ (:player/stations test-player) (:mil-stations income)) (:player/stations tx))))))))
 
 (deftest test-apply-income-zero-planets
-  (testing "Advances to phase 2 without changing resources when player has no planets"
+  (testing "Advances to phase 2 with only tax income when player has no planets"
     (let [player  (assoc test-player :player/ore-planets  0
                                      :player/food-planets 0
                                      :player/mil-planets  0)
@@ -199,11 +214,14 @@
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
         (income/apply-income {:path-params {:player-id (str test-player-id)}
                               :biff/db     nil})
-        (let [tx (first @tx-atom)]
-          (is (= (:player/credits  player) (:player/credits  tx)))
-          (is (= (:player/food     player) (:player/food     tx)))
-          (is (= (:player/fuel     player) (:player/fuel     tx)))
-          (is (= 2                          (:player/current-phase tx))))))))
+        (let [tx    (first @tx-atom)
+              ;; Planet income is zero; only population tax is applied to credits
+              expected-credits (+ (:player/credits player)
+                                  (* (:player/population player) (:game/population-tax-credits test-game)))]
+          (is (= expected-credits (:player/credits  tx)))
+          (is (= (:player/food    player) (:player/food  tx)))
+          (is (= (:player/fuel    player) (:player/fuel  tx)))
+          (is (= 2                         (:player/current-phase tx))))))))
 
 ;;;;
 ;;;; apply-income Day-Reset Tests
@@ -277,14 +295,14 @@
   (testing "Handles income-map with only a subset of resource keys"
     ;; Food planets only produce :food; other keys default to 0 via (or (k m) 0)
     (is (vector? (income/income-row "Food" 2 {:food 400})))
-    (is (vector? (income/income-row "Mil"  4 {:soldiers 100 :fighters 60 :stations 20 :agents 32})))))
+    (is (vector? (income/income-row "Mil"  4 {:soldiers 100 :fighters 60 :stations 20})))))
 
 (deftest test-income-row-all-zeros
   (testing "Renders without error when all income values are zero"
     ;; Desktop layout dims zero values; this verifies no crash with all-zero input
-    (is (vector? (income/income-row "Ore" 0 {:credits 0 :fuel 0 :galaxars 0
+    (is (vector? (income/income-row "Ore" 0 {:credits 0 :fuel 0
                                               :food 0 :soldiers 0 :fighters 0
-                                              :stations 0 :agents 0})))))
+                                              :stations 0})))))
 
 (deftest test-income-row-large-values
   (testing "Renders without error for very large resource values"

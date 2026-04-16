@@ -79,12 +79,11 @@
             :game/admiral-power  const/admiral-power
             :game/ore-planet-credits const/ore-planet-credits
             :game/ore-planet-fuel const/ore-planet-fuel
-            :game/ore-planet-galaxars const/ore-planet-galaxars
             :game/food-planet-food const/food-planet-food
             :game/mil-planet-soldiers const/mil-planet-soldiers
             :game/mil-planet-fighters const/mil-planet-fighters
             :game/mil-planet-stations const/mil-planet-stations
-            :game/mil-planet-agents const/mil-planet-agents
+            :game/population-tax-credits const/population-tax-credits
             :game/planet-upkeep-credits const/planet-upkeep-credits
             :game/planet-upkeep-food const/planet-upkeep-food
             :game/soldier-upkeep-credits const/soldier-upkeep-credits
@@ -232,8 +231,9 @@
             :player/stations      const/starting-stations
             :player/carriers      const/starting-carriers
             :player/fighters      const/starting-fighters
-            :player/cmd-ships     const/starting-cmd-ships
-            :player/agents        const/starting-agents}])
+            :player/cmd-ships               const/starting-cmd-ships
+            :player/agents                  const/starting-agents
+            :player/last-population-growth  nil}])
         {:status 303
          :headers {"location" (str "/app/game/" player-id)}}))))
 
@@ -398,12 +398,44 @@
                              {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
                               :player/incoming-espionage-fails
                               (inc (or (:player/incoming-espionage-fails target) 0))})]))
-                      result))))]
+                      result))))
 
-          (outcomes/outcomes-page {:player           display-player
+              ;; --- population growth (end of round only) ---
+              end-round?  (>= (:player/current-turn display-player) (:game/turns-per-round game))
+              [pop-growth final-player]
+              (if-not end-round?
+                [nil display-player]
+                (let [cached (:player/last-population-growth display-player)]
+                  (if (some? cached)
+                    [cached display-player]
+                    (let [pop      (:player/population display-player)
+                          planets  (+ (:player/ore-planets  display-player)
+                                      (:player/food-planets display-player)
+                                      (:player/mil-planets  display-player))
+                          capacity (* planets const/pop-capacity-per-planet)
+                          raw      (+ (* pop const/pop-growth-rate)
+                                      (* planets const/pop-growth-per-planet))
+                          crowding (if (zero? capacity) 0.0
+                                     (max 0.0 (- 1.0 (/ pop capacity))))
+                          rnd         (+ const/pop-random-min
+                                         (* (rand) (- const/pop-random-max const/pop-random-min)))
+                          raw-growth  (* raw crowding rnd)
+                          growth-int  (long raw-growth)
+                          growth-frac (- raw-growth growth-int)
+                          growth      (max 0 (+ growth-int (if (< (rand) growth-frac) 1 0)))]
+                      (biff/submit-tx ctx
+                        [{:db/doc-type :player :db/op :update :xt/id player-id
+                          :player/population             (+ pop growth)
+                          :player/last-population-growth growth}])
+                      [growth (-> display-player
+                                  (assoc :player/population             (+ pop growth))
+                                  (assoc :player/last-population-growth growth))]))))]
+
+          (outcomes/outcomes-page {:player           final-player
                                    :game             game
                                    :battle-result    battle-result
-                                   :espionage-result espionage-result})))))
+                                   :espionage-result espionage-result
+                                   :pop-growth       pop-growth})))))
 
 ;; :: HTMX fragment — polls for incoming alerts; triggers HX-Refresh when new alerts arrive
 (defn alerts-handler [{:keys [biff/db path-params params] :as ctx}]
