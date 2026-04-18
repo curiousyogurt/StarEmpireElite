@@ -1,7 +1,21 @@
+;;;;;
+;;;;; Action Phase - Combat Target Selection
+;;;;;
+;;;;; The action phase is the fourth phase of each turn where players choose an empire to attack.
+;;;;; Selecting a target queues the attack; no combat is resolved here. The actual battle is
+;;;;; computed when the player loads the outcomes page (phase 6), where both sides take casualties
+;;;;; and any captured planets are transferred. Players can also skip combat entirely by submitting
+;;;;; without choosing a target.
+;;;;;
+
 (ns com.star-empire-elite.pages.app.action
   (:require [com.biffweb :as biff :refer [q]]
             [com.star-empire-elite.ui :as ui]
             [xtdb.api :as xt]))
+
+;;;;
+;;;; Data Fetching
+;;;;
 
 (defn get-other-players
   "Fetch all other players in the same game, sorted by score descending.
@@ -14,6 +28,10 @@
                                 [(not= player current-player-id)]]}
                    game-id current-player-id)]
     (sort-by :player/score > (seq players))))
+
+;;;;
+;;;; UI Components
+;;;;
 
 (defn target-row
   "Render a single row in the targets table with a radio-button attack selector.
@@ -42,6 +60,39 @@
        [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
         {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
         "Attack"]]]]))
+
+;;;;
+;;;; Actions
+;;;;
+
+(defn apply-action
+  "Store the pending attack target (nil if none chosen) and advance to espionage phase.
+
+  [ctx ring-ctx] -> ring-response (303 redirect to espionage)"
+  [{:keys [path-params params biff/db] :as ctx}]
+  (let [player-id (java.util.UUID/fromString (:player-id path-params))
+        player (xt/entity db player-id)]
+    (if (nil? player)
+      {:status 404
+       :body "Player not found"}
+      (if (not= (:player/current-phase player) 4)
+        {:status 303
+         :headers {"location" (str "/app/game/" player-id)}}
+        (let [target-str (:target-player-id params)
+              target-id (when (and target-str (not (empty? target-str)))
+                          (java.util.UUID/fromString target-str))
+              tx-map {:db/doc-type :player
+                      :db/op :update
+                      :xt/id player-id
+                      :player/current-phase 5
+                      :player/pending-attack target-id}]
+          (biff/submit-tx ctx [tx-map])
+          {:status 303
+           :headers {"location" (str "/app/game/" player-id "/espionage")}})))))
+
+;;;;
+;;;; Page
+;;;;
 
 (defn action-page
   "Show the action phase: choose a target empire to attack, or skip combat.
@@ -96,28 +147,3 @@
         [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
          {:type "submit"}
          "Continue to Espionage"]])])))
-
-(defn apply-action
-  "Store the pending attack target (nil if none chosen) and advance to espionage phase.
-
-  [ctx ring-ctx] -> ring-response (303 redirect to espionage)"
-  [{:keys [path-params params biff/db] :as ctx}]
-  (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player (xt/entity db player-id)]
-    (if (nil? player)
-      {:status 404
-       :body "Player not found"}
-      (if (not= (:player/current-phase player) 4)
-        {:status 303
-         :headers {"location" (str "/app/game/" player-id)}}
-        (let [target-str (:target-player-id params)
-              target-id (when (and target-str (not (empty? target-str)))
-                          (java.util.UUID/fromString target-str))
-              tx-map {:db/doc-type :player
-                      :db/op :update
-                      :xt/id player-id
-                      :player/current-phase 5
-                      :player/pending-attack target-id}]
-          (biff/submit-tx ctx [tx-map])
-          {:status 303
-           :headers {"location" (str "/app/game/" player-id "/espionage")}})))))

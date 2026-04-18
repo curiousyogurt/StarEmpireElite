@@ -119,6 +119,10 @@
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/expenses")}}))))
 
+;;;;
+;;;; Page
+;;;;
+
 (defn income-page
   "Show income preview for the current turn. No player decisions required — income is informational 
   only, so no htmx dynamic updates are needed.

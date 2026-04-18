@@ -294,6 +294,10 @@
             [:p.text-yellow-400.font-bold "WARNING: Insufficient credits for purchases!"])]
          (submit-button affordable? {:hx-swap-oob "true"})]))))
 
+;;;;
+;;;; Page
+;;;;
+
 (defn building-page
   "Show purchase options and input fields for buying units and planets.
 

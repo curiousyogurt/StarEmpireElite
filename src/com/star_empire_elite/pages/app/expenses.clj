@@ -3,7 +3,7 @@
 ;;;;;
 ;;;;; The expenses phase is the second phase of each round where players pay upkeep costs for their
 ;;;;; planets, military units, and population. Unlike the income phase, expenses require player
-;;;;; decisions, and they can choose how much to pay for each category, with underpayment resulting 
+;;;;; decisions, and they can choose how much to pay for each category, with underpayment resulting
 ;;;;; in various penalties.
 ;;;;;
 ;;;;; This webpage uses htmx for dynamic validation, showing players in real-time whether they can
@@ -11,13 +11,49 @@
 ;;;;;
 
 (ns com.star-empire-elite.pages.app.expenses
-  (:require [com.biffweb :as biff]
+  (:require [clojure.string :as str]
+            [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
 
 ;;;;
 ;;;; Calculations
 ;;;;
+
+;;; Single source of truth for all expense categories. Each entry describes one row of the
+;;; expenses table: its display name, mobile abbreviation, HTML row-id, and whichever
+;;; resource fields (credits/food/fuel) it consumes. Adding or renaming a category only
+;;; requires changing this one def — the row rendering, HTMX updates, and hx-include
+;;; selector are all derived from it at load time.
+(def expense-row-specs
+  [{:category "Planets"      :abbrev "Plnts" :row-id "planets"
+    :credits {:field-name "planets-pay"      :required-key :planets-credits}
+    :food    {:field-name "planets-food"     :required-key :planets-food}}
+   {:category "Soldiers"     :abbrev "Sold"  :row-id "soldiers"
+    :credits {:field-name "soldiers-credits" :required-key :soldiers-credits}
+    :food    {:field-name "soldiers-food"    :required-key :soldiers-food}}
+   {:category "Fighters"     :abbrev "Fght"  :row-id "fighters"
+    :credits {:field-name "fighters-credits" :required-key :fighters-credits}
+    :fuel    {:field-name "fighters-fuel"    :required-key :fighters-fuel}}
+   {:category "Defence Stns" :abbrev "Def"   :row-id "stations"
+    :credits {:field-name "stations-credits" :required-key :stations-credits}
+    :fuel    {:field-name "stations-fuel"    :required-key :stations-fuel}}
+   {:category "Agents"       :abbrev "Agnt"  :row-id "agents"
+    :food    {:field-name "agents-food"      :required-key :agents-food}
+    :fuel    {:field-name "agents-fuel"      :required-key :agents-fuel}}
+   {:category "Population"   :abbrev "Pop"   :row-id "population"
+    :food    {:field-name "population-food"  :required-key :population-food}
+    :fuel    {:field-name "population-fuel"  :required-key :population-fuel}}])
+
+;;; HTMX hx-include selector listing all expense input fields, derived from expense-row-specs
+;;; so it stays in sync automatically when categories are added or renamed.
+(def expense-hx-include
+  (str/join ","
+    (for [spec expense-row-specs
+          resource-key [:credits :food :fuel]
+          :let  [resource (get spec resource-key)]
+          :when resource]
+      (str "[name='" (:field-name resource) "']"))))
 
 (defn calculate-required-expenses
   "Calculate required upkeep costs for all empire assets using game constants.
@@ -32,21 +68,16 @@
   (let [planet-count (+ (:player/mil-planets player)
                         (:player/food-planets player)
                         (:player/ore-planets player))]
-    {:planets-credits   (* planet-count (:game/planet-upkeep-credits game))
-     :planets-food      (* planet-count (:game/planet-upkeep-food game))
-     :soldiers-credits  (* (:player/soldiers player) (:game/soldier-upkeep-credits game))
-     :soldiers-food     (* (:player/soldiers player) (:game/soldier-upkeep-food game))
-     :fighters-credits  (* (:player/fighters player) 
-                           (:game/fighter-upkeep-credits game))
-     :fighters-fuel     (* (:player/fighters player) 
-                           (:game/fighter-upkeep-fuel game))
-     :stations-credits  (* (:player/stations player) 
-                           (:game/station-upkeep-credits game))
-     :stations-fuel     (* (:player/stations player) 
-                           (:game/station-upkeep-fuel game))
-     :agents-food       (* (:player/agents player) (:game/agent-upkeep-food game))
-     :agents-fuel       (* (:player/agents player)
-                           (:game/agent-upkeep-fuel game))
+    {:planets-credits   (* planet-count                (:game/planet-upkeep-credits game))
+     :planets-food      (* planet-count                (:game/planet-upkeep-food game))
+     :soldiers-credits  (* (:player/soldiers player)   (:game/soldier-upkeep-credits game))
+     :soldiers-food     (* (:player/soldiers player)   (:game/soldier-upkeep-food game))
+     :fighters-credits  (* (:player/fighters player)   (:game/fighter-upkeep-credits game))
+     :fighters-fuel     (* (:player/fighters player)   (:game/fighter-upkeep-fuel game))
+     :stations-credits  (* (:player/stations player)   (:game/station-upkeep-credits game))
+     :stations-fuel     (* (:player/stations player)   (:game/station-upkeep-fuel game))
+     :agents-food       (* (:player/agents player)     (:game/agent-upkeep-food game))
+     :agents-fuel       (* (:player/agents player)     (:game/agent-upkeep-fuel game))
      :population-food   (* (:player/population player) (:game/population-upkeep-food game))
      :population-fuel   (* (:player/population player) (:game/population-upkeep-fuel game))}))
 
@@ -77,8 +108,8 @@
   [resources-after {:credits int, :food int, :fuel int}] -> boolean"
   [resources-after]
   (and (>= (:credits resources-after) 0)
-       (>= (:food resources-after) 0)
-       (>= (:fuel resources-after) 0)))
+       (>= (:food resources-after)    0)
+       (>= (:fuel resources-after)    0)))
 
 (defn parse-expense-payments
   "Parse all expense payment inputs from request params. Invalid or missing values default to 0.
@@ -104,6 +135,44 @@
 ;;;;
 ;;;; UI Components
 ;;;;
+
+(defn- render-required-cell
+  "Render the required-cost display cell for a row, highlighting red when the player
+  has paid less than required. Used in both initial page render and HTMX oob updates.
+
+  [row-id str, required-text str, credits-paid int|nil, credits-req int|nil,
+   food-paid int|nil, food-req int|nil, fuel-paid int|nil, fuel-req int|nil] -> hiccup"
+  [row-id required-text credits-paid credits-req food-paid food-req fuel-paid fuel-req]
+  (let [underpaid? (or (and credits-req (< credits-paid credits-req))
+                       (and food-req    (< food-paid    food-req))
+                       (and fuel-req    (< fuel-paid    fuel-req)))]
+    [:div.font-mono.text-xxs.lg:text-base.lg:pr-4
+     {:id (str "required-" row-id)
+      :hx-swap-oob "true"
+      :class (when underpaid? "text-red-400")}
+     required-text]))
+
+(defn- build-row-required-update
+  "Build an HTMX oob update fragment for the required-cost cell of one expense row.
+  Uses the same spec format as build-expense-row so both iterate over expense-row-specs.
+
+  [spec expense-row-spec, required required-expenses-map, payments expense-payments-map] -> hiccup"
+  [spec required payments]
+  (let [{:keys [row-id credits food fuel]} spec
+        credits-val   (if credits   (get required (:required-key credits)) 0)
+        food-val      (if food      (get required (:required-key food))    0)
+        fuel-val      (if fuel      (get required (:required-key fuel))    0)
+        required-text (str credits-val "/" food-val "/" fuel-val)
+        credits-paid  (when credits (get payments (keyword (:field-name credits))))
+        credits-req   (when credits (get required (:required-key credits)))
+        food-paid     (when food    (get payments (keyword (:field-name food))))
+        food-req      (when food    (get required (:required-key food)))
+        fuel-paid     (when fuel    (get payments (keyword (:field-name fuel))))
+        fuel-req      (when fuel    (get required (:required-key fuel)))]
+    (render-required-cell row-id required-text
+                          credits-paid credits-req
+                          food-paid    food-req
+                          fuel-paid    fuel-req)))
 
 (defn submit-button
   "Render the submit button, disabled when the player cannot afford expenses.
@@ -149,7 +218,7 @@
    ;; Col 4: Pay Credits
    [:div.px-1.lg:pr-4
     (if credits-field
-      (ui/numeric-input (:field-name credits-field) (:default-value credits-field) 
+      (ui/numeric-input (:field-name credits-field) (:default-value credits-field)
                         player-id "/calculate-expenses" hx-include
                         {:input-class "py-0.5 text-xs lg:py-1 lg:text-sm"})
       [:div.font-mono.opacity-30 "0"])]
@@ -157,7 +226,7 @@
    ;; Col 5: Pay Food
    [:div.px-1.lg:pr-4
     (if food-field
-      (ui/numeric-input (:field-name food-field) (:default-value food-field) 
+      (ui/numeric-input (:field-name food-field) (:default-value food-field)
                         player-id "/calculate-expenses" hx-include
                         {:input-class "py-0.5 text-xs lg:py-1 lg:text-sm"})
       [:div.font-mono.opacity-30 "0"])]
@@ -165,7 +234,7 @@
    ;; Col 6: Pay Fuel
    [:div.px-1.lg:pr-4
     (if fuel-field
-      (ui/numeric-input (:field-name fuel-field) (:default-value fuel-field) 
+      (ui/numeric-input (:field-name fuel-field) (:default-value fuel-field)
                         player-id "/calculate-expenses" hx-include
                         {:input-class "py-0.5 text-xs lg:py-1 lg:text-sm"})
       [:div.font-mono.opacity-30 "0"])]])
@@ -180,34 +249,27 @@
   [spec map, required map, player-id uuid, hx-include str] -> hiccup"
   [spec required player-id hx-include]
   (let [{:keys [category abbrev row-id count credits food fuel]} spec
-        ;; Build required display as "credits/food/fuel" format
-        credits-val (if credits (get required (:required-key credits)) 0)
-        food-val (if food (get required (:required-key food)) 0)
-        fuel-val (if fuel (get required (:required-key fuel)) 0)
+        credits-val      (if credits (get required (:required-key credits)) 0)
+        food-val         (if food    (get required (:required-key food))    0)
+        fuel-val         (if fuel    (get required (:required-key fuel))    0)
         required-display (str credits-val "/" food-val "/" fuel-val)
-
-        ;; Build field maps
-        credits-field (when credits
-                        {:field-name (:field-name credits)
-                         :default-value (get required (:required-key credits))
-                         :required (get required (:required-key credits))})
-        food-field (when food
-                     {:field-name (:field-name food)
-                      :default-value (get required (:required-key food))
-                      :required (get required (:required-key food))})
-        fuel-field (when fuel
-                     {:field-name (:field-name fuel)
-                      :default-value (get required (:required-key fuel))
-                      :required (get required (:required-key fuel))})]
-
+        credits-field    (when credits
+                           {:field-name    (:field-name credits)
+                            :default-value (get required (:required-key credits))
+                            :required      (get required (:required-key credits))})
+        food-field       (when food
+                           {:field-name    (:field-name food)
+                            :default-value (get required (:required-key food))
+                            :required      (get required (:required-key food))})
+        fuel-field       (when fuel
+                           {:field-name    (:field-name fuel)
+                            :default-value (get required (:required-key fuel))
+                            :required      (get required (:required-key fuel))})]
     (expense-row category abbrev row-id count required-display
                  credits-field food-field fuel-field player-id hx-include)))
 
 ;;;;
 ;;;; Actions
-;;;;
-;;;; expenses-page shows costs and input fields. calculate-expenses handles HTMX dynamic updates
-;;;; as the player changes values. apply-expenses commits payments and advances to building phase.
 ;;;;
 
 (defn apply-expenses
@@ -216,24 +278,17 @@
   [ctx ring-ctx] -> ring-response (303 redirect to building)"
   [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
-    ;; Phase validation prevents players from applying expenses multiple times or out of order
     (if-let [redirect (utils/validate-phase player 2 player-id)]
       redirect
-      ;; Parse all expense payment inputs using extracted function
-      (let [payments (parse-expense-payments params)
-
-            ;; Calculate the final resource values
+      (let [payments        (parse-expense-payments params)
             resources-after (calculate-resources-after-expenses player payments)]
-
-        ;; Single atomic transaction updates resources and advances phase together
-        ;; This prevents partial updates if something fails midway through
         (biff/submit-tx ctx
-                        [{:db/doc-type :player
-                          :db/op :update
-                          :xt/id player-id
-                          :player/credits (:credits resources-after)
-                          :player/food (:food resources-after)
-                          :player/fuel (:fuel resources-after)
+                        [{:db/doc-type          :player
+                          :db/op                :update
+                          :xt/id                player-id
+                          :player/credits       (:credits resources-after)
+                          :player/food          (:food resources-after)
+                          :player/fuel          (:fuel resources-after)
                           :player/current-phase 3}])
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/building")}}))))
@@ -245,53 +300,12 @@
   [ctx ring-ctx] -> hiccup (HTMX oob fragments)"
   [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
-    ;; Parse expense payment inputs using extracted function
-    (let [payments (parse-expense-payments params)
-          required (calculate-required-expenses player game)
-
-          ;; Calculate resulting resources and whether affordable
+    (let [payments        (parse-expense-payments params)
+          required        (calculate-required-expenses player game)
           resources-after (calculate-resources-after-expenses player payments)
-          affordable? (can-afford-expenses? resources-after)
-
-          ;; Helper to render required display with red text if underpaid
-          render-required
-          (fn [row-id required-text credits-paid credits-req food-paid food-req fuel-paid fuel-req]
-            (let [underpaid? (or (and credits-req (< credits-paid credits-req))
-                                 (and food-req (< food-paid food-req))
-                                 (and fuel-req (< fuel-paid fuel-req)))]
-              [:div.font-mono.text-xxs.lg:text-base.lg:pr-4
-               {:id (str "required-" row-id)
-                :hx-swap-oob "true"
-                :class (when underpaid? "text-red-400")}
-               required-text]))
-
-          ;; Helper to build render-required call from same spec format as build-expense-row
-          build-render-required
-          (fn [spec]
-            (let [{:keys [row-id credits food fuel]} spec
-                  ;; Build required display as "credits/food/fuel" format
-                  credits-val (if credits (get required (:required-key credits)) 0)
-                  food-val (if food (get required (:required-key food)) 0)
-                  fuel-val (if fuel (get required (:required-key fuel)) 0)
-                  required-text (str credits-val "/" food-val "/" fuel-val)
-
-                  ;; Get payment and required values for each resource type
-                  credits-paid (when credits (get payments (keyword (:field-name credits))))
-                  credits-req (when credits (get required (:required-key credits)))
-                  food-paid (when food (get payments (keyword (:field-name food))))
-                  food-req (when food (get required (:required-key food)))
-                  fuel-paid (when fuel (get payments (keyword (:field-name fuel))))
-                  fuel-req (when fuel (get required (:required-key fuel)))]
-
-              (render-required row-id required-text 
-                               credits-paid credits-req 
-                               food-paid food-req 
-                               fuel-paid fuel-req)))]
-
-      ;; Render htmx response fragments that replace specific page elements
+          affordable?     (can-afford-expenses? resources-after)]
       (biff/render
         [:div
-         ;; Resources display with red highlighting for negative values; use shared component
          [:div#resources-after
           (ui/resource-display-grid
             (assoc resources-after
@@ -301,54 +315,35 @@
                    :stations (:player/stations player)
                    :agents   (:player/agents player))
             "Resources After Expenses" true)]
-
-         ;; Warning message if expenses exceed available resources
          [:div#expense-warning.flex.items-center
           {:hx-swap-oob "true"}
           (when (not affordable?)
             [:p.text-yellow-400.font-bold "WARNING: Insufficient resources to pay expenses!"])]
-
-         ;; Submit button - disabled if player can't afford expenses
          (submit-button affordable? {:hx-swap-oob "true"})
+         (map #(build-row-required-update % required payments) expense-row-specs)]))))
 
-         ;; Update required displays with red highlighting if underpaid - using same specs as build-expense-row
-         (build-render-required
-           {:row-id "planets"
-            :credits {:field-name "planets-pay" :required-key :planets-credits}
-            :food {:field-name "planets-food" :required-key :planets-food}})
-         (build-render-required
-           {:row-id "soldiers"
-            :credits {:field-name "soldiers-credits" :required-key :soldiers-credits}
-            :food {:field-name "soldiers-food" :required-key :soldiers-food}})
-         (build-render-required
-           {:row-id "fighters"
-            :credits {:field-name "fighters-credits" :required-key :fighters-credits}
-            :fuel {:field-name "fighters-fuel" :required-key :fighters-fuel}})
-         (build-render-required
-           {:row-id "stations"
-            :credits {:field-name "stations-credits" :required-key :stations-credits}
-            :fuel {:field-name "stations-fuel" :required-key :stations-fuel}})
-         (build-render-required
-           {:row-id "agents"
-            :food {:field-name "agents-food" :required-key :agents-food}
-            :fuel {:field-name "agents-fuel" :required-key :agents-fuel}})
-         (build-render-required
-           {:row-id "population"
-            :food {:field-name "population-food" :required-key :population-food}
-            :fuel {:field-name "population-fuel" :required-key :population-fuel}})
-         ]))))
+;;;;
+;;;; Page
+;;;;
 
 (defn expenses-page
   "Show expense requirements and input fields for the player to choose payment amounts.
 
   [{:keys [player game]}] -> hiccup"
   [{:keys [player game]}]
-  (let [required (calculate-required-expenses player game)
-        player-id (:xt/id player)
-        hx-include "[name='planets-pay'],[name='planets-food'],[name='soldiers-credits'],[name='soldiers-food'],[name='fighters-credits'],[name='fighters-fuel'],[name='stations-credits'],[name='stations-fuel'],[name='agents-food'],[name='agents-fuel'],[name='population-food'],[name='population-fuel']"
+  (let [required     (calculate-required-expenses player game)
+        player-id    (:xt/id player)
         planet-count (+ (:player/mil-planets player)
                         (:player/food-planets player)
-                        (:player/ore-planets player))]
+                        (:player/ore-planets player))
+        ;; Per-row asset counts keyed by row-id, used when iterating expense-row-specs.
+        ;; Population is formatted with "M" suffix; all others are plain integers.
+        row-counts   {"planets"    planet-count
+                      "soldiers"   (:player/soldiers player)
+                      "fighters"   (:player/fighters player)
+                      "stations"   (:player/stations player)
+                      "agents"     (:player/agents player)
+                      "population" (str (:player/population player) "M")}]
     (ui/page
       {}
       [:div.mx-auto.max-w-4xl.w-full.text-green-400.font-mono
@@ -406,42 +401,10 @@
                {:label "Pay Food" :class "pr-4"}
                {:label "Pay Fuel" :class "pr-4"}])
 
-            ;; All expense rows using build-expense-row helper for cleaner code
-            (build-expense-row 
-              {:category "Planets" :abbrev "Plnts" :row-id "planets" :count planet-count
-               :credits {:field-name "planets-pay" :required-key :planets-credits}
-               :food {:field-name "planets-food" :required-key :planets-food}}
-              required player-id hx-include)
-
-            (build-expense-row
-              {:category "Soldiers" :abbrev "Sold" :row-id "soldiers" :count (:player/soldiers player)
-               :credits {:field-name "soldiers-credits" :required-key :soldiers-credits}
-               :food {:field-name "soldiers-food" :required-key :soldiers-food}}
-              required player-id hx-include)
-
-            (build-expense-row
-              {:category "Fighters" :abbrev "Fght" :row-id "fighters" :count (:player/fighters player)
-               :credits {:field-name "fighters-credits" :required-key :fighters-credits}
-               :fuel {:field-name "fighters-fuel" :required-key :fighters-fuel}}
-              required player-id hx-include)
-
-            (build-expense-row
-              {:category "Defence Stns" :abbrev "Def" :row-id "stations" :count (:player/stations player)
-               :credits {:field-name "stations-credits" :required-key :stations-credits}
-               :fuel {:field-name "stations-fuel" :required-key :stations-fuel}}
-              required player-id hx-include)
-
-            (build-expense-row
-              {:category "Agents" :abbrev "Agnt" :row-id "agents" :count (:player/agents player)
-               :food {:field-name "agents-food" :required-key :agents-food}
-               :fuel {:field-name "agents-fuel" :required-key :agents-fuel}}
-              required player-id hx-include)
-
-            (build-expense-row
-              {:category "Population" :abbrev "Pop" :row-id "population" :count (str (:player/population player) "M")
-               :food {:field-name "population-food" :required-key :population-food}
-               :fuel {:field-name "population-fuel" :required-key :population-fuel}}
-              required player-id hx-include)]]]
+            ;; One row per expense category, driven by expense-row-specs
+            (for [spec expense-row-specs]
+              (build-expense-row (assoc spec :count (get row-counts (:row-id spec)))
+                                 required player-id expense-hx-include))]]]
 
          ;; Resources after expenses - initial copy, updated via HTMX
          [:div#resources-after

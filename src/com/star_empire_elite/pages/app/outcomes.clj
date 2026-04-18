@@ -1,7 +1,23 @@
+;;;;;
+;;;;; Outcomes Phase - Turn Results and Advancement
+;;;;;
+;;;;; The outcomes page is the final phase of each turn. It displays the results of any combat and
+;;;;; espionage operations that were resolved when the page was first loaded (in outcomes-handler in
+;;;;; app.clj), along with population growth at the end of a round. All stat changes — casualties,
+;;;;; captured planets, population — are applied on the GET request and cached in the player entity
+;;;;; so that a page refresh shows the same result without recomputing. The POST (apply-outcomes)
+;;;;; only handles turn advancement and cleanup: incrementing turn/round counters, clearing pending
+;;;;; state, and recording the score.
+;;;;;
+
 (ns com.star-empire-elite.pages.app.outcomes
   (:require [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]
             [xtdb.api :as xt]))
+
+;;;;
+;;;; Calculations
+;;;;
 
 (defn- calculate-score
   "Compute player score: planets (dominant) + military (power-weighted) + credits (tiebreaker).
@@ -19,47 +35,9 @@
      (* (:player/admirals     player) 100)
      (quot (max 0 (:player/credits player)) 1000)))
 
-(defn apply-outcomes
-  "Advance turn/round/phase and clear stored battle and espionage results.
-  All stat changes were applied when the player loaded the outcomes page (GET);
-  this POST only handles turn progression and cleanup.
-
-  [ctx ring-ctx] -> ring-response (303 redirect to income)"
-  [{:keys [path-params biff/db] :as ctx}]
-  (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player    (xt/entity db player-id)]
-    (if (nil? player)
-      {:status 404 :body "Player not found"}
-      (if (not= (:player/current-phase player) 6)
-        {:status 303 :headers {"location" (str "/app/game/" player-id)}}
-        (let [game            (xt/entity db (:player/game player))
-              turns-per-round (:game/turns-per-round game)
-              now             (java.util.Date.)
-              turns-used      (inc (:player/turns-used player))
-              end-round?      (>= turns-used turns-per-round)
-              next-turn       (if end-round? 1 (inc (:player/current-turn player)))
-              next-round      (if end-round? (inc (:player/current-round player)) (:player/current-round player))
-              reset-used      (if end-round? 0 turns-used)]
-          (biff/submit-tx ctx
-            [(merge {:db/doc-type                     :player
-                     :db/op                           :update
-                     :xt/id                           player-id
-                     :player/current-turn             next-turn
-                     :player/current-round            next-round
-                     :player/turns-used               reset-used
-                     :player/current-phase            1
-                     :player/last-turn-at             now
-                     :player/last-battle-result        nil
-                     :player/last-espionage-result     nil
-                     :player/last-population-growth    nil
-                     :player/pending-espionage         nil
-                     :player/incoming-attacks         nil
-                     :player/incoming-espionage-fails 0
-                     :player/score                    (calculate-score player)}
-                    (when end-round?
-                      {:player/last-round-completed-at now}))])
-          {:status 303
-           :headers {"location" (str "/app/game/" player-id "/income")}})))))
+;;;;
+;;;; UI Components
+;;;;
 
 (defn- incoming-battle-row [label dc dl al unit-key loss-key def-only? separator-below?]
   [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
@@ -121,6 +99,56 @@
    [:td.text-right.px-3 "—"]
    [:td.text-right.px-3 "—"]
    [:td.text-right (if att-wins? enemy-losses "—")]])
+
+;;;;
+;;;; Actions
+;;;;
+
+(defn apply-outcomes
+  "Advance turn/round/phase and clear stored battle and espionage results.
+  All stat changes were applied when the player loaded the outcomes page (GET);
+  this POST only handles turn progression and cleanup.
+
+  [ctx ring-ctx] -> ring-response (303 redirect to income)"
+  [{:keys [path-params biff/db] :as ctx}]
+  (let [player-id (java.util.UUID/fromString (:player-id path-params))
+        player    (xt/entity db player-id)]
+    (if (nil? player)
+      {:status 404 :body "Player not found"}
+      (if (not= (:player/current-phase player) 6)
+        {:status 303 :headers {"location" (str "/app/game/" player-id)}}
+        (let [game            (xt/entity db (:player/game player))
+              turns-per-round (:game/turns-per-round game)
+              now             (java.util.Date.)
+              turns-used      (inc (:player/turns-used player))
+              end-round?      (>= turns-used turns-per-round)
+              next-turn       (if end-round? 1 (inc (:player/current-turn player)))
+              next-round      (if end-round? (inc (:player/current-round player)) (:player/current-round player))
+              reset-used      (if end-round? 0 turns-used)]
+          (biff/submit-tx ctx
+            [(merge {:db/doc-type                     :player
+                     :db/op                           :update
+                     :xt/id                           player-id
+                     :player/current-turn             next-turn
+                     :player/current-round            next-round
+                     :player/turns-used               reset-used
+                     :player/current-phase            1
+                     :player/last-turn-at             now
+                     :player/last-battle-result        nil
+                     :player/last-espionage-result     nil
+                     :player/last-population-growth    nil
+                     :player/pending-espionage         nil
+                     :player/incoming-attacks         nil
+                     :player/incoming-espionage-fails 0
+                     :player/score                    (calculate-score player)}
+                    (when end-round?
+                      {:player/last-round-completed-at now}))])
+          {:status 303
+           :headers {"location" (str "/app/game/" player-id "/income")}})))))
+
+;;;;
+;;;; Page
+;;;;
 
 (defn outcomes-page
   "Show turn results (combat, espionage, population growth) and the advance button for the next turn.

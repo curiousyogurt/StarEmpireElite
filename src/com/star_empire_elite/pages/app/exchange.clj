@@ -165,7 +165,7 @@
    :invalid-fuel-purchase? (and (> (:fuel-bought quantities) 0) (< (:credits resources-after) 0))})
 
 ;;;;
-;;;; UI Components for Table-Based Layout
+;;;; UI Components
 ;;;;
 
 (defn submit-button
@@ -310,9 +310,6 @@
 
 ;;;;
 ;;;; Actions
-;;;;
-;;;; Three handlers: exchange-page (show form), calculate-exchange (HTMX dynamic updates),
-;;;; apply-exchange (commit to DB, stay in phase 2 for multiple exchanges).
 ;;;;
 
 (defn apply-exchange
@@ -508,6 +505,10 @@
 
          ;; Submit button - disabled if player can't execute exchanges
          (submit-button can-execute? {:hx-swap-oob "true"})]))))
+
+;;;;
+;;;; Page
+;;;;
 
 (defn exchange-page
   "Show exchange options and input fields for buying/selling resources and assets.

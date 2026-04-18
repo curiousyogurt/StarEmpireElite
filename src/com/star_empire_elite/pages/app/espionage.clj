@@ -1,7 +1,21 @@
+;;;;;
+;;;;; Espionage Phase - Infiltration Target Selection
+;;;;;
+;;;;; The espionage phase is the fifth phase of each turn where players choose an empire to
+;;;;; infiltrate. Players with no agents are blocked from choosing a target. Like combat, the
+;;;;; actual espionage roll is resolved when the player loads the outcomes page: a successful
+;;;;; infiltration reveals the target's full military unit counts as intel; a failed attempt
+;;;;; notifies the defender that their security detected an intrusion.
+;;;;;
+
 (ns com.star-empire-elite.pages.app.espionage
   (:require [com.biffweb :as biff :refer [q]]
             [com.star-empire-elite.ui :as ui]
             [xtdb.api :as xt]))
+
+;;;;
+;;;; Data Fetching
+;;;;
 
 (defn get-other-players
   "Fetch all other players in the same game, sorted by score descending.
@@ -14,6 +28,10 @@
                                 [(not= player current-player-id)]]}
                    game-id current-player-id)]
     (sort-by :player/score > (seq players))))
+
+;;;;
+;;;; UI Components
+;;;;
 
 (defn target-row
   "Render a single row in the targets table with a radio-button infiltrate selector.
@@ -40,6 +58,39 @@
        [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
         {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
         "Infiltrate"]]]]))
+
+;;;;
+;;;; Actions
+;;;;
+
+(defn apply-espionage
+  "Store the pending espionage target (nil if none chosen) and advance to outcomes phase.
+
+  [ctx ring-ctx] -> ring-response (303 redirect to outcomes)"
+  [{:keys [path-params params biff/db] :as ctx}]
+  (let [player-id (java.util.UUID/fromString (:player-id path-params))
+        player (xt/entity db player-id)]
+    (if (nil? player)
+      {:status 404
+       :body "Player not found"}
+      (if (not= (:player/current-phase player) 5)
+        {:status 303
+         :headers {"location" (str "/app/game/" player-id)}}
+        (let [target-str (:target-player-id params)
+              target-id (when (and target-str (not (empty? target-str)))
+                          (java.util.UUID/fromString target-str))
+              tx-map {:db/doc-type          :player
+                      :db/op                :update
+                      :xt/id                player-id
+                      :player/current-phase 6
+                      :player/pending-espionage target-id}]
+          (biff/submit-tx ctx [tx-map])
+          {:status 303
+           :headers {"location" (str "/app/game/" player-id "/outcomes")}})))))
+
+;;;;
+;;;; Page
+;;;;
 
 (defn espionage-page
   "Show the espionage phase: choose a target empire to infiltrate, or skip espionage.
@@ -101,28 +152,3 @@
         [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
          {:type "submit"}
          "Continue to Outcomes"]])])))
-
-(defn apply-espionage
-  "Store the pending espionage target (nil if none chosen) and advance to outcomes phase.
-
-  [ctx ring-ctx] -> ring-response (303 redirect to outcomes)"
-  [{:keys [path-params params biff/db] :as ctx}]
-  (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player (xt/entity db player-id)]
-    (if (nil? player)
-      {:status 404
-       :body "Player not found"}
-      (if (not= (:player/current-phase player) 5)
-        {:status 303
-         :headers {"location" (str "/app/game/" player-id)}}
-        (let [target-str (:target-player-id params)
-              target-id (when (and target-str (not (empty? target-str)))
-                          (java.util.UUID/fromString target-str))
-              tx-map {:db/doc-type          :player
-                      :db/op                :update
-                      :xt/id                player-id
-                      :player/current-phase 6
-                      :player/pending-espionage target-id}]
-          (biff/submit-tx ctx [tx-map])
-          {:status 303
-           :headers {"location" (str "/app/game/" player-id "/outcomes")}})))))
