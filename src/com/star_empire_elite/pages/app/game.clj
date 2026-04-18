@@ -143,7 +143,10 @@
       {:status 404 :body "Game not found"}
       (let [game        (xt/entity db (:player/game player))
             players     (get-game-players db (:xt/id game))
-            cooldown-ms (utils/round-cooldown-ms player game)]
+            ;; Mid-turn players (past income) have already committed to their turn
+            ;; and must be allowed to finish it regardless of cooldown state.
+            mid-turn?   (> (:player/current-phase player) 1)
+            cooldown-ms (when-not mid-turn? (utils/round-cooldown-ms player game))]
         (ui/page
          {}
          [:div.text-green-400.font-mono

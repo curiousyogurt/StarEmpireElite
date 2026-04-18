@@ -49,7 +49,7 @@
           (case error
             "recaptcha" (str "You failed the recaptcha test. Try again, "
                              "and make sure you aren't blocking scripts from Google.")
-            "invalid-email" "Invalid email. Try again with a different address."
+            "invalid-email" "You must have a Bennington College email address to play. If you believe you should have access, contact the game administrator."
             "send-failed" (str "We weren't able to send an email to that address. "
                                "If the problem persists, try another address.")
             "There was an error.")]]])
@@ -149,7 +149,7 @@
           (case error
             "recaptcha" (str "You failed the recaptcha test. Try again, "
                              "and make sure you aren't blocking scripts from Google.")
-            "invalid-email" "Invalid email. Try again with a different address."
+            "invalid-email" "You must have a Bennington College email address to play. If you believe you should have access, contact the game administrator."
             "send-failed" (str "We weren't able to send an email to that address. "
                                "If the problem persists, try another address.")
             "invalid-link" "Invalid or expired link. Sign in to get a new link."

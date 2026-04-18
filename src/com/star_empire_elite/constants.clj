@@ -5,6 +5,12 @@
 
 (def admin-emails #{"darcyotto@bennington.edu"})
 
+;; Access Control
+;; Players must have a Bennington College email address, or appear in the whitelist below.
+
+(def allowed-email-domain "bennington.edu")
+(def whitelisted-emails   #{"darcyotto@gmail.com" "danher@unc.edu"})
+
 ;; Default Game Settings for Turns (per round) and Rounds (per day)
 
 (def turns-per-round 6)

@@ -14,6 +14,7 @@
 (ns com.star-empire-elite
   (:require [com.biffweb :as biff]
             ;; Application-specific modules
+            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.email :as email]
             [com.star-empire-elite.app :as app]
             [com.star-empire-elite.home :as home]
@@ -59,12 +60,24 @@
 ;;;; to organize functionality into self-contained units that can be composed together.
 ;;;;
 
+(defn email-allowed?
+  "Return true if the email is valid in format AND is either a Bennington College
+  address or appears in the whitelist in constants.clj.
+  Signature matches Biff's :biff.auth/email-validator — takes [ctx email]."
+  [_ctx email]
+  (and email
+       (re-matches #".+@.+\..+" email)
+       (not (re-find #"\s" email))
+       (or (clojure.string/ends-with? email (str "@" const/allowed-email-domain))
+           (const/whitelisted-emails email))))
+
 (def modules
-  [app/module                      ; Main application routes and logic
-   (biff/authentication-module {}) ; Built-in Biff auth (login/logout/signup)
-   home/module                     ; Home page routes
-   schema/module                   ; Data schemas and validation
-   worker/module])                 ; Background job processing
+  [app/module                                                      ; Main application routes and logic
+   (biff/authentication-module                                     ; Built-in Biff auth (login/logout/signup)
+    {:biff.auth/email-validator email-allowed?})
+   home/module                                                     ; Home page routes
+   schema/module                                                   ; Data schemas and validation
+   worker/module])                                                 ; Background job processing
 
 ;;;;
 ;;;; Routing Configuration
