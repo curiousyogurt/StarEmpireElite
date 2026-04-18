@@ -128,8 +128,8 @@
    ;; Header row: game/empire info left, rank/score/delete right
    [:div.flex.justify-between.mb-3
     [:div
-     [:h3.font-bold (:game/name game)]
-     [:p.text-sm (:player/empire-name player)]
+     [:h3.text-2xl.font-bold (:player/empire-name player)]
+     [:p.text-sm (:game/name game)]
      [:p.text-xs.text-green-400.text-opacity-75
       (format-turn-round player game)]]
     [:div.flex.gap-8.items-start.relative.z-10
