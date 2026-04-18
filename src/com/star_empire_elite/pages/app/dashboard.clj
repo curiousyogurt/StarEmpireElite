@@ -1,11 +1,51 @@
+;;;;;
+;;;;; Dashboard - Game and Empire Overview
+;;;;;
+;;;;; The dashboard is the main landing page after login. It lists all games the current user has
+;;;;; joined, with a compact snapshot of each empire's resources, military, and turn status. It
+;;;;; also shows available games the player has not yet joined, and an admin-only game creation
+;;;;; link.
+;;;;;
+
 (ns com.star-empire-elite.pages.app.dashboard
   (:require [com.biffweb :as biff :refer [q]]
             [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [xtdb.api :as xt]))
 
-;; :: fetch all games for the current user
-(defn get-user-games [db uid]
+;;;;
+;;;; Calculations
+;;;;
+
+(defn format-turn-round
+  "Format the turn/round status string for dashboard display.
+  Caps both values at their per-day/per-round maxes so that rolled-over values show the completed 
+  state rather than the reset one. For example, a player who has used all turns and is waiting for the 
+  next day sees 'Turn 6/6 | Round 2/2' rather than the misleading 'Turn 1 | Round 3'.
+
+  [player game] -> string"
+  [player game]
+  (let [rounds-per-day  (:game/rounds-per-day game)
+        turns-per-round (:game/turns-per-round game)
+        current-round   (:player/current-round player)
+        current-turn    (:player/current-turn player)
+        ;; When current-round has rolled past the max, the day is complete and
+        ;; all turns in the last round were used — display the maxes.
+        day-complete?   (> current-round rounds-per-day)
+        display-turn    (if day-complete? turns-per-round current-turn)
+        display-round   (min current-round rounds-per-day)]
+    (str "Turn " display-turn "/" turns-per-round
+         " | Round " display-round "/" rounds-per-day)))
+
+;;;;
+;;;; Data Fetching
+;;;;
+
+(defn get-user-games
+  "Fetch all games the current user has joined, with rank computed from scores.
+
+  [db xtdb-db, uid uuid] -> [{:player player-map, :game game-map}]"
+  [db uid]
   (let [players (q db
                    '{:find (pull player [*])
                      :in [user-id]
@@ -24,8 +64,11 @@
         {:player (assoc player :player/rank rank)
          :game game}))))
 
-;; :: fetch all games the current user has NOT joined
-(defn get-available-games [db uid]
+(defn get-available-games
+  "Fetch all games the current user has NOT joined, with player count for each.
+
+  [db xtdb-db, uid uuid] -> [{:game game-map, :player-count int}]"
+  [db uid]
   (let [games (q db
                  '{:find (pull game [*])
                    :in [user-id]
@@ -43,8 +86,16 @@
         {:game game
          :player-count player-count}))))
 
-;; :: render a joinable game card with player count and join link
-(defn available-game-card [{:keys [game player-count admin?]}]
+;;;;
+;;;; UI Components
+;;;;
+
+(defn available-game-card
+  "Render a card for a game the user has not yet joined, showing player count and a join link.
+  Admin users also see a delete button.
+
+  [{:keys [game player-count admin?]}] -> hiccup"
+  [{:keys [game player-count admin?]}]
   [:div.border.border-green-400.p-4.mb-4.max-w-6xl
    [:div.flex.justify-between.items-center
     [:div
@@ -63,22 +114,24 @@
         [:button.border.border-green-400.text-green-400.px-2.py-1.text-sm.hover:border-yellow-400.hover:text-yellow-400.transition-colors
          {:type "submit"} "X"]))]]])
 
-;; :: render a single game as a card with sections
-(defn game-card [{:keys [player game admin?]}]
+(defn game-card
+  "Render a full empire snapshot card for a game the player has joined.
+  The entire card is a stretched link to the game page. Admin users also see a delete button.
+
+  [{:keys [player game admin?]}] -> hiccup"
+  [{:keys [player game admin?]}]
   [:div.border.border-green-400.p-4.mb-4.max-w-6xl.relative.hover:bg-green-400.hover:bg-opacity-10.transition-colors.cursor-pointer
 
-   ;; :: stretched link covers the whole card
+   ;; Stretched link covers the whole card
    [:a.absolute.inset-0 {:href (str "/app/game/" (:xt/id player))}]
 
-   ;; :: header row: info left, rank/score/delete right
+   ;; Header row: game/empire info left, rank/score/delete right
    [:div.flex.justify-between.mb-3
     [:div
      [:h3.font-bold (:game/name game)]
      [:p.text-sm (:player/empire-name player)]
      [:p.text-xs.text-green-400.text-opacity-75
-      (str "Turn " (:player/current-turn player)
-           " | Round " (:player/current-round player)
-           " | Phase " (:player/current-phase player))]]
+      (format-turn-round player game)]]
     [:div.flex.gap-8.items-start.relative.z-10
      [:div.text-right
       [:p.text-xs "Rank"]
@@ -94,7 +147,7 @@
         [:button.border.border-green-400.text-green-400.px-2.py-1.text-sm.hover:border-yellow-400.hover:text-yellow-400.transition-colors
          {:type "submit"} "X"]))]]
 
-   ;; :: row 1: currencies and planets
+   ;; Row 1: currencies, population, and planets
    [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2.mb-3.pb-3.border-b.border-green-400
     [:div [:p.text-xs "Credits"]    [:p.font-mono (:player/credits player)]]
     [:div [:p.text-xs "Food"]       [:p.font-mono (:player/food player)]]
@@ -106,7 +159,7 @@
     [:div [:p.text-xs "Food Plts"]  [:p.font-mono (:player/food-planets player)]]
     [:div [:p.text-xs "Mil Plts"]   [:p.font-mono (:player/mil-planets player)]]]
 
-   ;; :: row 2: military units and leadership
+   ;; Row 2: military units and leadership
    [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2.mb-3.pb-3.border-b.border-green-400
     [:div [:p.text-xs "Generals"]   [:p.font-mono (:player/generals player)]]
     [:div [:p.text-xs "Soldiers"]   [:p.font-mono (:player/soldiers player)]]
@@ -118,8 +171,15 @@
     [:div [:p.text-xs "Cmd Ships"]  [:p.font-mono (:player/cmd-ships player)]]
     [:div [:p.text-xs "Agents"]     [:p.font-mono (:player/agents player)]]]])
 
-;; :: dashboard page showing all games
-(defn dashboard [{:keys [session biff/db] :as ctx}]
+;;;;
+;;;; Page
+;;;;
+
+(defn dashboard
+  "Render the main dashboard page showing the user's active games and available games to join.
+
+  [ctx ring-ctx] -> hiccup"
+  [{:keys [session biff/db] :as ctx}]
   (let [my-games        (get-user-games db (:uid session))
         available-games (get-available-games db (:uid session))
         user            (xt/entity db (:uid session))
@@ -127,7 +187,8 @@
     (ui/page
      {}
      [:div.text-green-400.font-mono
-      ;; :: header with user info and sign out
+
+      ;; Header with user info and sign-out button
       [:div.flex.justify-between.items-center.mb-6
        [:h1.text-3xl.font-bold "Your Games"]
        [:div.flex.items-center.gap-4
@@ -139,19 +200,19 @@
           {:type "submit"}
           "Sign Out"])]]
 
-      ;; :: user's active games
+      ;; Active games — one card per joined game
       (if (empty? my-games)
         [:p.mb-6 "You are not currently in any games."]
         [:div.mb-6
          (map #(game-card (assoc % :admin? admin?)) my-games)])
 
-      ;; :: available games to join
+      ;; Available games to join — only shown when any exist
       (when (seq available-games)
         [:div.mb-6
          [:h2.text-xl.font-bold.mb-4 "Available Games"]
          (map #(available-game-card (assoc % :admin? admin?)) available-games)])
 
-      ;; :: create game button (admin only)
+      ;; Create game button — admin only
       (when admin?
         [:a.bg-green-400.text-black.px-4.py-2.font-bold.hover:bg-green-300.transition-colors.inline-block
          {:href "/app/create-game"}
