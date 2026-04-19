@@ -13,7 +13,7 @@
 (ns com.star-empire-elite.pages.app.outcomes
   (:require [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]
-            [xtdb.api :as xt]))
+            [com.star-empire-elite.utils :as utils]))
 
 ;;;;
 ;;;; Calculations
@@ -39,12 +39,30 @@
 ;;;; UI Components
 ;;;;
 
-(defn- incoming-battle-row [label dc dl al unit-key loss-key def-only? separator-below?]
+;; Specs for combat unit rows. :special? marks stations (defender-only): in incoming sections
+;; it suppresses the attacker-losses column; in outgoing sections it suppresses your-forces and
+;; your-losses columns. :separator? marks the last row before the planet rows.
+(def ^:private battle-unit-specs
+  [{:label "Soldiers"   :unit-key :soldiers   :loss-key :soldiers-lost   :special? false :separator? false}
+   {:label "Transports" :unit-key :transports :loss-key :transports-lost :special? false :separator? false}
+   {:label "Generals"   :unit-key :generals   :loss-key :generals-lost   :special? false :separator? false}
+   {:label "Fighters"   :unit-key :fighters   :loss-key :fighters-lost   :special? false :separator? false}
+   {:label "Carriers"   :unit-key :carriers   :loss-key :carriers-lost   :special? false :separator? false}
+   {:label "Admirals"   :unit-key :admirals   :loss-key :admirals-lost   :special? false :separator? false}
+   {:label "Cmd Ships"  :unit-key :cmd-ships  :loss-key :cmd-ships-lost  :special? false :separator? false}
+   {:label "Stations"   :unit-key :stations   :loss-key :stations-lost   :special? true  :separator? true}])
+
+(def ^:private planet-specs
+  [{:label "Ore"      :pt-key :ore  :separator? false}
+   {:label "Food"     :pt-key :food :separator? false}
+   {:label "Military" :pt-key :mil  :separator? true}])
+
+(defn- incoming-battle-row [label dc dl al unit-key loss-key special? separator-below?]
   [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
    [:td.py-1 label]
    [:td.text-right.px-3 (get dc unit-key)]
    [:td.text-right.px-3 (get dl loss-key)]
-   [:td.text-right (if def-only? "—" (get al loss-key))]])
+   [:td.text-right (if special? "—" (get al loss-key))]])
 
 (defn- incoming-planet-row [label def-losses separator-below?]
   [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
@@ -74,23 +92,17 @@
          [:th.text-right.py-1 {:style {:width "30%"}} "Your Losses"]
          [:th.text-right.py-1 {:style {:width "30%"}} (str att-name " Losses")]]]
        [:tbody
-        (incoming-battle-row "Soldiers"   dc dl al :soldiers   :soldiers-lost   false false)
-        (incoming-battle-row "Transports" dc dl al :transports :transports-lost false false)
-        (incoming-battle-row "Generals"   dc dl al :generals   :generals-lost   false false)
-        (incoming-battle-row "Fighters"   dc dl al :fighters   :fighters-lost   false false)
-        (incoming-battle-row "Carriers"   dc dl al :carriers   :carriers-lost   false false)
-        (incoming-battle-row "Admirals"   dc dl al :admirals   :admirals-lost   false false)
-        (incoming-battle-row "Cmd Ships"  dc dl al :cmd-ships  :cmd-ships-lost  false false)
-        (incoming-battle-row "Stations"   dc dl al :stations   :stations-lost   true  true)
-        (incoming-planet-row "Ore"      (:ore  pt) false)
-        (incoming-planet-row "Food"     (:food pt) false)
-        (incoming-planet-row "Military" (:mil  pt) true)]]]]))
+        (for [spec battle-unit-specs]
+          (incoming-battle-row (:label spec) dc dl al (:unit-key spec) (:loss-key spec)
+                               (:special? spec) (:separator? spec)))
+        (for [spec planet-specs]
+          (incoming-planet-row (:label spec) (get pt (:pt-key spec)) (:separator? spec)))]]]]))
 
-(defn- battle-row [label af al dl att-key loss-key att-only? separator-below?]
+(defn- battle-row [label af al dl att-key loss-key special? separator-below?]
   [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
    [:td.py-1 label]
-   [:td.text-right.px-3 (if att-only? "—" (get af att-key))]
-   [:td.text-right.px-3 (if att-only? "—" (get al loss-key))]
+   [:td.text-right.px-3 (if special? "—" (get af att-key))]
+   [:td.text-right.px-3 (if special? "—" (get al loss-key))]
    [:td.text-right (get dl loss-key)]])
 
 (defn- planet-row [label enemy-losses att-wins? separator-below?]
@@ -110,41 +122,37 @@
   this POST only handles turn progression and cleanup.
 
   [ctx ring-ctx] -> ring-response (303 redirect to income)"
-  [{:keys [path-params biff/db] :as ctx}]
-  (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player    (xt/entity db player-id)]
-    (if (nil? player)
-      {:status 404 :body "Player not found"}
-      (if (not= (:player/current-phase player) 6)
-        {:status 303 :headers {"location" (str "/app/game/" player-id)}}
-        (let [game            (xt/entity db (:player/game player))
-              turns-per-round (:game/turns-per-round game)
-              now             (java.util.Date.)
-              turns-used      (inc (:player/turns-used player))
-              end-round?      (>= turns-used turns-per-round)
-              next-turn       (if end-round? 1 (inc (:player/current-turn player)))
-              next-round      (if end-round? (inc (:player/current-round player)) (:player/current-round player))
-              reset-used      (if end-round? 0 turns-used)]
-          (biff/submit-tx ctx
-            [(merge {:db/doc-type                     :player
-                     :db/op                           :update
-                     :xt/id                           player-id
-                     :player/current-turn             next-turn
-                     :player/current-round            next-round
-                     :player/turns-used               reset-used
-                     :player/current-phase            1
-                     :player/last-turn-at             now
-                     :player/last-battle-result        nil
-                     :player/last-espionage-result     nil
-                     :player/last-population-growth    nil
-                     :player/pending-espionage         nil
-                     :player/incoming-attacks         nil
-                     :player/incoming-espionage-fails 0
-                     :player/score                    (calculate-score player)}
-                    (when end-round?
-                      {:player/last-round-completed-at now}))])
-          {:status 303
-           :headers {"location" (str "/app/game/" player-id "/income")}})))))
+  [{:keys [path-params] :as ctx}]
+  (utils/with-player-and-game [player game player-id] ctx
+    (if-let [redirect (utils/validate-phase player 6 player-id)]
+      redirect
+      (let [turns-per-round (:game/turns-per-round game)
+            now             (java.util.Date.)
+            turns-used      (inc (:player/turns-used player))
+            end-round?      (>= turns-used turns-per-round)
+            next-turn       (if end-round? 1 (inc (:player/current-turn player)))
+            next-round      (if end-round? (inc (:player/current-round player)) (:player/current-round player))
+            reset-used      (if end-round? 0 turns-used)]
+        (biff/submit-tx ctx
+          [(merge {:db/doc-type                     :player
+                   :db/op                           :update
+                   :xt/id                           player-id
+                   :player/current-turn             next-turn
+                   :player/current-round            next-round
+                   :player/turns-used               reset-used
+                   :player/current-phase            1
+                   :player/last-turn-at             now
+                   :player/last-battle-result        nil
+                   :player/last-espionage-result     nil
+                   :player/last-population-growth    nil
+                   :player/pending-espionage         nil
+                   :player/incoming-attacks         nil
+                   :player/incoming-espionage-fails 0
+                   :player/score                    (calculate-score player)}
+                  (when end-round?
+                    {:player/last-round-completed-at now}))])
+        {:status 303
+         :headers {"location" (str "/app/game/" player-id "/income")}}))))
 
 ;;;;
 ;;;; Page
@@ -155,9 +163,9 @@
 
   [{:keys [player game battle-result espionage-result pop-growth]}] -> hiccup"
   [{:keys [player game battle-result espionage-result pop-growth]}]
-  (let [current-turn        (:player/current-turn player)
-        turns-per-round     (:game/turns-per-round game)
-        end-current-round?  (>= current-turn turns-per-round)]
+  (let [current-turn       (:player/current-turn player)
+        turns-per-round    (:game/turns-per-round game)
+        end-current-round? (>= current-turn turns-per-round)]
     (ui/page
      {}
      [:div.mx-auto.max-w-4xl.w-full.text-green-400.font-mono
@@ -167,7 +175,7 @@
                        (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
 
       ;; Incoming attacks section (attacks received from other players this turn)
-      (let [incoming (seq (:player/incoming-attacks player))
+      (let [incoming  (seq (:player/incoming-attacks player))
             esp-fails (or (:player/incoming-espionage-fails player) 0)]
         (when (or incoming (pos? esp-fails))
           [:div
@@ -184,8 +192,7 @@
               al        (:attacker-losses battle-result)
               dl        (:defender-losses battle-result)
               def-name  (:defender-name battle-result)
-              pt        (:planets-transferred battle-result)
-              pt-total  (+ (:mil pt) (:food pt) (:ore pt))]
+              pt        (:planets-transferred battle-result)]
           [:div.border.border-green-400.p-4.mb-4
            [:h3.font-bold.mb-3
             (if att-wins? (str "Victory against " def-name) (str "Defeat by " def-name))]
@@ -198,18 +205,12 @@
                [:th.text-right.py-1  {:style {:width "30%"}} "Your Losses"]
                [:th.text-right.py-1  {:style {:width "30%"}} (str def-name " Losses")]]]
              [:tbody
-              (battle-row "Soldiers"   ac al dl :soldiers   :soldiers-lost   false false)
-              (battle-row "Transports" ac al dl :transports :transports-lost false false)
-              (battle-row "Generals"   ac al dl :generals   :generals-lost   false false)
-              (battle-row "Fighters"   ac al dl :fighters   :fighters-lost   false false)
-              (battle-row "Carriers"   ac al dl :carriers   :carriers-lost   false false)
-              (battle-row "Admirals"   ac al dl :admirals   :admirals-lost   false false)
-              (battle-row "Cmd Ships"  ac al dl :cmd-ships  :cmd-ships-lost  false false)
-              (battle-row "Stations"   ac al dl :stations   :stations-lost   true  true)
-              (planet-row "Ore"       (:ore  pt) att-wins? false)
-              (planet-row "Food"      (:food pt) att-wins? false)
-              (planet-row "Military"  (:mil  pt) att-wins? true)]]]]
-        ))
+              (for [spec battle-unit-specs]
+                (battle-row (:label spec) ac al dl (:unit-key spec) (:loss-key spec)
+                            (:special? spec) (:separator? spec)))
+              (for [spec planet-specs]
+                (planet-row (:label spec) (get pt (:pt-key spec)) att-wins? (:separator? spec)))]]]]))
+
       ;; Espionage result section (only shown when an infiltration was declared)
       (when espionage-result
         (let [won?  (:attacker-wins? espionage-result)

@@ -347,21 +347,6 @@
     (ui/page
       {}
       [:div.mx-auto.max-w-4xl.w-full.text-green-400.font-mono
-       ;; CSS for responsive grid columns
-       [:style "
-        .expense-row-grid {
-                           grid-template-columns: 0.7fr 0.4fr 1.3fr 1fr 1fr 1fr;
-                           }
-        @media (min-width: 1024px) {
-                                    .expense-row-grid {
-                                                       grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;
-                                                       }
-                                    }
-        .text-xxs {
-                   font-size: 0.65rem;
-                   line-height: 0.9rem;
-                   }
-        "]
 
        [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
 

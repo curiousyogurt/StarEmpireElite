@@ -82,6 +82,32 @@
   .link {
     @apply text-blue-600 hover:underline;
   }
+
+  /* Responsive grid for building and exchange phase table rows (5 columns) */
+  .phase-row-grid {
+    grid-template-columns: 0.9fr 0.8fr 0.7fr 1.1fr 0.9fr;
+  }
+  @media (min-width: 1024px) {
+    .phase-row-grid {
+      grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
+    }
+  }
+
+  /* Responsive grid for expense phase table rows (6 columns, wider required-cost column) */
+  .expense-row-grid {
+    grid-template-columns: 0.7fr 0.4fr 1.3fr 1fr 1fr 1fr;
+  }
+  @media (min-width: 1024px) {
+    .expense-row-grid {
+      grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr;
+    }
+  }
+
+  /* Smaller than Tailwind's text-xs, used for compact required-cost display */
+  .text-xxs {
+    font-size: 0.65rem;
+    line-height: 0.9rem;
+  }
 }
 
 .grecaptcha-badge { visibility: hidden; }

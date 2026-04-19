@@ -10,13 +10,33 @@
 ;;;;;
 
 (ns com.star-empire-elite.pages.app.building
-  (:require [com.biffweb :as biff]
+  (:require [clojure.string :as str]
+            [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
 
 ;;;;
 ;;;; Calculations
 ;;;;
+
+(def purchase-row-specs
+  [{:label "Soldiers"         :abbrev "Soldiers"  :qty-key :soldiers     :cost-key :game/soldier-cost}
+   {:label "Transports"       :abbrev "Transport" :qty-key :transports   :cost-key :game/transport-cost}
+   {:label "Generals"         :abbrev "Generals"  :qty-key :generals     :cost-key :game/general-cost}
+   {:label "Carriers"         :abbrev "Carriers"  :qty-key :carriers     :cost-key :game/carrier-cost}
+   {:label "Fighters"         :abbrev "Fighters"  :qty-key :fighters     :cost-key :game/fighter-cost}
+   {:label "Admirals"         :abbrev "Admirals"  :qty-key :admirals     :cost-key :game/admiral-cost}
+   {:label "Defence Stations" :abbrev "Def Stns"  :qty-key :stations     :cost-key :game/station-cost}
+   {:label "Command Ships"    :abbrev "Cmd Ships" :qty-key :cmd-ships    :cost-key :game/cmd-ship-cost}
+   {:label "Agents"           :abbrev "Agents"    :qty-key :agents       :cost-key :game/agent-cost}
+   {:label "Ore Planets"      :abbrev "Ore Plts"  :qty-key :ore-planets  :cost-key :game/ore-planet-cost}
+   {:label "Food Planets"     :abbrev "Food Plts" :qty-key :food-planets :cost-key :game/food-planet-cost}
+   {:label "Military Planets" :abbrev "Mil Plts"  :qty-key :mil-planets  :cost-key :game/mil-planet-cost}])
+
+(def building-hx-include
+  (str/join ","
+    (for [spec purchase-row-specs]
+      (str "[name='" (name (:qty-key spec)) "']"))))
 
 (defn parse-purchase-quantities
   "Parse all purchase quantity inputs from request params.
@@ -36,24 +56,21 @@
    :food-planets (utils/parse-numeric-input (:food-planets params))
    :mil-planets  (utils/parse-numeric-input (:mil-planets params))})
 
+(defn- total-cost
+  "Sum of quantity × cost-per-unit across all purchasable items.
+
+  [quantities purchase-quantities, game game-map] -> int"
+  [quantities game]
+  (reduce + (for [spec purchase-row-specs]
+              (* (get quantities (:qty-key spec))
+                 (get game (:cost-key spec))))))
+
 (defn calculate-purchase-cost
   "Calculate total credits needed for all purchases based on game constants.
 
   [quantities purchase-quantities, game game-map] -> {:total-cost int}"
   [quantities game]
-  (let [total-cost (+ (* (:soldiers quantities)     (:game/soldier-cost game))
-                      (* (:transports quantities)   (:game/transport-cost game))
-                      (* (:generals quantities)     (:game/general-cost game))
-                      (* (:carriers quantities)     (:game/carrier-cost game))
-                      (* (:fighters quantities)     (:game/fighter-cost game))
-                      (* (:admirals quantities)     (:game/admiral-cost game))
-                      (* (:stations quantities)     (:game/station-cost game))
-                      (* (:cmd-ships quantities)    (:game/cmd-ship-cost game))
-                      (* (:agents quantities)       (:game/agent-cost game))
-                      (* (:ore-planets quantities)  (:game/ore-planet-cost game))
-                      (* (:food-planets quantities) (:game/food-planet-cost game))
-                      (* (:mil-planets quantities)  (:game/mil-planet-cost game)))]
-    {:total-cost total-cost}))
+  {:total-cost (total-cost quantities game)})
 
 (defn calculate-resources-after-purchases
   "Calculate player resources after executing purchases.
@@ -69,7 +86,7 @@
    :admirals     (+ (:player/admirals player)     (:admirals quantities))
    :stations     (+ (:player/stations player)     (:stations quantities))
    :cmd-ships    (+ (:player/cmd-ships player)    (:cmd-ships quantities))
-   :agents       (+ (:player/agents player) (:agents quantities))
+   :agents       (+ (:player/agents player)       (:agents quantities))
    :ore-planets  (+ (:player/ore-planets player)  (:ore-planets quantities))
    :food-planets (+ (:player/food-planets player) (:food-planets quantities))
    :mil-planets  (+ (:player/mil-planets player)  (:mil-planets quantities))})
@@ -87,31 +104,9 @@
 
   [player player-map, quantities purchase-quantities, game game-map] -> {:soldiers int, :transports int, ...}"
   [player quantities game]
-  (let [total-cost-so-far (+ (* (:soldiers quantities)     (:game/soldier-cost game))
-                             (* (:transports quantities)   (:game/transport-cost game))
-                             (* (:generals quantities)     (:game/general-cost game))
-                             (* (:carriers quantities)     (:game/carrier-cost game))
-                             (* (:fighters quantities)     (:game/fighter-cost game))
-                             (* (:admirals quantities)     (:game/admiral-cost game))
-                             (* (:stations quantities)     (:game/station-cost game))
-                             (* (:cmd-ships quantities)    (:game/cmd-ship-cost game))
-                             (* (:agents quantities)       (:game/agent-cost game))
-                             (* (:ore-planets quantities)  (:game/ore-planet-cost game))
-                             (* (:food-planets quantities) (:game/food-planet-cost game))
-                             (* (:mil-planets quantities)  (:game/mil-planet-cost game)))
-        remaining-credits (- (:player/credits player) total-cost-so-far)]
-    {:soldiers     (quot remaining-credits (:game/soldier-cost game))
-     :transports   (quot remaining-credits (:game/transport-cost game))
-     :generals     (quot remaining-credits (:game/general-cost game))
-     :carriers     (quot remaining-credits (:game/carrier-cost game))
-     :fighters     (quot remaining-credits (:game/fighter-cost game))
-     :admirals     (quot remaining-credits (:game/admiral-cost game))
-     :stations     (quot remaining-credits (:game/station-cost game))
-     :cmd-ships    (quot remaining-credits (:game/cmd-ship-cost game))
-     :agents       (quot remaining-credits (:game/agent-cost game))
-     :ore-planets  (quot remaining-credits (:game/ore-planet-cost game))
-     :food-planets (quot remaining-credits (:game/food-planet-cost game))
-     :mil-planets  (quot remaining-credits (:game/mil-planet-cost game))}))
+  (let [remaining-credits (- (:player/credits player) (total-cost quantities game))]
+    (into {} (for [spec purchase-row-specs]
+               [(:qty-key spec) (quot remaining-credits (get game (:cost-key spec)))]))))
 
 ;;;;
 ;;;; UI Components
@@ -131,7 +126,6 @@
            extra-attrs)
     "Continue to Action"]))
 
-
 (defn purchase-row
   "Renders a purchase row with a single responsive input field for mobile and desktop.
 
@@ -139,11 +133,10 @@
    current-quantity int, max-quantity int, game game-map, player-id uuid, hx-include str] -> hiccup"
   [unit-name unit-name-mobile unit-key cost-key current-quantity max-quantity game player-id hx-include]
   (let [cost-per-unit (get game cost-key)
-        item-cost (* cost-per-unit current-quantity)
-        cost-id (str "cost-" (name unit-key))
-        max-qty-id (str "max-qty-" (name unit-key))]
-    ;; Single grid that changes layout responsively - one input, just restyled
-    [:div.border-b.border-green-400.last:border-b-0.grid.items-center.gap-1.px-2.py-2.text-xs.leading-tight.lg:gap-3.lg:px-4.lg:py-2.lg:text-base.building-row-grid
+        item-cost     (* cost-per-unit current-quantity)
+        cost-id       (str "cost-" (name unit-key))
+        max-qty-id    (str "max-qty-" (name unit-key))]
+    [:div.border-b.border-green-400.last:border-b-0.grid.items-center.gap-1.px-2.py-2.text-xs.leading-tight.lg:gap-3.lg:px-4.lg:py-2.lg:text-base.phase-row-grid
 
      ;; Col 1: Item name (abbreviated on mobile, full on desktop)
      [:div.font-mono.lg:pr-4
@@ -180,23 +173,17 @@
   [:div#cost-summary.border-t-2.border-green-400.bg-green-400.bg-opacity-10
 
    ;; Mobile: Compact layout
-   [:div.grid.gap-1.px-2.py-3.font-bold.text-sm.lg:hidden
-    {:style {:grid-template-columns "0.9fr 0.8fr 0.7fr 1.1fr 0.9fr"}}
+   [:div.grid.gap-1.px-2.py-3.font-bold.text-sm.phase-row-grid.lg:hidden
     [:div "Credits (Expense)"]
-    [:div]
-    [:div]
-    [:div]
+    [:div] [:div] [:div]
     [:div.text-right.font-mono.text-base
      {:class (when (not affordable?) "text-red-400")}
      (ui/format-number total-cost)]]
 
    ;; Desktop: Full width layout
-   [:div.hidden.lg:grid.lg:gap-3.lg:px-4.lg:py-2.lg:font-bold
-    {:style {:grid-template-columns "1.5fr 1fr 1fr 1fr 1fr"}}
+   [:div.hidden.lg:grid.lg:gap-3.lg:px-4.lg:py-2.lg:font-bold.phase-row-grid
     [:div.text-lg "Credits (Expense)"]
-    [:div]
-    [:div]
-    [:div]
+    [:div] [:div] [:div]
     [:div.text-right.font-mono.text-xl.pr-4
      {:class (when (not affordable?) "text-red-400")}
      (ui/format-number total-cost)]]])
@@ -252,18 +239,9 @@
           resources-after (calculate-resources-after-purchases player quantities cost-info)
           affordable?     (can-afford-purchases? resources-after)
           max-quantities  (calculate-max-quantities player quantities game)
-          item-costs      {:soldiers     (* (:soldiers quantities)     (:game/soldier-cost game))
-                           :transports   (* (:transports quantities)   (:game/transport-cost game))
-                           :generals     (* (:generals quantities)     (:game/general-cost game))
-                           :carriers     (* (:carriers quantities)     (:game/carrier-cost game))
-                           :fighters     (* (:fighters quantities)     (:game/fighter-cost game))
-                           :admirals     (* (:admirals quantities)     (:game/admiral-cost game))
-                           :stations     (* (:stations quantities)     (:game/station-cost game))
-                           :cmd-ships    (* (:cmd-ships quantities)    (:game/cmd-ship-cost game))
-                           :agents       (* (:agents quantities) (:game/agent-cost game))
-                           :ore-planets  (* (:ore-planets quantities)  (:game/ore-planet-cost game))
-                           :food-planets (* (:food-planets quantities) (:game/food-planet-cost game))
-                           :mil-planets  (* (:mil-planets quantities)  (:game/mil-planet-cost game))}]
+          item-costs      (into {} (for [spec purchase-row-specs]
+                                     [(:qty-key spec) (* (get quantities (:qty-key spec))
+                                                         (get game (:cost-key spec)))]))]
       (biff/render
         [:div
          [:div#resources-after
@@ -303,22 +281,10 @@
 
   [{:keys [player game]}] -> hiccup"
   [{:keys [player game]}]
-  (let [player-id  (:xt/id player)
-        hx-include "[name='soldiers'],[name='transports'],[name='generals'],[name='carriers'],[name='fighters'],[name='admirals'],[name='stations'],[name='cmd-ships'],[name='agents'],[name='ore-planets'],[name='food-planets'],[name='mil-planets']"]
+  (let [player-id (:xt/id player)]
     (ui/page
       {}
       [:div.mx-auto.max-w-4xl.w-full.text-green-400.font-mono
-       ;; CSS for responsive grid columns
-       [:style "
-        .building-row-grid {
-                            grid-template-columns: 0.9fr 0.8fr 0.7fr 1.1fr 0.9fr;
-                            }
-        @media (min-width: 1024px) {
-                                    .building-row-grid {
-                                                        grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
-                                                        }
-                                    }
-        "]
 
        [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
 
@@ -334,14 +300,12 @@
 
          [:h3.font-bold.mb-4 "Building This Round"]
 
-         ;; Table container with header and rows
          [:div.w-full.mb-8
           [:div.border.border-green-400.overflow-x-auto
            [:div
 
             ;; Mobile header - abbreviated
-            [:div.grid.gap-1.px-2.py-2.bg-green-400.bg-opacity-10.font-bold.border-b.border-green-400.text-xs.lg:hidden
-             {:style {:grid-template-columns "0.9fr 0.8fr 0.7fr 1.1fr 0.9fr"}}
+            [:div.grid.gap-1.px-2.py-2.bg-green-400.bg-opacity-10.font-bold.border-b.border-green-400.text-xs.phase-row-grid.lg:hidden
              [:div "Item"]
              [:div.text-right "Cost"]
              [:div.text-right "Max"]
@@ -356,19 +320,10 @@
                {:label "Purchase" :class "pr-4"}
                {:label "Credits" :class "text-right pr-4"}])
 
-            ;; All purchase rows with abbreviated mobile names
-            (purchase-row "Soldiers" "Soldiers" :soldiers :game/soldier-cost 0 0 game player-id hx-include)
-            (purchase-row "Transports" "Transport" :transports :game/transport-cost 0 0 game player-id hx-include)
-            (purchase-row "Generals" "Generals" :generals :game/general-cost 0 0 game player-id hx-include)
-            (purchase-row "Carriers" "Carriers" :carriers :game/carrier-cost 0 0 game player-id hx-include)
-            (purchase-row "Fighters" "Fighters" :fighters :game/fighter-cost 0 0 game player-id hx-include)
-            (purchase-row "Admirals" "Admirals" :admirals :game/admiral-cost 0 0 game player-id hx-include)
-            (purchase-row "Defence Stations" "Def Stns" :stations :game/station-cost 0 0 game player-id hx-include)
-            (purchase-row "Command Ships" "Cmd Ships" :cmd-ships :game/cmd-ship-cost 0 0 game player-id hx-include)
-            (purchase-row "Agents"        "Agents"    :agents    :game/agent-cost     0 0 game player-id hx-include)
-            (purchase-row "Ore Planets" "Ore Plts" :ore-planets :game/ore-planet-cost 0 0 game player-id hx-include)
-            (purchase-row "Food Planets" "Food Plts" :food-planets :game/food-planet-cost 0 0 game player-id hx-include)
-            (purchase-row "Military Planets" "Mil Plts" :mil-planets :game/mil-planet-cost 0 0 game player-id hx-include)
+            ;; Purchase rows
+            (for [spec purchase-row-specs]
+              (purchase-row (:label spec) (:abbrev spec) (:qty-key spec) (:cost-key spec)
+                            0 0 game player-id building-hx-include))
 
             (total-cost-row 0 true)]]]
 

@@ -11,7 +11,7 @@
 (ns com.star-empire-elite.pages.app.espionage
   (:require [com.biffweb :as biff :refer [q]]
             [com.star-empire-elite.ui :as ui]
-            [xtdb.api :as xt]))
+            [com.star-empire-elite.utils :as utils]))
 
 ;;;;
 ;;;; Data Fetching
@@ -67,26 +67,20 @@
   "Store the pending espionage target (nil if none chosen) and advance to outcomes phase.
 
   [ctx ring-ctx] -> ring-response (303 redirect to outcomes)"
-  [{:keys [path-params params biff/db] :as ctx}]
-  (let [player-id (java.util.UUID/fromString (:player-id path-params))
-        player (xt/entity db player-id)]
-    (if (nil? player)
-      {:status 404
-       :body "Player not found"}
-      (if (not= (:player/current-phase player) 5)
+  [{:keys [path-params params] :as ctx}]
+  (utils/with-player-and-game [player game player-id] ctx
+    (if-let [redirect (utils/validate-phase player 5 player-id)]
+      redirect
+      (let [target-str (:target-player-id params)
+            target-id  (when (and target-str (not (empty? target-str)))
+                         (java.util.UUID/fromString target-str))]
+        (biff/submit-tx ctx [{:db/doc-type              :player
+                              :db/op                    :update
+                              :xt/id                    player-id
+                              :player/current-phase     6
+                              :player/pending-espionage target-id}])
         {:status 303
-         :headers {"location" (str "/app/game/" player-id)}}
-        (let [target-str (:target-player-id params)
-              target-id (when (and target-str (not (empty? target-str)))
-                          (java.util.UUID/fromString target-str))
-              tx-map {:db/doc-type          :player
-                      :db/op                :update
-                      :xt/id                player-id
-                      :player/current-phase 6
-                      :player/pending-espionage target-id}]
-          (biff/submit-tx ctx [tx-map])
-          {:status 303
-           :headers {"location" (str "/app/game/" player-id "/outcomes")}})))))
+         :headers {"location" (str "/app/game/" player-id "/outcomes")}}))))
 
 ;;;;
 ;;;; Page

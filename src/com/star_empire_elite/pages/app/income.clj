@@ -19,7 +19,7 @@
 (defn calculate-income
   "Calculate income from all sources using game constants.
 
-  [player game] -> {:ore-credits int, :ore-fuel int,
+  [player player-map, game game-map] -> {:ore-credits int, :ore-fuel int,
                     :food-food int, :mil-soldiers int, :mil-fighters int,
                     :mil-stations int, :tax-credits int}"
   [player game]
@@ -33,6 +33,20 @@
    :mil-fighters (* (:player/mil-planets player)  (:game/mil-planet-fighters game))
    :mil-stations (* (:player/mil-planets player)  (:game/mil-planet-stations game))
    :tax-credits  (* (:player/population player)   (:game/population-tax-credits game))})
+
+(defn calculate-resources-after-income
+  "Calculate all player resources after applying income.
+
+  [player player-map, income income-map] -> {:credits int, :food int, ...}"
+  [player income]
+  {:credits  (+ (:player/credits player)  (:ore-credits income) (:tax-credits income))
+   :food     (+ (:player/food player)     (:food-food income))
+   :fuel     (+ (:player/fuel player)     (:ore-fuel income))
+   :galaxars (:player/galaxars player)
+   :soldiers (+ (:player/soldiers player) (:mil-soldiers income))
+   :fighters (+ (:player/fighters player) (:mil-fighters income))
+   :stations (+ (:player/stations player) (:mil-stations income))
+   :agents   (:player/agents player)})
 
 ;;;;
 ;;;; UI Components
@@ -100,6 +114,7 @@
     (if-let [redirect (utils/validate-phase player 1 player-id)]
       redirect
       (let [income         (calculate-income player game)
+            after          (calculate-resources-after-income player income)
             last-completed (:player/last-round-completed-at player)
             day-reset?     (and (> (:player/current-round player) 1)
                                 last-completed
@@ -108,12 +123,12 @@
           [(cond-> {:db/doc-type          :player
                     :db/op                :update
                     :xt/id                player-id
-                    :player/credits       (+ (:player/credits player)  (:ore-credits income) (:tax-credits income))
-                    :player/food          (+ (:player/food player)     (:food-food income))
-                    :player/fuel          (+ (:player/fuel player)     (:ore-fuel income))
-                    :player/soldiers      (+ (:player/soldiers player) (:mil-soldiers income))
-                    :player/fighters      (+ (:player/fighters player) (:mil-fighters income))
-                    :player/stations      (+ (:player/stations player) (:mil-stations income))
+                    :player/credits       (:credits after)
+                    :player/food          (:food after)
+                    :player/fuel          (:fuel after)
+                    :player/soldiers      (:soldiers after)
+                    :player/fighters      (:fighters after)
+                    :player/stations      (:stations after)
                     :player/current-phase 2}
                    day-reset? (assoc :player/current-round 1))])
         {:status 303
@@ -129,7 +144,8 @@
 
   [{:keys [player game]}] -> hiccup"
   [{:keys [player game]}]
-  (let [income (calculate-income player game)]
+  (let [income (calculate-income player game)
+        after  (calculate-resources-after-income player income)]
     (ui/page
       {}
       [:div.text-green-400.font-mono
@@ -178,16 +194,7 @@
        ;;; Final resource totals:
        ;;; Shows what the player will have after income is applied. This preview helps players
        ;;; anticipate actions that they might want or need to take in the subsequent phases.
-       (ui/resource-display-grid
-         {:credits  (+ (:player/credits player)  (:ore-credits income) (:tax-credits income))
-          :food     (+ (:player/food player)     (:food-food income))
-          :fuel     (+ (:player/fuel player)     (:ore-fuel income))
-          :galaxars (:player/galaxars player)
-          :soldiers (+ (:player/soldiers player) (:mil-soldiers income))
-          :fighters (+ (:player/fighters player) (:mil-fighters income))
-          :stations (+ (:player/stations player) (:mil-stations income))
-          :agents   (:player/agents player)}
-         "Resources After Income")
+       (ui/resource-display-grid after "Resources After Income")
 
        ;;; Phase Advance Form:
        ;;; Simple form submission with no validation needed. Income is always valid and beneficial.

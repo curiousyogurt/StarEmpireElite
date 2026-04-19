@@ -95,7 +95,7 @@
       (let [ctx    {:path-params {:player-id (str test-player-id)} :biff/db nil}
             result (game/game-view ctx)]
         (is (= 404 (:status result)))
-        (is (= "Game not found" (:body result)))))))
+        (is (= "Player not found" (:body result)))))))
 
 (deftest test-game-view-bad-uuid
   (testing "Throws when player-id is not a valid UUID"

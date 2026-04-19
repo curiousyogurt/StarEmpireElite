@@ -368,23 +368,20 @@
   (testing "Returns a hiccup vector for a standard player"
     (is (vector? (exchange/exchange-page {:player test-player :game test-game})))))
 
-(deftest test-sell-row-renders
+(deftest test-exchange-row-renders
   (let [rates (exchange/get-exchange-rates test-game)]
     (testing "Renders hiccup for a typical sell row"
-      (is (vector? (exchange/sell-row "Soldiers" "Soldiers" "soldiers-sold"
-                                      (:soldier-sell rates) 0 100 test-player-id "form"))))
+      (is (vector? (exchange/exchange-row "Soldiers" "Soldiers" "soldiers-sold"
+                                          (:soldier-sell rates) 0 100 test-player-id "form"))))
     (testing "Renders without error when max-quantity is negative (shown as 0)"
-      (is (vector? (exchange/sell-row "Soldiers" "Soldiers" "soldiers-sold"
-                                      (:soldier-sell rates) 0 -5 test-player-id "form"))))))
-
-(deftest test-buy-row-renders
-  (let [rates (exchange/get-exchange-rates test-game)]
+      (is (vector? (exchange/exchange-row "Soldiers" "Soldiers" "soldiers-sold"
+                                          (:soldier-sell rates) 0 -5 test-player-id "form"))))
     (testing "Renders hiccup for a typical buy row"
-      (is (vector? (exchange/buy-row "Food" "Food" "food-bought"
-                                     (:food-buy rates) 0 500 test-player-id "form"))))
+      (is (vector? (exchange/exchange-row "Food" "Food" "food-bought"
+                                          (:food-buy rates) 0 500 test-player-id "form"))))
     (testing "Renders without error when max-quantity is zero"
-      (is (vector? (exchange/buy-row "Food" "Food" "food-bought"
-                                     (:food-buy rates) 0 0 test-player-id "form"))))))
+      (is (vector? (exchange/exchange-row "Food" "Food" "food-bought"
+                                          (:food-buy rates) 0 0 test-player-id "form"))))))
 
 (deftest test-submit-button-renders
   (testing "Enabled submit button"

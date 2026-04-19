@@ -90,6 +90,18 @@
 ;;;; UI Components
 ;;;;
 
+(defn- delete-game-button
+  "Render an admin-only delete button for a game, with a confirmation prompt.
+
+  [game-id uuid] -> hiccup"
+  [game-id]
+  (biff/form
+   {:action  (str "/app/delete-game/" game-id)
+    :method  "post"
+    :onsubmit "return confirm('Delete this game and all its players?')"}
+   [:button.border.border-green-400.text-green-400.px-2.py-1.text-sm.hover:border-yellow-400.hover:text-yellow-400.transition-colors
+    {:type "submit"} "X"]))
+
 (defn available-game-card
   "Render a card for a game the user has not yet joined, showing player count and a join link.
   Admin users also see a delete button.
@@ -107,12 +119,7 @@
       {:href (str "/app/join-game/" (:xt/id game))}
       "Join Game"]
      (when admin?
-       (biff/form
-        {:action (str "/app/delete-game/" (:xt/id game))
-         :method "post"
-         :onsubmit "return confirm('Delete this game and all its players?')"}
-        [:button.border.border-green-400.text-green-400.px-2.py-1.text-sm.hover:border-yellow-400.hover:text-yellow-400.transition-colors
-         {:type "submit"} "X"]))]]])
+       (delete-game-button (:xt/id game)))]]])
 
 (defn game-card
   "Render a full empire snapshot card for a game the player has joined.
@@ -140,12 +147,7 @@
       [:p.text-xs "Score"]
       [:p.text-lg.font-bold (:player/score player)]]
      (when admin?
-       (biff/form
-        {:action (str "/app/delete-game/" (:xt/id game))
-         :method "post"
-         :onsubmit "return confirm('Delete this game and all its players?')"}
-        [:button.border.border-green-400.text-green-400.px-2.py-1.text-sm.hover:border-yellow-400.hover:text-yellow-400.transition-colors
-         {:type "submit"} "X"]))]]
+       (delete-game-button (:xt/id game)))]]
 
    ;; Row 1: currencies, population, and planets
    [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2.mb-3.pb-3.border-b.border-green-400
