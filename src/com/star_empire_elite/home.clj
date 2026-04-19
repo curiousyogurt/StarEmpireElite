@@ -39,7 +39,7 @@
        {:name "email"
         :type "email"
         :autocomplete "email"
-        :placeholder "commander@galaxy.com"}]]
+        :placeholder "commander@bennington.edu"}]]
      
      ;; :: error messages
      (when-some [error (:error params)]

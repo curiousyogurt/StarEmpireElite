@@ -263,10 +263,10 @@
 (deftest test-purchase-row-renders
   (testing "Returns a hiccup vector for a typical purchase row"
     (is (vector? (building/purchase-row "Soldiers" "Soldiers" :soldiers :game/soldier-cost
-                                        0 100 test-game test-player-id "form"))))
+                                        0 0 100 test-game test-player-id "form"))))
   (testing "Renders without error when max-quantity is negative (shown as 0)"
     (is (vector? (building/purchase-row "Soldiers" "Soldiers" :soldiers :game/soldier-cost
-                                        0 -5 test-game test-player-id "form")))))
+                                        0 0 -5 test-game test-player-id "form")))))
 
 (deftest test-submit-button-renders
   (testing "Enabled submit button"

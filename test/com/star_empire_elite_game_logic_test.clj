@@ -68,6 +68,12 @@
                    :game/ore-planet-cost const/ore-planet-cost
                    :game/agent-cost const/agent-cost
                    :game/population-tax-credits const/population-tax-credits
+                   ;; Stability constants
+                   :game/expense-stability-penalty    const/expense-stability-penalty
+                   :game/stability-breakaway-threshold const/stability-breakaway-threshold
+                   :game/stability-breakaway-cap       const/stability-breakaway-cap
+                   :game/stability-recovery-amount     const/stability-recovery-amount
+                   :game/stability-recovery-floor      const/stability-recovery-floor
                    ;; Exchange sell/buy rates
                    :game/soldier-sell    const/soldier-sell
                    :game/transport-sell  const/transport-sell

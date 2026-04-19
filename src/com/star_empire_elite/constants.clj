@@ -99,6 +99,23 @@
 (def population-upkeep-fuel 10)
 
 
+;; Stability Breakaway and Recovery
+;; Breakaway: if roll (1–100) > stability + threshold, planets break away.
+;; Recovery:  if roll < max(stability, floor), stability recovers.
+
+(def stability-breakaway-threshold 20)
+(def stability-breakaway-cap       25)  ; stored as %, i.e. 25 = 25%
+(def stability-recovery-amount      5)  ; flat stability points gained on recovery
+(def stability-recovery-floor      50)  ; minimum effective stability for recovery rolls
+
+
+;; Expense Underpayment Penalty
+;; Stability points lost per unit of underpayment fraction across all expense categories.
+;; 0 = no penalty until explicitly set.
+
+(def expense-stability-penalty 3)
+
+
 ;; Upkeep / Expense Defaults
 ;; Cost to maintain units and infrastructure per round
 

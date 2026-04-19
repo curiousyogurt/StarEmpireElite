@@ -2,7 +2,7 @@
 ;;;;; Espionage Phase - Infiltration Target Selection
 ;;;;;
 ;;;;; The espionage phase is the fifth phase of each turn where players choose an empire to
-;;;;; infiltrate. Players with no agents are blocked from choosing a target. Like combat, the
+;;;;; spy on. Players with no agents are blocked from choosing a target. Like combat, the
 ;;;;; actual espionage roll is resolved when the player loads the outcomes page: a successful
 ;;;;; infiltration reveals the target's full military unit counts as intel; a failed attempt
 ;;;;; notifies the defender that their security detected an intrusion.
@@ -34,7 +34,7 @@
 ;;;;
 
 (defn target-row
-  "Render a single row in the targets table with a radio-button infiltrate selector.
+  "Render a single row in the targets table with a radio-button spy selector.
 
   [player player-map] -> hiccup"
   [player]
@@ -57,7 +57,7 @@
                        "if(p){this.checked=false;}else{this.dataset.was='true';}")}]
        [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
         {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
-        "Infiltrate"]]]]))
+        "Spy"]]]]))
 
 ;;;;
 ;;;; Actions
@@ -87,7 +87,7 @@
 ;;;;
 
 (defn espionage-page
-  "Show the espionage phase: choose a target empire to infiltrate, or skip espionage.
+  "Show the espionage phase: choose a target empire to spy on, or skip espionage.
 
   [{:keys [player game db]}] -> hiccup"
   [{:keys [player game db]}]
@@ -111,13 +111,13 @@
           "\u26a0 You have no agents. You cannot undertake espionage operations this turn."]
 
          (empty? other-players)
-         [:p.mb-6 "There are no other empires to infiltrate."]
+         [:p.mb-6 "There are no other empires to spy on."]
 
          :else
          [:div.mb-6
           [:h2.text-xl.font-bold.mb-4 "Choose a Target"]
           [:p.text-sm.mb-4.text-green-400.text-opacity-75
-           "Select an empire to infiltrate. Espionage results will be revealed in the Outcomes phase."]
+           "Select an empire to spy on. Espionage results will be revealed in the Outcomes phase."]
           [:div.overflow-x-auto
            [:table.w-full.text-sm.border.border-green-400
             [:thead

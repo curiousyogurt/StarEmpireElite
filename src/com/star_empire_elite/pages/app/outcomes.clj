@@ -35,6 +35,78 @@
      (* (:player/admirals     player) 100)
      (quot (max 0 (:player/credits player)) 1000)))
 
+(defn- distribute-breakaway-planets
+  "Distribute n planet losses proportionally across ore/erg/mil counts.
+  Uses largest-remainder method so the total always equals n exactly.
+
+  [ore int, erg int, mil int, n int] -> {:ore int, :erg int, :mil int}"
+  [ore erg mil n]
+  (let [total (+ ore erg mil)]
+    (if (zero? total)
+      {:ore 0 :erg 0 :mil 0}
+      (let [ore-frac (* n (/ (double ore) total))
+            erg-frac (* n (/ (double erg) total))
+            mil-frac (* n (/ (double mil) total))
+            ore-base (long ore-frac)
+            erg-base (long erg-frac)
+            mil-base (long mil-frac)
+            remainder (- n ore-base erg-base mil-base)
+            ;; Distribute remainder to types with largest fractional parts
+            by-frac  (sort-by second >
+                       [[:ore (- ore-frac ore-base)]
+                        [:erg (- erg-frac erg-base)]
+                        [:mil (- mil-frac mil-base)]])
+            extras   (set (map first (take remainder by-frac)))]
+        {:ore (min ore (+ ore-base (if (extras :ore) 1 0)))
+         :erg (min erg (+ erg-base (if (extras :erg) 1 0)))
+         :mil (min mil (+ mil-base (if (extras :mil) 1 0)))}))))
+
+(defn calculate-stability-breakaway
+  "Roll for a stability breakaway event. Returns a result map whether or not
+  a breakaway occurs; :triggered? indicates whether planets were lost.
+
+  [player player-map, game game-map] -> result-map"
+  [player game]
+  (let [stability  (:player/stability player)
+        threshold  (:game/stability-breakaway-threshold game)
+        cap        (/ (:game/stability-breakaway-cap game) 100.0)
+        roll       (inc (rand-int 100))
+        triggered? (> roll (+ stability threshold))]
+    (if-not triggered?
+      {:roll roll :stability stability :triggered? false}
+      (let [ore   (:player/ore-planets player)
+            erg   (:player/erg-planets player)
+            mil   (:player/mil-planets player)
+            total (+ ore erg mil)
+            fraction     (min cap (/ (double (- roll stability threshold)) 100.0))
+            planets-lost (max 1 (long (Math/ceil (* fraction total))))
+            lost         (distribute-breakaway-planets ore erg mil planets-lost)]
+        {:roll        roll
+         :stability   stability
+         :triggered?  true
+         :ore-lost    (:ore lost)
+         :erg-lost    (:erg lost)
+         :mil-lost    (:mil lost)
+         :total-lost  planets-lost}))))
+
+(defn calculate-stability-recovery
+  "Roll for a stability recovery event. Only call when expenses were fully paid
+  and stability is below 100. Triggers if roll < max(stability, 50), so higher
+  stability means a greater chance of recovery, with a 50% floor.
+
+  [player player-map, game game-map] -> result-map"
+  [player game]
+  (let [stability  (:player/stability player)
+        amount     (:game/stability-recovery-amount game)
+        floor      (:game/stability-recovery-floor game)
+        roll       (inc (rand-int 100))
+        target     (max stability floor)
+        triggered? (< roll target)]
+    {:roll       roll
+     :stability  stability
+     :triggered? triggered?
+     :amount     (when triggered? (min amount (- 100 stability)))}))
+
 ;;;;
 ;;;; UI Components
 ;;;;
@@ -142,10 +214,13 @@
                    :player/turns-used               reset-used
                    :player/current-phase            1
                    :player/last-turn-at             now
-                   :player/last-battle-result        nil
-                   :player/last-espionage-result     nil
-                   :player/last-population-growth    nil
-                   :player/pending-espionage         nil
+                   :player/last-battle-result              nil
+                   :player/last-espionage-result           nil
+                   :player/last-population-growth          nil
+                   :player/last-expense-stability-penalty  nil
+                   :player/last-stability-breakaway        nil
+                   :player/last-stability-recovery         nil
+                   :player/pending-espionage               nil
                    :player/incoming-attacks         nil
                    :player/incoming-espionage-fails 0
                    :player/score                    (calculate-score player)}
@@ -159,10 +234,10 @@
 ;;;;
 
 (defn outcomes-page
-  "Show turn results (combat, espionage, population growth) and the advance button for the next turn.
+  "Show turn results (combat, espionage, population growth, expense penalties, breakaway) and the advance button.
 
-  [{:keys [player game battle-result espionage-result pop-growth]}] -> hiccup"
-  [{:keys [player game battle-result espionage-result pop-growth]}]
+  [{:keys [player game battle-result espionage-result pop-growth expense-penalty breakaway-result recovery-result]}] -> hiccup"
+  [{:keys [player game battle-result espionage-result pop-growth expense-penalty breakaway-result recovery-result]}]
   (let [current-turn       (:player/current-turn player)
         turns-per-round    (:game/turns-per-round game)
         end-current-round? (>= current-turn turns-per-round)]
@@ -233,6 +308,31 @@
               [:p.text-xs (str "Cmd Ships:  " (:cmd-ships  intel))]
               [:p.text-xs (str "Agents:     " (:agents     intel))]]
              [:p.text-xs "Your agents were unable to obtain useful intelligence."])]))
+
+      ;; Stability section — only shown when at least one stability event occurred
+      (let [has-penalty?   (and (some? expense-penalty) (pos? expense-penalty))
+            has-breakaway? (and (some? breakaway-result) (:triggered? breakaway-result))
+            has-recovery?  (and (some? recovery-result) (:triggered? recovery-result))]
+        (when (or has-penalty? has-breakaway? has-recovery?)
+          [:div.border.border-green-400.p-4.mb-4
+           [:h3.font-bold.mb-3 "Stability"]
+           (when has-penalty?
+             [:p.text-xs.mb-2.text-yellow-400
+              (str "Empire stability decreases due to unpaid expenses: −" expense-penalty "%")])
+           (when has-breakaway?
+             (let [lost-str (clojure.string/join ", "
+                              (keep identity
+                                [(when (pos? (:ore-lost breakaway-result))
+                                   (str (:ore-lost breakaway-result) " ore planet(s)"))
+                                 (when (pos? (:erg-lost breakaway-result))
+                                   (str (:erg-lost breakaway-result) " energy planet(s)"))
+                                 (when (pos? (:mil-lost breakaway-result))
+                                   (str (:mil-lost breakaway-result) " military planet(s)"))]))]
+               [:p.text-xs.mb-2.text-red-400
+                (str "Empire instability prompts revolution. Lost: " lost-str)]))
+           (when has-recovery?
+             [:p.text-xs.text-green-400
+              (str "Empire stability increases due to paid expenses: +" (:amount recovery-result) "%")])]))
 
       ;; Population growth section (only shown at end of round)
       (when (some? pop-growth)

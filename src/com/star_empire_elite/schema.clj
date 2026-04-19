@@ -19,6 +19,15 @@
           [:game/rounds-per-day            :int]
           [:game/hours-between-rounds      :int]
 
+          ;; Expense underpayment penalty
+          [:game/expense-stability-penalty    :int]
+
+          ;; Stability breakaway and recovery
+          [:game/stability-breakaway-threshold :int]
+          [:game/stability-breakaway-cap       :int]
+          [:game/stability-recovery-amount      :int]
+          [:game/stability-recovery-floor       :int]
+
           ;; Combat power constants
           [:game/soldier-power             :int]
           [:game/fighter-power             :int]
@@ -140,6 +149,14 @@
             [:player/allies {:optional true}   [:set :player/id]]
             [:player/treaties {:optional true} [:set :player/id]]
             [:player/messages {:optional true} [:vector :message/id]]
+
+            ;; Expense stability penalty
+            [:player/expense-stability-penalty      {:optional true} [:maybe :int]]
+            [:player/last-expense-stability-penalty {:optional true} [:maybe :int]]
+
+            ;; Stability breakaway and recovery
+            [:player/last-stability-breakaway       {:optional true} [:maybe :string]]
+            [:player/last-stability-recovery        {:optional true} [:maybe :string]]
 
             ;; Combat
             [:player/pending-attack {:optional true} [:maybe :player/id]]

@@ -117,6 +117,34 @@
    :erg-planets (:player/erg-planets player)
    :mil-planets  (:player/mil-planets player)})
 
+(defn calculate-expense-stability-penalty
+  "Calculate the stability penalty for underpaying expenses.
+  For each of the 12 required/paid pairs, computes the underpayment fraction
+  (shortfall ÷ required). Sums all fractions and multiplies by the game constant.
+  Returns 0 when the game constant is 0 or all expenses are fully paid.
+
+  [required required-map, payments payments-map, game game-map] -> int"
+  [required payments game]
+  (let [pairs [[:planets-credits  :planets-pay]
+               [:planets-food     :planets-food]
+               [:soldiers-credits :soldiers-credits]
+               [:soldiers-food    :soldiers-food]
+               [:fighters-credits :fighters-credits]
+               [:fighters-fuel    :fighters-fuel]
+               [:stations-credits :stations-credits]
+               [:stations-fuel    :stations-fuel]
+               [:agents-food      :agents-food]
+               [:agents-fuel      :agents-fuel]
+               [:population-food  :population-food]
+               [:population-fuel  :population-fuel]]
+        total-fraction (reduce +
+                         (for [[req-key pay-key] pairs
+                               :let [req      (get required req-key 0)
+                                     paid     (get payments  pay-key 0)
+                                     shortfall (max 0 (- req paid))]]
+                           (double (/ shortfall (max 1 req)))))]
+    (long (* total-fraction (:game/expense-stability-penalty game)))))
+
 (defn can-afford-expenses?
   "Returns true if all resource values after expenses are non-negative.
 
@@ -299,15 +327,18 @@
     (if-let [redirect (utils/validate-phase player 2 player-id)]
       redirect
       (let [payments        (parse-expense-payments params)
-            resources-after (calculate-resources-after-expenses player payments)]
+            required        (calculate-required-expenses player game)
+            resources-after (calculate-resources-after-expenses player payments)
+            penalty         (calculate-expense-stability-penalty required payments game)]
         (biff/submit-tx ctx
-                        [{:db/doc-type          :player
-                          :db/op                :update
-                          :xt/id                player-id
-                          :player/credits       (:credits resources-after)
-                          :player/food          (:food resources-after)
-                          :player/fuel          (:fuel resources-after)
-                          :player/current-phase 3}])
+                        [{:db/doc-type                       :player
+                          :db/op                             :update
+                          :xt/id                             player-id
+                          :player/credits                    (:credits resources-after)
+                          :player/food                       (:food resources-after)
+                          :player/fuel                       (:fuel resources-after)
+                          :player/expense-stability-penalty  penalty
+                          :player/current-phase              3}])
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/building")}}))))
 

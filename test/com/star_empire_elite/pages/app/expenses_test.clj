@@ -28,7 +28,8 @@
    :game/agent-upkeep-food 16
    :game/agent-upkeep-fuel 9
    :game/population-upkeep-food 2
-   :game/population-upkeep-fuel 7})
+   :game/population-upkeep-fuel 7
+   :game/expense-stability-penalty 3})
 
 (def test-player
   {:xt/id test-player-id
@@ -95,7 +96,7 @@
           expected-credits (- 1000 225 18 28 24)
           expected-food    (- 800 3 27 24 18)
           expected-fuel    (- 200 21 16 13 63)]
-      (with-redefs [xt/entity (helpers/fake-entity [test-player])
+      (with-redefs [xt/entity (helpers/fake-entity [test-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params params
@@ -116,7 +117,7 @@
     (let [params {} ;; no params at all
           start-player (assoc test-player :player/current-phase 2)
           tx-called (atom nil)]
-      (with-redefs [xt/entity (helpers/fake-entity [start-player])
+      (with-redefs [xt/entity (helpers/fake-entity [start-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params params
@@ -133,7 +134,7 @@
     (let [params {"planets-pay" "abc" "agents-food" ""}
           player (assoc test-player :player/current-phase 2)
           tx-called (atom nil)]
-      (with-redefs [xt/entity (helpers/fake-entity [player])
+      (with-redefs [xt/entity (helpers/fake-entity [player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params params

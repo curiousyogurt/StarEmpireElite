@@ -66,6 +66,15 @@
    ;; Population tax
    :game/population-tax-credits 0
 
+   ;; Expense stability penalty
+   :game/expense-stability-penalty 0
+
+   ;; Stability breakaway and recovery
+   :game/stability-breakaway-threshold 20
+   :game/stability-breakaway-cap       25
+   :game/stability-recovery-amount      5
+   :game/stability-recovery-floor      50
+
    ;; Exchange sell/buy rates
    :game/soldier-sell         0
    :game/transport-sell       0

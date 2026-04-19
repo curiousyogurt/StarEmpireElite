@@ -123,7 +123,12 @@
             :game/food-buy        const/food-buy
             :game/food-sell       const/food-sell
             :game/fuel-buy        const/fuel-buy
-            :game/fuel-sell       const/fuel-sell}])
+            :game/fuel-sell       const/fuel-sell
+            :game/expense-stability-penalty     const/expense-stability-penalty
+            :game/stability-breakaway-threshold const/stability-breakaway-threshold
+            :game/stability-breakaway-cap       const/stability-breakaway-cap
+            :game/stability-recovery-amount     const/stability-recovery-amount
+            :game/stability-recovery-floor      const/stability-recovery-floor}])
         {:status 303
          :headers {"location" (str "/app/join-game/" game-id)}}))))
 
@@ -160,7 +165,7 @@
        {}
        [:div.text-green-400.font-mono
         [:h1.text-3xl.font-bold.mb-6 "Join Game"]
-        [:p.mb-4 (str "Game: " (:game/name game))]
+        [:p.mb-4 (str "Galaxy: " (:game/name game))]
         (when error
           [:p.text-red-400.mb-4 error])
         (biff/form
@@ -429,14 +434,118 @@
                           :player/last-population-growth growth}])
                       [growth (-> display-player
                                   (assoc :player/population             (+ pop growth))
-                                  (assoc :player/last-population-growth growth))]))))]
+                                  (assoc :player/last-population-growth growth))]))))
 
-          (outcomes/outcomes-page {:player           final-player
+              ;; --- expense stability penalty ---
+              pending-penalty (:player/expense-stability-penalty final-player)
+              last-penalty    (:player/last-expense-stability-penalty final-player)
+
+              [expense-penalty final-player-2]
+              (cond
+                ;; Cache hit — already applied on a previous load this turn
+                (some? last-penalty)
+                [last-penalty final-player]
+
+                ;; No penalty this turn
+                (or (nil? pending-penalty) (zero? pending-penalty))
+                [nil final-player]
+
+                ;; Fresh apply
+                :else
+                (let [new-stability (max 0 (- (:player/stability final-player) pending-penalty))]
+                  (biff/submit-tx ctx
+                    [{:db/doc-type                            :player
+                      :db/op                                  :update
+                      :xt/id                                  player-id
+                      :player/stability                       new-stability
+                      :player/last-expense-stability-penalty  pending-penalty
+                      :player/expense-stability-penalty       nil}])
+                  [pending-penalty (-> final-player
+                                       (assoc :player/stability new-stability)
+                                       (assoc :player/last-expense-stability-penalty pending-penalty))]))
+
+              ;; --- stability breakaway ---
+              stored-breakaway (some-> (:player/last-stability-breakaway final-player-2)
+                                       clojure.core/read-string)
+
+              [breakaway-result final-player-3]
+              (if (some? stored-breakaway)
+                ;; Cache hit — already resolved this turn
+                [stored-breakaway final-player-2]
+                ;; Fresh roll
+                (let [result (outcomes/calculate-stability-breakaway final-player-2 game)]
+                  (if-not (:triggered? result)
+                    (do
+                      (biff/submit-tx ctx
+                        [{:db/doc-type                    :player
+                          :db/op                          :update
+                          :xt/id                          player-id
+                          :player/last-stability-breakaway (pr-str result)}])
+                      [result final-player-2])
+                    (let [ore-after (- (:player/ore-planets final-player-2) (:ore-lost result))
+                          erg-after (- (:player/erg-planets final-player-2) (:erg-lost result))
+                          mil-after (- (:player/mil-planets final-player-2) (:mil-lost result))]
+                      (biff/submit-tx ctx
+                        [{:db/doc-type                     :player
+                          :db/op                           :update
+                          :xt/id                           player-id
+                          :player/ore-planets              ore-after
+                          :player/erg-planets              erg-after
+                          :player/mil-planets              mil-after
+                          :player/last-stability-breakaway (pr-str result)}])
+                      [result (-> final-player-2
+                                  (assoc :player/ore-planets ore-after)
+                                  (assoc :player/erg-planets erg-after)
+                                  (assoc :player/mil-planets mil-after))]))))
+
+              ;; --- stability recovery ---
+              ;; Eligible only when expenses were fully paid (pending-penalty = 0, not nil)
+              ;; and no breakaway triggered this turn.
+              stored-recovery  (some-> (:player/last-stability-recovery final-player-3)
+                                       clojure.core/read-string)
+              recovery-eligible? (and (some? pending-penalty)
+                                      (zero? pending-penalty)
+                                      (not (:triggered? breakaway-result))
+                                      (< (:player/stability final-player-3) 100))
+
+              [recovery-result final-player-4]
+              (cond
+                ;; Cache hit — already resolved this turn
+                (some? stored-recovery)
+                [stored-recovery final-player-3]
+
+                ;; Not eligible — skip without rolling
+                (not recovery-eligible?)
+                [nil final-player-3]
+
+                ;; Fresh roll
+                :else
+                (let [result (outcomes/calculate-stability-recovery final-player-3 game)]
+                  (if-not (:triggered? result)
+                    (do
+                      (biff/submit-tx ctx
+                        [{:db/doc-type                    :player
+                          :db/op                          :update
+                          :xt/id                          player-id
+                          :player/last-stability-recovery (pr-str result)}])
+                      [result final-player-3])
+                    (let [new-stability (min 100 (+ (:player/stability final-player-3) (:amount result)))]
+                      (biff/submit-tx ctx
+                        [{:db/doc-type                    :player
+                          :db/op                          :update
+                          :xt/id                          player-id
+                          :player/stability               new-stability
+                          :player/last-stability-recovery (pr-str result)}])
+                      [result (assoc final-player-3 :player/stability new-stability)]))))]
+
+          (outcomes/outcomes-page {:player           final-player-4
                                    :game             game
                                    :battle-result    battle-result
                                    :espionage-result espionage-result
-                                   :pop-growth       pop-growth})))))
-
+                                   :pop-growth       pop-growth
+                                   :expense-penalty  expense-penalty
+                                   :breakaway-result breakaway-result
+                                   :recovery-result  recovery-result})))))
 ;; :: HTMX fragment — polls for incoming alerts; triggers HX-Refresh when new alerts arrive
 (defn alerts-handler [{:keys [biff/db path-params params] :as ctx}]
   (let [player-id  (java.util.UUID/fromString (:player-id path-params))
