@@ -19,9 +19,9 @@
 (defn calculate-income
   "Calculate income from all sources using game constants.
 
-  [player player-map, game game-map] -> {:ore-credits int, :ore-fuel int,
-                    :food-food int, :mil-soldiers int, :mil-fighters int,
-                    :mil-stations int, :tax-credits int}"
+  [player player-map, game game-map] -> {:ore-credits int,  :ore-fuel int,     :food-food int, 
+  :mil-soldiers int, :mil-fighters int, :mil-stations int, 
+  :tax-credits int}"
   [player game]
   ;; Keys such as :player/ore-planets are fully qualified keys in the player map.
   ;; That is, there is a key in the player map named :player/ore-planets, etc.
@@ -120,17 +120,17 @@
                                 last-completed
                                 (not (utils/same-calendar-day? last-completed)))]
         (biff/submit-tx ctx
-          [(cond-> {:db/doc-type          :player
-                    :db/op                :update
-                    :xt/id                player-id
-                    :player/credits       (:credits after)
-                    :player/food          (:food after)
-                    :player/fuel          (:fuel after)
-                    :player/soldiers      (:soldiers after)
-                    :player/fighters      (:fighters after)
-                    :player/stations      (:stations after)
-                    :player/current-phase 2}
-                   day-reset? (assoc :player/current-round 1))])
+                        [(cond-> {:db/doc-type          :player
+                                  :db/op                :update
+                                  :xt/id                player-id
+                                  :player/credits       (:credits after)
+                                  :player/food          (:food after)
+                                  :player/fuel          (:fuel after)
+                                  :player/soldiers      (:soldiers after)
+                                  :player/fighters      (:fighters after)
+                                  :player/stations      (:stations after)
+                                  :player/current-phase 2}
+                           day-reset? (assoc :player/current-round 1))])
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/expenses")}}))))
 
