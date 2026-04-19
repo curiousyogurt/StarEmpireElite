@@ -15,34 +15,35 @@
     (str path "?t=" last-modified)
     path))
 
-(defn format-number
-  "Format numbers for display with hybrid approach:
-  - Small numbers (< 100K absolute): Display as-is (e.g., 999, -1234, 99999)
-  - Large numbers (≥ 100K absolute): Use abbreviated suffixes (e.g., 123K, -1.2M, 5.7B)
-
-  Returns a hiccup span with title attribute for tooltip on hover.
-  Abbreviations: K (thousand), M (million), B (billion), T (trillion), Q (quadrillion)
-  Handles both positive and negative numbers."
+(defn- format-number-core
+  "Returns [formatted-string abbreviated?] for a number.
+  Abbreviations: K (100K+), M (1M+), B (1B+), T (1T+), Q (1Q+)."
   [n]
-  (when n  ; Handle nil values
-    (let [abs-n (Math/abs n)  ; Work with absolute value for formatting logic
-          is-negative? (< n 0)
-          formatted (cond
-                      ;; If abs-n needs a suffix       divide by the value and round                 sym
-                      (>= abs-n 1000000000000000) (str (/ (Math/round (/ abs-n 100000000000000.0)) 10.0) "Q")
-                      (>= abs-n 1000000000000)    (str (/ (Math/round (/ abs-n 100000000000.0))    10.0) "T")
-                      (>= abs-n 1000000000)       (str (/ (Math/round (/ abs-n 100000000.0))       10.0) "B")
-                      (>= abs-n 1000000)          (str (/ (Math/round (/ abs-n 100000.0))          10.0) "M")
-                      (>= abs-n 100000)           (str (/ (Math/round (/ abs-n 100.0))             10.0) "K")
-                      :else (str n))  ; For small numbers, use original n (with sign)
-          ;; Add negative sign for large formatted numbers
-          formatted-with-sign (if (and is-negative? (>= abs-n 100000))
-                                (str "-" formatted)
-                                formatted)
-          is-abbreviated? (>= abs-n 100000)]
-      (if is-abbreviated?
-        [:span {:title (str n)} formatted-with-sign] ; If Abbreviated: add tooltip with full number
-        formatted-with-sign))))                       ; Otherwise     : just return the string
+  (let [abs-n        (Math/abs n)
+        is-negative? (< n 0)
+        formatted    (cond
+                       (>= abs-n 1000000000000000) (str (/ (Math/round (/ abs-n 100000000000000.0)) 10.0) "Q")
+                       (>= abs-n 1000000000000)    (str (/ (Math/round (/ abs-n 100000000000.0))    10.0) "T")
+                       (>= abs-n 1000000000)       (str (/ (Math/round (/ abs-n 100000000.0))       10.0) "B")
+                       (>= abs-n 1000000)          (str (/ (Math/round (/ abs-n 100000.0))          10.0) "M")
+                       (>= abs-n 100000)           (str (/ (Math/round (/ abs-n 100.0))             10.0) "K")
+                       :else                       (str n))
+        s            (if (and is-negative? (>= abs-n 100000)) (str "-" formatted) formatted)]
+    [s (>= abs-n 100000)]))
+
+(defn format-number
+  "Format a number for display. Small numbers (< 100K) are returned as-is; large numbers
+  use abbreviated suffixes (123K, 1.2M, etc.) wrapped in a hiccup span with a tooltip."
+  [n]
+  (when n
+    (let [[s abbreviated?] (format-number-core n)]
+      (if abbreviated? [:span {:title (str n)} s] s))))
+
+(defn format-number-str
+  "Like format-number but always returns a plain string. Use where hiccup is not appropriate,
+  e.g. when building slash-separated compound display values."
+  [n]
+  (when n (first (format-number-core n))))
 
 ;;; Phase progress indicator showing current position in the 6-phase turn cycle. Uses filled circles
 ;;; for completed phases, a highlighted circle for current phase, and empty circles for future phases.

@@ -159,10 +159,11 @@
   [spec expense-row-spec, required required-expenses-map, payments expense-payments-map] -> hiccup"
   [spec required payments]
   (let [{:keys [row-id credits food fuel]} spec
-        credits-val   (if credits   (get required (:required-key credits)) 0)
-        food-val      (if food      (get required (:required-key food))    0)
-        fuel-val      (if fuel      (get required (:required-key fuel))    0)
-        required-text (str credits-val "/" food-val "/" fuel-val)
+        required-text (str/join "/"
+                        (keep identity
+                          [(when credits (ui/format-number-str (get required (:required-key credits))))
+                           (when food    (ui/format-number-str (get required (:required-key food))))
+                           (when fuel    (ui/format-number-str (get required (:required-key fuel))))]))
         credits-paid  (when credits (get payments (keyword (:field-name credits))))
         credits-req   (when credits (get required (:required-key credits)))
         food-paid     (when food    (get payments (keyword (:field-name food))))
@@ -249,10 +250,11 @@
   [spec map, required map, player-id uuid, hx-include str] -> hiccup"
   [spec required player-id hx-include]
   (let [{:keys [category abbrev row-id count credits food fuel]} spec
-        credits-val      (if credits (get required (:required-key credits)) 0)
-        food-val         (if food    (get required (:required-key food))    0)
-        fuel-val         (if fuel    (get required (:required-key fuel))    0)
-        required-display (str credits-val "/" food-val "/" fuel-val)
+        required-display (str/join "/"
+                           (keep identity
+                             [(when credits (ui/format-number-str (get required (:required-key credits))))
+                              (when food    (ui/format-number-str (get required (:required-key food))))
+                              (when fuel    (ui/format-number-str (get required (:required-key fuel))))]))
         credits-field    (when credits
                            {:field-name    (:field-name credits)
                             :default-value (get required (:required-key credits))
@@ -371,8 +373,8 @@
             [:div.grid.gap-1.px-2.py-2.bg-green-400.bg-opacity-10.font-bold.border-b.border-green-400.text-xs.lg:hidden
              {:style {:grid-template-columns "0.7fr 0.4fr 1.3fr 1fr 1fr 1fr"}}
              [:div "Item"]
-             [:div.text-right ""]  ; Empty for count (will show in parentheses)
-             [:div "C/F/F"]
+             [:div.text-right ""]
+             [:div "Exp"]
              [:div.text-center "Crd"]
              [:div.text-center "Food"]
              [:div.text-center "Fuel"]]
@@ -381,7 +383,7 @@
             (ui/phase-table-header
               [{:label "Item" :class "pr-4"}
                {:label "Count" :class "text-right pr-4"}
-               {:label "Cred/Food/Fuel" :class "pr-4"}
+               {:label "Expense" :class "pr-4"}
                {:label "Pay Credits" :class "pr-4"}
                {:label "Pay Food" :class "pr-4"}
                {:label "Pay Fuel" :class "pr-4"}])
