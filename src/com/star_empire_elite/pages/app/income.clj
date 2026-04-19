@@ -19,7 +19,7 @@
 (defn calculate-income
   "Calculate income from all sources using game constants.
 
-  [player player-map, game game-map] -> {:ore-credits int,  :ore-fuel int,     :energy-food int, 
+  [player player-map, game game-map] -> {:ore-credits int,  :erg-food int,     :erg-fuel int,
   :mil-soldiers int, :mil-fighters int, :mil-stations int, 
   :tax-credits int}"
   [player game]
@@ -27,8 +27,8 @@
   ;; That is, there is a key in the player map named :player/ore-planets, etc.
   ;;             (* resource-count-for-player     resource-value-in-game)
   {:ore-credits  (* (:player/ore-planets player) (:game/ore-planet-credits game))
-   :energy-food  (* (:player/erg-planets player) (:game/erg-planet-food game))
-   :energy-fuel  (* (:player/erg-planets player) (:game/erg-planet-fuel game))
+   :erg-food  (* (:player/erg-planets player) (:game/erg-planet-food game))
+   :erg-fuel  (* (:player/erg-planets player) (:game/erg-planet-fuel game))
    :mil-soldiers (* (:player/mil-planets player) (:game/mil-planet-soldiers game))
    :mil-fighters (* (:player/mil-planets player) (:game/mil-planet-fighters game))
    :mil-stations (* (:player/mil-planets player) (:game/mil-planet-stations game))
@@ -40,8 +40,8 @@
   [player player-map, income income-map] -> {:credits int, :food int, ...}"
   [player income]
   {:credits      (+ (:player/credits player)  (:ore-credits income) (:tax-credits income))
-   :food         (+ (:player/food player)     (:energy-food income))
-   :fuel         (+ (:player/fuel player)     (:energy-fuel income))
+   :food         (+ (:player/food player)     (:erg-food income))
+   :fuel         (+ (:player/fuel player)     (:erg-fuel income))
    :population   (:player/population player)
    :stability    (:player/stability player)
    :galaxars     (:player/galaxars player)
@@ -186,8 +186,8 @@
         ;; Energy planets generate food and fuel (biofuel processing)
         (income-row "Erg"
                     (:player/erg-planets player)
-                    {:food (:energy-food income)
-                     :fuel (:energy-fuel income)})
+                    {:food (:erg-food income)
+                     :fuel (:erg-fuel income)})
 
         ;; Military planets generate military units: soldiers, fighters, and stations
         (income-row "Mil"

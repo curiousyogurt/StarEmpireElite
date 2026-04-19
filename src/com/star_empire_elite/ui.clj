@@ -141,6 +141,9 @@
    {:label "Galaxars"   :key :galaxars     :player-key :player/galaxars}
    {:label "Population" :key :population   :player-key :player/population :display-fn #(format-number (* % 1000000))}
    {:label "Stability"  :key :stability    :player-key :player/stability  :display-fn #(str % "%")}
+   {:label "Ore Plts"   :key :ore-planets  :player-key :player/ore-planets}
+   {:label "Erg Plts"   :key :erg-planets  :player-key :player/erg-planets}
+   {:label "Mil Plts"   :key :mil-planets  :player-key :player/mil-planets}
    {:label "Soldiers"   :key :soldiers     :player-key :player/soldiers}
    {:label "Transports" :key :transports   :player-key :player/transports}
    {:label "Generals"   :key :generals     :player-key :player/generals}
@@ -149,10 +152,7 @@
    {:label "Admirals"   :key :admirals     :player-key :player/admirals}
    {:label "Stations"   :key :stations     :player-key :player/stations}
    {:label "Cmd Ships"  :key :cmd-ships    :player-key :player/cmd-ships}
-   {:label "Agents"     :key :agents       :player-key :player/agents}
-   {:label "Ore Plts"   :key :ore-planets  :player-key :player/ore-planets}
-   {:label "Erg Plts"  :key :erg-planets :player-key :player/erg-planets}
-   {:label "Mil Plts"   :key :mil-planets  :player-key :player/mil-planets}])
+   {:label "Agents"     :key :agents       :player-key :player/agents}])
 
 (defn resource-display-grid
   "Display all player resources, units, and planets in a responsive grid layout.

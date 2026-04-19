@@ -60,8 +60,8 @@
       ;; Ore: 3 planets * game rates
       (is (= 300 (:ore-credits income)))   ; 3 * 100
       ;; Food: 2 planets * game rates
-      (is (= 400 (:energy-food income)))     ; 2 * 200
-      (is (= 100 (:energy-fuel income)))     ; 2 * 50
+      (is (= 400 (:erg-food income)))     ; 2 * 200
+      (is (= 100 (:erg-fuel income)))     ; 2 * 50
       ;; Military: 4 planets * game rates
       (is (= 100 (:mil-soldiers income)))  ; 4 * 25
       (is (= 60  (:mil-fighters income)))  ; 4 * 15
@@ -76,8 +76,8 @@
                                     :player/mil-planets  0)
           income (income/calculate-income player test-game)]
       (is (= 0 (:ore-credits income)))
-      (is (= 0 (:energy-food income)))
-      (is (= 0 (:energy-fuel income)))
+      (is (= 0 (:erg-food income)))
+      (is (= 0 (:erg-fuel income)))
       (is (= 0 (:mil-soldiers income)))
       (is (= 0 (:mil-fighters income)))
       (is (= 0 (:mil-stations income))))))
@@ -89,8 +89,8 @@
                                     :player/mil-planets  0)
           income (income/calculate-income player test-game)]
       (is (= 500 (:ore-credits income)))  ; 5 * 100
-      (is (= 0   (:energy-food income)))
-      (is (= 0   (:energy-fuel income)))
+      (is (= 0   (:erg-food income)))
+      (is (= 0   (:erg-fuel income)))
       (is (= 0   (:mil-soldiers income))))))
 
 (deftest test-calculate-income-zero-rates
@@ -105,7 +105,7 @@
                            :game/population-tax-credits 0)
           income (income/calculate-income test-player zero-game)]
       (is (= 0 (:ore-credits income)))
-      (is (= 0 (:energy-food income)))
+      (is (= 0 (:erg-food income)))
       (is (= 0 (:mil-soldiers income)))
       (is (= 0 (:tax-credits income))))))
 
@@ -119,7 +119,7 @@
                                   :game/mil-planet-soldiers 100)
           income (income/calculate-income player game)]
       (is (= 1000 (:ore-credits income)))   ; 2 * 500
-      (is (= 3000 (:energy-food income)))     ; 3 * 1000
+      (is (= 3000 (:erg-food income)))     ; 3 * 1000
       (is (= 100  (:mil-soldiers income))))))  ; 1 * 100
 
 (deftest test-calculate-income-population-tax
@@ -149,8 +149,8 @@
                                     :player/mil-planets  250)
           income (income/calculate-income player test-game)]
       (is (= 100000 (:ore-credits income)))  ; 1000 * 100
-      (is (= 100000 (:energy-food income)))    ; 500 * 200
-      (is (= 25000  (:energy-fuel income)))    ; 500 * 50
+      (is (= 100000 (:erg-food income)))    ; 500 * 200
+      (is (= 25000  (:erg-fuel income)))    ; 500 * 50
       (is (= 6250   (:mil-soldiers income)))))) ; 250 * 25
 
 ;;;;
@@ -198,8 +198,8 @@
           (is (= 2              (:player/current-phase tx)))
           ;; Resource deltas
           (is (= (+ (:player/credits  test-player) (:ore-credits  income) (:tax-credits income)) (:player/credits  tx)))
-          (is (= (+ (:player/food     test-player) (:energy-food    income)) (:player/food     tx)))
-          (is (= (+ (:player/fuel     test-player) (:energy-fuel    income)) (:player/fuel     tx)))
+          (is (= (+ (:player/food     test-player) (:erg-food    income)) (:player/food     tx)))
+          (is (= (+ (:player/fuel     test-player) (:erg-fuel    income)) (:player/fuel     tx)))
           (is (= (+ (:player/soldiers test-player) (:mil-soldiers income)) (:player/soldiers tx)))
           (is (= (+ (:player/fighters test-player) (:mil-fighters income)) (:player/fighters tx)))
           (is (= (+ (:player/stations test-player) (:mil-stations income)) (:player/stations tx))))))))

@@ -151,44 +151,50 @@
 ;;;; UI Components
 ;;;;
 
-(defn- render-required-cell
-  "Render the required-cost display cell for a row, highlighting red when the player
-  has paid less than required. Used in both initial page render and HTMX oob updates.
+(defn- build-required-parts
+  "Build the parts seq for render-required-cell. Each part has :display (hiccup) and
+  :underpaid? (boolean). When payments is nil (initial render), underpaid? is always false.
 
-  [row-id str, required-text str, credits-paid int|nil, credits-req int|nil,
-   food-paid int|nil, food-req int|nil, fuel-paid int|nil, fuel-req int|nil] -> hiccup"
-  [row-id required-text credits-paid credits-req food-paid food-req fuel-paid fuel-req]
-  (let [underpaid? (or (and credits-req (< credits-paid credits-req))
-                       (and food-req    (< food-paid    food-req))
-                       (and fuel-req    (< fuel-paid    fuel-req)))]
-    [:div.font-mono.text-xxs.lg:text-base.lg:pr-4
-     {:id (str "required-" row-id)
-      :hx-swap-oob "true"
-      :class (when underpaid? "text-red-400")}
-     required-text]))
+  [spec, required required-map, payments payments-map|nil] -> [{:display hiccup, :underpaid? bool}]"
+  [{:keys [credits food fuel]} required payments]
+  (keep identity
+    [(when credits
+       {:display    (ui/format-number (get required (:required-key credits)))
+        :underpaid? (boolean (and payments
+                                  (< (get payments (keyword (:field-name credits)) 0)
+                                     (get required (:required-key credits) 0))))})
+     (when food
+       {:display    (ui/format-number (get required (:required-key food)))
+        :underpaid? (boolean (and payments
+                                  (< (get payments (keyword (:field-name food)) 0)
+                                     (get required (:required-key food) 0))))})
+     (when fuel
+       {:display    (ui/format-number (get required (:required-key fuel)))
+        :underpaid? (boolean (and payments
+                                  (< (get payments (keyword (:field-name fuel)) 0)
+                                     (get required (:required-key fuel) 0))))})]))
+
+(defn- render-required-cell
+  "Render the required-cost display cell. Each resource amount is colored independently —
+  only amounts where the player has underpaid turn red.
+
+  [row-id str, parts [{:display hiccup, :underpaid? bool}], oob? bool] -> hiccup"
+  [row-id parts oob?]
+  (into [:div.font-mono.text-xxs.lg:text-base.lg:pr-4
+         (cond-> {:id (str "required-" row-id)}
+           oob? (assoc :hx-swap-oob "true"))]
+        (interpose "/"
+          (for [{:keys [display underpaid?]} parts]
+            [:span {:class (when underpaid? "text-red-400")} display]))))
 
 (defn- build-row-required-update
   "Build an HTMX oob update fragment for the required-cost cell of one expense row.
-  Uses the same spec format as build-expense-row so both iterate over expense-row-specs.
 
   [spec expense-row-spec, required required-expenses-map, payments expense-payments-map] -> hiccup"
   [spec required payments]
-  (let [{:keys [row-id credits food fuel]} spec
-        required-text (interpose "/"
-                        (keep identity
-                          [(when credits (ui/format-number (get required (:required-key credits))))
-                           (when food    (ui/format-number (get required (:required-key food))))
-                           (when fuel    (ui/format-number (get required (:required-key fuel))))]))
-        credits-paid  (when credits (get payments (keyword (:field-name credits))))
-        credits-req   (when credits (get required (:required-key credits)))
-        food-paid     (when food    (get payments (keyword (:field-name food))))
-        food-req      (when food    (get required (:required-key food)))
-        fuel-paid     (when fuel    (get payments (keyword (:field-name fuel))))
-        fuel-req      (when fuel    (get required (:required-key fuel)))]
-    (render-required-cell row-id required-text
-                          credits-paid credits-req
-                          food-paid    food-req
-                          fuel-paid    fuel-req)))
+  (render-required-cell (:row-id spec)
+                        (build-required-parts spec required payments)
+                        true))
 
 (defn submit-button
   "Render the submit button, disabled when the player cannot afford expenses.
@@ -208,11 +214,12 @@
   "Render a responsive expense row: compact on mobile, full table row on desktop.
   credits-field, food-field, and fuel-field are either {:field-name str, :default-value int,
   :required int} or nil when that resource type is not applicable to this category.
+  required-cell is a pre-built hiccup element from render-required-cell.
 
   [category-name str, category-name-mobile str, row-id str, asset-count int|str,
-   required-display str, credits-field map|nil, food-field map|nil, fuel-field map|nil,
+   required-cell hiccup, credits-field map|nil, food-field map|nil, fuel-field map|nil,
    player-id uuid, hx-include str] -> hiccup"
-  [category-name category-name-mobile row-id asset-count required-display credits-field food-field fuel-field player-id hx-include]
+  [category-name category-name-mobile row-id asset-count required-cell credits-field food-field fuel-field player-id hx-include]
   [:div.border-b.border-green-400.last:border-b-0.grid.items-center.gap-1.px-2.py-2.text-xs.leading-tight.lg:gap-3.lg:px-4.lg:py-2.lg:text-base.expense-row-grid
 
    ;; Col 1: Category name (abbreviated on mobile, full on desktop)
@@ -226,10 +233,8 @@
       [:span.lg:hidden "(" count-display ")"]
       [:span.hidden.lg:inline count-display]])
 
-   ;; Col 3: Total required (with ID for HTMX swapping, will turn red if underpaid)
-   [:div.font-mono.text-xxs.lg:text-base.lg:pr-4
-    {:id (str "required-" row-id)}
-    required-display]
+   ;; Col 3: Total required (with ID for HTMX swapping; each resource colored independently)
+   required-cell
 
    ;; Col 4: Pay Credits
    [:div.px-1.lg:pr-4
@@ -265,11 +270,7 @@
   [spec map, required map, player-id uuid, hx-include str] -> hiccup"
   [spec required player-id hx-include]
   (let [{:keys [category abbrev row-id count credits food fuel]} spec
-        required-display (interpose "/"
-                           (keep identity
-                             [(when credits (ui/format-number (get required (:required-key credits))))
-                              (when food    (ui/format-number (get required (:required-key food))))
-                              (when fuel    (ui/format-number (get required (:required-key fuel))))]))
+        required-cell    (render-required-cell row-id (build-required-parts spec required nil) false)
         credits-field    (when credits
                            {:field-name    (:field-name credits)
                             :default-value (get required (:required-key credits))
@@ -282,7 +283,7 @@
                            {:field-name    (:field-name fuel)
                             :default-value (get required (:required-key fuel))
                             :required      (get required (:required-key fuel))})]
-    (expense-row category abbrev row-id count required-display
+    (expense-row category abbrev row-id count required-cell
                  credits-field food-field fuel-field player-id hx-include)))
 
 ;;;;

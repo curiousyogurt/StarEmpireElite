@@ -83,13 +83,23 @@
     @apply text-blue-600 hover:underline;
   }
 
-  /* Responsive grid for building and exchange phase table rows (5 columns) */
+  /* Responsive grid for exchange phase table rows (5 columns) */
   .phase-row-grid {
     grid-template-columns: 0.9fr 0.8fr 0.7fr 1.1fr 0.9fr;
   }
   @media (min-width: 1024px) {
     .phase-row-grid {
       grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr;
+    }
+  }
+
+  /* Responsive grid for building phase table rows (6 columns: item, current, cost/unit, max, buy, credits) */
+  .building-row-grid {
+    grid-template-columns: 0.9fr 0.7fr 0.8fr 0.7fr 1.1fr 0.9fr;
+  }
+  @media (min-width: 1024px) {
+    .building-row-grid {
+      grid-template-columns: 1.5fr 0.8fr 1fr 1fr 1fr 1fr;
     }
   }
 

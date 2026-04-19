@@ -135,13 +135,14 @@
   "Renders a purchase row with a single responsive input field for mobile and desktop.
 
   [unit-name str, unit-name-mobile str, unit-key keyword, cost-key keyword,
-   current-quantity int, max-quantity int, game game-map, player-id uuid, hx-include str] -> hiccup"
-  [unit-name unit-name-mobile unit-key cost-key current-quantity max-quantity game player-id hx-include]
+   current-owned int, purchase-quantity int, max-quantity int, game game-map,
+   player-id uuid, hx-include str] -> hiccup"
+  [unit-name unit-name-mobile unit-key cost-key current-owned purchase-quantity max-quantity game player-id hx-include]
   (let [cost-per-unit (get game cost-key)
-        item-cost     (* cost-per-unit current-quantity)
+        item-cost     (* cost-per-unit purchase-quantity)
         cost-id       (str "cost-" (name unit-key))
         max-qty-id    (str "max-qty-" (name unit-key))]
-    [:div.border-b.border-green-400.last:border-b-0.grid.items-center.gap-1.px-2.py-2.text-xs.leading-tight.lg:gap-3.lg:px-4.lg:py-2.lg:text-base.phase-row-grid
+    [:div.border-b.border-green-400.last:border-b-0.grid.items-center.gap-1.px-2.py-2.text-xs.leading-tight.lg:gap-3.lg:px-4.lg:py-2.lg:text-base.building-row-grid
 
      ;; Col 1: Item name (abbreviated on mobile, full on desktop)
      [:div.font-mono.lg:pr-4
@@ -152,18 +153,22 @@
      [:div.text-right.font-mono.lg:pr-4
       (ui/format-number cost-per-unit)]
 
-     ;; Col 3: Maximum quantity
+     ;; Col 3: Current owned quantity
+     [:div.text-right.font-mono.lg:pr-4
+      (ui/format-number current-owned)]
+
+     ;; Col 4: Buildable (max affordable quantity)
      [:div.text-right.font-mono.lg:pr-4
       [:span {:id max-qty-id
               :class (when (zero? max-quantity) "opacity-20")}
        (ui/format-number (if (neg? max-quantity) 0 max-quantity))]]
 
-     ;; Col 4: Purchase Quantity - SINGLE input field with responsive sizing
+     ;; Col 5: Buy quantity - SINGLE input field with responsive sizing
      [:div.px-1.lg:pr-4
-      (ui/numeric-input (name unit-key) current-quantity player-id "/calculate-building" hx-include
+      (ui/numeric-input (name unit-key) purchase-quantity player-id "/calculate-building" hx-include
                         {:input-class "py-0.5 text-xs lg:py-1 lg:text-sm"})]
 
-     ;; Col 5: Cost in credits
+     ;; Col 6: Cost in credits
      [:div.text-right.font-mono.lg:pr-4
       [:span {:id cost-id
               :class (when (zero? item-cost) "opacity-20")}
@@ -178,17 +183,17 @@
   [:div#cost-summary.border-t-2.border-green-400.bg-green-400.bg-opacity-10
 
    ;; Mobile: Compact layout
-   [:div.grid.gap-1.px-2.py-3.font-bold.text-sm.phase-row-grid.lg:hidden
+   [:div.grid.gap-1.px-2.py-3.font-bold.text-sm.building-row-grid.lg:hidden
     [:div "Credits (Expense)"]
-    [:div] [:div] [:div]
+    [:div] [:div] [:div] [:div]
     [:div.text-right.font-mono.text-base
      {:class (when (not affordable?) "text-red-400")}
      (ui/format-number total-cost)]]
 
    ;; Desktop: Full width layout
-   [:div.hidden.lg:grid.lg:gap-3.lg:px-4.lg:py-2.lg:font-bold.phase-row-grid
+   [:div.hidden.lg:grid.lg:gap-3.lg:px-4.lg:py-2.lg:font-bold.building-row-grid
     [:div.text-lg "Credits (Expense)"]
-    [:div] [:div] [:div]
+    [:div] [:div] [:div] [:div]
     [:div.text-right.font-mono.text-xl.pr-4
      {:class (when (not affordable?) "text-red-400")}
      (ui/format-number total-cost)]]])
@@ -310,25 +315,28 @@
            [:div
 
             ;; Mobile header - abbreviated
-            [:div.grid.gap-1.px-2.py-2.bg-green-400.bg-opacity-10.font-bold.border-b.border-green-400.text-xs.phase-row-grid.lg:hidden
+            [:div.grid.gap-1.px-2.py-2.bg-green-400.bg-opacity-10.font-bold.border-b.border-green-400.text-xs.building-row-grid.lg:hidden
              [:div "Item"]
-             [:div.text-right "Cost"]
+             [:div.text-right "Each"]
+             [:div.text-right "Owned"]
              [:div.text-right "Max"]
-             [:div.text-center "Buy"]
-             [:div.text-right "Cred"]]
+             [:div.text-center "Bld"]
+             [:div.text-right "Cost"]]
 
             ;; Desktop header - full text
-            (ui/phase-table-header
-              [{:label "Item" :class "pr-4"}
-               {:label "Credits/Unit" :class "text-right pr-4"}
-               {:label "Maximum" :class "text-right pr-4"}
-               {:label "Purchase" :class "pr-4"}
-               {:label "Credits" :class "text-right pr-4"}])
+            [:div.hidden.lg:grid.lg:gap-3.lg:px-4.lg:py-2.lg:bg-green-400.lg:bg-opacity-10.lg:font-bold.border-b.border-green-400.building-row-grid
+             [:div.pr-4 "Item"]
+             [:div.text-right.pr-4 "Each"]
+             [:div.text-right.pr-4 "Owned"]
+             [:div.text-right.pr-4 "Max"]
+             [:div.pr-4 "Build"]
+             [:div.text-right.pr-4 "Cost"]]
 
             ;; Purchase rows
             (for [spec purchase-row-specs]
-              (purchase-row (:label spec) (:abbrev spec) (:qty-key spec) (:cost-key spec)
-                            0 0 game player-id building-hx-include))
+              (let [current-owned (get player (keyword "player" (name (:qty-key spec))) 0)]
+                (purchase-row (:label spec) (:abbrev spec) (:qty-key spec) (:cost-key spec)
+                              current-owned 0 0 game player-id building-hx-include)))
 
             (total-cost-row 0 true)]]]
 
