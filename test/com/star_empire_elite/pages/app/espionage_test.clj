@@ -31,7 +31,7 @@
    :player/empire-name "Enemy Empire"
    :player/score       500
    :player/mil-planets 2
-   :player/food-planets 1
+   :player/erg-planets 1
    :player/ore-planets 3})
 
 ;;;;

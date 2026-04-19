@@ -37,8 +37,8 @@
                    :game/general-power const/general-power
                    :game/admiral-power const/admiral-power
                    :game/ore-planet-credits const/ore-planet-credits
-                   :game/ore-planet-fuel const/ore-planet-fuel
-                   :game/food-planet-food const/food-planet-food
+                   :game/erg-planet-food const/erg-planet-food
+                   :game/erg-planet-fuel const/erg-planet-fuel
                    :game/mil-planet-soldiers const/mil-planet-soldiers
                    :game/mil-planet-fighters const/mil-planet-fighters
                    :game/mil-planet-stations const/mil-planet-stations
@@ -64,7 +64,7 @@
                    :game/station-cost const/station-cost
                    :game/cmd-ship-cost const/cmd-ship-cost
                    :game/mil-planet-cost const/mil-planet-cost
-                   :game/food-planet-cost const/food-planet-cost
+                   :game/erg-planet-cost const/erg-planet-cost
                    :game/ore-planet-cost const/ore-planet-cost
                    :game/agent-cost const/agent-cost
                    :game/population-tax-credits const/population-tax-credits
@@ -79,7 +79,7 @@
                    :game/cmd-ship-sell   const/cmd-ship-sell
                    :game/agent-sell      const/agent-sell
                    :game/mil-planet-sell const/mil-planet-sell
-                   :game/food-planet-sell const/food-planet-sell
+                   :game/erg-planet-sell const/erg-planet-sell
                    :game/ore-planet-sell const/ore-planet-sell
                    :game/food-buy        const/food-buy
                    :game/food-sell       const/food-sell
@@ -96,7 +96,7 @@
                      :player/fuel 300
                      :player/galaxars 100
                      :player/mil-planets 1
-                     :player/food-planets 1
+                     :player/erg-planets 1
                      :player/ore-planets 1
                      :player/population 100000
                      :player/stability 75
@@ -140,31 +140,28 @@
             player (xt/entity db player-id)
             game (xt/entity db game-id)
 
-            expected-credits (* 3 const/ore-planet-credits)
-            expected-fuel (* 3 const/ore-planet-fuel)]
+            expected-credits (* 3 const/ore-planet-credits)]
 
         ;; Test the income calculation logic directly
-        (let [ore-credits (* (:player/ore-planets player) (:game/ore-planet-credits game))
-              ore-fuel (* (:player/ore-planets player) (:game/ore-planet-fuel game))]
-          (is (= ore-credits expected-credits))
-          (is (= ore-fuel expected-fuel)))))))
+        (let [ore-credits (* (:player/ore-planets player) (:game/ore-planet-credits game))]
+          (is (= ore-credits expected-credits)))))))
 
-(deftest food-planet-income-calculation-test
-  (testing "Food planets generate correct food income"
+(deftest energy-planet-income-calculation-test
+  (testing "Energy planets generate correct food income"
     (with-open [node (test-xtdb-node [])]
       (let [ctx (get-context node)
             {:keys [game-id player-id]}
             (create-test-player-and-game 
               ctx
-              {:player/food-planets 4
+              {:player/erg-planets 4
                :player/food 1000}
               {})
             db (xt/db node)
             player (xt/entity db player-id)
             game (xt/entity db game-id)
 
-            expected-food (* 4 const/food-planet-food)
-            actual-food (* (:player/food-planets player) (:game/food-planet-food game))]
+            expected-food (* 4 const/erg-planet-food)
+            actual-food (* (:player/erg-planets player) (:game/erg-planet-food game))]
 
         (is (= actual-food expected-food))))))
 
@@ -262,7 +259,7 @@
               ctx
               {:player/current-phase 1
                :player/ore-planets 2
-               :player/food-planets 1
+               :player/erg-planets 1
                :player/mil-planets 1
                :player/credits 1000
                :player/food 500
@@ -279,8 +276,8 @@
 
         ;; Test income calculations (from income.clj logic)
         (let [ore-credits  (* (:player/ore-planets player) (:game/ore-planet-credits game))
-              ore-fuel     (* (:player/ore-planets player) (:game/ore-planet-fuel game))
-              food-food    (* (:player/food-planets player) (:game/food-planet-food game))
+              food-food    (* (:player/erg-planets player) (:game/erg-planet-food game))
+              food-fuel    (* (:player/erg-planets player) (:game/erg-planet-fuel game))
               mil-soldiers (* (:player/mil-planets player) (:game/mil-planet-soldiers game))
               mil-fighters (* (:player/mil-planets player) (:game/mil-planet-fighters game))
               mil-stations (* (:player/mil-planets player) (:game/mil-planet-stations game))
@@ -288,15 +285,15 @@
               ;; Calculate final resources after income
               final-credits  (+ (:player/credits player) ore-credits)
               final-food     (+ (:player/food player) food-food)
-              final-fuel     (+ (:player/fuel player) ore-fuel)
+              final-fuel     (+ (:player/fuel player) food-fuel)
               final-soldiers (+ (:player/soldiers player) mil-soldiers)
               final-fighters (+ (:player/fighters player) mil-fighters)
               final-stations (+ (:player/stations player) mil-stations)]
 
           ;; Verify income components match game constants
           (is (= ore-credits   (* 2 const/ore-planet-credits)))
-          (is (= ore-fuel      (* 2 const/ore-planet-fuel)))
-          (is (= food-food     (* 1 const/food-planet-food)))
+          (is (= food-food     (* 1 const/erg-planet-food)))
+          (is (= food-fuel     (* 1 const/erg-planet-fuel)))
           (is (= mil-soldiers  (* 1 const/mil-planet-soldiers)))
           (is (= mil-fighters  (* 1 const/mil-planet-fighters)))
           (is (= mil-stations  (* 1 const/mil-planet-stations)))
@@ -304,7 +301,7 @@
           ;; Verify final resource totals
           (is (= final-credits  (+ 1000 ore-credits)))
           (is (= final-food     (+ 500  food-food)))
-          (is (= final-fuel     (+ 200  ore-fuel)))
+          (is (= final-fuel     (+ 200  food-fuel)))
           (is (= final-soldiers (+ 100  mil-soldiers)))
           (is (= final-fighters (+ 20   mil-fighters)))
           (is (= final-stations (+ 5    mil-stations))))))))
@@ -319,7 +316,7 @@
             (create-test-player-and-game 
               ctx
               {:player/ore-planets 0
-               :player/food-planets 0
+               :player/erg-planets 0
                :player/mil-planets 0}
               {})
             db (xt/db node)
@@ -328,7 +325,7 @@
 
         ;; All income should be zero
         (is (= (* (:player/ore-planets player) (:game/ore-planet-credits game)) 0))
-        (is (= (* (:player/food-planets player) (:game/food-planet-food game)) 0))
+        (is (= (* (:player/erg-planets player) (:game/erg-planet-food game)) 0))
         (is (= (* (:player/mil-planets player) (:game/mil-planet-soldiers game)) 0))))))
 
 ;; Test 7: Game Constants Consistency
@@ -342,7 +339,7 @@
 
         ;; Verify game constants match const namespace
         (is (= (:game/ore-planet-credits game) const/ore-planet-credits))
-        (is (= (:game/ore-planet-fuel game) const/ore-planet-fuel))
-        (is (= (:game/food-planet-food game) const/food-planet-food))
+        (is (= (:game/erg-planet-food game) const/erg-planet-food))
+        (is (= (:game/erg-planet-fuel game) const/erg-planet-fuel))
         (is (= (:game/mil-planet-soldiers game) const/mil-planet-soldiers))
         (is (= (:game/mil-planet-fighters game) const/mil-planet-fighters))))))

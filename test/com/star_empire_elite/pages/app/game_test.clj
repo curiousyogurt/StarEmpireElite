@@ -42,11 +42,11 @@
 (deftest test-get-game-players-ranking
   (testing "Players are sorted by score descending and assigned 1-based ranks"
     (let [player-a {:xt/id (helpers/uuid) :player/score 300 :player/empire-name "A"
-                    :player/mil-planets 0 :player/food-planets 0 :player/ore-planets 0}
+                    :player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0}
           player-b {:xt/id (helpers/uuid) :player/score 100 :player/empire-name "B"
-                    :player/mil-planets 0 :player/food-planets 0 :player/ore-planets 0}
+                    :player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0}
           player-c {:xt/id (helpers/uuid) :player/score 200 :player/empire-name "C"
-                    :player/mil-planets 0 :player/food-planets 0 :player/ore-planets 0}
+                    :player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0}
           sorted   (sort-by :player/score > [player-a player-b player-c])
           ranked   (map-indexed (fn [idx p] (assoc p :rank (inc idx))) sorted)]
       (is (= 1   (:rank (first ranked))))
@@ -59,7 +59,7 @@
 (deftest test-get-game-players-single-player
   (testing "A single player gets rank 1"
     (let [player {:xt/id (helpers/uuid) :player/score 500 :player/empire-name "Solo"
-                  :player/mil-planets 0 :player/food-planets 0 :player/ore-planets 0}
+                  :player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0}
           ranked (map-indexed (fn [idx p] (assoc p :rank (inc idx)))
                               (sort-by :player/score > [player]))]
       (is (= 1 (:rank (first ranked)))))))

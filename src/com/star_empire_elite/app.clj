@@ -78,8 +78,8 @@
             :game/general-power  const/general-power
             :game/admiral-power  const/admiral-power
             :game/ore-planet-credits const/ore-planet-credits
-            :game/ore-planet-fuel const/ore-planet-fuel
-            :game/food-planet-food const/food-planet-food
+            :game/erg-planet-food const/erg-planet-food
+            :game/erg-planet-fuel const/erg-planet-fuel
             :game/mil-planet-soldiers const/mil-planet-soldiers
             :game/mil-planet-fighters const/mil-planet-fighters
             :game/mil-planet-stations const/mil-planet-stations
@@ -106,7 +106,7 @@
             :game/cmd-ship-cost const/cmd-ship-cost
             :game/agent-cost    const/agent-cost
             :game/mil-planet-cost const/mil-planet-cost
-            :game/food-planet-cost const/food-planet-cost
+            :game/erg-planet-cost const/erg-planet-cost
             :game/ore-planet-cost const/ore-planet-cost
             :game/soldier-sell    const/soldier-sell
             :game/transport-sell  const/transport-sell
@@ -118,7 +118,7 @@
             :game/cmd-ship-sell   const/cmd-ship-sell
             :game/agent-sell      const/agent-sell
             :game/mil-planet-sell const/mil-planet-sell
-            :game/food-planet-sell const/food-planet-sell
+            :game/erg-planet-sell const/erg-planet-sell
             :game/ore-planet-sell const/ore-planet-sell
             :game/food-buy        const/food-buy
             :game/food-sell       const/food-sell
@@ -214,7 +214,7 @@
             :player/fuel          const/starting-fuel
             :player/galaxars      const/starting-galaxars
             :player/mil-planets   const/starting-mil-planets
-            :player/food-planets  const/starting-food-planets
+            :player/erg-planets  const/starting-erg-planets
             :player/ore-planets   const/starting-ore-planets
             :player/population    const/starting-population
             :player/stability     const/starting-stability
@@ -328,7 +328,7 @@
                           dl      (:defender-losses result)
                           raw-pt  (or (:planets-transferred result) {:mil 0 :food 0 :ore 0})
                           pt-mil  (min (:mil  raw-pt) (:player/mil-planets  defender))
-                          pt-food (min (:food raw-pt) (:player/food-planets defender))
+                          pt-food (min (:food raw-pt) (:player/erg-planets defender))
                           pt-ore  (min (:ore  raw-pt) (:player/ore-planets  defender))
                           capped  (assoc result :planets-transferred {:mil pt-mil :food pt-food :ore pt-ore})
                           att-soldiers   (max 0 (- (:player/soldiers   player) (:soldiers-lost   al)))
@@ -339,7 +339,7 @@
                           att-admirals   (max 0 (- (:player/admirals   player) (:admirals-lost   al)))
                           att-cmd-ships  (max 0 (- (:player/cmd-ships  player) (:cmd-ships-lost  al)))
                           att-mil-plts   (+ (:player/mil-planets  player) pt-mil)
-                          att-food-plts  (+ (:player/food-planets player) pt-food)
+                          att-food-plts  (+ (:player/erg-planets player) pt-food)
                           att-ore-plts   (+ (:player/ore-planets  player) pt-ore)]
                       (biff/submit-tx ctx
                         [{:db/doc-type :player :db/op :update :xt/id player-id
@@ -352,7 +352,7 @@
                           :player/admirals     att-admirals
                           :player/cmd-ships    att-cmd-ships
                           :player/mil-planets  att-mil-plts
-                          :player/food-planets att-food-plts
+                          :player/erg-planets att-food-plts
                           :player/ore-planets  att-ore-plts}
                          {:db/doc-type :player :db/op :update :xt/id (:xt/id defender)
                           :player/soldiers     (max 0 (- (:player/soldiers   defender) (:soldiers-lost   dl)))
@@ -364,7 +364,7 @@
                           :player/cmd-ships    (max 0 (- (:player/cmd-ships  defender) (:cmd-ships-lost  dl)))
                           :player/stations     (max 0 (- (:player/stations   defender) (:stations-lost   dl)))
                           :player/mil-planets  (max 0 (- (:player/mil-planets  defender) pt-mil))
-                          :player/food-planets (max 0 (- (:player/food-planets defender) pt-food))
+                          :player/erg-planets (max 0 (- (:player/erg-planets defender) pt-food))
                           :player/ore-planets  (max 0 (- (:player/ore-planets  defender) pt-ore))
                           :player/incoming-attacks
                           (conj (or (:player/incoming-attacks defender) []) (pr-str capped))}])
@@ -377,7 +377,7 @@
                                              :player/admirals     att-admirals
                                              :player/cmd-ships    att-cmd-ships
                                              :player/mil-planets  att-mil-plts
-                                             :player/food-planets att-food-plts
+                                             :player/erg-planets att-food-plts
                                              :player/ore-planets  att-ore-plts})]))))
 
               ;; --- espionage ---
@@ -410,7 +410,7 @@
                     [cached display-player]
                     (let [pop      (:player/population display-player)
                           planets  (+ (:player/ore-planets  display-player)
-                                      (:player/food-planets display-player)
+                                      (:player/erg-planets display-player)
                                       (:player/mil-planets  display-player))
                           capacity (* planets const/pop-capacity-per-planet)
                           raw      (+ (* pop const/pop-growth-rate)

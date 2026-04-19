@@ -31,7 +31,7 @@
    {:label "Command Ships"    :abbrev "Cmd Ships"  :field "cmd-ships-sold"    :qty-key :cmd-ships-sold    :rate-key :cmd-ship-sell   :player-key :player/cmd-ships}
    {:label "Agents"           :abbrev "Agents"     :field "agents-sold"       :qty-key :agents-sold       :rate-key :agent-sell      :player-key :player/agents}
    {:label "Military Planets" :abbrev "Mil Plts"   :field "mil-planets-sold"  :qty-key :mil-planets-sold  :rate-key :mil-planet-sell :player-key :player/mil-planets}
-   {:label "Food Planets"     :abbrev "Food Plts"  :field "food-planets-sold" :qty-key :food-planets-sold :rate-key :food-planet-sell :player-key :player/food-planets}
+   {:label "Energy Planets"     :abbrev "Erg Plts"  :field "erg-planets-sold" :qty-key :erg-planets-sold :rate-key :erg-planet-sell :player-key :player/erg-planets}
    {:label "Ore Planets"      :abbrev "Ore Plts"   :field "ore-planets-sold"  :qty-key :ore-planets-sold  :rate-key :ore-planet-sell :player-key :player/ore-planets}
    {:label "Food"             :abbrev "Food"       :field "food-sold"         :qty-key :food-sold         :rate-key :food-sell       :player-key :player/food}
    {:label "Fuel"             :abbrev "Fuel"       :field "fuel-sold"         :qty-key :fuel-sold         :rate-key :fuel-sell       :player-key :player/fuel}])
@@ -60,7 +60,7 @@
    :cmd-ship-sell    (:game/cmd-ship-sell    game)
    :agent-sell       (:game/agent-sell       game)
    :mil-planet-sell  (:game/mil-planet-sell  game)
-   :food-planet-sell (:game/food-planet-sell game)
+   :erg-planet-sell (:game/erg-planet-sell game)
    :ore-planet-sell  (:game/ore-planet-sell  game)
    :food-buy         (:game/food-buy         game)
    :food-sell        (:game/food-sell        game)
@@ -82,7 +82,7 @@
    :cmd-ships-sold    (utils/parse-numeric-input (:cmd-ships-sold params))
    :agents-sold       (utils/parse-numeric-input (:agents-sold params))
    :mil-planets-sold  (utils/parse-numeric-input (:mil-planets-sold params))
-   :food-planets-sold (utils/parse-numeric-input (:food-planets-sold params))
+   :erg-planets-sold (utils/parse-numeric-input (:erg-planets-sold params))
    :ore-planets-sold  (utils/parse-numeric-input (:ore-planets-sold params))
    :food-bought       (utils/parse-numeric-input (:food-bought params))
    :food-sold         (utils/parse-numeric-input (:food-sold params))
@@ -104,7 +104,7 @@
                                      (* (:cmd-ships-sold quantities)    (:cmd-ship-sell rates))
                                      (* (:agents-sold quantities)       (:agent-sell rates))
                                      (* (:mil-planets-sold quantities)  (:mil-planet-sell rates))
-                                     (* (:food-planets-sold quantities) (:food-planet-sell rates))
+                                     (* (:erg-planets-sold quantities) (:erg-planet-sell rates))
                                      (* (:ore-planets-sold quantities)  (:ore-planet-sell rates)))
         credits-from-resources (- (+ (* (:food-sold quantities)         (:food-sell rates))
                                      (* (:fuel-sold quantities)         (:fuel-sell rates)))
@@ -141,11 +141,13 @@
    :cmd-ships    (- (:player/cmd-ships player)    (:cmd-ships-sold quantities))
    :agents       (- (:player/agents player)       (:agents-sold quantities))
    :mil-planets  (- (:player/mil-planets player)  (:mil-planets-sold quantities))
-   :food-planets (- (:player/food-planets player) (:food-planets-sold quantities))
+   :erg-planets (- (:player/erg-planets player) (:erg-planets-sold quantities))
    :ore-planets  (- (:player/ore-planets player)  (:ore-planets-sold quantities))
    :food (+ (:player/food player) (:food-bought quantities) (- (:food-sold quantities)))
    :fuel (+ (:player/fuel player) (:fuel-bought quantities) (- (:fuel-sold quantities)))
-   :galaxars (:player/galaxars player)})
+   :galaxars   (:player/galaxars player)
+   :population (:player/population player)
+   :stability  (:player/stability player)})
 
 (defn valid-exchange?
   "Returns true if player can execute the exchange (all resources non-negative).
@@ -154,7 +156,7 @@
   [resources-after]
   (every? #(>= (get resources-after %) 0)
           [:credits :soldiers :transports :generals :carriers :fighters
-           :admirals :stations :cmd-ships :agents :mil-planets :food-planets
+           :admirals :stations :cmd-ships :agents :mil-planets :erg-planets
            :ore-planets :food :fuel]))
 
 (defn identify-invalid-exchanges
@@ -172,7 +174,7 @@
    :invalid-cmd-ship-sale?    (< (:cmd-ships resources-after) 0)
    :invalid-agent-sale?       (< (:agents resources-after) 0)
    :invalid-mil-planet-sale?  (< (:mil-planets resources-after) 0)
-   :invalid-food-planet-sale? (< (:food-planets resources-after) 0)
+   :invalid-energy-planet-sale? (< (:erg-planets resources-after) 0)
    :invalid-ore-planet-sale?  (< (:ore-planets resources-after) 0)
    :invalid-food-sale?        (and (> (:food-sold quantities) 0) (< (:food resources-after) 0))
    :invalid-fuel-sale?        (and (> (:fuel-sold quantities) 0) (< (:fuel resources-after) 0))
@@ -313,7 +315,7 @@
                           :player/cmd-ships    (:cmd-ships resources-after)
                           :player/agents       (:agents resources-after)
                           :player/mil-planets  (:mil-planets resources-after)
-                          :player/food-planets (:food-planets resources-after)
+                          :player/erg-planets (:erg-planets resources-after)
                           :player/ore-planets  (:ore-planets resources-after)
                           :player/food         (:food resources-after)
                           :player/fuel         (:fuel resources-after)}])
@@ -358,7 +360,7 @@
 
          ;; Resources display with red highlighting for negative values
          [:div#resources-after
-          (ui/extended-resource-display-grid resources-after "Resources After Exchange" true)]
+          (ui/resource-display-grid resources-after "Resources After Exchange" true)]
 
          ;; Warning message if exchange is invalid
          [:div#exchange-warning.flex.items-center
@@ -418,7 +420,7 @@
                         (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
 
        ;; Current resources before exchange
-       (ui/extended-resource-display-grid player "Resources Before Exchange" false)
+       (ui/resource-display-grid player "Resources Before Exchange" false)
 
        (biff/form
          {:action (str "/app/game/" player-id "/apply-exchange")
@@ -486,7 +488,7 @@
 
          ;; Resources After Exchange (initially shows current resources)
          [:div#resources-after
-          (ui/extended-resource-display-grid player "Resources After Exchange" true)]
+          (ui/resource-display-grid player "Resources After Exchange" true)]
 
          ;; Warning message area - populated by HTMX if player tries invalid exchanges
          [:div#exchange-warning.flex.items-center]

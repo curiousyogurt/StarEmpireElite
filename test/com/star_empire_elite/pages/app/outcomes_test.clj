@@ -29,7 +29,7 @@
    ;; Resources (needed for score calculation)
    :player/credits                  5000
    :player/mil-planets              3
-   :player/food-planets             2
+   :player/erg-planets             2
    :player/ore-planets              1
    :player/soldiers                 100
    :player/fighters                 20
@@ -56,7 +56,7 @@
 
 (deftest test-calculate-score-formula
   (testing "Planets dominate the score, military and credits are tie-breakers"
-    (let [player {:player/mil-planets  2 :player/food-planets 1 :player/ore-planets  0
+    (let [player {:player/mil-planets  2 :player/erg-planets 1 :player/ore-planets  0
                   :player/soldiers     10 :player/fighters     5 :player/cmd-ships    1
                   :player/stations     3  :player/generals     1 :player/admirals     0
                   :player/credits      3000}
@@ -69,7 +69,7 @@
 
 (deftest test-calculate-score-zero-player
   (testing "Returns zero when all values are zero"
-    (let [player {:player/mil-planets 0 :player/food-planets 0 :player/ore-planets 0
+    (let [player {:player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0
                   :player/soldiers 0 :player/fighters 0 :player/cmd-ships 0
                   :player/stations 0 :player/generals 0 :player/admirals 0
                   :player/credits 0}]
@@ -77,7 +77,7 @@
 
 (deftest test-calculate-score-negative-credits-clamped
   (testing "Negative credits contribute 0 to score (clamped via max 0)"
-    (let [player {:player/mil-planets 0 :player/food-planets 0 :player/ore-planets 0
+    (let [player {:player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0
                   :player/soldiers 0 :player/fighters 0 :player/cmd-ships 0
                   :player/stations 0 :player/generals 0 :player/admirals 0
                   :player/credits -9999}]
@@ -85,11 +85,11 @@
 
 (deftest test-calculate-score-planets-dominate
   (testing "A single military planet outweighs hundreds of soldiers"
-    (let [planet-player  {:player/mil-planets 1 :player/food-planets 0 :player/ore-planets 0
+    (let [planet-player  {:player/mil-planets 1 :player/erg-planets 0 :player/ore-planets 0
                           :player/soldiers 0 :player/fighters 0 :player/cmd-ships 0
                           :player/stations 0 :player/generals 0 :player/admirals 0
                           :player/credits 0}
-          soldier-player {:player/mil-planets 0 :player/food-planets 0 :player/ore-planets 0
+          soldier-player {:player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0
                           :player/soldiers 499 :player/fighters 0 :player/cmd-ships 0
                           :player/stations 0 :player/generals 0 :player/admirals 0
                           :player/credits 0}]

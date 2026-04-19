@@ -29,8 +29,8 @@
 
           ;; Income generation constants
           [:game/ore-planet-credits        :int]
-          [:game/ore-planet-fuel           :int]
-          [:game/food-planet-food          :int]
+          [:game/erg-planet-food          :int]
+          [:game/erg-planet-fuel          :int]
           [:game/mil-planet-soldiers       :int]
           [:game/mil-planet-fighters       :int]
           [:game/mil-planet-stations       :int]
@@ -63,7 +63,7 @@
           [:game/cmd-ship-cost           :int]
           [:game/agent-cost              :int]
           [:game/mil-planet-cost         :int]
-          [:game/food-planet-cost        :int]
+          [:game/erg-planet-cost        :int]
           [:game/ore-planet-cost         :int]
 
           ;; Exchange sell/buy rates
@@ -77,7 +77,7 @@
           [:game/cmd-ship-sell           :int]
           [:game/agent-sell              :int]
           [:game/mil-planet-sell         :int]
-          [:game/food-planet-sell        :int]
+          [:game/erg-planet-sell        :int]
           [:game/ore-planet-sell         :int]
           [:game/food-buy                :int]
           [:game/food-sell               :int]
@@ -99,7 +99,7 @@
  
             ;; Resources
             [:player/mil-planets      :int]
-            [:player/food-planets          :int]
+            [:player/erg-planets          :int]
             [:player/ore-planets           :int]
             [:player/population            :int]
 

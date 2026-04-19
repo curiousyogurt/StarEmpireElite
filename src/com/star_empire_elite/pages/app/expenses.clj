@@ -66,7 +66,7 @@
                     :population-food int, :population-fuel int}"
   [player game]
   (let [planet-count (+ (:player/mil-planets player)
-                        (:player/food-planets player)
+                        (:player/erg-planets player)
                         (:player/ore-planets player))]
     {:planets-credits   (* planet-count                (:game/planet-upkeep-credits game))
      :planets-food      (* planet-count                (:game/planet-upkeep-food game))
@@ -84,23 +84,38 @@
 (defn calculate-resources-after-expenses
   "Calculate player resources after deducting expense payments.
 
-  [player payments] -> {:credits int, :food int, :fuel int}"
+  [player payments] -> {:credits int, :food int, :fuel int, ...}"
   [player payments]
-  {:credits (- (:player/credits player)
-               (:planets-pay payments)
-               (:soldiers-credits payments)
-               (:fighters-credits payments)
-               (:stations-credits payments))
-   :food    (- (:player/food player)
-               (:planets-food payments)
-               (:soldiers-food payments)
-               (:agents-food payments)
-               (:population-food payments))
-   :fuel    (- (:player/fuel player)
-               (:fighters-fuel payments)
-               (:stations-fuel payments)
-               (:agents-fuel payments)
-               (:population-fuel payments))})
+  {:credits      (- (:player/credits player)
+                    (:planets-pay payments)
+                    (:soldiers-credits payments)
+                    (:fighters-credits payments)
+                    (:stations-credits payments))
+   :food         (- (:player/food player)
+                    (:planets-food payments)
+                    (:soldiers-food payments)
+                    (:agents-food payments)
+                    (:population-food payments))
+   :fuel         (- (:player/fuel player)
+                    (:fighters-fuel payments)
+                    (:stations-fuel payments)
+                    (:agents-fuel payments)
+                    (:population-fuel payments))
+   :population   (:player/population player)
+   :stability    (:player/stability player)
+   :galaxars     (:player/galaxars player)
+   :soldiers     (:player/soldiers player)
+   :transports   (:player/transports player)
+   :generals     (:player/generals player)
+   :fighters     (:player/fighters player)
+   :carriers     (:player/carriers player)
+   :admirals     (:player/admirals player)
+   :stations     (:player/stations player)
+   :cmd-ships    (:player/cmd-ships player)
+   :agents       (:player/agents player)
+   :ore-planets  (:player/ore-planets player)
+   :erg-planets (:player/erg-planets player)
+   :mil-planets  (:player/mil-planets player)})
 
 (defn can-afford-expenses?
   "Returns true if all resource values after expenses are non-negative.
@@ -309,14 +324,7 @@
       (biff/render
         [:div
          [:div#resources-after
-          (ui/resource-display-grid
-            (assoc resources-after
-                   :galaxars (:player/galaxars player)
-                   :soldiers (:player/soldiers player)
-                   :fighters (:player/fighters player)
-                   :stations (:player/stations player)
-                   :agents   (:player/agents player))
-            "Resources After Expenses" true)]
+          (ui/resource-display-grid resources-after "Resources After Expenses" true)]
          [:div#expense-warning.flex.items-center
           {:hx-swap-oob "true"}
           (when (not affordable?)
@@ -336,7 +344,7 @@
   (let [required     (calculate-required-expenses player game)
         player-id    (:xt/id player)
         planet-count (+ (:player/mil-planets player)
-                        (:player/food-planets player)
+                        (:player/erg-planets player)
                         (:player/ore-planets player))
         ;; Per-row asset counts keyed by row-id, used when iterating expense-row-specs.
         ;; Population is formatted with "M" suffix; all others are plain integers.
@@ -383,7 +391,7 @@
             (ui/phase-table-header
               [{:label "Item" :class "pr-4"}
                {:label "Count" :class "text-right pr-4"}
-               {:label "Expense" :class "pr-4"}
+               {:label "Amounts" :class "pr-4"}
                {:label "Pay Credits" :class "pr-4"}
                {:label "Pay Food" :class "pr-4"}
                {:label "Pay Fuel" :class "pr-4"}])

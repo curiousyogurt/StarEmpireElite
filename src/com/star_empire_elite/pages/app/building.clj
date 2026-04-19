@@ -30,7 +30,7 @@
    {:label "Command Ships"    :abbrev "Cmd Ships" :qty-key :cmd-ships    :cost-key :game/cmd-ship-cost}
    {:label "Agents"           :abbrev "Agents"    :qty-key :agents       :cost-key :game/agent-cost}
    {:label "Ore Planets"      :abbrev "Ore Plts"  :qty-key :ore-planets  :cost-key :game/ore-planet-cost}
-   {:label "Food Planets"     :abbrev "Food Plts" :qty-key :food-planets :cost-key :game/food-planet-cost}
+   {:label "Energy Planets"     :abbrev "Erg Plts" :qty-key :erg-planets :cost-key :game/erg-planet-cost}
    {:label "Military Planets" :abbrev "Mil Plts"  :qty-key :mil-planets  :cost-key :game/mil-planet-cost}])
 
 (def building-hx-include
@@ -53,7 +53,7 @@
    :cmd-ships    (utils/parse-numeric-input (:cmd-ships params))
    :agents       (utils/parse-numeric-input (:agents params))
    :ore-planets  (utils/parse-numeric-input (:ore-planets params))
-   :food-planets (utils/parse-numeric-input (:food-planets params))
+   :erg-planets (utils/parse-numeric-input (:erg-planets params))
    :mil-planets  (utils/parse-numeric-input (:mil-planets params))})
 
 (defn- total-cost
@@ -78,6 +78,11 @@
   [player player-map, quantities purchase-quantities, cost-info {:total-cost int}] -> {:credits int, :soldiers int, ...}"
   [player quantities cost-info]
   {:credits      (- (:player/credits player)      (:total-cost cost-info))
+   :food         (:player/food player)
+   :fuel         (:player/fuel player)
+   :population   (:player/population player)
+   :stability    (:player/stability player)
+   :galaxars     (:player/galaxars player)
    :soldiers     (+ (:player/soldiers player)     (:soldiers quantities))
    :transports   (+ (:player/transports player)   (:transports quantities))
    :generals     (+ (:player/generals player)     (:generals quantities))
@@ -88,7 +93,7 @@
    :cmd-ships    (+ (:player/cmd-ships player)    (:cmd-ships quantities))
    :agents       (+ (:player/agents player)       (:agents quantities))
    :ore-planets  (+ (:player/ore-planets player)  (:ore-planets quantities))
-   :food-planets (+ (:player/food-planets player) (:food-planets quantities))
+   :erg-planets (+ (:player/erg-planets player) (:erg-planets quantities))
    :mil-planets  (+ (:player/mil-planets player)  (:mil-planets quantities))})
 
 (defn can-afford-purchases?
@@ -222,7 +227,7 @@
                               :player/cmd-ships    (:cmd-ships resources-after)
                               :player/agents       (:agents resources-after)
                               :player/ore-planets  (:ore-planets resources-after)
-                              :player/food-planets (:food-planets resources-after)
+                              :player/erg-planets (:erg-planets resources-after)
                               :player/mil-planets  (:mil-planets resources-after)
                               :player/current-phase 4}])
             {:status 303
@@ -245,7 +250,7 @@
       (biff/render
         [:div
          [:div#resources-after
-          (ui/extended-resource-display-grid
+          (ui/resource-display-grid
             (assoc resources-after
                    :food     (:player/food player)
                    :fuel     (:player/fuel player)
@@ -292,7 +297,7 @@
                         (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
 
        ;; Current resources before building
-       (ui/extended-resource-display-grid player "Resources Before Building" false)
+       (ui/resource-display-grid player "Resources Before Building" false)
 
        (biff/form
          {:action (str "/app/game/" player-id "/apply-building")
@@ -329,7 +334,7 @@
 
          ;; Resources after purchases - initial copy, updated via HTMX
          [:div#resources-after
-          (ui/extended-resource-display-grid player "Resources After Purchases" false)]
+          (ui/resource-display-grid player "Resources After Purchases" false)]
 
          ;; Warning message area - populated by HTMX if player can't afford purchases
          [:div#building-warning.flex.items-center]

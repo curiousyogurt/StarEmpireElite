@@ -26,7 +26,7 @@
    :game/cmd-ship-sell  30000
    :game/agent-sell      1000
    :game/mil-planet-sell 1000
-   :game/food-planet-sell 5500
+   :game/erg-planet-sell 5500
    :game/ore-planet-sell 11000
    :game/food-buy           6
    :game/food-sell          2
@@ -49,7 +49,7 @@
    :player/cmd-ships    0
    :player/agents       5
    :player/mil-planets  5
-   :player/food-planets 4
+   :player/erg-planets 4
    :player/ore-planets  6
    :player/food         500
    :player/fuel         300
@@ -61,7 +61,7 @@
   {:soldiers-sold    0 :transports-sold   0 :generals-sold   0
    :fighters-sold    0 :carriers-sold     0 :admirals-sold   0
    :stations-sold    0 :cmd-ships-sold    0 :agents-sold     0
-   :mil-planets-sold 0 :food-planets-sold 0 :ore-planets-sold 0
+   :mil-planets-sold 0 :erg-planets-sold 0 :ore-planets-sold 0
    :food-bought      0 :food-sold         0
    :fuel-bought      0 :fuel-sold         0})
 
@@ -78,7 +78,7 @@
       (is (= 375   (:fighter-sell     rates)))
       (is (= 500   (:station-sell     rates)))
       (is (= 1000  (:mil-planet-sell  rates)))
-      (is (= 5500  (:food-planet-sell rates)))
+      (is (= 5500  (:erg-planet-sell rates)))
       (is (= 11000 (:ore-planet-sell  rates)))
       (is (= 6     (:food-buy         rates)))
       (is (= 2     (:food-sell        rates)))
@@ -97,7 +97,7 @@
     (let [params {:soldiers-sold "10" :transports-sold "2" :generals-sold "1"
                   :fighters-sold "5"  :carriers-sold   "1" :admirals-sold "1"
                   :stations-sold "3"  :cmd-ships-sold  "0" :agents-sold   "2"
-                  :mil-planets-sold "1" :food-planets-sold "1" :ore-planets-sold "1"
+                  :mil-planets-sold "1" :erg-planets-sold "1" :ore-planets-sold "1"
                   :food-bought "50" :food-sold "20" :fuel-bought "30" :fuel-sold "10"}
           q (exchange/parse-exchange-quantities params)]
       (is (= 10 (:soldiers-sold q)))
@@ -122,12 +122,12 @@
 (deftest test-calculate-exchange-credits-unit-sales
   (testing "Credits from selling military units accumulate correctly"
     (let [quantities (merge zero-quantities {:soldiers-sold 10 :fighters-sold 5 :stations-sold 2
-                                             :mil-planets-sold 1 :food-planets-sold 1 :ore-planets-sold 1})
+                                             :mil-planets-sold 1 :erg-planets-sold 1 :ore-planets-sold 1})
           rates (exchange/get-exchange-rates test-game)
           result (exchange/calculate-exchange-credits quantities rates)
           expected (+ (* 10 (:game/soldier-sell test-game)) (* 5 (:game/fighter-sell test-game))
                       (* 2 (:game/station-sell test-game))
-                      (* 1 (:game/mil-planet-sell test-game)) (* 1 (:game/food-planet-sell test-game)) (* 1 (:game/ore-planet-sell test-game)))]
+                      (* 1 (:game/mil-planet-sell test-game)) (* 1 (:game/erg-planet-sell test-game)) (* 1 (:game/ore-planet-sell test-game)))]
       (is (= expected (:credits-from-sales result)))
       (is (= 0 (:credits-from-resources result)))
       (is (= expected (:total-credits result))))))
@@ -181,10 +181,10 @@
                      :player/soldiers 100 :player/transports 5 :player/generals 2
                      :player/fighters 20  :player/carriers 1  :player/admirals 1
                      :player/stations 10  :player/cmd-ships 0  :player/agents 5
-                     :player/mil-planets 5 :player/food-planets 4 :player/ore-planets 6}
+                     :player/mil-planets 5 :player/erg-planets 4 :player/ore-planets 6}
           quantities (merge zero-quantities {:soldiers-sold 10 :fighters-sold 5 :stations-sold 2
                                              :agents-sold 1 :mil-planets-sold 1
-                                             :food-planets-sold 1 :ore-planets-sold 1
+                                             :erg-planets-sold 1 :ore-planets-sold 1
                                              :food-bought 50 :food-sold 20
                                              :fuel-bought 30 :fuel-sold 10})
           ;; Use a simplified credit-changes to keep the test deterministic.
@@ -196,7 +196,7 @@
       (is (= 8    (:stations r)))     ; 10 - 2
       (is (= 4    (:agents r)))       ; 5 - 1
       (is (= 4    (:mil-planets r)))  ; 5 - 1
-      (is (= 3    (:food-planets r))) ; 4 - 1
+      (is (= 3    (:erg-planets r))) ; 4 - 1
       (is (= 5    (:ore-planets r)))  ; 6 - 1
       (is (= 530  (:food r)))         ; 500 + 50 - 20
       (is (= 320  (:fuel r)))         ; 300 + 30 - 10
@@ -207,7 +207,7 @@
                      :player/soldiers 0 :player/transports 0 :player/generals 0
                      :player/fighters 0 :player/carriers 0  :player/admirals 0
                      :player/stations 0 :player/cmd-ships 0 :player/agents 0
-                     :player/mil-planets 0 :player/food-planets 0 :player/ore-planets 0}
+                     :player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0}
           r (exchange/calculate-resources-after-exchange player zero-quantities {:total-credits 0})]
       (is (= 99 (:galaxars r))))))
 
@@ -219,7 +219,7 @@
   {:credits 100 :soldiers 50 :transports 5 :generals 2
    :fighters 10 :carriers 1  :admirals 1  :stations 5
    :cmd-ships 0 :agents 5
-   :mil-planets 2 :food-planets 3 :ore-planets 1
+   :mil-planets 2 :erg-planets 3 :ore-planets 1
    :food 1000 :fuel 500})
 
 (deftest test-valid-exchange
@@ -238,7 +238,7 @@
     (let [resources-after {:credits -50 :soldiers -10 :transports 5 :generals 2
                            :fighters 15 :carriers 1   :admirals 1  :stations 8
                            :cmd-ships 0 :agents 5
-                           :mil-planets 4 :food-planets 3 :ore-planets 5
+                           :mil-planets 4 :erg-planets 3 :ore-planets 5
                            :food 530 :fuel 320}
           quantities (merge zero-quantities {:soldiers-sold 110 :food-bought 5})
           invalid (exchange/identify-invalid-exchanges resources-after quantities)]
@@ -311,7 +311,7 @@
 (deftest test-apply-exchange-commits-correct-tx
   (testing "Commits correct resource deltas and redirects to expenses"
     (let [params {:soldiers-sold "10" :fighters-sold "5" :agents-sold "1"
-                  :stations-sold "2"  :mil-planets-sold "1" :food-planets-sold "1" :ore-planets-sold "1"
+                  :stations-sold "2"  :mil-planets-sold "1" :erg-planets-sold "1" :ore-planets-sold "1"
                   :food-bought "50" :food-sold "20" :fuel-bought "30" :fuel-sold "10"}
           tx-atom (atom nil)]
       (with-redefs [xt/entity      (helpers/fake-entity [test-player test-game])
@@ -338,7 +338,7 @@
           (is (= (:stations     expected) (:player/stations     tx)))
           (is (= (:agents       expected) (:player/agents       tx)))
           (is (= (:mil-planets  expected) (:player/mil-planets  tx)))
-          (is (= (:food-planets expected) (:player/food-planets tx)))
+          (is (= (:erg-planets expected) (:player/erg-planets tx)))
           (is (= (:ore-planets  expected) (:player/ore-planets  tx)))
           (is (= (:food         expected) (:player/food         tx)))
           (is (= (:fuel         expected) (:player/fuel         tx))))))))

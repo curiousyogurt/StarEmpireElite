@@ -26,7 +26,7 @@
    :game/cmd-ship-cost   80
    :game/agent-cost      90
    :game/mil-planet-cost  700
-   :game/food-planet-cost 800
+   :game/erg-planet-cost 800
    :game/ore-planet-cost  900})
 
 ;; Player in phase 3 with enough credits to buy most things.
@@ -46,7 +46,7 @@
    :player/cmd-ships     1
    :player/agents        0
    :player/mil-planets   2
-   :player/food-planets  2
+   :player/erg-planets  2
    :player/ore-planets   2
    :player/food          100
    :player/fuel          50
@@ -57,7 +57,7 @@
 (def zero-quantities
   {:soldiers 0 :transports 0 :generals 0 :carriers 0
    :fighters 0 :admirals  0 :stations 0 :cmd-ships 0 :agents 0
-   :ore-planets 0 :food-planets 0 :mil-planets 0})
+   :ore-planets 0 :erg-planets 0 :mil-planets 0})
 
 ;;;;
 ;;;; calculate-purchase-cost Tests
@@ -82,7 +82,7 @@
     ;; = 100 + 100 + 60 + 120 + 400 + 60 + 280 + 160 + 90 + 700 + 800 + 900 = 3770
     (let [quantities {:soldiers 10 :transports 5 :generals 2 :carriers 3
                       :fighters 8  :admirals  1 :stations 4 :cmd-ships 2 :agents 1
-                      :mil-planets 1 :food-planets 1 :ore-planets 1}
+                      :mil-planets 1 :erg-planets 1 :ore-planets 1}
           expected (+ (* 10 10) (* 5 20) (* 2 30) (* 3 40) (* 8 50)
                       (* 1 60) (* 4 70) (* 2 80) (* 1 90)
                       (* 1 700) (* 1 800) (* 1 900))]
@@ -104,10 +104,10 @@
                      :player/soldiers 100 :player/transports 20 :player/generals 5
                      :player/carriers 10  :player/fighters  50 :player/admirals 2
                      :player/stations 15  :player/cmd-ships  3
-                     :player/mil-planets 5 :player/food-planets 4 :player/ore-planets 6}
+                     :player/mil-planets 5 :player/erg-planets 4 :player/ore-planets 6}
           quantities {:soldiers 10 :transports 5 :generals 2 :carriers 3
                       :fighters 8  :admirals  1 :stations 4 :cmd-ships 2 :agents 1
-                      :mil-planets 1 :food-planets 1 :ore-planets 1}
+                      :mil-planets 1 :erg-planets 1 :ore-planets 1}
           cost-info {:total-cost 3770}
           r (building/calculate-resources-after-purchases player quantities cost-info)]
       (is (= 1230 (:credits r)))       ; 5000 - 3770
@@ -121,7 +121,7 @@
       (is (= 5    (:cmd-ships r)))     ; 3 + 2
       (is (= 3    (:agents r)))        ; 2 + 1
       (is (= 6    (:mil-planets r)))   ; 5 + 1
-      (is (= 5    (:food-planets r)))  ; 4 + 1
+      (is (= 5    (:erg-planets r)))  ; 4 + 1
       (is (= 7    (:ore-planets r))))) ; 6 + 1
 
   (testing "Allows negative credits (overspending is caught by can-afford-purchases?, not here)"
@@ -129,7 +129,7 @@
                      :player/soldiers 0 :player/transports 0 :player/generals 0
                      :player/carriers 0 :player/fighters  0 :player/admirals 0
                      :player/stations 0 :player/cmd-ships  0
-                     :player/mil-planets 0 :player/food-planets 0 :player/ore-planets 0}
+                     :player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0}
           quantities (assoc zero-quantities :soldiers 100)
           cost-info {:total-cost 1000}
           r (building/calculate-resources-after-purchases player quantities cost-info)]
@@ -198,7 +198,7 @@
   (testing "Commits correct resource deltas, advances to phase 4, and redirects to action"
     (let [params   {:soldiers "3" :transports "2" :generals "1" :carriers "0"
                     :fighters "3" :admirals   "0" :stations "2" :cmd-ships "0" :agents "1"
-                    :mil-planets "0" :food-planets "0" :ore-planets "0"}
+                    :mil-planets "0" :erg-planets "0" :ore-planets "0"}
           tx-atom (atom nil)]
       (with-redefs [xt/entity      (helpers/fake-entity [test-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]

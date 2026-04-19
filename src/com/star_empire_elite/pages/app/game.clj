@@ -84,7 +84,7 @@
    [:div
     [:p.text-xs "Planets"]
     [:p.font-mono (+ (:player/mil-planets player)
-                     (:player/food-planets player)
+                     (:player/erg-planets player)
                      (:player/ore-planets player))]]
 
    ;; Turn progression
@@ -122,7 +122,7 @@
          [:td.border-r.border-green-400.px-3.py-2 (:player/empire-name player)]
          [:td.border-r.border-green-400.px-3.py-2
           (+ (:player/mil-planets player)
-             (:player/food-planets player)
+             (:player/erg-planets player)
              (:player/ore-planets player))]
          [:td.px-3.py-2 (:player/score player)]])]]]])
 

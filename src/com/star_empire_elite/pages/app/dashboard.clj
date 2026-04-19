@@ -158,7 +158,7 @@
     [:div [:p.text-xs "Population"] [:p.font-mono (str (:player/population player) "M")]]
     [:div [:p.text-xs "Stability"]  [:p.font-mono (:player/stability player) "%"]]
     [:div [:p.text-xs "Ore Plts"]   [:p.font-mono (:player/ore-planets player)]]
-    [:div [:p.text-xs "Food Plts"]  [:p.font-mono (:player/food-planets player)]]
+    [:div [:p.text-xs "Erg Plts"]  [:p.font-mono (:player/erg-planets player)]]
     [:div [:p.text-xs "Mil Plts"]   [:p.font-mono (:player/mil-planets player)]]]
 
    ;; Row 2: military units and leadership

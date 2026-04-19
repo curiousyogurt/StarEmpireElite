@@ -39,7 +39,7 @@
   [player player-map] -> hiccup"
   [player]
   (let [total-planets (+ (:player/mil-planets player)
-                         (:player/food-planets player)
+                         (:player/erg-planets player)
                          (:player/ore-planets player))
         player-id-str (str (:xt/id player))]
     [:tr.border-b.border-green-400

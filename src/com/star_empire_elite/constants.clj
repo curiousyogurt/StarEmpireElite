@@ -49,7 +49,7 @@
 (def starting-galaxars 0)
 
 (def starting-mil-planets  0)
-(def starting-food-planets 1)
+(def starting-erg-planets 1)
 (def starting-ore-planets  1)
 
 (def starting-population 6)   ; Stored in millions
@@ -77,9 +77,9 @@
 ;; Income Generation Defaults
 ;; Resources generated per planet type per round
 
-(def ore-planet-credits  10000)
-(def ore-planet-fuel     50)
-(def food-planet-food    3500)
+(def ore-planet-credits 10000)
+(def erg-planet-food 3000)
+(def erg-planet-fuel 2000)
 
 ;; Military planets provide modest ongoing military support.
 ;; They should not out-compete ore planets as a source of sell value.
@@ -102,41 +102,41 @@
 ;; Upkeep / Expense Defaults
 ;; Cost to maintain units and infrastructure per round
 
-(def planet-upkeep-credits    2500)
-(def planet-upkeep-food       100)
+(def planet-upkeep-credits  2500)
+(def planet-upkeep-food     100)
 
-(def soldier-upkeep-credits   25)
-(def soldier-upkeep-food      10)
+(def soldier-upkeep-credits 25)
+(def soldier-upkeep-food    10)
 
-(def fighter-upkeep-credits   100)
-(def fighter-upkeep-fuel      10)
+(def fighter-upkeep-credits 100)
+(def fighter-upkeep-fuel    10)
 
-(def station-upkeep-credits   100)
-(def station-upkeep-fuel      10)
+(def station-upkeep-credits 100)
+(def station-upkeep-fuel    10)
 
-(def agent-upkeep-food        10)
-(def agent-upkeep-fuel        10)
+(def agent-upkeep-food      10)
+(def agent-upkeep-fuel      10)
 
 
 ;; Building / Purchase Cost Defaults
 ;; Cost to purchase new units, ships, and planets
 
-(def soldier-cost     1000)
-(def transport-cost   5000)
-(def general-cost     11000)
+(def soldier-cost    1000)
+(def transport-cost  5000)
+(def general-cost    11000)
 
-(def fighter-cost     1500)
-(def carrier-cost     15000)
-(def admiral-cost     15000)
+(def fighter-cost    1500)
+(def carrier-cost    15000)
+(def admiral-cost    15000)
 
-(def station-cost     2000)
-(def cmd-ship-cost    60000)
+(def station-cost    2000)
+(def cmd-ship-cost   60000)
 
-(def mil-planet-cost  17000)
-(def food-planet-cost 11000)
-(def ore-planet-cost  22000)
+(def mil-planet-cost 17000)
+(def erg-planet-cost 11000)
+(def ore-planet-cost 22000)
 
-(def agent-cost       5000)
+(def agent-cost      5000)
 
 
 ;; Rates for buying and selling assets in the exchange
@@ -153,7 +153,7 @@
 (def cmd-ship-sell    30000)
 
 (def mil-planet-sell  1000)
-(def food-planet-sell 5500)
+(def erg-planet-sell 5500)
 (def ore-planet-sell  11000)
 
 (def agent-sell       1000)

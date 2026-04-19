@@ -28,7 +28,7 @@
    :player/current-phase 4
    :player/score       500
    :player/mil-planets 2
-   :player/food-planets 1
+   :player/erg-planets 1
    :player/ore-planets 3})
 
 (def test-target-2
@@ -38,7 +38,7 @@
    :player/current-phase 4
    :player/score       750
    :player/mil-planets 1
-   :player/food-planets 2
+   :player/erg-planets 2
    :player/ore-planets 2})
 
 ;;;;

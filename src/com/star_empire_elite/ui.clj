@@ -75,13 +75,13 @@
     ;; Mobile: Stack vertically
     [:div.flex.flex-col.gap-3.lg:hidden
      [:div.flex.items-baseline.gap-3
-      [:h2.text-xl.font-bold (str "PHASE " current-phase ": " phase-name)]
+      [:h2.text-xl.font-bold (str phase-name " PHASE")]
       (when info-str [:span.text-xs.text-green-400.text-opacity-75 info-str])]
      (phase-indicator current-phase)]
     ;; Wide screen: Horizontal with space between
     [:div.hidden.lg:flex.lg:items-center.lg:justify-between.lg:gap-8
      [:div.flex.items-baseline.gap-3
-      [:h2.text-xl.font-bold (str "PHASE " current-phase ": " phase-name)]
+      [:h2.text-xl.font-bold (str phase-name " PHASE")]
       (when info-str [:span.text-xs.text-green-400.text-opacity-75 info-str])]
      (phase-indicator current-phase)]]))
 
@@ -131,127 +131,45 @@
                 "Page not found."
                 "Something went wrong.")]))})
 
-;;; Resource display grid showing player's current or projected resources. Used across all
-;;; phases to display resources in a consistent format. Can highlight negative values in red.
+;;; Resource display grid showing all player resources, units, and planets. Accepts either a
+;;; player entity (using :player/credits etc.) or a plain resource map (:credits etc.).
+;;; Spec drives both the field list and label — add a field here to show it everywhere.
+(def ^:private resource-specs
+  [{:label "Credits"    :key :credits      :player-key :player/credits}
+   {:label "Food"       :key :food         :player-key :player/food}
+   {:label "Fuel"       :key :fuel         :player-key :player/fuel}
+   {:label "Galaxars"   :key :galaxars     :player-key :player/galaxars}
+   {:label "Population" :key :population   :player-key :player/population :display-fn #(format-number (* % 1000000))}
+   {:label "Stability"  :key :stability    :player-key :player/stability  :display-fn #(str % "%")}
+   {:label "Soldiers"   :key :soldiers     :player-key :player/soldiers}
+   {:label "Transports" :key :transports   :player-key :player/transports}
+   {:label "Generals"   :key :generals     :player-key :player/generals}
+   {:label "Fighters"   :key :fighters     :player-key :player/fighters}
+   {:label "Carriers"   :key :carriers     :player-key :player/carriers}
+   {:label "Admirals"   :key :admirals     :player-key :player/admirals}
+   {:label "Stations"   :key :stations     :player-key :player/stations}
+   {:label "Cmd Ships"  :key :cmd-ships    :player-key :player/cmd-ships}
+   {:label "Agents"     :key :agents       :player-key :player/agents}
+   {:label "Ore Plts"   :key :ore-planets  :player-key :player/ore-planets}
+   {:label "Erg Plts"  :key :erg-planets :player-key :player/erg-planets}
+   {:label "Mil Plts"   :key :mil-planets  :player-key :player/mil-planets}])
+
 (defn resource-display-grid
-  "Display player resources in a responsive grid layout.
-
-  Args:
-  resources - map of resource values to display (uses either player entity or custom map)
-  title - optional title for the display section
-  highlight-negative? - if true, shows negative values in red (default false)"
-  ([resources title] (resource-display-grid resources title false nil))
-  ([resources title highlight-negative?] (resource-display-grid resources title highlight-negative? nil))
-  ([resources title highlight-negative? game]
-   [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
-    [:h3.font-bold.mb-4 title]
-    [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
-     [:div
-      [:p.text-xs "Credits"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:credits resources) (:player/credits resources)) 0)) "text-red-400")} 
-       (format-number (or (:credits resources) (:player/credits resources)))]]
-     [:div
-      [:p.text-xs "Fuel"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:fuel resources) (:player/fuel resources)) 0)) "text-red-400")} 
-       (format-number (or (:fuel resources) (:player/fuel resources)))]]
-     [:div
-      [:p.text-xs "Galaxars"]
-      [:p.font-mono (format-number (or (:galaxars resources) (:player/galaxars resources)))]]
-     [:div
-      [:p.text-xs "Food"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:food resources) (:player/food resources)) 0)) "text-red-400")} 
-       (format-number (or (:food resources) (:player/food resources)))]]
-     [:div
-      [:p.text-xs "Soldiers"]
-      [:p.font-mono (format-number (or (:soldiers resources) (:player/soldiers resources)))]]
-     [:div
-      [:p.text-xs "Fighters"]
-      [:p.font-mono (format-number (or (:fighters resources) (:player/fighters resources)))]]
-     [:div
-      [:p.text-xs "Stations"]
-      [:p.font-mono (format-number (or (:stations resources) (:player/stations resources)))]]
-     [:div
-      [:p.text-xs "Agents"]
-      [:p.font-mono (format-number (or (:agents resources) (:player/agents resources)))]]
-]]))
-
-;;; Extended resource display grid including all unit types and planets. Used in building phase
-;;; where players need to see all their assets, not just basic resources.
-(defn extended-resource-display-grid
-  "Display all player resources including units and planets in a responsive grid layout.
+  "Display all player resources, units, and planets in a responsive grid layout.
   Accepts either a player entity (uses :player/credits etc.) or a plain resource map (:credits etc.).
 
   ([resources title]) ([resources title highlight-negative? bool]) -> hiccup"
-  ([resources title] (extended-resource-display-grid resources title false))
+  ([resources title] (resource-display-grid resources title false))
   ([resources title highlight-negative?]
    [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
     [:h3.font-bold.mb-4 title]
     [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
-     [:div
-      [:p.text-xs "Credits"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:credits resources) (:player/credits resources) 0) 0)) "text-red-400")}
-       (format-number (or (:credits resources) (:player/credits resources) 0))]]
-     [:div
-      [:p.text-xs "Food"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:food resources) (:player/food resources) 0) 0)) "text-red-400")}
-       (format-number (or (:food resources) (:player/food resources) 0))]]
-     [:div
-      [:p.text-xs "Fuel"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:fuel resources) (:player/fuel resources) 0) 0)) "text-red-400")}
-       (format-number (or (:fuel resources) (:player/fuel resources) 0))]]
-     [:div
-      [:p.text-xs "Galaxars"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:galaxars resources) (:player/galaxars resources) 0) 0)) "text-red-400")}
-       (format-number (or (:galaxars resources) (:player/galaxars resources) 0))]]
-     [:div
-      [:p.text-xs "Soldiers"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:soldiers resources) (:player/soldiers resources) 0) 0)) "text-red-400")}
-       (format-number (or (:soldiers resources) (:player/soldiers resources) 0))]]
-     [:div
-      [:p.text-xs "Transports"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:transports resources) (:player/transports resources) 0) 0)) "text-red-400")}
-       (format-number (or (:transports resources) (:player/transports resources) 0))]]
-     [:div
-      [:p.text-xs "Generals"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:generals resources) (:player/generals resources) 0) 0)) "text-red-400")}
-       (format-number (or (:generals resources) (:player/generals resources) 0))]]
-     [:div
-      [:p.text-xs "Fighters"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:fighters resources) (:player/fighters resources) 0) 0)) "text-red-400")}
-       (format-number (or (:fighters resources) (:player/fighters resources) 0))]]
-     [:div
-      [:p.text-xs "Carriers"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:carriers resources) (:player/carriers resources) 0) 0)) "text-red-400")}
-       (format-number (or (:carriers resources) (:player/carriers resources) 0))]]
-     [:div
-      [:p.text-xs "Admirals"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:admirals resources) (:player/admirals resources) 0) 0)) "text-red-400")}
-       (format-number (or (:admirals resources) (:player/admirals resources) 0))]]
-     [:div
-      [:p.text-xs "Stations"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:stations resources) (:player/stations resources) 0) 0)) "text-red-400")}
-       (format-number (or (:stations resources) (:player/stations resources) 0))]]
-     [:div
-      [:p.text-xs "Cmd Ships"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:cmd-ships resources) (:player/cmd-ships resources) 0) 0)) "text-red-400")}
-       (format-number (or (:cmd-ships resources) (:player/cmd-ships resources) 0))]]
-     [:div
-      [:p.text-xs "Agents"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:agents resources) (:player/agents resources) 0) 0)) "text-red-400")}
-       (format-number (or (:agents resources) (:player/agents resources) 0))]]
-     [:div
-      [:p.text-xs "Ore Plts"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:ore-planets resources) (:player/ore-planets resources) 0) 0)) "text-red-400")}
-       (format-number (or (:ore-planets resources) (:player/ore-planets resources) 0))]]
-     [:div
-      [:p.text-xs "Food Plts"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:food-planets resources) (:player/food-planets resources) 0) 0)) "text-red-400")}
-       (format-number (or (:food-planets resources) (:player/food-planets resources) 0))]]
-     [:div
-      [:p.text-xs "Mil Plts"]
-      [:p.font-mono {:class (when (and highlight-negative? (< (or (:mil-planets resources) (:player/mil-planets resources) 0) 0)) "text-red-400")}
-       (format-number (or (:mil-planets resources) (:player/mil-planets resources) 0))]]
-]]))
+     (for [{:keys [label key player-key display-fn]} resource-specs
+           :let [v (or (get resources key) (get resources player-key) 0)]]
+       [:div {:key label}
+        [:p.text-xs label]
+        [:p.font-mono {:class (when (and highlight-negative? (< v 0)) "text-red-400")}
+         (if display-fn (display-fn v) (format-number v))]])]]))
 
 (defn incoming-alert-content [player]
   (let [attacks   (seq (:player/incoming-attacks player))

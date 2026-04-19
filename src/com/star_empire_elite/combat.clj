@@ -55,7 +55,7 @@
 ;;; Returns a map {:mil n :food n :ore n} of how many of each type are transferred.
 (defn- select-planets [defender n]
   (let [pool (shuffle (concat (repeat (:player/mil-planets  defender) :mil)
-                              (repeat (:player/food-planets defender) :food)
+                              (repeat (:player/erg-planets defender) :food)
                               (repeat (:player/ore-planets  defender) :ore)))
         taken (frequencies (take n pool))]
     {:mil  (get taken :mil  0)
@@ -99,7 +99,7 @@
         winner-rate (/ loser-rate 2.0)
         ;; planet transfer: only when attacker wins
         def-total-planets (+ (:player/mil-planets  defender)
-                              (:player/food-planets defender)
+                              (:player/erg-planets defender)
                               (:player/ore-planets  defender))
         planets-count (if att-wins? (long (* margin def-total-planets)) 0)
         planets-transferred (select-planets defender planets-count)]

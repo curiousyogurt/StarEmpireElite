@@ -25,7 +25,7 @@
   [player player-map] -> int"
   [player]
   (+ (* (:player/mil-planets  player) 500)
-     (* (:player/food-planets player) 300)
+     (* (:player/erg-planets player) 300)
      (* (:player/ore-planets  player) 200)
      (* (:player/soldiers     player) 1)
      (* (:player/fighters     player) 3)
@@ -241,7 +241,7 @@
            [:p.font-bold (str "Population grew by " pop-growth " million this round.")]
            [:p.font-bold "Population held steady this round."])])
 
-      (ui/extended-resource-display-grid player "Resources" false)
+      (ui/resource-display-grid player "Resources" false)
 
       (biff/form
        {:action (str "/app/game/" (:xt/id player) "/apply-outcomes")

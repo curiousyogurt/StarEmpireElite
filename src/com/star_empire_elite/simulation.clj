@@ -5,8 +5,8 @@
 (def default-constants
   {;; Planet income
    :ore-planet-credits     const/ore-planet-credits
-   :ore-planet-fuel        const/ore-planet-fuel
-   :food-planet-food       const/food-planet-food
+   :erg-planet-food       const/erg-planet-food
+   :erg-planet-fuel       const/erg-planet-fuel
    :mil-planet-soldiers    const/mil-planet-soldiers
    :mil-planet-fighters    const/mil-planet-fighters
    :mil-planet-stations    const/mil-planet-stations
@@ -37,14 +37,14 @@
 
    ;; Planet costs (for expansion estimate)
    :ore-planet-cost  const/ore-planet-cost
-   :food-planet-cost const/food-planet-cost
+   :erg-planet-cost const/erg-planet-cost
    :mil-planet-cost  const/mil-planet-cost})
 
 (defn simulate-empire
   "Simulate one round of empire economics.
 
   empire map keys (all optional, default to 0 or starting constants):
-    :ore-planets :food-planets :mil-planets
+    :ore-planets :erg-planets :mil-planets
     :population :soldiers :generals :transports
     :fighters :admirals :carriers :stations :cmd-ships :agents
     :credits :food :fuel                  ; starting stockpiles
@@ -59,9 +59,9 @@
    (let [c (merge default-constants const-overrides)
 
          ore-planets   (get empire :ore-planets 0)
-         food-planets  (get empire :food-planets 0)
+         erg-planets  (get empire :erg-planets 0)
          mil-planets   (get empire :mil-planets 0)
-         total-planets (+ ore-planets food-planets mil-planets)
+         total-planets (+ ore-planets erg-planets mil-planets)
 
          population (get empire :population 0)
          soldiers   (get empire :soldiers 0)
@@ -93,8 +93,8 @@
                                     0)
          credits-in (+ credits-from-ore credits-from-liquidation)
 
-         food-in (* food-planets (:food-planet-food c))
-         fuel-in (* ore-planets  (:ore-planet-fuel c))
+         food-in (* erg-planets (:erg-planet-food c))
+         fuel-in (* erg-planets (:erg-planet-fuel c))
 
          ;; Expenses — credits (transports, generals, carriers, admirals, cmd-ships are free)
          credits-out (+ (* total-planets (:planet-upkeep-credits c))
@@ -144,7 +144,7 @@
                           (or (nil? rounds-until-fuel-shortage)
                               (>= rounds-until-fuel-shortage const/rounds-per-day))))
 
-         cheapest-planet (min (:ore-planet-cost c) (:food-planet-cost c) (:mil-planet-cost c))
+         cheapest-planet (min (:ore-planet-cost c) (:erg-planet-cost c) (:mil-planet-cost c))
 
          ;; How many rounds until the empire can afford the cheapest planet.
          ;; Accounts for credits already on hand — if already affordable, returns 0.
@@ -184,28 +184,28 @@
 
 (def scenario-a
   "Starting Empire — opening viability"
-  {:ore-planets 1 :food-planets 1 :mil-planets 0
+  {:ore-planets 1 :erg-planets 1 :mil-planets 0
    :population 6 :soldiers 100 :generals 2 :carriers 1})
 
 (def scenario-b
   "Ore-Spam Player — economic snowball test"
-  {:ore-planets 4 :food-planets 1 :mil-planets 0
+  {:ore-planets 4 :erg-planets 1 :mil-planets 0
    :population 6 :soldiers 100 :generals 2 :carriers 1})
 
 (def scenario-c
   "Military Buildup Player — war economy test"
-  {:ore-planets 2 :food-planets 1 :mil-planets 2
+  {:ore-planets 2 :erg-planets 1 :mil-planets 2
    :population 6 :soldiers 300 :generals 4
    :transports 3 :fighters 50 :admirals 1 :carriers 1})
 
 (def scenario-d
-  "Food-Neglect Player — food pressure test"
-  {:ore-planets 3 :food-planets 0 :mil-planets 0
+  "Energy-Neglect Player — food pressure test"
+  {:ore-planets 3 :erg-planets 0 :mil-planets 0
    :population 6 :soldiers 100 :generals 2 :carriers 1})
 
 (def scenario-e
   "Liquidation Exploit — military output as credit engine"
-  {:ore-planets 0 :food-planets 1 :mil-planets 3
+  {:ore-planets 0 :erg-planets 1 :mil-planets 3
    :population 6
    :liquidate-military-output? true})
 

@@ -19,34 +19,44 @@
 (defn calculate-income
   "Calculate income from all sources using game constants.
 
-  [player player-map, game game-map] -> {:ore-credits int,  :ore-fuel int,     :food-food int, 
+  [player player-map, game game-map] -> {:ore-credits int,  :ore-fuel int,     :energy-food int, 
   :mil-soldiers int, :mil-fighters int, :mil-stations int, 
   :tax-credits int}"
   [player game]
   ;; Keys such as :player/ore-planets are fully qualified keys in the player map.
   ;; That is, there is a key in the player map named :player/ore-planets, etc.
   ;;             (* resource-count-for-player     resource-value-in-game)
-  {:ore-credits  (* (:player/ore-planets player)  (:game/ore-planet-credits game))
-   :ore-fuel     (* (:player/ore-planets player)  (:game/ore-planet-fuel game))
-   :food-food    (* (:player/food-planets player) (:game/food-planet-food game))
-   :mil-soldiers (* (:player/mil-planets player)  (:game/mil-planet-soldiers game))
-   :mil-fighters (* (:player/mil-planets player)  (:game/mil-planet-fighters game))
-   :mil-stations (* (:player/mil-planets player)  (:game/mil-planet-stations game))
-   :tax-credits  (* (:player/population player)   (:game/population-tax-credits game))})
+  {:ore-credits  (* (:player/ore-planets player) (:game/ore-planet-credits game))
+   :energy-food  (* (:player/erg-planets player) (:game/erg-planet-food game))
+   :energy-fuel  (* (:player/erg-planets player) (:game/erg-planet-fuel game))
+   :mil-soldiers (* (:player/mil-planets player) (:game/mil-planet-soldiers game))
+   :mil-fighters (* (:player/mil-planets player) (:game/mil-planet-fighters game))
+   :mil-stations (* (:player/mil-planets player) (:game/mil-planet-stations game))
+   :tax-credits  (* (:player/population player)  (:game/population-tax-credits game))})
 
 (defn calculate-resources-after-income
   "Calculate all player resources after applying income.
 
   [player player-map, income income-map] -> {:credits int, :food int, ...}"
   [player income]
-  {:credits  (+ (:player/credits player)  (:ore-credits income) (:tax-credits income))
-   :food     (+ (:player/food player)     (:food-food income))
-   :fuel     (+ (:player/fuel player)     (:ore-fuel income))
-   :galaxars (:player/galaxars player)
-   :soldiers (+ (:player/soldiers player) (:mil-soldiers income))
-   :fighters (+ (:player/fighters player) (:mil-fighters income))
-   :stations (+ (:player/stations player) (:mil-stations income))
-   :agents   (:player/agents player)})
+  {:credits      (+ (:player/credits player)  (:ore-credits income) (:tax-credits income))
+   :food         (+ (:player/food player)     (:energy-food income))
+   :fuel         (+ (:player/fuel player)     (:energy-fuel income))
+   :population   (:player/population player)
+   :stability    (:player/stability player)
+   :galaxars     (:player/galaxars player)
+   :soldiers     (+ (:player/soldiers player) (:mil-soldiers income))
+   :transports   (:player/transports player)
+   :generals     (:player/generals player)
+   :fighters     (+ (:player/fighters player) (:mil-fighters income))
+   :carriers     (:player/carriers player)
+   :admirals     (:player/admirals player)
+   :stations     (+ (:player/stations player) (:mil-stations income))
+   :cmd-ships    (:player/cmd-ships player)
+   :agents       (:player/agents player)
+   :ore-planets  (:player/ore-planets player)
+   :erg-planets  (:player/erg-planets player)
+   :mil-planets  (:player/mil-planets player)})
 
 ;;;;
 ;;;; UI Components
@@ -75,8 +85,8 @@
 
     ;; Resources - all in one column, spaced out
     [:div.flex.gap-3.justify-start.flex-wrap
-     (for [[k label] [[:credits "Crds"] [:fuel "Fuel"]
-                      [:food "Food"] [:soldiers "Sold"] [:fighters "Fghts"]
+     (for [[k label] [[:credits "Crds"] [:food "Food"]
+                      [:fuel "Fuel"] [:soldiers "Sold"] [:fighters "Fghts"]
                       [:stations "Stns"]]
            :let [v (or (k income-map) 0)]
            :when (pos? v)]
@@ -89,7 +99,7 @@
     {:style {:grid-template-columns "repeat(8, minmax(0, 1fr))"}}
     [:div planet-type-name]
     [:div (ui/format-number planet-count)]
-    (for [k [:credits :fuel :food :soldiers :fighters :stations]
+    (for [k [:credits :food :fuel :soldiers :fighters :stations]
           :let [v (or (k income-map) 0)]]
       [:div {:key k}
        [:span.font-mono {:style {:word-spacing "-0.2em"}
@@ -166,18 +176,18 @@
        [:h3.font-bold.mb-4 "Income"]
        [:div.border.border-green-400.mb-8
         ;; Header row (only visible on wide screens)
-        (ui/phase-table-header ["Source" "Count" "Credits" "Fuel" "Food" "Soldiers" "Fighters" "Stations"])
+        (ui/phase-table-header ["Source" "Count" "Credits" "Food" "Fuel" "Soldiers" "Fighters" "Stations"])
 
-        ;; Ore planets generate economic resources: credits and fuel
+        ;; Ore planets generate credits
         (income-row "Ore"
                     (:player/ore-planets player)
-                    {:credits (:ore-credits income)
-                     :fuel    (:ore-fuel income)})
+                    {:credits (:ore-credits income)})
 
-        ;; Food planets have a single output: food for feeding the population and the military
-        (income-row "Food"
-                    (:player/food-planets player)
-                    {:food (:food-food income)})
+        ;; Energy planets generate food and fuel (biofuel processing)
+        (income-row "Erg"
+                    (:player/erg-planets player)
+                    {:food (:energy-food income)
+                     :fuel (:energy-fuel income)})
 
         ;; Military planets generate military units: soldiers, fighters, and stations
         (income-row "Mil"

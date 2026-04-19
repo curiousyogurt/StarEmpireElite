@@ -22,7 +22,7 @@
 (deftest constants-test
   (testing "Game constants are positive numbers"
     (is (pos? const/ore-planet-credits))
-    (is (pos? const/food-planet-food))
+    (is (pos? const/erg-planet-food))
     (is (pos? const/mil-planet-soldiers))
     (is (pos? const/planet-upkeep-credits))
     (is (pos? const/soldier-upkeep-food))
@@ -76,8 +76,8 @@
             :game/admiral-power const/admiral-power
             ;; All the required income generation constants
             :game/ore-planet-credits const/ore-planet-credits
-            :game/ore-planet-fuel const/ore-planet-fuel
-            :game/food-planet-food const/food-planet-food
+            :game/erg-planet-food const/erg-planet-food
+            :game/erg-planet-fuel const/erg-planet-fuel
             :game/mil-planet-soldiers const/mil-planet-soldiers
             :game/mil-planet-fighters const/mil-planet-fighters
             :game/mil-planet-stations const/mil-planet-stations
@@ -104,7 +104,7 @@
             :game/station-cost const/station-cost
             :game/cmd-ship-cost const/cmd-ship-cost
             :game/mil-planet-cost const/mil-planet-cost
-            :game/food-planet-cost const/food-planet-cost
+            :game/erg-planet-cost const/erg-planet-cost
             :game/ore-planet-cost const/ore-planet-cost
             :game/agent-cost const/agent-cost
             :game/population-tax-credits const/population-tax-credits
@@ -119,7 +119,7 @@
             :game/cmd-ship-sell   const/cmd-ship-sell
             :game/agent-sell      const/agent-sell
             :game/mil-planet-sell const/mil-planet-sell
-            :game/food-planet-sell const/food-planet-sell
+            :game/erg-planet-sell const/erg-planet-sell
             :game/ore-planet-sell const/ore-planet-sell
             :game/food-buy        const/food-buy
             :game/food-sell       const/food-sell
@@ -154,7 +154,7 @@
             :player/galaxars 1000
             ;; Resources
             :player/mil-planets 2
-            :player/food-planets 3
+            :player/erg-planets 3
             :player/ore-planets 1
             :player/population 1000000
             ;; Status  
@@ -214,8 +214,8 @@
                 :game/admiral-power const/admiral-power
                 ;; Income generation constants
                 :game/ore-planet-credits const/ore-planet-credits
-                :game/ore-planet-fuel const/ore-planet-fuel
-                :game/food-planet-food const/food-planet-food
+                :game/erg-planet-food const/erg-planet-food
+                :game/erg-planet-fuel const/erg-planet-fuel
                 :game/mil-planet-soldiers const/mil-planet-soldiers
                 :game/mil-planet-fighters const/mil-planet-fighters
                 :game/mil-planet-stations const/mil-planet-stations
@@ -242,7 +242,7 @@
                 :game/station-cost const/station-cost
                 :game/cmd-ship-cost const/cmd-ship-cost
                 :game/mil-planet-cost const/mil-planet-cost
-                :game/food-planet-cost const/food-planet-cost
+                :game/erg-planet-cost const/erg-planet-cost
                 :game/ore-planet-cost const/ore-planet-cost
                 :game/agent-cost const/agent-cost
                 :game/population-tax-credits const/population-tax-credits
@@ -257,7 +257,7 @@
                 :game/cmd-ship-sell   const/cmd-ship-sell
                 :game/agent-sell      const/agent-sell
                 :game/mil-planet-sell const/mil-planet-sell
-                :game/food-planet-sell const/food-planet-sell
+                :game/erg-planet-sell const/erg-planet-sell
                 :game/ore-planet-sell const/ore-planet-sell
                 :game/food-buy        const/food-buy
                 :game/food-sell       const/food-sell
@@ -273,7 +273,7 @@
                 :player/fuel 3000
                 :player/galaxars 1000
                 :player/mil-planets 2
-                :player/food-planets 3
+                :player/erg-planets 3
                 :player/ore-planets 1
                 :player/population 1000000
                 :player/stability 75

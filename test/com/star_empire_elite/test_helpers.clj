@@ -56,8 +56,8 @@
    :game/planet-upkeep-credits     0
    :game/planet-upkeep-food        0
    :game/ore-planet-credits        0
-   :game/ore-planet-fuel           0
-   :game/food-planet-food          0
+   :game/erg-planet-food          0
+   :game/erg-planet-fuel          0
    :game/mil-planet-stations  0
    :game/mil-planet-fighters  0
    :game/mil-planet-soldiers  0
@@ -77,7 +77,7 @@
    :game/cmd-ship-sell        0
    :game/agent-sell           0
    :game/mil-planet-sell      0
-   :game/food-planet-sell     0
+   :game/erg-planet-sell     0
    :game/ore-planet-sell      0
    :game/food-buy             1
    :game/food-sell            0
@@ -123,7 +123,7 @@
 
    ;; planet summaries
    :player/ore-planets        1
-   :player/food-planets       3
+   :player/erg-planets       3
    :player/mil-planets        2
 
    :player/last-population-growth nil})
