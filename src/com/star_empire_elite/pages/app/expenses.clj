@@ -159,11 +159,11 @@
   [spec expense-row-spec, required required-expenses-map, payments expense-payments-map] -> hiccup"
   [spec required payments]
   (let [{:keys [row-id credits food fuel]} spec
-        required-text (str/join "/"
+        required-text (interpose "/"
                         (keep identity
-                          [(when credits (ui/format-number-str (get required (:required-key credits))))
-                           (when food    (ui/format-number-str (get required (:required-key food))))
-                           (when fuel    (ui/format-number-str (get required (:required-key fuel))))]))
+                          [(when credits (ui/format-number (get required (:required-key credits))))
+                           (when food    (ui/format-number (get required (:required-key food))))
+                           (when fuel    (ui/format-number (get required (:required-key fuel))))]))
         credits-paid  (when credits (get payments (keyword (:field-name credits))))
         credits-req   (when credits (get required (:required-key credits)))
         food-paid     (when food    (get payments (keyword (:field-name food))))
@@ -250,11 +250,11 @@
   [spec map, required map, player-id uuid, hx-include str] -> hiccup"
   [spec required player-id hx-include]
   (let [{:keys [category abbrev row-id count credits food fuel]} spec
-        required-display (str/join "/"
+        required-display (interpose "/"
                            (keep identity
-                             [(when credits (ui/format-number-str (get required (:required-key credits))))
-                              (when food    (ui/format-number-str (get required (:required-key food))))
-                              (when fuel    (ui/format-number-str (get required (:required-key fuel))))]))
+                             [(when credits (ui/format-number (get required (:required-key credits))))
+                              (when food    (ui/format-number (get required (:required-key food))))
+                              (when fuel    (ui/format-number (get required (:required-key fuel))))]))
         credits-field    (when credits
                            {:field-name    (:field-name credits)
                             :default-value (get required (:required-key credits))
