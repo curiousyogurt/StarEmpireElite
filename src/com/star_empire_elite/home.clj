@@ -35,9 +35,9 @@
     [:div.w-96.border-t.border-green-400.mb-8]
 
     (biff/form
-     {:action "/auth/send-link"
+     {:action "/auth/send-code"
       :id "signup"
-      :hidden {:on-error "/"}
+      :hidden {:on-error "/signup"}
       :class "w-full max-w-md"}
      (biff/recaptcha-callback "submitSignup" "signup")
 
@@ -66,7 +66,7 @@
                {:data-sitekey site-key
                 :data-callback "submitSignup"})
              {:type "submit"})
-      "Send Sign-Up Link"])
+      "Send Sign-Up Code"])
 
     [:div.w-96.border-t.border-green-400.my-8]
 
