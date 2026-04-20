@@ -123,10 +123,10 @@
          [:td.border-r.border-green-400.px-3.py-2 (:rank player)]
          [:td.border-r.border-green-400.px-3.py-2 (:player/empire-name player)]
          [:td.border-r.border-green-400.px-3.py-2
-          (+ (:player/mil-planets player)
-             (:player/erg-planets player)
-             (:player/ore-planets player))]
-         [:td.px-3.py-2 (:player/score player)]])]]]])
+          (ui/format-number (+ (:player/mil-planets player)
+                               (:player/erg-planets player)
+                               (:player/ore-planets player)))]
+         [:td.px-3.py-2 (ui/format-number (:player/score player))]])]]]])
 
 ;;;;
 ;;;; Page

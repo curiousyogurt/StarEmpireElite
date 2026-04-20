@@ -1,9 +1,17 @@
-;;; Development Notes
-;;; In order to add a new page <p>, the following changes must be made to app.clj:
-;;;  - Import the <p> module at the top require with :as alias
-;;;    - This corresponds to a <p>.clj file in the pages/app directory
-;;;  - Create a handler function <p>-handler that uses with-player-and-game macro
-;;;  - Add a route that maps a URL to the handler
+;;;;;
+;;;;; App - Route Handlers and Game Management
+;;;;;
+;;;;; Central handler module wiring all game phases to routes. Contains admin-only game management
+;;;;; (create, delete), the player join flow, phase GET handlers that validate the current phase
+;;;;; and delegate to their respective page functions, and the outcomes handler which resolves
+;;;;; combat, espionage, population growth, stability events, and elimination inline on first load.
+;;;;;
+;;;;; To add a new page <p>:
+;;;;;  - Import the <p> module at the top require with :as alias
+;;;;;    - This corresponds to a <p>.clj file in the pages/app directory
+;;;;;  - Create a handler function <p>-handler using with-player-and-game
+;;;;;  - Add a route in the module map
+;;;;;
 
 (ns com.star-empire-elite.app
   (:require [rum.core :as rum]
@@ -25,12 +33,26 @@
             [com.star-empire-elite.utils :as utils]
             [xtdb.api :as xt]))
 
-;; :: main app dashboard showing all player games
-(defn app [{:keys [session biff/db] :as ctx}]
+;;;;
+;;;; Dashboard
+;;;;
+
+(defn app
+  "Render the main app dashboard showing all games the current user has joined.
+
+  [ctx ring-ctx] -> hiccup"
+  [{:keys [session biff/db] :as ctx}]
   (dashboard/dashboard ctx))
 
-;; :: show game name prompt
-(defn create-game-page [{:keys [session biff/db] :as ctx}]
+;;;;
+;;;; Game Management
+;;;;
+
+(defn create-game-page
+  "Show the create-game form (admin only). Redirects non-admins to /app.
+
+  [ctx ring-ctx] -> hiccup"
+  [{:keys [session biff/db] :as ctx}]
   (let [uid  (:uid session)
         user (xt/entity db uid)]
     (if-not (const/admin-emails (:user/email user))
@@ -52,8 +74,11 @@
           [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
            {:type "submit"} "Create"]])]))))
 
-;; :: create a new game with the submitted name
-(defn create-game [{:keys [session biff/db params] :as ctx}]
+(defn create-game
+  "Create a new game entity with all constants baked in. Admin only.
+
+  [ctx ring-ctx] -> ring-response (303 redirect to join-game page)"
+  [{:keys [session biff/db params] :as ctx}]
   (let [uid  (:uid session)
         user (xt/entity db uid)]
     (if-not (const/admin-emails (:user/email user))
@@ -133,8 +158,11 @@
         {:status 303
          :headers {"location" (str "/app/join-game/" game-id)}}))))
 
-;; :: delete a game and all associated players and messages (admin only)
-(defn delete-game [{:keys [session biff/db path-params] :as ctx}]
+(defn delete-game
+  "Delete a game and all associated players (admin only).
+
+  [ctx ring-ctx] -> ring-response (303 redirect to /app)"
+  [{:keys [session biff/db path-params] :as ctx}]
   (let [uid  (:uid session)
         user (xt/entity db uid)]
     (if-not (const/admin-emails (:user/email user))
@@ -155,8 +183,15 @@
             [{:db/op :delete :xt/id game-id}]))
         {:status 303 :headers {"location" "/app"}}))))
 
-;; :: show empire name prompt for joining a game
-(defn join-game-page [{:keys [session biff/db path-params params] :as ctx}]
+;;;;
+;;;; Join Game
+;;;;
+
+(defn join-game-page
+  "Show the empire name prompt for joining a game.
+
+  [ctx ring-ctx] -> hiccup"
+  [{:keys [session biff/db path-params params] :as ctx}]
   (let [game-id (java.util.UUID/fromString (:game-id path-params))
         game (xt/entity db game-id)
         error (:error params)]
@@ -183,8 +218,11 @@
           [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
            {:type "submit"} "Join"]])]))))
 
-;; :: create player in a game after validating empire name uniqueness
-(defn join-game [{:keys [session biff/db path-params params] :as ctx}]
+(defn join-game
+  "Create a player entity in the chosen game after validating empire name uniqueness.
+
+  [ctx ring-ctx] -> ring-response (303 redirect to game overview)"
+  [{:keys [session biff/db path-params params] :as ctx}]
   (let [game-id (java.util.UUID/fromString (:game-id path-params))
         game (xt/entity db game-id)
         empire-name (clojure.string/trim (or (:empire-name params) ""))
@@ -244,9 +282,9 @@
          :headers {"location" (str "/app/game/" player-id)}}))))
 
 ;;;;
-;;;; Phase Handlers - Streamlined using utils/with-player-and-game
+;;;; Phase Handlers
 ;;;;
-;;;; Each handler now uses the with-player-and-game macro which:
+;;;; Each handler uses the with-player-and-game macro which:
 ;;;;  1. Loads player and game entities from the database
 ;;;;  2. Handles the 404 error case automatically
 ;;;;  3. Provides clean bindings for player, game, and player-id
@@ -254,7 +292,11 @@
 ;;;;  5. Calls the appropriate page function with the entities
 ;;;;
 
-(defn- cooldown-page [{:keys [player game remaining-ms]}]
+(defn- cooldown-page
+  "Render the between-rounds waiting screen, showing time until the next round or midnight UTC.
+
+  [{:keys [player game remaining-ms]}] -> hiccup"
+  [{:keys [player game remaining-ms]}]
   (let [day-exhausted? (utils/day-exhausted? player game)]
     (ui/page
      {}
@@ -275,7 +317,6 @@
 
 (defn income-handler [ctx]
   (utils/with-player-and-game [player game player-id] ctx
-    ;; Validate phase 1 (income), then check round cooldown, then show page
     (or (utils/validate-phase player 1 player-id)
         (when-let [remaining-ms (utils/round-cooldown-ms player game)]
           (cooldown-page {:player player :game game :remaining-ms remaining-ms}))
@@ -283,7 +324,6 @@
 
 (defn expenses-handler [ctx]
   (utils/with-player-and-game [player game player-id] ctx
-    ;; Validate phase 2 (expenses), then show page
     (or (utils/validate-phase player 2 player-id)
         (expenses/expenses-page {:player player :game game}))))
 
@@ -295,23 +335,26 @@
 
 (defn building-handler [ctx]
   (utils/with-player-and-game [player game player-id] ctx
-    ;; Validate phase 3 (building), then show page
     (or (utils/validate-phase player 3 player-id)
         (building/building-page {:player player :game game}))))
 
 (defn action-handler [ctx]
   (utils/with-player-and-game [player game player-id] ctx
-    ;; Validate phase 4 (action), then show page
     (or (utils/validate-phase player 4 player-id)
         (action/action-page {:player player :game game :db (:biff/db ctx)}))))
 
 (defn espionage-handler [ctx]
   (utils/with-player-and-game [player game player-id] ctx
-    ;; Validate phase 5 (espionage), then show page
     (or (utils/validate-phase player 5 player-id)
         (espionage/espionage-page {:player player :game game :db (:biff/db ctx)}))))
 
-(defn outcomes-handler [{:keys [biff/db] :as ctx}]
+(defn outcomes-handler
+  "Resolve all turn events on first load (combat, espionage, population, stability, elimination),
+  cache results in the player entity, then render the outcomes page. On refresh, cached results
+  are used without re-rolling.
+
+  [ctx ring-ctx] -> hiccup"
+  [{:keys [biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (or (utils/validate-phase player 6 player-id)
 
@@ -560,8 +603,17 @@
                                      :breakaway-result breakaway-result
                                      :recovery-result  recovery-result
                                      :eliminated?      eliminated?}))))))
-;; :: HTMX fragment — polls for incoming alerts; triggers HX-Refresh when new alerts arrive
-(defn alerts-handler [{:keys [biff/db path-params params] :as ctx}]
+
+;;;;
+;;;; Alerts
+;;;;
+
+(defn alerts-handler
+  "HTMX polling fragment — checks for incoming attacks or espionage failures.
+  Returns HX-Refresh to reload the page when new alerts arrive.
+
+  [ctx ring-ctx] -> ring-response (200 with HTML fragment)"
+  [{:keys [biff/db path-params params] :as ctx}]
   (let [player-id  (java.util.UUID/fromString (:player-id path-params))
         player     (xt/entity db player-id)
         had-alerts (= "true" (:had-alerts params))
@@ -572,6 +624,10 @@
       {:status  200
        :headers {"content-type" "text/html"}
        :body    (rum/render-static-markup (ui/incoming-alert-content player))})))
+
+;;;;
+;;;; Routes
+;;;;
 
 (def module
   {:routes ["/app" {:middleware [mid/wrap-signed-in]}

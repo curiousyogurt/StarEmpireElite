@@ -1,3 +1,12 @@
+;;;;;
+;;;;; UI - Shared Page Components and Layout
+;;;;;
+;;;;; Base HTML shell, page wrapper, and reusable hiccup components used across all phases. Components 
+;;;;; here are display-only and have no DB access or side effects. The resource display grid, phase 
+;;;;; header/indicator, numeric input, and alert polling fragment are the primary shared building 
+;;;;; blocks.
+;;;;;
+
 (ns com.star-empire-elite.ui
   (:require [cheshire.core :as cheshire]
             [clojure.java.io :as io]
@@ -7,7 +16,16 @@
             [ring.util.response :as ring-response]
             [rum.core :as rum]))
 
-(defn static-path [path]
+;;;;
+;;;; Utilities
+;;;;
+
+(defn static-path
+  "Append a cache-busting ?t= timestamp to a static asset path, derived from the file's
+  last-modified time. Returns the path unchanged if the resource is not found.
+
+  [path string] -> string"
+  [path]
   (if-some [last-modified (some-> (io/resource (str "public" path))
                                   ring-response/resource-data
                                   :last-modified
@@ -17,23 +35,33 @@
 
 (defn- format-number-core
   "Returns [formatted-string abbreviated?] for a number.
-  Abbreviations: K (100K+), M (1M+), B (1B+), T (1T+), Q (1Q+)."
+  Abbreviations: K (100K+), M (1M+), B (1B+), T (1T+),
+  Qa (quadrillion), Qi (quintillion), Sx (sextillion), Sp (septillion),
+  Oc (octillion), No (nonillion), Dc (decillion)."
   [n]
   (let [abs-n        (Math/abs n)
         is-negative? (< n 0)
         formatted    (cond
-                       (>= abs-n 1000000000000000) (str (/ (Math/round (/ abs-n 100000000000000.0)) 10.0) "Q")
-                       (>= abs-n 1000000000000)    (str (/ (Math/round (/ abs-n 100000000000.0))    10.0) "T")
-                       (>= abs-n 1000000000)       (str (/ (Math/round (/ abs-n 100000000.0))       10.0) "B")
-                       (>= abs-n 1000000)          (str (/ (Math/round (/ abs-n 100000.0))          10.0) "M")
-                       (>= abs-n 100000)           (str (/ (Math/round (/ abs-n 100.0))             10.0) "K")
-                       :else                       (str n))
-        s            (if (and is-negative? (>= abs-n 100000)) (str "-" formatted) formatted)]
-    [s (>= abs-n 100000)]))
+                       (>= abs-n 1e33) (str (/ (Math/round (/ abs-n 1e32)) 10.0) "Dc")
+                       (>= abs-n 1e30) (str (/ (Math/round (/ abs-n 1e29)) 10.0) "No")
+                       (>= abs-n 1e27) (str (/ (Math/round (/ abs-n 1e26)) 10.0) "Oc")
+                       (>= abs-n 1e24) (str (/ (Math/round (/ abs-n 1e23)) 10.0) "Sp")
+                       (>= abs-n 1e21) (str (/ (Math/round (/ abs-n 1e20)) 10.0) "Sx")
+                       (>= abs-n 1e18) (str (/ (Math/round (/ abs-n 1e17)) 10.0) "Qi")
+                       (>= abs-n 1e15) (str (/ (Math/round (/ abs-n 1e14)) 10.0) "Qa")
+                       (>= abs-n 1e12) (str (/ (Math/round (/ abs-n 1e11)) 10.0) "T")
+                       (>= abs-n 1e9)  (str (/ (Math/round (/ abs-n 1e8))  10.0) "B")
+                       (>= abs-n 1e6)  (str (/ (Math/round (/ abs-n 1e5))  10.0) "M")
+                       (>= abs-n 1e5)  (str (/ (Math/round (/ abs-n 1e2))  10.0) "K")
+                       :else           (str n))
+        s            (if (and is-negative? (>= abs-n 1e5)) (str "-" formatted) formatted)]
+    [s (>= abs-n 1e5)]))
 
 (defn format-number
   "Format a number for display. Small numbers (< 100K) are returned as-is; large numbers
-  use abbreviated suffixes (123K, 1.2M, etc.) wrapped in a hiccup span with a tooltip."
+  use abbreviated suffixes (123K, 1.2M, etc.) wrapped in a hiccup span with a tooltip.
+
+  [n number] -> string | hiccup"
   [n]
   (when n
     (let [[s abbreviated?] (format-number-core n)]
@@ -41,51 +69,63 @@
 
 (defn format-number-str
   "Like format-number but always returns a plain string. Use where hiccup is not appropriate,
-  e.g. when building slash-separated compound display values."
+  e.g. when building slash-separated compound display values.
+
+  [n number] -> string"
   [n]
   (when n (first (format-number-core n))))
 
-;;; Phase progress indicator showing current position in the 6-phase turn cycle. Uses filled circles
-;;; for completed phases, a highlighted circle for current phase, and empty circles for future phases.
-(defn phase-indicator [current-phase]
+;;;;
+;;;; Phase Navigation
+;;;;
+
+(defn phase-indicator
+  "Render the 6-phase turn progress indicator. Current phase is highlighted; others are plain circles.
+
+  [current-phase int] -> hiccup"
+  [current-phase]
   [:div.flex.items-center.gap-2
-   ;; Phase progress circles
    (for [phase (range 1 7)]
      [:div.flex.items-center.gap-1 {:key phase}
-      ;; Circle indicator with larger numbers
       [:div.w-5.h-5.rounded-full.border.border-green-400.flex.items-center.justify-center
-       {:class (if (= phase current-phase) 
-                 "bg-green-400 ring-2 ring-green-300"            ; Current phase only
-                 "bg-transparent")}                               ; All other phases
-       ;; Larger, non-bold phase number inside circle
+       {:class (if (= phase current-phase)
+                 "bg-green-400 ring-2 ring-green-300"
+                 "bg-transparent")}
        [:span.text-base
         {:class (if (= phase current-phase) "text-black" "text-green-400")}
         phase]]
-      ;; Arrow between phases (except after last phase)
       (when (< phase 6)
         [:span.text-green-400.text-xs.ml-1 "→"])])])
 
-;;; Complete phase header with title on the left and progress indicator on the right. Takes current
-;;; phase number and phase name string to generate the full header with progress visualization.
-;;; Optional info-str appears as small text to the right of the phase name.
 (defn phase-header
+  "Render the full phase header: phase name on the left, progress indicator on the right.
+  Stacks vertically on mobile, horizontal on large screens. Optional info-str appears as
+  small muted text beside the phase name.
+
+  ([current-phase phase-name]) ([current-phase phase-name info-str]) -> hiccup"
   ([current-phase phase-name] (phase-header current-phase phase-name nil))
   ([current-phase phase-name info-str]
    [:div.mb-6
-    ;; Mobile: Stack vertically
     [:div.flex.flex-col.gap-3.lg:hidden
      [:div.flex.items-baseline.gap-3
       [:h2.text-xl.font-bold (str phase-name " PHASE")]
       (when info-str [:span.text-xs.text-green-400.text-opacity-75 info-str])]
      (phase-indicator current-phase)]
-    ;; Wide screen: Horizontal with space between
     [:div.hidden.lg:flex.lg:items-center.lg:justify-between.lg:gap-8
      [:div.flex.items-baseline.gap-3
       [:h2.text-xl.font-bold (str phase-name " PHASE")]
       (when info-str [:span.text-xs.text-green-400.text-opacity-75 info-str])]
      (phase-indicator current-phase)]]))
 
-(defn base [{:keys [::recaptcha] :as ctx} & body]
+;;;;
+;;;; Page Shell
+;;;;
+
+(defn base
+  "Render the full HTML document shell with CSS, JS, HTMX, and optional reCAPTCHA script tags.
+
+  [ctx ring-ctx & body hiccup] -> hiccup"
+  [{:keys [::recaptcha] :as ctx} & body]
   (apply
     biff/base-html
     (-> ctx
@@ -106,7 +146,12 @@
                                      head))))
     body))
 
-(defn page [ctx & body]
+(defn page
+  "Wrap body content in the standard game page shell (base HTML + centered card container).
+  Automatically injects the CSRF token into hx-headers when inside a request context.
+
+  [ctx ring-ctx & body hiccup] -> hiccup"
+  [ctx & body]
   (base
     ctx
     [:.flex-grow]
@@ -120,7 +165,11 @@
     [:.flex-grow]
     [:.flex-grow]))
 
-(defn on-error [{:keys [status ex] :as ctx}]
+(defn on-error
+  "Render a minimal error page for 404 and 5xx responses.
+
+  [{:keys [status ex] :as ctx}] -> ring-response"
+  [{:keys [status ex] :as ctx}]
   {:status status
    :headers {"content-type" "text/html"}
    :body (rum/render-static-markup
@@ -131,34 +180,37 @@
                 "Page not found."
                 "Something went wrong.")]))})
 
-;;; Resource display grid showing all player resources, units, and planets. Accepts either a
-;;; player entity (using :player/credits etc.) or a plain resource map (:credits etc.).
-;;; Spec drives both the field list and label — add a field here to show it everywhere.
+;;;;
+;;;; Resource Display
+;;;;
+
+;; Spec drives both the field list and labels — add an entry here to show it everywhere.
 (def ^:private resource-specs
-  [{:label "Credits"    :key :credits      :player-key :player/credits}
-   {:label "Food"       :key :food         :player-key :player/food}
-   {:label "Fuel"       :key :fuel         :player-key :player/fuel}
-   {:label "Galaxars"   :key :galaxars     :player-key :player/galaxars}
-   {:label "Population" :key :population   :player-key :player/population :display-fn #(format-number (* % 1000000))}
-   {:label "Stability"  :key :stability    :player-key :player/stability  :display-fn #(str % "%")}
-   {:label "Ore Plts"   :key :ore-planets  :player-key :player/ore-planets}
-   {:label "Erg Plts"   :key :erg-planets  :player-key :player/erg-planets}
-   {:label "Mil Plts"   :key :mil-planets  :player-key :player/mil-planets}
-   {:label "Soldiers"   :key :soldiers     :player-key :player/soldiers}
-   {:label "Transports" :key :transports   :player-key :player/transports}
-   {:label "Generals"   :key :generals     :player-key :player/generals}
-   {:label "Fighters"   :key :fighters     :player-key :player/fighters}
-   {:label "Carriers"   :key :carriers     :player-key :player/carriers}
-   {:label "Admirals"   :key :admirals     :player-key :player/admirals}
-   {:label "Stations"   :key :stations     :player-key :player/stations}
-   {:label "Cmd Ships"  :key :cmd-ships    :player-key :player/cmd-ships}
-   {:label "Agents"     :key :agents       :player-key :player/agents}])
+  [{:label "Credits"    :key :credits    :player-key :player/credits}
+   {:label "Food"       :key :food       :player-key :player/food}
+   {:label "Fuel"       :key :fuel       :player-key :player/fuel}
+   {:label "Galaxars"   :key :galaxars   :player-key :player/galaxars}
+   {:label "Population" :key :population :player-key :player/population :display-fn #(format-number (* % 1000000))}
+   {:label "Stability"  :key :stability  :player-key :player/stability  :display-fn #(str % "%")}
+   {:label "Ore Plts"   :key :ore-planets :player-key :player/ore-planets}
+   {:label "Erg Plts"   :key :erg-planets :player-key :player/erg-planets}
+   {:label "Mil Plts"   :key :mil-planets :player-key :player/mil-planets}
+   {:label "Soldiers"   :key :soldiers   :player-key :player/soldiers}
+   {:label "Transports" :key :transports :player-key :player/transports}
+   {:label "Generals"   :key :generals   :player-key :player/generals}
+   {:label "Fighters"   :key :fighters   :player-key :player/fighters}
+   {:label "Carriers"   :key :carriers   :player-key :player/carriers}
+   {:label "Admirals"   :key :admirals   :player-key :player/admirals}
+   {:label "Stations"   :key :stations   :player-key :player/stations}
+   {:label "Cmd Ships"  :key :cmd-ships  :player-key :player/cmd-ships}
+   {:label "Agents"     :key :agents     :player-key :player/agents}])
 
 (defn resource-display-grid
-  "Display all player resources, units, and planets in a responsive grid layout.
+  "Display all player resources, units, and planets in a responsive grid.
   Accepts either a player entity (uses :player/credits etc.) or a plain resource map (:credits etc.).
+  When highlight-negative? is true, values below zero are rendered in red.
 
-  ([resources title]) ([resources title highlight-negative? bool]) -> hiccup"
+  ([resources title]) ([resources title highlight-negative?]) -> hiccup"
   ([resources title] (resource-display-grid resources title false))
   ([resources title highlight-negative?]
    [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
@@ -171,7 +223,16 @@
         [:p.font-mono {:class (when (and highlight-negative? (< v 0)) "text-red-400")}
          (if display-fn (display-fn v) (format-number v))]])]]))
 
-(defn incoming-alert-content [player]
+;;;;
+;;;; Incoming Alerts
+;;;;
+
+(defn incoming-alert-content
+  "Render the alert banner content when the player has unread incoming attacks or espionage failures.
+  Returns nil when there are no alerts.
+
+  [player player-map] -> hiccup | nil"
+  [player]
   (let [attacks   (seq (:player/incoming-attacks player))
         esp-fails (or (:player/incoming-espionage-fails player) 0)]
     (when (or attacks (pos? esp-fails))
@@ -181,7 +242,12 @@
             (when (pos? esp-fails) "Espionage against your empire was discovered. ")
             "See details in Outcomes phase.")])))
 
-(defn incoming-alert [player]
+(defn incoming-alert
+  "Render the HTMX polling container that checks for new alerts every 10 seconds and
+  triggers a full page refresh when new ones arrive.
+
+  [player player-map] -> hiccup"
+  [player]
   (let [has-alerts? (or (seq (:player/incoming-attacks player))
                         (pos? (or (:player/incoming-espionage-fails player) 0)))
         player-id   (:xt/id player)]
@@ -193,19 +259,26 @@
      [:input {:type "hidden" :name "had-alerts" :value (if has-alerts? "true" "false")}]
      (incoming-alert-content player)]))
 
-(defn numeric-input 
-  "Creates a numeric-only input field with HTMX integration and reset button.
+;;;;
+;;;; Phase Table Components
+;;;;
+
+(defn numeric-input
+  "Render a numeric-only input field with HTMX live-update integration and a reset button.
+  The oninput handler strips non-numeric characters while preserving cursor position.
 
   Args:
-  name - input field name
-  value - default/initial value
-  player-id - player UUID for HTMX endpoint
-  hx-post-path - relative path for HTMX post (e.g. '/calculate-expenses')
-  hx-include - selector string for fields to include in HTMX request
-  opts - optional map:
-  {:display-only? true        ; strip name and HTMX wiring (for read-only mirrors)
-   :input-class   \"...\"     ; extra classes for the <input>
-   :sync-key      \"soldiers\"} ; optional key for JS sync across views"
+  - name          — input field name
+  - value         — default/initial value
+  - player-id     — player UUID for HTMX endpoint construction
+  - hx-post-path  — relative path for HTMX POST (e.g. \"/calculate-expenses\")
+  - hx-include    — CSS selector for fields to include in the HTMX request
+  - opts (optional map):
+      :display-only? — strip name and HTMX wiring (for read-only mirrors)
+      :input-class   — extra CSS classes for the <input>
+      :sync-key      — JS key for syncing value across views
+
+  [name value player-id hx-post-path hx-include & [opts]] -> hiccup"
   [name value player-id hx-post-path hx-include & [{:keys [display-only? input-class sync-key]}]]
   [:div.relative
    [:input
@@ -221,7 +294,6 @@
        :class (str "w-full bg-black border border-green-400 text-green-400 "
                    "p-2 pr-6 font-mono "
                    (or input-class ""))
-       ;; Strip non-numeric characters immediately while preserving cursor position
        :oninput
        (str
          "let start=this.selectionStart;"
@@ -233,7 +305,6 @@
          "  let diff=oldVal.length-newVal.length;"
          "  this.setSelectionRange(start-diff,end-diff);"
          "}"
-         ;; Optional sync to matching proxy inputs
          (when sync-key
            (str "if(window.seeSyncBuildingField){"
                 "  window.seeSyncBuildingField('" sync-key "', this);"
@@ -244,7 +315,6 @@
          "if(val===''||val==='0'){val='0';}"
          "else{val=String(parseInt(val,10));}"
          "this.value=val;")}
-      ;; Only real, HTMX-enabled input gets name + hx-*
       (not display-only?)
       (merge {:name name
               :hx-post (str "/app/game/" player-id hx-post-path)
@@ -252,9 +322,7 @@
               :hx-swap "outerHTML"
               :hx-trigger "load, input"
               :hx-include hx-include})
-      ;; JS-sync key, if provided
       sync-key (assoc :data-sync-key sync-key))]
-   ;; Reset button only for non-display inputs
    (when (not display-only?)
      [:button
       {:type "button"
@@ -266,18 +334,15 @@
       "\u25e6"])])
 
 (defn phase-table-header
-  "Renders a header row for phase tables on wide screens only.
+  "Render a header row for phase tables, visible on wide screens only.
+  Each column can be a plain string label or a map with :label and optional :class.
 
-  Args:
-  columns - Vector of column definitions. Each can be either:
-  - A string (simple label, left-aligned)
-  - A map with :label and optional :class for custom styling"
+  [columns vector] -> hiccup"
   [columns]
   (let [col-count (count columns)
-        ;; If this is the 5-column building header, bias the first column wider
-        template (if (= col-count 5)
-                   "1.5fr 1fr 1fr 1fr 1fr"
-                   (str "repeat(" col-count ", minmax(0, 1fr))"))]
+        template  (if (= col-count 5)
+                    "1.5fr 1fr 1fr 1fr 1fr"
+                    (str "repeat(" col-count ", minmax(0, 1fr))"))]
     [:div.hidden.lg:grid.lg:gap-4.lg:px-4.lg:py-2.lg:bg-green-400.lg:bg-opacity-10.lg:font-bold.border-b.border-green-400
      {:style {:grid-template-columns template}}
      (for [col columns]
@@ -285,22 +350,22 @@
          [:div {:key col} col]
          [:div {:key (:label col) :class (:class col)} (:label col)]))]))
 
-;;; Responsive phase row component for spreadsheet-like layout on wide screens
 (defn phase-row
-  "Renders a responsive row that displays as a card on mobile/tablet and as a table row on wide screens.
-  This is a display-only component: it does not render interactive inputs.
+  "Render a responsive row that displays as a card on mobile and as a table row on wide screens.
+  This is a display-only component — it does not render interactive inputs.
 
-  Args:
-  columns - Vector of column maps. Each map can have:
-  :label - Column label/header
-  :value - Simple text value or Hiccup to display
-  :class - Additional CSS classes for the column
-  :highlight? - If true, highlights negative values in red (for numbers)
-  :hide-on-mobile? - If true, hides this field on mobile (but shows on wide screen)"
+  Each column map can have:
+  - :label          — column header / field label
+  - :value          — string, number, or hiccup to display
+  - :class          — additional CSS classes for the wide-screen column cell
+  - :highlight?     — when true, renders negative numbers in red
+  - :hide-on-mobile? — when true, omits this field from the mobile card view
+
+  [columns vector] -> hiccup"
   [columns]
   [:div.border-b.border-green-400.last:border-b-0
 
-   ;; Mobile/Tablet: Vertical card layout (stacked fields)
+   ;; Mobile/Tablet: vertical card layout
    [:div.lg:hidden.p-4.space-y-2
     (for [{:keys [label value highlight? hide-on-mobile?]} columns]
       (when (and (some? value) (not hide-on-mobile?))
@@ -308,11 +373,11 @@
          [:p.text-xs.text-green-300 label]
          (if (vector? value)
            value
-           [:p.font-mono 
+           [:p.font-mono
             {:class (when (and highlight? (number? value) (neg? value)) "text-red-400")}
             value])]))]
 
-   ;; Wide screen: Horizontal row layout (spreadsheet-like)
+   ;; Wide screen: horizontal spreadsheet-style row
    [:div.hidden.lg:grid.lg:gap-4.lg:items-center.lg:px-4.lg:py-3
     {:style {:grid-template-columns (str "repeat(" (count columns) ", minmax(0, 1fr))")}}
     (for [{:keys [label value class highlight?]} columns]

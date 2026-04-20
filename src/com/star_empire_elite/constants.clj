@@ -1,59 +1,76 @@
+;;;;;
+;;;;; Constants - Game-Wide Configuration Values
+;;;;;
+;;;;; All tuneable values for the game live here. Game entities are seeded from these constants
+;;;;; at creation time so values are snapshotted per-game. Player-facing balance (costs, rates,
+;;;;; combat power) can be adjusted here without touching logic code.
+;;;;;
+
 (ns com.star-empire-elite.constants)
 
-;; Admin Accounts
-;; Only these email addresses are permitted to create new games
+;;;;
+;;;; Access Control
+;;;;
 
 (def admin-emails #{"darcyotto@bennington.edu"})
-
-;; Access Control
-;; Players must have a Bennington College email address, or appear in the whitelist below.
 
 (def allowed-email-domain "bennington.edu")
 (def whitelisted-emails   #{"darcyotto@gmail.com" "danher@unc.edu"})
 
-;; Default Game Settings for Turns (per round) and Rounds (per day)
+;;;;
+;;;; Turn Structure
+;;;;
 
-(def turns-per-round 6)
-(def rounds-per-day 2)
+(def turns-per-round      6)
+(def rounds-per-day       2)
 (def hours-between-rounds 2)
 
-
-;; Combat Power Values
-;; Power contribution of each unit type per unit
+;;;;
+;;;; Combat Power
+;;;; Power contribution of each unit type per unit.
 
 (def soldier-power   1)
 (def fighter-power   3)
 (def cmd-ship-power  20)
-(def station-power   5) 
+(def station-power   5)  ; defender only
 (def general-power   5)
 (def admiral-power   10)
 (def combat-variance 0.15) ; ±15% random factor
 
+;;;;
+;;;; Command / Transport Capacity
+;;;;
 
-;; Population Growth
-;; Applied at the end of each round in outcomes
+(def soldiers-per-general   1000)
+(def soldiers-per-transport 100)
+(def fighters-per-admiral   1000)
+(def fighters-per-carrier   100)
 
-(def pop-growth-rate       0.02)  ; 2% of current population per round
-(def pop-growth-per-planet 0.02)  ; +20,000 per planet per round (in millions)
-(def pop-capacity-per-planet 10.0) ; max 10 million population per planet
-(def pop-random-min        0.9)
-(def pop-random-max        1.1)
+;;;;
+;;;; Population Growth
+;;;; Applied at the end of each round in outcomes.
 
+(def pop-growth-rate         0.02)  ; 2% of current population per round
+(def pop-growth-per-planet   0.02)  ; +20,000 per planet per round (in millions)
+(def pop-capacity-per-planet 10.0)  ; max 10 million population per planet
+(def pop-random-min          0.9)
+(def pop-random-max          1.1)
 
-;; Starting Empire Defaults
-;; Resources and units a new player begins with
+;;;;
+;;;; Starting Empire Defaults
+;;;; Resources and units a new player begins with.
 
 (def starting-credits  70000)
 (def starting-food     5000)
 (def starting-fuel     5000)
 (def starting-galaxars 0)
 
-(def starting-mil-planets  0)
+(def starting-mil-planets 0)
 (def starting-erg-planets 1)
-(def starting-ore-planets  1)
+(def starting-ore-planets 1)
 
-(def starting-population 6)   ; Stored in millions
-(def starting-stability  100) ; Stored as %
+(def starting-population 6)    ; stored in millions
+(def starting-stability  100)  ; stored as %
 
 (def starting-soldiers   100)
 (def starting-transports 0)
@@ -65,21 +82,13 @@
 (def starting-cmd-ships  0)
 (def starting-agents     0)
 
-
-;; Command / Transport Capacity Defaults
-
-(def soldiers-per-general   1000)
-(def soldiers-per-transport 100)
-(def fighters-per-admiral   1000)
-(def fighters-per-carrier   100)
-
-
-;; Income Generation Defaults
-;; Resources generated per planet type per round
+;;;;
+;;;; Income Generation
+;;;; Resources generated per planet type per turn.
 
 (def ore-planet-credits 10000)
-(def erg-planet-food 3000)
-(def erg-planet-fuel 2000)
+(def erg-planet-food    3000)
+(def erg-planet-fuel    2000)
 
 ;; Military planets provide modest ongoing military support.
 ;; They should not out-compete ore planets as a source of sell value.
@@ -87,43 +96,37 @@
 (def mil-planet-fighters 2)
 (def mil-planet-stations 1)
 
+;;;;
+;;;; Population Tax
+;;;; Population is stored in millions, so these are per-population-unit.
 
-;; :: Population / Tax Defaults
-;; Population is stored in millions, so these are per-population-unit.
+(def population-tax-credits  2000)  ; credits per million population per round
 
-;; Tax revenue
-(def population-tax-credits 2000) ; credits per million population per round
+(def population-upkeep-food  250)
+(def population-upkeep-fuel  10)
 
-;; Civilian consumption
-(def population-upkeep-food 250)
-(def population-upkeep-fuel 10)
-
-
-;; Stability Breakaway and Recovery
-;; Breakaway: if roll (1–100) > stability + threshold, planets break away.
-;; Recovery:  if roll < max(stability, floor), stability recovers.
+;;;;
+;;;; Stability
+;;;; Breakaway: if roll (1–100) > stability + threshold, planets break away.
+;;;; Recovery:  if roll < max(stability, floor), stability recovers.
 
 (def stability-breakaway-threshold 20)
 (def stability-breakaway-cap       25)  ; stored as %, i.e. 25 = 25%
 (def stability-recovery-amount      5)  ; flat stability points gained on recovery
 (def stability-recovery-floor      50)  ; minimum effective stability for recovery rolls
 
+(def expense-stability-penalty 3)  ; stability points lost per underpaid expense fraction
 
-;; Player Status
+;;;;
+;;;; Player Status
+;;;;
 
 (def player-status-active    0)
 (def player-status-eliminated 1)
 
-
-;; Expense Underpayment Penalty
-;; Stability points lost per unit of underpayment fraction across all expense categories.
-;; 0 = no penalty until explicitly set.
-
-(def expense-stability-penalty 3)
-
-
-;; Upkeep / Expense Defaults
-;; Cost to maintain units and infrastructure per round
+;;;;
+;;;; Upkeep / Expenses
+;;;; Cost to maintain units and infrastructure per round.
 
 (def planet-upkeep-credits  2500)
 (def planet-upkeep-food     100)
@@ -137,12 +140,12 @@
 (def station-upkeep-credits 100)
 (def station-upkeep-fuel    10)
 
-(def agent-upkeep-food      10)
-(def agent-upkeep-fuel      10)
+(def agent-upkeep-food 10)
+(def agent-upkeep-fuel 10)
 
-
-;; Building / Purchase Cost Defaults
-;; Cost to purchase new units, ships, and planets
+;;;;
+;;;; Building Costs
+;;;; Cost to purchase new units, ships, and planets.
 
 (def soldier-cost    1000)
 (def transport-cost  5000)
@@ -159,10 +162,11 @@
 (def erg-planet-cost 11000)
 (def ore-planet-cost 22000)
 
-(def agent-cost      5000)
+(def agent-cost 5000)
 
-
-;; Rates for buying and selling assets in the exchange
+;;;;
+;;;; Exchange Rates
+;;;; Rates for buying and selling assets in the exchange.
 
 (def soldier-sell     250)
 (def transport-sell   2500)
@@ -176,12 +180,12 @@
 (def cmd-ship-sell    30000)
 
 (def mil-planet-sell  1000)
-(def erg-planet-sell 5500)
+(def erg-planet-sell  5500)
 (def ore-planet-sell  11000)
 
-(def agent-sell       1000)
+(def agent-sell 1000)
 
-(def food-buy         6)
-(def food-sell        2)
-(def fuel-buy         6)
-(def fuel-sell        3)
+(def food-buy  6)
+(def food-sell 2)
+(def fuel-buy  6)
+(def fuel-sell 3)
