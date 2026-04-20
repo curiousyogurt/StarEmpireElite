@@ -10,6 +10,7 @@
 
 (ns com.star-empire-elite.pages.app.action
   (:require [com.biffweb :as biff :refer [q]]
+            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
 
@@ -22,11 +23,12 @@
 
   [db xtdb-db, game-id uuid, current-player-id uuid] -> seq of player maps"
   [db game-id current-player-id]
-  (let [players (q db '{:find (pull player [*])
-                        :in [game-id current-player-id]
-                        :where [[player :player/game game-id]
-                                [(not= player current-player-id)]]}
-                   game-id current-player-id)]
+  (let [players (filter #(not= (:player/status %) const/player-status-eliminated)
+                        (q db '{:find (pull player [*])
+                                :in [game-id current-player-id]
+                                :where [[player :player/game game-id]
+                                        [(not= player current-player-id)]]}
+                             game-id current-player-id))]
     (sort-by :player/score > (seq players))))
 
 ;;;;

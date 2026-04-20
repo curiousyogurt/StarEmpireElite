@@ -18,6 +18,7 @@
             [com.star-empire-elite.pages.app.action :as action]
             [com.star-empire-elite.pages.app.espionage :as espionage]
             [com.star-empire-elite.pages.app.outcomes :as outcomes]
+            [com.star-empire-elite.pages.app.eliminated :as eliminated]
             [com.star-empire-elite.combat :as combat]
             [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
@@ -538,14 +539,27 @@
                           :player/last-stability-recovery (pr-str result)}])
                       [result (assoc final-player-3 :player/stability new-stability)]))))]
 
-          (outcomes/outcomes-page {:player           final-player-4
-                                   :game             game
-                                   :battle-result    battle-result
-                                   :espionage-result espionage-result
-                                   :pop-growth       pop-growth
-                                   :expense-penalty  expense-penalty
-                                   :breakaway-result breakaway-result
-                                   :recovery-result  recovery-result})))))
+          ;; --- elimination check ---
+          (let [total-planets (+ (:player/ore-planets final-player-4)
+                                 (:player/erg-planets final-player-4)
+                                 (:player/mil-planets final-player-4))
+                eliminated?   (zero? total-planets)]
+            (when (and eliminated?
+                       (not= (:player/status final-player-4) const/player-status-eliminated))
+              (biff/submit-tx ctx
+                [{:db/doc-type   :player
+                  :db/op         :update
+                  :xt/id         player-id
+                  :player/status const/player-status-eliminated}]))
+            (outcomes/outcomes-page {:player           final-player-4
+                                     :game             game
+                                     :battle-result    battle-result
+                                     :espionage-result espionage-result
+                                     :pop-growth       pop-growth
+                                     :expense-penalty  expense-penalty
+                                     :breakaway-result breakaway-result
+                                     :recovery-result  recovery-result
+                                     :eliminated?      eliminated?}))))))
 ;; :: HTMX fragment — polls for incoming alerts; triggers HX-Refresh when new alerts arrive
 (defn alerts-handler [{:keys [biff/db path-params params] :as ctx}]
   (let [player-id  (java.util.UUID/fromString (:player-id path-params))
@@ -583,5 +597,7 @@
             ["/game/:player-id/apply-espionage"    {:post espionage/apply-espionage}]
             ["/game/:player-id/outcomes"           {:get outcomes-handler}]
             ["/game/:player-id/apply-outcomes"     {:post outcomes/apply-outcomes}]
+            ["/game/:player-id/eliminated"         {:get eliminated/eliminated-page}]
+            ["/game/:player-id/rejoin"             {:post eliminated/rejoin}]
             ["/game/:player-id/alerts"             {:get alerts-handler}]
             ]})

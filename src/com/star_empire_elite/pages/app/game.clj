@@ -8,6 +8,7 @@
 
 (ns com.star-empire-elite.pages.app.game
   (:require [com.biffweb :as biff :refer [q]]
+            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
 
@@ -39,10 +40,11 @@
 
   [db xtdb-db, game-id uuid] -> [player-map]"
   [db game-id]
-  (let [results        (q db '{:find (pull player [*])
-                                :in [game-id]
-                                :where [[player :player/game game-id]]}
-                           game-id)
+  (let [results        (filter #(not= (:player/status %) const/player-status-eliminated)
+                              (q db '{:find (pull player [*])
+                                       :in [game-id]
+                                       :where [[player :player/game game-id]]}
+                                   game-id))
         sorted-players (sort-by :player/score > (seq results))]
     (map-indexed (fn [idx player]
                    (assoc player :rank (inc idx)))

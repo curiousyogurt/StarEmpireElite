@@ -109,6 +109,12 @@
 (def stability-recovery-floor      50)  ; minimum effective stability for recovery rolls
 
 
+;; Player Status
+
+(def player-status-active    0)
+(def player-status-eliminated 1)
+
+
 ;; Expense Underpayment Penalty
 ;; Stability points lost per unit of underpayment fraction across all expense categories.
 ;; 0 = no penalty until explicitly set.

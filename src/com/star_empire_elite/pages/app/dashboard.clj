@@ -46,11 +46,12 @@
 
   [db xtdb-db, uid uuid] -> [{:player player-map, :game game-map}]"
   [db uid]
-  (let [players (q db
-                   '{:find (pull player [*])
-                     :in [user-id]
-                     :where [[player :player/user user-id]]}
-                   uid)]
+  (let [players (filter #(not= (:player/status %) const/player-status-eliminated)
+                        (q db
+                           '{:find (pull player [*])
+                             :in [user-id]
+                             :where [[player :player/user user-id]]}
+                           uid))]
     (for [player players]
       (let [game         (xt/entity db (:player/game player))
             game-scores  (map :player/score

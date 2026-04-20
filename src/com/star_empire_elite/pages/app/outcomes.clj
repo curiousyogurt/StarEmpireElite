@@ -12,6 +12,7 @@
 
 (ns com.star-empire-elite.pages.app.outcomes
   (:require [com.biffweb :as biff]
+            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
 
@@ -198,7 +199,9 @@
   (utils/with-player-and-game [player game player-id] ctx
     (if-let [redirect (utils/validate-phase player 6 player-id)]
       redirect
-      (let [turns-per-round (:game/turns-per-round game)
+      (if (= (:player/status player) const/player-status-eliminated)
+        {:status 303 :headers {"location" (str "/app/game/" player-id "/eliminated")}}
+        (let [turns-per-round (:game/turns-per-round game)
             now             (java.util.Date.)
             turns-used      (inc (:player/turns-used player))
             end-round?      (>= turns-used turns-per-round)
@@ -227,7 +230,7 @@
                   (when end-round?
                     {:player/last-round-completed-at now}))])
         {:status 303
-         :headers {"location" (str "/app/game/" player-id "/income")}}))))
+         :headers {"location" (str "/app/game/" player-id "/income")}})))))
 
 ;;;;
 ;;;; Page
@@ -236,8 +239,8 @@
 (defn outcomes-page
   "Show turn results (combat, espionage, population growth, expense penalties, breakaway) and the advance button.
 
-  [{:keys [player game battle-result espionage-result pop-growth expense-penalty breakaway-result recovery-result]}] -> hiccup"
-  [{:keys [player game battle-result espionage-result pop-growth expense-penalty breakaway-result recovery-result]}]
+  [{:keys [player game battle-result espionage-result pop-growth expense-penalty breakaway-result recovery-result eliminated?]}] -> hiccup"
+  [{:keys [player game battle-result espionage-result pop-growth expense-penalty breakaway-result recovery-result eliminated?]}]
   (let [current-turn       (:player/current-turn player)
         turns-per-round    (:game/turns-per-round game)
         end-current-round? (>= current-turn turns-per-round)]
@@ -333,6 +336,13 @@
            (when has-recovery?
              [:p.text-xs.text-green-400
               (str "Empire stability increases due to paid expenses: +" (:amount recovery-result) "%")])]))
+
+      ;; Elimination notice (only shown when player has 0 planets)
+      (when eliminated?
+        [:div.border.border-red-400.p-4.mb-4
+         [:h3.font-bold.mb-2.text-red-400 "Empire Eliminated"]
+         [:p.text-xs.text-red-400
+          "Your empire has no planets remaining. You have been eliminated."]])
 
       ;; Population growth section (only shown at end of round)
       (when (some? pop-growth)
