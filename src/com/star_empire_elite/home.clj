@@ -254,7 +254,9 @@
 (def module
   {:routes [[""
              ["/" {:get main-home/home}]
-             ["/about" {:get main-about/about}]]
+             ["/about"              {:get main-about/about}]
+             ["/about/essay"        {:get main-about/essay}]
+             ["/about/architecture" {:get main-about/architecture}]]
             ["" {:middleware [mid/wrap-redirect-signed-in]}
              ["/link-sent"    {:get link-sent}]
              ["/verify-link"  {:get verify-email-page}]
