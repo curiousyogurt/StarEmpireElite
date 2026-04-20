@@ -256,7 +256,7 @@
              ["/" {:get main-home/home}]
              ["/about"              {:get main-about/about}]
              ["/about/essay"        {:get main-about/essay}]
-             ["/about/architecture" {:get main-about/architecture}]]
+             ["/about/design" {:get main-about/design}]]
             ["" {:middleware [mid/wrap-redirect-signed-in]}
              ["/link-sent"    {:get link-sent}]
              ["/verify-link"  {:get verify-email-page}]

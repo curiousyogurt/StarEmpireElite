@@ -182,7 +182,7 @@
         "small and abstract one, is to grapple with a web of tradeoffs. What makes the form durable is "
         "that it forcefully brings that setting to the table.")]))
 
-(defn architecture-content []
+(defn design-content []
   [:<>
    (section "What This Game Brings Together ✨"
      "A game like " [:em "Star Empire Elite"] " is not simply a piece of entertainment software. It is a meeting "
@@ -211,10 +211,10 @@
      "not an afterthought. It is part of the game's intelligibility. A good interface allows strategic "
      "depth to appear as richness, rather than as confusion.")
 
-   (section "Visual Design 🎨"
+   (section "Visual Language 🎨"
      "The visual dimension of the game matters not only for atmosphere, but for clarity. Typography, "
      "color, layout, iconography, and graphical style all contribute to the player's sense of the world "
-     "and to the legibility of the information being presented. Visual design, at its best, is not "
+     "and to the legibility of the information being presented. Visual language, at its best, is not "
      "decoration laid on top of a system. It is one of the means by which the system becomes perceptible.")
 
    (section "Economic and Strategic Balancing ⚖️"
@@ -255,7 +255,7 @@
 ;;;;
 
 (defn about-page
-  "Renders the full about page. tab is :about, :essay, or :architecture."
+  "Renders the full about page. tab is :about, :essay, or :design."
   [tab]
   (ui/page
     {}
@@ -266,13 +266,13 @@
      [:div.flex.gap-2.mb-10
       (tab-button "/about"              "Overview"     (= tab :about))
       (tab-button "/about/essay"        "History"      (= tab :essay))
-      (tab-button "/about/architecture" "Architecture" (= tab :architecture))]
+      (tab-button "/about/design" "Design" (= tab :design))]
 
      ;; Tab content
      (case tab
        :about        (about-content)
        :essay        (essay-content)
-       :architecture (architecture-content))
+       :design (design-content))
 
      ;; Navigation links
      [:div.flex.gap-4.mt-8
@@ -290,5 +290,5 @@
 (defn essay [_ctx]
   (about-page :essay))
 
-(defn architecture [_ctx]
-  (about-page :architecture))
+(defn design [_ctx]
+  (about-page :design))
