@@ -19,8 +19,8 @@
 ;;;; Force Calculations
 ;;;;
 
-(defn effective-attacking-forces
-  "Compute the effective attacking force counts, applying transport and general capacity caps.
+(defn effective-forces
+  "Compute effective force counts, capped by transport and general capacity.
 
   [player player-map] -> force-map"
   [player]
@@ -37,21 +37,17 @@
    :cmd-ships  (:player/cmd-ships  player)})
 
 (defn effective-defending-forces
-  "Compute the effective defending force counts, applying general and admiral capacity caps.
-  Stations are included for defenders only.
+  "Compute effective force counts for a defender. Defenders have no transport  cap (troops are already 
+   where the need to be to defend against an attack), and stations are included.
 
   [player player-map] -> force-map"
   [player]
-  {:soldiers   (min (:player/soldiers player)
-                    (* (:player/generals player) const/soldiers-per-general))
-   :fighters   (min (:player/fighters player)
-                    (* (:player/admirals player) const/fighters-per-admiral))
-   :transports (:player/transports player)
-   :generals   (:player/generals   player)
-   :carriers   (:player/carriers   player)
-   :admirals   (:player/admirals   player)
-   :cmd-ships  (:player/cmd-ships  player)
-   :stations   (:player/stations   player)})
+  (-> (effective-forces player)
+      (assoc :soldiers  (min (:player/soldiers player)
+                             (* (:player/generals player) const/soldiers-per-general))
+             :fighters  (min (:player/fighters player)
+                             (* (:player/admirals player) const/fighters-per-admiral))
+             :stations  (:player/stations player))))
 
 (defn base-power
   "Sum the raw power of a force set. Stations are counted only for defenders.
@@ -138,7 +134,7 @@
 
   [game game-map, attacker player-map, defender player-map] -> result-map"
   [game attacker defender]
-  (let [att-forces (effective-attacking-forces attacker)
+  (let [att-forces (effective-forces attacker)
         def-forces (effective-defending-forces defender)
         att-power  (base-power game att-forces true)
         def-power  (base-power game def-forces false)
