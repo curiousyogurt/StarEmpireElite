@@ -34,7 +34,8 @@
    :generals   (:player/generals   player)
    :carriers   (:player/carriers   player)
    :admirals   (:player/admirals   player)
-   :cmd-ships  (:player/cmd-ships  player)})
+   :cmd-ships  (:player/cmd-ships  player)
+   :stations   0})
 
 (defn effective-defending-forces
   "Compute effective force counts for a defender. Defenders have no transport cap (soliders and 
