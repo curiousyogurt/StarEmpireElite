@@ -37,11 +37,14 @@
    :cmd-ships  (:player/cmd-ships  player)})
 
 (defn effective-defending-forces
-  "Compute effective force counts for a defender. Defenders have no transport  cap (troops are already 
-   where the need to be to defend against an attack), and stations are included.
+  "Compute effective force counts for a defender. Defenders have no transport cap (soliders and 
+  fighters are are already where the need to be to defend against an attack), and stations are 
+  included.
 
   [player player-map] -> force-map"
   [player]
+  ;; Start with effective-forces for defending player, and modify :soldiers, :fighters calculation,
+  ;; and add defence stations.
   (-> (effective-forces player)
       (assoc :soldiers  (min (:player/soldiers player)
                              (* (:player/generals player) const/soldiers-per-general))
@@ -89,8 +92,8 @@
    :stations-lost   (max 0 (long (* (:stations   forces) rate)))})
 
 (defn- select-planets
-  "Randomly select n planets from the defender's pool, returning a
-  {:mil n :food n :ore n} map of how many of each type are transferred.
+  "Randomly select n planets from the defender's pool, returning a {:mil n :food n :ore n} map of how 
+  many of each type are transferred.
 
   [defender player-map, n int] -> transfer-map"
   [defender n]
@@ -103,9 +106,8 @@
      :ore  (get taken :ore  0)}))
 
 (defn resolve-espionage
-  "Resolve an espionage attempt. Agent counts are compared with ±variance random rolls.
-  Returns a result map including intel snapshot on success. UUIDs stored as strings for
-  safe pr-str round-trip.
+  "Resolve an espionage attempt. Agent counts are compared with ±variance random rolls. Returns a 
+  result map including intel snapshot on success. UUIDs stored as strings for safe pr-str round-trip.
 
   [attacker player-map, defender player-map] -> result-map"
   [attacker defender]
@@ -128,9 +130,9 @@
                :agents     (:player/agents     defender)})}))
 
 (defn resolve-combat
-  "Resolve a full combat engagement between attacker and defender. Returns a result map
-  containing both sides' force counts, losses, rolls, and any planets transferred.
-  UUIDs stored as strings for safe pr-str round-trip.
+  "Resolve a full combat engagement between attacker and defender. Returns a result map containing 
+  both sides' force counts, losses, rolls, and any planets transferred. UUIDs stored as strings for 
+  safe pr-str round-trip.
 
   [game game-map, attacker player-map, defender player-map] -> result-map"
   [game attacker defender]
@@ -142,24 +144,24 @@
         def-roll   (* def-power (random-factor))
         att-wins?  (> att-roll def-roll)
         max-roll   (max att-roll def-roll)
-        ;; Normalised relative difference (always between 0.0 and 1.0)
-        ;; Lower margin means rolls were nearly identical; higher margin
-        ;; means one side overwhelmed the other.
+        ;; Normalised relative difference (always between 0.0 and 1.0) Lower margin means rolls were 
+        ;; nearly identical; higher margin means one side overwhelmed the other.
         margin     (if (zero? max-roll) 0.0
                      (/ (Math/abs (- att-roll def-roll)) max-roll))
-        ;; If margin is small, loser-rate is small (survives with most of
-        ;; their forces.  Capped at 75% as margin increases.
+        ;; If margin is small, loser-rate is small (survives with most of their forces.  Capped at 75% 
+        ;; as margin increases.
         loser-rate  (min margin 0.75)
-        ;; Cap winner losses at 50% of loser's losses, ensuring that 
-        ;; even in victory, there is some cost to combat.
+        ;; Cap winner losses at 50% of loser's losses, ensuring that even in victory, there is some 
+        ;; cost to combat.
         winner-rate (/ loser-rate 2.0)
         def-total-planets (+ (:player/mil-planets  defender)
                               (:player/erg-planets defender)
                               (:player/ore-planets  defender))
-        ;; The margin also determines whether any territory is gained.  A close 
-        ;; battle will result in no new territory; but a crushing victory will 
-        ;; allow the attacker to capture a large number of planets.
+        ;; The margin also determines whether any territory is gained.  A close battle will result in 
+        ;; no new territory; but a crushing victory will allow the attacker to capture a large number 
+        ;; of planets.
         planets-count       (if att-wins? (long (* margin def-total-planets)) 0)
+        ;; Randomly select planets to be transferred to the attacker.
         planets-transferred (select-planets defender planets-count)]
     {:attacker-id     (str (:xt/id attacker))
      :attacker-name   (:player/empire-name attacker)
