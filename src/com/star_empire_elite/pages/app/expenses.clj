@@ -49,35 +49,35 @@
 ;;; so it stays in sync automatically when categories are added or renamed.
 (def expense-hx-include
   (str/join ","
-    (for [spec expense-row-specs
-          resource-key [:credits :food :fuel]
-          :let  [resource (get spec resource-key)]
-          :when resource]
-      (str "[name='" (:field-name resource) "']"))))
+            (for [spec expense-row-specs
+                  resource-key [:credits :food :fuel]
+                  :let  [resource (get spec resource-key)]
+                  :when resource]
+              (str "[name='" (:field-name resource) "']"))))
 
 (defn calculate-required-expenses
   "Calculate required upkeep costs for all empire assets using game constants.
 
   [player game] -> {:planets-credits int, :planets-food int,
-                    :soldiers-credits int, :soldiers-food int,
-                    :fighters-credits int, :fighters-fuel int,
-                    :stations-credits int, :stations-fuel int,
-                    :agents-food int, :agents-fuel int,
-                    :population-food int, :population-fuel int}"
+  :soldiers-credits int, :soldiers-food int,
+  :fighters-credits int, :fighters-fuel int,
+  :stations-credits int, :stations-fuel int,
+  :agents-food int, :agents-fuel int,
+  :population-food int, :population-fuel int}"
   [player game]
   (let [planet-count (+ (:player/mil-planets player)
                         (:player/erg-planets player)
                         (:player/ore-planets player))]
-    {:planets-credits   (* planet-count                (:game/planet-upkeep-credits game))
-     :planets-food      (* planet-count                (:game/planet-upkeep-food game))
-     :soldiers-credits  (* (:player/soldiers player)   (:game/soldier-upkeep-credits game))
-     :soldiers-food     (* (:player/soldiers player)   (:game/soldier-upkeep-food game))
-     :fighters-credits  (* (:player/fighters player)   (:game/fighter-upkeep-credits game))
-     :fighters-fuel     (* (:player/fighters player)   (:game/fighter-upkeep-fuel game))
-     :stations-credits  (* (:player/stations player)   (:game/station-upkeep-credits game))
-     :stations-fuel     (* (:player/stations player)   (:game/station-upkeep-fuel game))
-     :agents-food       (* (:player/agents player)     (:game/agent-upkeep-food game))
-     :agents-fuel       (* (:player/agents player)     (:game/agent-upkeep-fuel game))
+    {:planets-credits   (* planet-count                (:game/planet-upkeep-credits  game))
+     :planets-food      (* planet-count                (:game/planet-upkeep-food     game))
+     :soldiers-credits  (* (:player/soldiers   player) (:game/soldier-upkeep-credits game))
+     :soldiers-food     (* (:player/soldiers   player) (:game/soldier-upkeep-food    game))
+     :fighters-credits  (* (:player/fighters   player) (:game/fighter-upkeep-credits game))
+     :fighters-fuel     (* (:player/fighters   player) (:game/fighter-upkeep-fuel    game))
+     :stations-credits  (* (:player/stations   player) (:game/station-upkeep-credits game))
+     :stations-fuel     (* (:player/stations   player) (:game/station-upkeep-fuel    game))
+     :agents-food       (* (:player/agents     player) (:game/agent-upkeep-food      game))
+     :agents-fuel       (* (:player/agents     player) (:game/agent-upkeep-fuel      game))
      :population-food   (* (:player/population player) (:game/population-upkeep-food game))
      :population-fuel   (* (:player/population player) (:game/population-upkeep-fuel game))}))
 
@@ -86,40 +86,40 @@
 
   [player payments] -> {:credits int, :food int, :fuel int, ...}"
   [player payments]
-  {:credits      (- (:player/credits player)
-                    (:planets-pay payments)
-                    (:soldiers-credits payments)
-                    (:fighters-credits payments)
-                    (:stations-credits payments))
-   :food         (- (:player/food player)
-                    (:planets-food payments)
-                    (:soldiers-food payments)
-                    (:agents-food payments)
-                    (:population-food payments))
-   :fuel         (- (:player/fuel player)
-                    (:fighters-fuel payments)
-                    (:stations-fuel payments)
-                    (:agents-fuel payments)
-                    (:population-fuel payments))
-   :population   (:player/population player)
-   :stability    (:player/stability player)
-   :galaxars     (:player/galaxars player)
-   :soldiers     (:player/soldiers player)
-   :transports   (:player/transports player)
-   :generals     (:player/generals player)
-   :fighters     (:player/fighters player)
-   :carriers     (:player/carriers player)
-   :admirals     (:player/admirals player)
-   :stations     (:player/stations player)
-   :cmd-ships    (:player/cmd-ships player)
-   :agents       (:player/agents player)
-   :ore-planets  (:player/ore-planets player)
+  {:credits (- (:player/credits   player)
+               (:planets-pay      payments)
+               (:soldiers-credits payments)
+               (:fighters-credits payments)
+               (:stations-credits payments))
+   :food    (- (:player/food      player)
+               (:planets-food     payments)
+               (:soldiers-food    payments)
+               (:agents-food      payments)
+               (:population-food  payments))
+   :fuel    (- (:player/fuel      player)
+               (:fighters-fuel    payments)
+               (:stations-fuel    payments)
+               (:agents-fuel      payments)
+               (:population-fuel  payments))
+   :population  (:player/population  player)
+   :stability   (:player/stability   player)
+   :galaxars    (:player/galaxars    player)
+   :soldiers    (:player/soldiers    player)
+   :transports  (:player/transports  player)
+   :generals    (:player/generals    player)
+   :fighters    (:player/fighters    player)
+   :carriers    (:player/carriers    player)
+   :admirals    (:player/admirals    player)
+   :stations    (:player/stations    player)
+   :cmd-ships   (:player/cmd-ships   player)
+   :agents      (:player/agents      player)
+   :ore-planets (:player/ore-planets player)
    :erg-planets (:player/erg-planets player)
-   :mil-planets  (:player/mil-planets player)})
+   :mil-planets (:player/mil-planets player)})
 
 (defn calculate-expense-stability-penalty
   "Calculate the stability penalty for underpaying expenses.
-  For each of the 12 required/paid pairs, computes the underpayment fraction
+  For each of the required/paid pairs, computes the underpayment fraction
   (shortfall ÷ required). Sums all fractions and multiplies by the game constant.
   Returns 0 when the game constant is 0 or all expenses are fully paid.
 
@@ -137,12 +137,11 @@
                [:agents-fuel      :agents-fuel]
                [:population-food  :population-food]
                [:population-fuel  :population-fuel]]
-        total-fraction (reduce +
-                         (for [[req-key pay-key] pairs
-                               :let [req      (get required req-key 0)
-                                     paid     (get payments  pay-key 0)
-                                     shortfall (max 0 (- req paid))]]
-                           (double (/ shortfall (max 1 req)))))]
+        total-fraction (reduce + (for [[req-key pay-key] pairs
+                                       :let [req      (get required req-key 0)
+                                             paid     (get payments  pay-key 0)
+                                             shortfall (max 0 (- req paid))]]
+                                   (double (/ shortfall (max 1 req)))))]
     (long (* total-fraction (:game/expense-stability-penalty game)))))
 
 (defn can-afford-expenses?
@@ -158,9 +157,9 @@
   "Parse all expense payment inputs from request params. Invalid or missing values default to 0.
 
   [params ring-params] -> {:planets-pay int, :planets-food int, :soldiers-credits int,
-                           :soldiers-food int, :fighters-credits int, :fighters-fuel int,
-                           :stations-credits int, :stations-fuel int, :agents-food int,
-                           :agents-fuel int, :population-food int, :population-fuel int}"
+  :soldiers-food int, :fighters-credits int, :fighters-fuel int,
+  :stations-credits int, :stations-fuel int, :agents-food int,
+  :agents-fuel int, :population-food int, :population-fuel int}"
   [params]
   {:planets-pay      (utils/parse-numeric-input (:planets-pay params))
    :planets-food     (utils/parse-numeric-input (:planets-food params))
@@ -186,21 +185,21 @@
   [spec, required required-map, payments payments-map|nil] -> [{:display hiccup, :underpaid? bool}]"
   [{:keys [credits food fuel]} required payments]
   (keep identity
-    [(when credits
-       {:display    (ui/format-number (get required (:required-key credits)))
-        :underpaid? (boolean (and payments
-                                  (< (get payments (keyword (:field-name credits)) 0)
-                                     (get required (:required-key credits) 0))))})
-     (when food
-       {:display    (ui/format-number (get required (:required-key food)))
-        :underpaid? (boolean (and payments
-                                  (< (get payments (keyword (:field-name food)) 0)
-                                     (get required (:required-key food) 0))))})
-     (when fuel
-       {:display    (ui/format-number (get required (:required-key fuel)))
-        :underpaid? (boolean (and payments
-                                  (< (get payments (keyword (:field-name fuel)) 0)
-                                     (get required (:required-key fuel) 0))))})]))
+        [(when credits
+           {:display    (ui/format-number (get required (:required-key credits)))
+            :underpaid? (boolean (and payments
+                                      (< (get payments (keyword (:field-name credits)) 0)
+                                         (get required (:required-key credits) 0))))})
+         (when food
+           {:display    (ui/format-number (get required (:required-key food)))
+            :underpaid? (boolean (and payments
+                                      (< (get payments (keyword (:field-name food)) 0)
+                                         (get required (:required-key food) 0))))})
+         (when fuel
+           {:display    (ui/format-number (get required (:required-key fuel)))
+            :underpaid? (boolean (and payments
+                                      (< (get payments (keyword (:field-name fuel)) 0)
+                                         (get required (:required-key fuel) 0))))})]))
 
 (defn- render-required-cell
   "Render the required-cost display cell. Each resource amount is colored independently —
@@ -212,8 +211,8 @@
          (cond-> {:id (str "required-" row-id)}
            oob? (assoc :hx-swap-oob "true"))]
         (interpose "/"
-          (for [{:keys [display underpaid?]} parts]
-            [:span {:class (when underpaid? "text-red-400")} display]))))
+                   (for [{:keys [display underpaid?]} parts]
+                     [:span {:class (when underpaid? "text-red-400")} display]))))
 
 (defn- build-row-required-update
   "Build an HTMX oob update fragment for the required-cost cell of one expense row.
@@ -245,8 +244,8 @@
   required-cell is a pre-built hiccup element from render-required-cell.
 
   [category-name str, category-name-mobile str, row-id str, asset-count int|str,
-   required-cell hiccup, credits-field map|nil, food-field map|nil, fuel-field map|nil,
-   player-id uuid, hx-include str] -> hiccup"
+  required-cell hiccup, credits-field map|nil, food-field map|nil, fuel-field map|nil,
+  player-id uuid, hx-include str] -> hiccup"
   [category-name category-name-mobile row-id asset-count required-cell credits-field food-field fuel-field player-id hx-include]
   [:div.border-b.border-green-400.last:border-b-0.grid.items-center.gap-1.px-2.py-2.text-xs.leading-tight.lg:gap-3.lg:px-4.lg:py-2.lg:text-base.expense-row-grid
 
@@ -291,9 +290,9 @@
 (defn build-expense-row
   "Build an expense-row from a spec map, deriving required values and input fields from it.
   Spec keys: :category str, :abbrev str, :row-id str, :count int|str,
-             :credits {:field-name str, :required-key kw} or nil,
-             :food   {:field-name str, :required-key kw} or nil,
-             :fuel   {:field-name str, :required-key kw} or nil.
+  :credits {:field-name str, :required-key kw} or nil,
+  :food   {:field-name str, :required-key kw} or nil,
+  :fuel   {:field-name str, :required-key kw} or nil.
 
   [spec map, required map, player-id uuid, hx-include str] -> hiccup"
   [spec required player-id hx-include]

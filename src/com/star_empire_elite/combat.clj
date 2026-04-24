@@ -24,14 +24,14 @@
 
   [player player-map] -> force-map"
   [player]
-  {:soldiers   (min (:player/soldiers   player)
+  {:soldiers   (min (:player/soldiers player)
                     (* (:player/transports player) const/soldiers-per-transport)
-                    (* (:player/generals  player) const/soldiers-per-general))
-   :transports (:player/transports player)
-   :generals   (:player/generals   player)
+                    (* (:player/generals   player) const/soldiers-per-general))
    :fighters   (min (:player/fighters player)
                     (* (:player/carriers player) const/fighters-per-carrier)
                     (* (:player/admirals player) const/fighters-per-admiral))
+   :transports (:player/transports player)
+   :generals   (:player/generals   player)
    :carriers   (:player/carriers   player)
    :admirals   (:player/admirals   player)
    :cmd-ships  (:player/cmd-ships  player)})
@@ -44,10 +44,10 @@
   [player]
   {:soldiers   (min (:player/soldiers player)
                     (* (:player/generals player) const/soldiers-per-general))
-   :transports (:player/transports player)
-   :generals   (:player/generals   player)
    :fighters   (min (:player/fighters player)
                     (* (:player/admirals player) const/fighters-per-admiral))
+   :transports (:player/transports player)
+   :generals   (:player/generals   player)
    :carriers   (:player/carriers   player)
    :admirals   (:player/admirals   player)
    :cmd-ships  (:player/cmd-ships  player)
@@ -90,7 +90,7 @@
    :carriers-lost   (max 0 (long (* (:carriers   forces) rate)))
    :admirals-lost   (max 0 (long (* (:admirals   forces) rate)))
    :cmd-ships-lost  (max 0 (long (* (:cmd-ships  forces) rate)))
-   :stations-lost   (max 0 (long (* (or (:stations forces) 0) rate)))})
+   :stations-lost   (max 0 (long (* (:stations   forces) rate)))})
 
 (defn- select-planets
   "Randomly select n planets from the defender's pool, returning a
@@ -98,9 +98,9 @@
 
   [defender player-map, n int] -> transfer-map"
   [defender n]
-  (let [pool  (shuffle (concat (repeat (:player/mil-planets  defender) :mil)
+  (let [pool  (shuffle (concat (repeat (:player/mil-planets defender) :mil)
                                (repeat (:player/erg-planets defender) :food)
-                               (repeat (:player/ore-planets  defender) :ore)))
+                               (repeat (:player/ore-planets defender) :ore)))
         taken (frequencies (take n pool))]
     {:mil  (get taken :mil  0)
      :food (get taken :food 0)
@@ -146,13 +146,23 @@
         def-roll   (* def-power (random-factor))
         att-wins?  (> att-roll def-roll)
         max-roll   (max att-roll def-roll)
+        ;; Normalised relative difference (always between 0.0 and 1.0)
+        ;; Lower margin means rolls were nearly identical; higher margin
+        ;; means one side overwhelmed the other.
         margin     (if (zero? max-roll) 0.0
                      (/ (Math/abs (- att-roll def-roll)) max-roll))
+        ;; If margin is small, loser-rate is small (survives with most of
+        ;; their forces.  Capped at 75% as margin increases.
         loser-rate  (min margin 0.75)
+        ;; Cap winner losses at 50% of loser's losses, ensuring that 
+        ;; even in victory, there is some cost to combat.
         winner-rate (/ loser-rate 2.0)
         def-total-planets (+ (:player/mil-planets  defender)
                               (:player/erg-planets defender)
                               (:player/ore-planets  defender))
+        ;; The margin also determines whether any territory is gained.  A close 
+        ;; battle will result in no new territory; but a crushing victory will 
+        ;; allow the attacker to capture a large number of planets.
         planets-count       (if att-wins? (long (* margin def-total-planets)) 0)
         planets-transferred (select-planets defender planets-count)]
     {:attacker-id     (str (:xt/id attacker))
