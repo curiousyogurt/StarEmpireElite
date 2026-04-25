@@ -119,28 +119,41 @@
           (is (= 303 (:status result)))
           (is (= (str "/app/game/" test-player-id) (get-in result [:headers "location"]))))))))
 
-(deftest test-apply-espionage-with-target
-  (testing "Records pending-espionage as target UUID and advances to phase 6"
+(deftest test-apply-espionage-with-spy
+  (testing "Records pending-espionage and op=spy when spy action submitted"
     (let [tx-atom (atom nil)]
       (with-redefs [xt/entity      (helpers/fake-entity [test-player])
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
-        (let [result (espionage/apply-espionage {:path-params {:player-id (str test-player-id)}
-                                                 :params {:target-player-id (str test-target-id)}
-                                                 :biff/db nil})
+        (let [result (espionage/apply-espionage
+                       {:path-params {:player-id (str test-player-id)}
+                        :params      {:espionage-action (str "spy:" test-target-id)}
+                        :biff/db     nil})
               tx     (first @tx-atom)]
-          ;; Redirect to outcomes
           (is (= 303 (:status result)))
           (is (= (str "/app/game/" test-player-id "/outcomes") (get-in result [:headers "location"])))
-          ;; Transaction
-          (is (= :player       (:db/doc-type tx)))
-          (is (= :update        (:db/op tx)))
-          (is (= test-player-id (:xt/id tx)))
-          ;; Advances phase and records target
-          (is (= 6 (:player/current-phase tx)))
-          (is (= test-target-id (:player/pending-espionage tx))))))))
+          (is (= :player        (:db/doc-type tx)))
+          (is (= :update         (:db/op tx)))
+          (is (= test-player-id  (:xt/id tx)))
+          (is (= 6               (:player/current-phase tx)))
+          (is (= test-target-id  (:player/pending-espionage tx)))
+          (is (= "spy"           (:player/pending-espionage-op tx))))))))
+
+(deftest test-apply-espionage-with-incite
+  (testing "Records pending-espionage and op=incite when incite action submitted"
+    (let [tx-atom (atom nil)]
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player])
+                    biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
+        (let [result (espionage/apply-espionage
+                       {:path-params {:player-id (str test-player-id)}
+                        :params      {:espionage-action (str "incite:" test-target-id)}
+                        :biff/db     nil})
+              tx     (first @tx-atom)]
+          (is (= 303 (:status result)))
+          (is (= test-target-id (:player/pending-espionage tx)))
+          (is (= "incite"        (:player/pending-espionage-op tx))))))))
 
 (deftest test-apply-espionage-without-target
-  (testing "Records nil pending-espionage when no target is selected"
+  (testing "Records nil pending-espionage when no action is selected"
     ;; Players may choose to skip espionage. pending-espionage is explicitly set to nil
     ;; so a previous round's value is not carried forward.
     (let [tx-atom (atom nil)]
@@ -150,13 +163,14 @@
                                     :params {} :biff/db nil})
         (let [tx (first @tx-atom)]
           (is (= 6 (:player/current-phase tx)))
-          (is (nil? (:player/pending-espionage tx))))))))
+          (is (nil? (:player/pending-espionage tx)))
+          (is (nil? (:player/pending-espionage-op tx))))))))
 
-(deftest test-apply-espionage-empty-target-string
-  (testing "Treats an empty target-player-id string as no target (nil pending-espionage)"
+(deftest test-apply-espionage-empty-action-string
+  (testing "Treats an empty espionage-action as no target (nil pending-espionage)"
     (let [tx-atom (atom nil)]
       (with-redefs [xt/entity      (helpers/fake-entity [test-player])
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
         (espionage/apply-espionage {:path-params {:player-id (str test-player-id)}
-                                    :params {:target-player-id ""} :biff/db nil})
+                                    :params {:espionage-action ""} :biff/db nil})
         (is (nil? (:player/pending-espionage (first @tx-atom))))))))

@@ -165,6 +165,16 @@
 (def agent-cost 5000)
 
 ;;;;
+;;;; Espionage
+;;;; Agent defection on a failed covert mission.
+
+(def espionage-defection-rate 0.10)  ; fraction of attacker's agents captured on any failed mission
+(def espionage-defection-min  1)     ; minimum agents captured on any failed mission
+
+(def incite-stability-damage  10)    ; stability points lost by the target on a successful incite
+(def bomb-damage-rate         0.10)  ; fraction of soldiers/transports/fighters/carriers destroyed on a successful bomb
+
+;;;;
 ;;;; Exchange Rates
 ;;;; Rates for buying and selling assets in the exchange.
 

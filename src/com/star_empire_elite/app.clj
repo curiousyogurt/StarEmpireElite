@@ -430,24 +430,61 @@
                                              :player/ore-planets  att-ore-plts})]))))
 
               ;; --- espionage ---
-              pending-espionage (:player/pending-espionage player)
-              stored-espionage  (some-> (:player/last-espionage-result player) clojure.core/read-string)
+              pending-espionage    (:player/pending-espionage player)
+              pending-espionage-op (:player/pending-espionage-op player)
+              stored-espionage     (some-> (:player/last-espionage-result player) clojure.core/read-string)
 
-              espionage-result
-              (when pending-espionage
+              [espionage-result display-player]
+              (if-not pending-espionage
+                [nil display-player]
                 (let [target (xt/entity db pending-espionage)]
                   (if (and stored-espionage (= (:defender-id stored-espionage) (str pending-espionage)))
-                    stored-espionage
-                    (let [result (combat/resolve-espionage player target)]
+                    ;; Cache hit — changes already applied on first load
+                    [stored-espionage display-player]
+                    ;; Fresh resolve
+                    (let [incite?     (= pending-espionage-op "incite")
+                          bomb?       (= pending-espionage-op "bomb")
+                          result      (cond
+                                        incite? (combat/resolve-incite player target)
+                                        bomb?   (combat/resolve-bomb   player target)
+                                        :else   (combat/resolve-espionage player target))
+                          att-wins?   (:attacker-wins? result)
+                          agents-lost (or (:agents-captured result) 0)
+                          stab-dmg    (or (:stability-damage result) 0)]
                       (biff/submit-tx ctx
                         (remove nil?
                           [{:db/doc-type :player :db/op :update :xt/id player-id
-                            :player/last-espionage-result (pr-str result)}
-                           (when-not (:attacker-wins? result)
+                            :player/last-espionage-result (pr-str result)
+                            :player/agents (max 0 (- (:player/agents display-player) agents-lost))}
+                           (when (pos? agents-lost)
                              {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
+                              :player/agents (+ (or (:player/agents target) 0) agents-lost)
                               :player/incoming-espionage-fails
-                              (inc (or (:player/incoming-espionage-fails target) 0))})]))
-                      result))))
+                              (inc (or (:player/incoming-espionage-fails target) 0))
+                              :player/incoming-espionage-agents-gained
+                              (+ (or (:player/incoming-espionage-agents-gained target) 0) agents-lost)})
+                           (when (and incite? att-wins? (pos? stab-dmg))
+                             {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
+                              :player/stability (max 0 (- (or (:player/stability target) 100) stab-dmg))
+                              :player/incoming-incite-stability-lost
+                              (+ (or (:player/incoming-incite-stability-lost target) 0) stab-dmg)})
+                           (when (and bomb? att-wins?)
+                             (let [sd (or (:soldiers-destroyed   result) 0)
+                                   td (or (:transports-destroyed result) 0)
+                                   fd (or (:fighters-destroyed   result) 0)
+                                   cd (or (:carriers-destroyed   result) 0)]
+                               {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
+                                :player/soldiers   (max 0 (- (:player/soldiers   target) sd))
+                                :player/transports (max 0 (- (:player/transports target) td))
+                                :player/fighters   (max 0 (- (:player/fighters   target) fd))
+                                :player/carriers   (max 0 (- (:player/carriers   target) cd))
+                                :player/incoming-bomb-result
+                                (pr-str {:soldiers-destroyed   sd
+                                         :transports-destroyed td
+                                         :fighters-destroyed   fd
+                                         :carriers-destroyed   cd})}))]))
+                      [result (assoc display-player :player/agents
+                                     (max 0 (- (:player/agents display-player) agents-lost)))]))))
 
               ;; --- population growth (end of round only) ---
               end-round?  (>= (:player/current-turn display-player) (:game/turns-per-round game))

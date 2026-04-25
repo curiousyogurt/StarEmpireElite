@@ -115,10 +115,15 @@
   (let [att-roll  (* (:player/agents attacker) (random-factor))
         def-roll  (* (:player/agents defender)  (random-factor))
         att-wins? (> att-roll def-roll)]
-    {:attacker-id    (str (:xt/id attacker))
+    {:op             "spy"
+     :attacker-id    (str (:xt/id attacker))
      :defender-id    (str (:xt/id defender))
      :defender-name  (:player/empire-name defender)
      :attacker-wins? att-wins?
+     :agents-captured (when-not att-wins?
+                    (min (:player/agents attacker)
+                         (max const/espionage-defection-min
+                              (long (* (:player/agents attacker) const/espionage-defection-rate)))))
      :intel (when att-wins?
               {:soldiers   (:player/soldiers   defender)
                :transports (:player/transports defender)
@@ -129,6 +134,51 @@
                :stations   (:player/stations   defender)
                :cmd-ships  (:player/cmd-ships  defender)
                :agents     (:player/agents     defender)})}))
+
+(defn resolve-incite
+  "Resolve an incite operation. Agent counts are compared with ±variance random rolls. On success,
+  the defender's stability is damaged. On failure, agents are captured. UUIDs stored as strings for
+  safe pr-str round-trip.
+
+  [attacker player-map, defender player-map] -> result-map"
+  [attacker defender]
+  (let [att-roll  (* (:player/agents attacker) (random-factor))
+        def-roll  (* (:player/agents defender)  (random-factor))
+        att-wins? (> att-roll def-roll)]
+    {:op               "incite"
+     :attacker-id      (str (:xt/id attacker))
+     :defender-id      (str (:xt/id defender))
+     :defender-name    (:player/empire-name defender)
+     :attacker-wins?   att-wins?
+     :stability-damage (when att-wins? const/incite-stability-damage)
+     :agents-captured  (when-not att-wins?
+                         (min (:player/agents attacker)
+                              (max const/espionage-defection-min
+                                   (long (* (:player/agents attacker) const/espionage-defection-rate)))))}))
+
+(defn resolve-bomb
+  "Resolve a bombing operation against the target empire's ground and space forces.
+  On success, a fixed percentage of soldiers, transports, fighters, and carriers are destroyed.
+  On failure, agents are captured. UUIDs stored as strings for safe pr-str round-trip.
+
+  [attacker player-map, defender player-map] -> result-map"
+  [attacker defender]
+  (let [att-roll  (* (:player/agents attacker) (random-factor))
+        def-roll  (* (:player/agents defender)  (random-factor))
+        att-wins? (> att-roll def-roll)]
+    {:op                   "bomb"
+     :attacker-id          (str (:xt/id attacker))
+     :defender-id          (str (:xt/id defender))
+     :defender-name        (:player/empire-name defender)
+     :attacker-wins?       att-wins?
+     :soldiers-destroyed   (when att-wins? (long (* (:player/soldiers   defender) const/bomb-damage-rate)))
+     :transports-destroyed (when att-wins? (long (* (:player/transports defender) const/bomb-damage-rate)))
+     :fighters-destroyed   (when att-wins? (long (* (:player/fighters   defender) const/bomb-damage-rate)))
+     :carriers-destroyed   (when att-wins? (long (* (:player/carriers   defender) const/bomb-damage-rate)))
+     :agents-captured      (when-not att-wins?
+                             (min (:player/agents attacker)
+                                  (max const/espionage-defection-min
+                                       (long (* (:player/agents attacker) const/espionage-defection-rate)))))}))
 
 (defn resolve-combat
   "Resolve a full combat engagement between attacker and defender. Returns a result map containing 

@@ -162,11 +162,15 @@
             [:player/pending-attack {:optional true} [:maybe :player/id]]
 
             ;; Espionage
-            [:player/pending-espionage {:optional true} [:maybe :player/id]]
+            [:player/pending-espionage    {:optional true} [:maybe :player/id]]
+            [:player/pending-espionage-op {:optional true} [:maybe :string]]
 
             ;; Incoming events (set by attackers, displayed on defender's outcomes page)
-            [:player/incoming-attacks        {:optional true} [:maybe [:vector :string]]]
-            [:player/incoming-espionage-fails {:optional true} [:maybe :int]]]
+            [:player/incoming-attacks                {:optional true} [:maybe [:vector :string]]]
+            [:player/incoming-espionage-fails        {:optional true} [:maybe :int]]
+            [:player/incoming-espionage-agents-gained  {:optional true} [:maybe :int]]
+            [:player/incoming-incite-stability-lost    {:optional true} [:maybe :int]]
+            [:player/incoming-bomb-result              {:optional true} [:maybe :string]]]
 
    :message/id :uuid
    :message [:map {:closed true}

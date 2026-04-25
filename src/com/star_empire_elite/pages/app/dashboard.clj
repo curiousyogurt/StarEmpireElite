@@ -146,7 +146,7 @@
       [:p.font-bold (:player/rank player)]]
      [:div.text-right
       [:p.text-xs "Score"]
-      [:p.text-lg.font-bold (:player/score player)]]
+      [:p.font-bold (:player/score player)]]
      (when admin?
        (delete-game-button (:xt/id game)))]]
 

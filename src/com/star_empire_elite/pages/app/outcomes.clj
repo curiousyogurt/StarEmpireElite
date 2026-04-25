@@ -224,8 +224,12 @@
                    :player/last-stability-breakaway        nil
                    :player/last-stability-recovery         nil
                    :player/pending-espionage               nil
-                   :player/incoming-attacks         nil
-                   :player/incoming-espionage-fails 0
+                   :player/incoming-attacks                 nil
+                   :player/incoming-espionage-fails         0
+                   :player/incoming-espionage-agents-gained nil
+                   :player/incoming-incite-stability-lost   nil
+                   :player/incoming-bomb-result             nil
+                   :player/pending-espionage-op             nil
                    :player/score                    (calculate-score player)}
                   (when end-round?
                     {:player/last-round-completed-at now}))])
@@ -253,15 +257,34 @@
                        (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
 
       ;; Incoming attacks section (attacks received from other players this turn)
-      (let [incoming  (seq (:player/incoming-attacks player))
-            esp-fails (or (:player/incoming-espionage-fails player) 0)]
-        (when (or incoming (pos? esp-fails))
+      (let [incoming         (seq (:player/incoming-attacks player))
+            esp-fails        (or (:player/incoming-espionage-fails player) 0)
+            esp-agents       (or (:player/incoming-espionage-agents-gained player) 0)
+            incite-stab-lost (or (:player/incoming-incite-stability-lost player) 0)
+            bomb-result      (some-> (:player/incoming-bomb-result player) clojure.core/read-string)]
+        (when (or incoming (pos? esp-fails) (pos? incite-stab-lost) bomb-result)
           [:div
            (for [r incoming]
              (incoming-attack-section (clojure.core/read-string r)))
            (when (pos? esp-fails)
              [:div.border.border-green-400.p-4.mb-4
-              [:p.font-bold (str esp-fails " infiltration attempt(s) against your empire were discovered and neutralized.")]])]))
+              [:p.font-bold
+               (str esp-fails " covert operation(s) against your empire were discovered and neutralized.")
+               (when (pos? esp-agents)
+                 (str " " esp-agents " captured agent(s) joined your forces."))]])
+           (when (pos? incite-stab-lost)
+             [:div.border.border-green-400.p-4.mb-4
+              [:p.font-bold.text-yellow-400
+               (str "Enemy agents successfully incited unrest in your empire. Stability reduced by "
+                    incite-stab-lost ".")]])
+           (when bomb-result
+             [:div.border.border-green-400.p-4.mb-4
+              [:p.font-bold.text-yellow-400.mb-2 "Enemy bombing raid struck your empire:"]
+              [:div.grid.grid-cols-2.gap-x-8.gap-y-1
+               [:p.text-xs (str "Soldiers lost:   " (:soldiers-destroyed   bomb-result))]
+               [:p.text-xs (str "Transports lost: " (:transports-destroyed bomb-result))]
+               [:p.text-xs (str "Fighters lost:   " (:fighters-destroyed   bomb-result))]
+               [:p.text-xs (str "Carriers lost:   " (:carriers-destroyed   bomb-result))]]])]))
 
       ;; Battle result section (only shown when an attack was declared)
       (when battle-result
@@ -289,16 +312,22 @@
               (for [spec planet-specs]
                 (planet-row (:label spec) (get pt (:pt-key spec)) att-wins? (:separator? spec)))]]]]))
 
-      ;; Espionage result section (only shown when an infiltration was declared)
+      ;; Espionage result section (only shown when an operation was declared)
       (when espionage-result
         (let [won?  (:attacker-wins? espionage-result)
-              intel (:intel espionage-result)]
+              op    (get espionage-result :op "spy")
+              intel (:intel espionage-result)
+              lost  (or (:agents-captured espionage-result) 0)
+              stab  (:stability-damage espionage-result)]
           [:div.border.border-green-400.p-4.mb-4
            [:h3.font-bold.mb-2
-            (if won?
-              (str "Infiltration of " (:defender-name espionage-result) " succeeded")
-              (str "Infiltration of " (:defender-name espionage-result) " failed — agents discovered"))]
-           (if won?
+            (cond
+              (and won? (= op "spy"))    (str "Spy operation against " (:defender-name espionage-result) " succeeded")
+              (and won? (= op "incite")) (str "Incite operation against " (:defender-name espionage-result) " succeeded")
+              (and won? (= op "bomb"))   (str "Bombing raid against " (:defender-name espionage-result) " succeeded")
+              :else                      (str "Operation against " (:defender-name espionage-result) " failed — agents captured"))]
+           (cond
+             (and won? (= op "spy"))
              [:div.grid.grid-cols-2.gap-x-8.gap-y-1
               [:p.text-xs.font-bold.col-span-2.mb-1 (str (:defender-name espionage-result) "'s military")]
               [:p.text-xs (str "Soldiers:   " (:soldiers   intel))]
@@ -310,7 +339,24 @@
               [:p.text-xs (str "Stations:   " (:stations   intel))]
               [:p.text-xs (str "Cmd Ships:  " (:cmd-ships  intel))]
               [:p.text-xs (str "Agents:     " (:agents     intel))]]
-             [:p.text-xs "Your agents were unable to obtain useful intelligence."])]))
+
+             (and won? (= op "incite"))
+             [:p.text-xs
+              (str "Your agents successfully stirred unrest. "
+                   (:defender-name espionage-result) "'s stability was reduced by " stab ".")]
+
+             (and won? (= op "bomb"))
+             [:div.grid.grid-cols-2.gap-x-8.gap-y-1
+              [:p.text-xs.font-bold.col-span-2.mb-1 (str "Units destroyed in " (:defender-name espionage-result) ":")]
+              [:p.text-xs (str "Soldiers:   " (or (:soldiers-destroyed   espionage-result) 0))]
+              [:p.text-xs (str "Transports: " (or (:transports-destroyed espionage-result) 0))]
+              [:p.text-xs (str "Fighters:   " (or (:fighters-destroyed   espionage-result) 0))]
+              [:p.text-xs (str "Carriers:   " (or (:carriers-destroyed   espionage-result) 0))]]
+
+             :else
+             [:p.text-xs
+              (str "Your agents were unable to complete their mission. "
+                   lost " agent(s) were captured by " (:defender-name espionage-result) ".")])]))
 
       ;; Stability section — only shown when at least one stability event occurred
       (let [has-penalty?   (and (some? expense-penalty) (pos? expense-penalty))
