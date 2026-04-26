@@ -120,6 +120,8 @@
       (ui/phase-header (:player/current-phase player) "ESPIONAGE"
                        (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
 
+      (ui/resource-display-grid player "Resources" false)
+
       (biff/form
        {:action (str "/app/game/" player-id "/apply-espionage")
         :method "post"}
@@ -134,9 +136,9 @@
 
          :else
          [:div.mb-6
-          [:h2.text-xl.font-bold.mb-4 "Choose a Target and Operation"]
+          [:h2.text-xl.font-bold.mb-4 "Choose a Target"]
           [:p.text-sm.mb-4.text-green-400.text-opacity-75
-           "Spy reveals the target's military. Incite reduces their stability. Bomb destroys units."]
+           "Spy reveals the target's military. Incite reduces their stability. Bomb covertly destroys units."]
           [:div.overflow-x-auto
            [:table.w-full.text-sm.border.border-green-400
             [:thead
@@ -144,7 +146,7 @@
               [:th.border-r.border-green-400.px-3.py-2.text-left.w-56 "Empire"]
               [:th.border-r.border-green-400.px-3.py-2.text-right.w-36 "Planets"]
               [:th.border-r.border-green-400.px-3.py-2.text-right.w-36 "Score"]
-              [:th.border-green-400.px-3.py-2 {:colspan 3} "Operation"]]]
+              [:th.border-green-400.px-3.py-2 {:colspan 3} "Operations"]]]
             [:tbody
              (for [target other-players]
                (target-row target))]]]])

@@ -105,6 +105,8 @@
       (ui/phase-header (:player/current-phase player) "ACTION"
                        (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
 
+      (ui/resource-display-grid player "Resources" false)
+
       (biff/form
        {:action (str "/app/game/" player-id "/apply-action")
         :method "post"}
@@ -122,7 +124,7 @@
               [:th.border-r.border-green-400.px-3.py-2.text-left.w-56 "Empire"]
               [:th.border-r.border-green-400.px-3.py-2.text-right.w-36 "Planets"]
               [:th.border-r.border-green-400.px-3.py-2.text-right.w-36 "Score"]
-              [:th.px-3.py-2 ""]]]
+              [:th.px-3.py-2 "Operation"]]]
             [:tbody
              (for [target other-players]
                (target-row target))]]]])
