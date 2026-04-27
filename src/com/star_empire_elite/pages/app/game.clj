@@ -68,7 +68,7 @@
     [:p.font-mono (ui/format-number (:player/credits player))]]
    [:div
     [:p.text-xs "Food"]
-    [:p.font-mono (ui/format-number (:player/food player))]
+    [:p.font-mono (ui/format-number (:player/food player))]]
    [:div
     [:p.text-xs "Fuel"]
     [:p.font-mono (ui/format-number (:player/fuel player))]]
@@ -79,15 +79,15 @@
    ;; Empire metrics
    [:div
     [:p.text-xs "Population"]
-    [:p.font-mono (str (:player/population player) "M")]]]
+    [:p.font-mono (str (:player/population player) "M")]]
    [:div
     [:p.text-xs "Stability"]
     [:p.font-mono (:player/stability player) "%"]]
    [:div
     [:p.text-xs "Planets"]
     [:p.font-mono (ui/format-number (+ (:player/mil-planets player)
-                                       (:player/erg-planets player)
-                                       (:player/ore-planets player)))]]
+                     (:player/erg-planets player)
+                     (:player/ore-planets player)))]]
 
    ;; Turn progression
    [:div
