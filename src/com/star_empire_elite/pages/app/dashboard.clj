@@ -146,33 +146,33 @@
       [:p.font-bold (:player/rank player)]]
      [:div.text-right
       [:p.text-xs "Score"]
-      [:p.font-bold (:player/score player)]]
+      [:p.font-bold (ui/format-number (:player/score player))]]
      (when admin?
        (delete-game-button (:xt/id game)))]]
 
    ;; Row 1: currencies, population, and planets
    [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2.mb-3.pb-3.border-b.border-green-400
-    [:div [:p.text-xs "Credits"]    [:p.font-mono (:player/credits player)]]
-    [:div [:p.text-xs "Food"]       [:p.font-mono (:player/food player)]]
-    [:div [:p.text-xs "Fuel"]       [:p.font-mono (:player/fuel player)]]
-    [:div [:p.text-xs "Galaxars"]   [:p.font-mono (:player/galaxars player)]]
+    [:div [:p.text-xs "Credits"]    [:p.font-mono (ui/format-number (:player/credits player))]]
+    [:div [:p.text-xs "Food"]       [:p.font-mono (ui/format-number (:player/food player))]]
+    [:div [:p.text-xs "Fuel"]       [:p.font-mono (ui/format-number (:player/fuel player))]]
+    [:div [:p.text-xs "Galaxars"]   [:p.font-mono (ui/format-number (:player/galaxars player))]]
     [:div [:p.text-xs "Population"] [:p.font-mono (str (:player/population player) "M")]]
     [:div [:p.text-xs "Stability"]  [:p.font-mono (:player/stability player) "%"]]
-    [:div [:p.text-xs "Ore Plts"]   [:p.font-mono (:player/ore-planets player)]]
-    [:div [:p.text-xs "Erg Plts"]  [:p.font-mono (:player/erg-planets player)]]
-    [:div [:p.text-xs "Mil Plts"]   [:p.font-mono (:player/mil-planets player)]]]
+    [:div [:p.text-xs "Ore Plts"]   [:p.font-mono (ui/format-number (:player/ore-planets player))]]
+    [:div [:p.text-xs "Erg Plts"]  [:p.font-mono (ui/format-number (:player/erg-planets player))]]
+    [:div [:p.text-xs "Mil Plts"]   [:p.font-mono (ui/format-number (:player/mil-planets player))]]]
 
    ;; Row 2: military units and leadership
    [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2.mb-3.pb-3.border-b.border-green-400
-    [:div [:p.text-xs "Generals"]   [:p.font-mono (:player/generals player)]]
-    [:div [:p.text-xs "Soldiers"]   [:p.font-mono (:player/soldiers player)]]
-    [:div [:p.text-xs "Transports"] [:p.font-mono (:player/transports player)]]
-    [:div [:p.text-xs "Admirals"]   [:p.font-mono (:player/admirals player)]]
-    [:div [:p.text-xs "Fighters"]   [:p.font-mono (:player/fighters player)]]
-    [:div [:p.text-xs "Carriers"]   [:p.font-mono (:player/carriers player)]]
-    [:div [:p.text-xs "Def Stns"]   [:p.font-mono (:player/stations player)]]
-    [:div [:p.text-xs "Cmd Ships"]  [:p.font-mono (:player/cmd-ships player)]]
-    [:div [:p.text-xs "Agents"]     [:p.font-mono (:player/agents player)]]]])
+    [:div [:p.text-xs "Generals"]   [:p.font-mono (ui/format-number (:player/generals player))]]
+    [:div [:p.text-xs "Soldiers"]   [:p.font-mono (ui/format-number (:player/soldiers player))]]
+    [:div [:p.text-xs "Transports"] [:p.font-mono (ui/format-number (:player/transports player))]]
+    [:div [:p.text-xs "Admirals"]   [:p.font-mono (ui/format-number (:player/admirals player))]]
+    [:div [:p.text-xs "Fighters"]   [:p.font-mono (ui/format-number (:player/fighters player))]]
+    [:div [:p.text-xs "Carriers"]   [:p.font-mono (ui/format-number (:player/carriers player))]]
+    [:div [:p.text-xs "Def Stns"]   [:p.font-mono (ui/format-number (:player/stations player))]]
+    [:div [:p.text-xs "Cmd Ships"]  [:p.font-mono (ui/format-number (:player/cmd-ships player))]]
+    [:div [:p.text-xs "Agents"]     [:p.font-mono (ui/format-number (:player/agents player))]]]])
 
 ;;;;
 ;;;; Page
