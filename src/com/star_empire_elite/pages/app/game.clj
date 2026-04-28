@@ -58,9 +58,9 @@
   "Render a responsive resource bar showing key empire stats.
   Adapts from 3 columns on mobile to 10 columns on large screens.
 
-  [{:keys [player]}] -> hiccup"
-  [{:keys [player]}]
-  [:div.grid.grid-cols-3.md:grid-cols-5.lg:grid-cols-10.gap-2.mb-6.pb-4.border-b.border-green-400
+  [{:keys [player game]}] -> hiccup"
+  [{:keys [player game]}]
+  [:div.grid.grid-cols-3.md:grid-cols-5.lg:grid-cols-9.gap-2.mb-6.pb-4.border-b.border-green-400
 
    ;; Economic resources
    [:div
@@ -90,15 +90,14 @@
                      (:player/ore-planets player)))]]
 
    ;; Turn progression
-   [:div
-    [:p.text-xs "Turn"]
-    [:p.font-mono (:player/current-turn player)]]
-   [:div
-    [:p.text-xs "Round"]
-    [:p.font-mono (:player/current-round player)]]
-   [:div
-    [:p.text-xs "Phase"]
-    [:p.font-mono (:player/current-phase player)]]])
+   (let [{:keys [turn round]} (utils/display-turn-round player game)]
+     (list
+      [:div
+       [:p.text-xs "Turn"]
+       [:p.font-mono turn]]
+      [:div
+       [:p.text-xs "Round"]
+       [:p.font-mono round]]))])
 
 (defn players-table
   "Render the leaderboard showing all players in the game ranked by score.
@@ -149,7 +148,7 @@
        [:div.text-green-400.font-mono
         [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
 
-        (game-header {:player player})
+        (game-header {:player player :game game})
         (players-table {:players players})
         [:.h-6]
 

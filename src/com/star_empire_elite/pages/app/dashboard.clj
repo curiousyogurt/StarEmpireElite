@@ -11,6 +11,7 @@
   (:require [com.biffweb :as biff :refer [q]]
             [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
+            [com.star-empire-elite.utils :as utils]
             [xtdb.api :as xt]))
 
 ;;;;
@@ -19,23 +20,12 @@
 
 (defn format-turn-round
   "Format the turn/round status string for dashboard display.
-  Caps both values at their per-day/per-round maxes so that rolled-over values show the completed 
-  state rather than the reset one. For example, a player who has used all turns and is waiting for the 
-  next day sees 'Turn 6/6 | Round 2/2' rather than the misleading 'Turn 1 | Round 3'.
 
   [player game] -> string"
   [player game]
-  (let [rounds-per-day  (:game/rounds-per-day game)
-        turns-per-round (:game/turns-per-round game)
-        current-round   (:player/current-round player)
-        current-turn    (:player/current-turn player)
-        ;; When current-round has rolled past the max, the day is complete and
-        ;; all turns in the last round were used — display the maxes.
-        day-complete?   (> current-round rounds-per-day)
-        display-turn    (if day-complete? turns-per-round current-turn)
-        display-round   (min current-round rounds-per-day)]
-    (str "Turn " display-turn "/" turns-per-round
-         " | Round " display-round "/" rounds-per-day)))
+  (let [{:keys [turn round]} (utils/display-turn-round player game)]
+    (str "Turn " turn "/" (:game/turns-per-round game)
+         " | Round " round "/" (:game/rounds-per-day game))))
 
 ;;;;
 ;;;; Data Fetching
@@ -159,7 +149,7 @@
     [:div [:p.text-xs "Population"] [:p.font-mono (str (:player/population player) "M")]]
     [:div [:p.text-xs "Stability"]  [:p.font-mono (:player/stability player) "%"]]
     [:div [:p.text-xs "Ore Plts"]   [:p.font-mono (ui/format-number (:player/ore-planets player))]]
-    [:div [:p.text-xs "Erg Plts"]  [:p.font-mono (ui/format-number (:player/erg-planets player))]]
+    [:div [:p.text-xs "Erg Plts"]   [:p.font-mono (ui/format-number (:player/erg-planets player))]]
     [:div [:p.text-xs "Mil Plts"]   [:p.font-mono (ui/format-number (:player/mil-planets player))]]]
 
    ;; Row 2: military units and leadership

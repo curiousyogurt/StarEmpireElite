@@ -111,6 +111,34 @@
       :else    (str s "s"))))
 
 ;;;;
+;;;; Turn/Round Display
+;;;;
+
+(defn display-turn-round
+  "Return display values {:turn n :round n} for turn and round indicators.
+  Shows the completed state when a player is waiting between rounds or for the next day,
+  rather than the misleading reset values.
+
+  [player game] -> {:turn int :round int}"
+  [player game]
+  (let [rounds-per-day  (:game/rounds-per-day game)
+        turns-per-round (:game/turns-per-round game)
+        current-round   (:player/current-round player)
+        current-turn    (:player/current-turn player)
+        turns-used      (:player/turns-used player)
+        last-completed  (:player/last-round-completed-at player)
+        day-complete?   (> current-round rounds-per-day)
+        between-rounds? (and (not day-complete?)
+                             (= current-turn 1)
+                             (= turns-used 0)
+                             (some? last-completed))]
+    {:turn  (if (or day-complete? between-rounds?) turns-per-round current-turn)
+     :round (cond
+              day-complete?   rounds-per-day
+              between-rounds? (dec current-round)
+              :else           current-round)}))
+
+;;;;
 ;;;; Entity Loading
 ;;;;
 

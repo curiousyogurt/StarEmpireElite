@@ -1,5 +1,6 @@
 (ns com.star-empire-elite.pages.app.dashboard-test
   (:require [clojure.test :refer :all]
+            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.pages.app.dashboard :as dashboard]))
 
 ;;
@@ -16,10 +17,15 @@
    :game/rounds-per-day  rounds-per-day})
 
 ;; Minimal player map for display tests
-(defn make-player [current-turn current-round]
-  {:xt/id test-player-id
-   :player/current-turn  current-turn
-   :player/current-round current-round})
+(defn make-player
+  ([current-turn current-round]
+   {:xt/id test-player-id
+    :player/current-turn  current-turn
+    :player/current-round current-round})
+  ([current-turn current-round turns-used last-completed]
+   (assoc (make-player current-turn current-round)
+          :player/turns-used               turns-used
+          :player/last-round-completed-at  last-completed)))
 
 ;;
 ;; format-turn-round
@@ -66,10 +72,35 @@
             (make-player 1 5)   ; rolled over: turn=1, round=5 (> max 4)
             (make-game 3 4))))))
 
-(deftest test-format-turn-round-first-turn-of-new-round
-  (testing "First turn of a new round mid-day shows turn 1"
-    ;; 3 turns-per-round, 4 rounds-per-day. Just finished round 1, starting round 2.
-    (is (= "Turn 1/3 | Round 2/4"
+(def some-timestamp (java.util.Date.))
+
+;; Standard game fixture using real constants — tests that model actual game state
+;; should use this so they stay correct if constants change.
+(def standard-game (make-game const/turns-per-round const/rounds-per-day))
+
+(deftest test-format-turn-round-between-rounds
+  (testing "After completing a round, shows completed round state until next round starts"
+    ;; Counters have reset (turn=1, round=2, turns-used=0) but no turns taken in round 2 yet.
+    (is (= (str "Turn " const/turns-per-round "/" const/turns-per-round
+                " | Round 1/" const/rounds-per-day)
            (dashboard/format-turn-round
-            (make-player 1 2)
-            (make-game 3 4))))))
+            (make-player 1 2 0 some-timestamp)
+            standard-game)))))
+
+(deftest test-format-turn-round-new-round-started
+  (testing "After taking the first turn of a new round, shows the new round"
+    ;; turns-used=1 means a turn has been submitted in round 2.
+    (is (= (str "Turn 2/" const/turns-per-round
+                " | Round 2/" const/rounds-per-day)
+           (dashboard/format-turn-round
+            (make-player 2 2 1 some-timestamp)
+            standard-game)))))
+
+(deftest test-format-turn-round-game-start
+  (testing "At game start (no turns taken, no completed round) shows turn 1 round 1"
+    ;; last-round-completed-at is nil — game hasn't started yet.
+    (is (= (str "Turn 1/" const/turns-per-round
+                " | Round 1/" const/rounds-per-day)
+           (dashboard/format-turn-round
+            (make-player 1 1 0 nil)
+            standard-game)))))
