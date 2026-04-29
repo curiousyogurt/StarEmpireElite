@@ -18,6 +18,12 @@
 (def whitelisted-emails   #{"darcyotto@gmail.com" "danher@unc.edu"})
 
 ;;;;
+;;;; Logging
+;;;;
+
+(def enable-game-logging false)
+
+;;;;
 ;;;; Turn Structure
 ;;;;
 
@@ -73,14 +79,14 @@
 (def starting-stability  100)  ; stored as %
 
 (def starting-soldiers   100)
-(def starting-transports 0)
-(def starting-generals   2)
+(def starting-transports 1)
+(def starting-generals   1)
 (def starting-fighters   0)
 (def starting-carriers   1)
-(def starting-admirals   0)
+(def starting-admirals   1)
 (def starting-stations   0)
 (def starting-cmd-ships  0)
-(def starting-agents     0)
+(def starting-agents     2)
 
 ;;;;
 ;;;; Income Generation

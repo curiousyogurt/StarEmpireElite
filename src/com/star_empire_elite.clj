@@ -22,6 +22,7 @@
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.worker :as worker]
             [com.star-empire-elite.schema :as schema]
+            [com.star-empire-elite.log :as gamelog]
             ;; Standard Clojure libraries
             [clojure.test :as test]
             [clojure.tools.logging :as log]
@@ -190,7 +191,8 @@
    biff/use-htmx-refresh     ; HTMX development auto-refresh
    biff/use-jetty            ; Jetty web server
    biff/use-chime            ; Scheduled tasks (cron-like functionality)
-   biff/use-beholder])       ; File system watching for development
+   biff/use-beholder          ; File system watching for development
+   gamelog/use-game-logger])  ; Game action log file
 
 ;;;;
 ;;;; System Lifecycle Functions

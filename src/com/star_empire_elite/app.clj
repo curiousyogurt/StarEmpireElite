@@ -31,6 +31,7 @@
             [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]
+            [com.star-empire-elite.log :as gamelog]
             [xtdb.api :as xt]))
 
 ;;;;
@@ -667,7 +668,7 @@
 ;;;;
 
 (def module
-  {:routes ["/app" {:middleware [mid/wrap-signed-in]}
+  {:routes ["/app" {:middleware [mid/wrap-signed-in gamelog/wrap-game-action-log]}
             ["" {:get app}]
             ["/create-game"                        {:get create-game-page :post create-game}]
             ["/delete-game/:game-id"               {:post delete-game}]
