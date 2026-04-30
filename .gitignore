@@ -35,6 +35,7 @@ tailwindcss
 # === Logs ===
 logs/
 *.log
+data/
 
 # === Clojure / REPL / Caches ===
 .cpcache/
