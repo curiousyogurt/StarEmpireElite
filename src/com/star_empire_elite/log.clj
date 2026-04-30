@@ -73,7 +73,7 @@
   (if (nil? before)
     after
     (when after
-      (not-empty (into {} (filter (fn [[k v]] (not= v (get before k))) after))))))
+      (into {} (filter (fn [[k v]] (not= v (get before k))) after)))))
 
 (defn- read-edn [s]
   (when (string? s)
