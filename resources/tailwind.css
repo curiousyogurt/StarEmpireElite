@@ -122,7 +122,9 @@
 
 .grecaptcha-badge { visibility: hidden; }
 
-/* Show queued-action warning and cancel button when an espionage radio is selected */
+/* Show queued-action warning and cancel button when a radio target is selected */
 .queued-warning, .cancel-target { display: none; }
-form:has([name=espionage-action]:checked) .queued-warning { display: flex; }
-form:has([name=espionage-action]:checked) .cancel-target  { display: inline-block; }
+form:has([name=espionage-action]:checked) .queued-warning,
+form:has([name=target-player-id]:checked) .queued-warning { display: flex; }
+form:has([name=espionage-action]:checked) .cancel-target,
+form:has([name=target-player-id]:checked) .cancel-target  { display: inline-block; }
