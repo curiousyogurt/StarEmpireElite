@@ -122,6 +122,12 @@
 
 .grecaptcha-badge { visibility: hidden; }
 
+/* Income phase: two separate row grids, shown at different breakpoints */
+@layer components {
+  .income-row-mobile  { display: grid; grid-template-columns: 80px 1fr 1fr 1fr; }
+  .income-row-desktop { grid-template-columns: 160px 12fr 5fr 5fr 5fr; }
+}
+
 /* Show queued-action warning and cancel button when a radio target is selected */
 .queued-warning, .cancel-target { display: none; }
 form:has([name=espionage-action]:checked) .queued-warning,

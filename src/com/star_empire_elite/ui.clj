@@ -75,6 +75,20 @@
   [n]
   (when n (first (format-number-core n))))
 
+(defn format-scale-tick-str
+  "Format a number for compact scale ticks. Abbreviates at 1K+.
+
+  [n number] -> string"
+  [n]
+  (when n
+    (let [r     (long (Math/round (double n)))
+          abs-r (Math/abs r)]
+      (cond
+        (zero? r)       "0"
+        (>= abs-r 1e6)  (format-number-str r)
+        (>= abs-r 1e3)  (str (long (Math/round (/ (double r) 1000.0))) "K")
+        :else           (str r)))))
+
 ;;;;
 ;;;; Phase Navigation
 ;;;;
