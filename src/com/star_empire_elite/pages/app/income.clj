@@ -88,7 +88,13 @@
     (or (first (drop-while #(< % needed) nice-scales))
         needed)))
 
-(defn- fmt-tick [v]
+(defn- fmt-tick
+  "Format a number for a scale-bar tick label.
+  Values below 1000 are rendered as plain integers; thousands as e.g. '2.5K'
+  with trailing '.0' stripped; larger values delegate to format-number-str.
+
+  [v number] -> string"
+  [v]
   (let [abs-v (Math/abs (double v))
         sign  (if (neg? (double v)) "-" "")]
     (cond
@@ -112,13 +118,12 @@
         ly         5
         arrow-w    3.5
         arrow-h    2.5]
-    [:div {:style {:display "flex" :flex-direction "column" :justify-content "center"
-                   :height "100%" :padding "0px 32px"}}
+    [:div.flex.flex-col.justify-center.h-full.px-8
      ;; SVG: track line, tick marks, and arrow only -- no text in SVG
-     [:svg {:viewBox "0 0 100 10"
-            :preserveAspectRatio "none"
-            :style {:display "block" :width "100%" :height "8px" :overflow "visible"
-                    :margin-top "4px" :margin-bottom "4px"}}
+     [:svg.block.w-full.overflow-visible.mt-1.mb-1
+      {:viewBox "0 0 100 10"
+       :preserveAspectRatio "none"
+       :style {:height "8px"}}
       [:defs
        [:filter {:id filter-id :x "-50%" :y "-50%" :width "200%" :height "200%"}
         [:feGaussianBlur {:stdDeviation "0.8" :result "blur"}]
@@ -145,10 +150,11 @@
       [:line {:x1 75  :y1 (+ ly 1) :x2 75  :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
       [:line {:x1 100 :y1 (+ ly 1) :x2 100 :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]]
      ;; Tick labels: absolutely positioned so each label centres on its tick mark
-     [:div.text-xs.text-gray-400 {:style {:position "relative" :height "1em" :margin-bottom "8px"}}
-      [:span {:style {:position "absolute" :left "0"   :transform "translateX(0%)"}}   "0"]
-      [:span {:style {:position "absolute" :left "50%" :transform "translateX(-50%)"}} (fmt-tick (* 0.5 scale-max))]
-      [:span {:style {:position "absolute" :right "0"  :transform "translateX(0%)"}}  (fmt-tick scale-max)]]]))
+     [:div.text-xs.text-gray-400.relative.mb-2
+      {:style {:height "1em"}}
+      [:span.absolute.left-0 "0"]
+      [:span.absolute {:style {:left "50%" :transform "translateX(-50%)"}} (fmt-tick (* 0.5 scale-max))]
+      [:span.absolute.right-0 (fmt-tick scale-max)]]]))
 
 ;;;;
 ;;;; UI Components
@@ -160,20 +166,19 @@
   [current-phase int] -> hiccup"
   [current-phase]
   (let [labels ["1" "2" "3" "4" "5" "6"]]
-    [:div {:style {:display "flex" :align-items "center" :gap "4px"}}
+    [:div.flex.items-center.gap-1
      (for [[i label] (map-indexed vector labels)
            :let [phase   (inc i)
                  active? (= phase current-phase)
                  done?   (< phase current-phase)]]
-       [:div {:key phase :style {:display "flex" :align-items "center" :gap "4px"}}
-        ;; text-xs for phase circle labels
-        [:div.text-xs {:style (merge {:width "22px" :height "22px" :border-radius "50%"
-                                      :border "1.5px solid #1e6e44"
-                                      :display "flex" :align-items "center" :justify-content "center"}
-                                     (cond
-                                       active? {:border-color "#4ade80" :color "#4ade80" :background "#1a3a28"}
-                                       done?   {:border-color "#1e6e44" :background "#162a1e" :color "#4ade80"}
-                                       :else   {:color "#7ab88a"}))}
+       [:div.flex.items-center.gap-1 {:key phase}
+        [:div.text-xs.flex.items-center.justify-center.rounded-full
+         {:style (merge {:width "22px" :height "22px"
+                         :border "1.5px solid #1e6e44"}
+                        (cond
+                          active? {:border-color "#4ade80" :color "#4ade80" :background "#1a3a28"}
+                          done?   {:border-color "#1e6e44" :background "#162a1e" :color "#4ade80"}
+                          :else   {:color "#7ab88a"}))}
          (if done? "✓" label)]
         (when (< phase 6)
           [:span.text-xs {:style {:color "#7ab88a"}} "›"])])]))
@@ -184,13 +189,11 @@
   [income-map {:credits? int, :food? int, ...}] -> seq of hiccup"
   [income-map]
   (for [[k label suffix] [[:credits "+" "cr"] [:food "+" "food"] [:fuel "+" "fuel"]
-                          [:soldiers "+" "sold"] [:fighters "+" "fgtr"] [:stations "+" "dstn"]]
+                          [:soldiers "+" "sold"] [:fighters "+" "fgtr"] [:stations "+" "stn"]]
         :let [v (or (k income-map) 0)]
         :when (pos? v)]
-    ;; text-xs for pill labels
-    [:span.text-xs {:key k
-                    :style {:display "inline-block" :padding "1px 5px" :border-radius "2px"
-                            :background "#1a3a28" :color "#4ade80"}}
+    [:span.text-xs.inline-block.rounded-sm.text-green-400
+     {:key k :style {:padding "1px 5px" :background "#1a3a28"}}
      label (ui/format-number v) " " suffix]))
 
 (defn- source-card
@@ -198,15 +201,13 @@
 
   [{:keys [name count income-map]}] -> hiccup"
   [{:keys [name count income-map]}]
-  [:div {:style {:border "1px solid #253530" :border-radius "3px"
-                 :padding "6px 8px" :background "#1e1e1e"
-                 :display "flex" :flex-direction "column" :gap "4px"}}
-   [:div {:style {:display "flex" :justify-content "space-between" :align-items "baseline"}}
-    ;; text-base for source name
-    [:span.text-base.font-bold {:style {:color "#4ade80"}} name]
-    ;; text-xs for count
+  [:div.flex.flex-col.gap-1
+   {:style {:border "1px solid #253530" :border-radius "3px"
+            :padding "6px 8px" :background "#1e1e1e"}}
+   [:div.flex.justify-between.items-baseline
+    [:span.text-base.font-bold.text-green-400 name]
     [:span.text-xs {:style {:color "#7ab88a"}} (str "x" count)]]
-   [:div {:style {:display "flex" :flex-direction "column" :gap "2px"}}
+   [:div {:class "flex flex-col gap-0.5"}
     (source-pills income-map)]])
 
 (defn- source-grid
@@ -231,11 +232,10 @@
                  {:name "Tax" :count pop-count
                   :income-map {:credits (:tax-credits income)}}]]
     [:div
-     ;; text-xs for section label
-     [:div.text-xs {:style {:text-transform "uppercase" :letter-spacing "0.12em"
-                            :color "#7ab88a" :margin-bottom "4px"}}
+     [:div.text-xs.uppercase.mb-1
+      {:style {:letter-spacing "0.12em" :color "#7ab88a"}}
       "Sources"]
-     [:div {:class "grid grid-cols-2 md:grid-cols-4" :style {:gap "6px"}}
+     [:div {:class "grid grid-cols-2 md:grid-cols-4 gap-1.5"}
       (for [src sources]
         (source-card src))]]))
 
@@ -244,64 +244,71 @@
 
   [name str, before int, delta int, key? bool, filter-id str] -> hiccup"
   [name before delta key? filter-id]
-  (let [after      (+ before delta)
-        row-style  (merge {:align-items "center" :gap "8px" :padding "4px 12px"
-                           :border-bottom "1px solid #1a2820"}
-                          (when key? {:background "#121a18"}))
-        name-cell  [:div.text-base {:style (if key? {:color "#4ade80" :font-weight "bold"} {:color "#7ab88a"})} name]
-        before-cell [:div.text-base {:style {:text-align "right" :color "#7ab88a"}} (ui/format-number before)]
-        delta-cell [:div.text-base {:style (merge {:text-align "right" :white-space "nowrap" :letter-spacing "0.03em"}
-                                                  (cond
-                                                    (zero? delta) {:color "#7ab88a"}
-                                                    key?          {:color "#4ade80" :font-weight "bold"
-                                                                   :text-shadow "0 0 8px rgba(74,222,128,0.6)"}
-                                                    :else         {:color "#4ade80"}))}
-                    (if (zero? delta) "-" [:<> "+" (ui/format-number delta)])]
-        after-cell [:div.text-base {:style (if key?
-                                             {:text-align "right" :color "#4ade80" :font-weight "bold"}
-                                             {:text-align "right" :color "#9adaaa"})} (ui/format-number after)]]
+  (let [after       (+ before delta)
+        row-class   "items-center gap-2 py-1 px-3"
+        row-style   (merge {:border-bottom "1px solid #1a2820"}
+                           (when key? {:background "#121a18"}))
+        name-cell   [:div.text-base
+                     {:class (when key? "font-bold")
+                      :style (if key? {:color "#4ade80"} {:color "#7ab88a"})}
+                     name]
+        before-cell [:div.text-base.text-right
+                     {:style {:color "#7ab88a"}}
+                     (ui/format-number before)]
+        delta-cell  [:div.text-base.text-right.whitespace-nowrap
+                     {:style (merge {:letter-spacing "0.03em"}
+                                    (cond
+                                      (zero? delta) {:color "#7ab88a"}
+                                      key?          {:color "#4ade80" :font-weight "bold"
+                                                     :text-shadow "0 0 8px rgba(74,222,128,0.6)"}
+                                      :else         {:color "#4ade80"}))}
+                     (if (zero? delta) "-" [:<> "+" (ui/format-number delta)])]
+        after-cell  [:div.text-base.text-right
+                     {:style (if key?
+                               {:color "#4ade80" :font-weight "bold"}
+                               {:color "#9adaaa"})}
+                     (ui/format-number after)]]
     [:<>
      ;; Mobile: 4-col grid, no bar
-     [:div.income-row-mobile {:class "md:hidden" :style row-style}
+     [:div.income-row-mobile
+      {:class (str "md:hidden " row-class)
+       :style row-style}
       name-cell before-cell delta-cell after-cell]
      ;; Desktop: 5-col grid, with bar
-     [:div.income-row-desktop {:class "hidden md:grid" :style row-style}
+     [:div.income-row-desktop
+      {:class (str "hidden md:grid " row-class)
+       :style row-style}
       name-cell (resource-bar before after filter-id) before-cell delta-cell after-cell]]))
 
-(defn- resource-table-header []
-  (let [header-style {:gap "8px"
-                      :background "#151f1a"
-                      :border-bottom "1px solid #253530"
-                      :padding "4px 12px"
-                      :align-items "center"}
-        label-style  {:letter-spacing "0.08em"
-                      :text-transform "uppercase"
-                      :color "#4ade80"}
-        item-style   (assoc label-style :letter-spacing "0.1em")
-        right-style  (assoc label-style
-                            :justify-self "end"
-                            :text-align "right")
-        label        (fn [text style]
-                       [:span.text-xs {:style style} text])]
-    [:<>
-     ;; Mobile header: Item / before / change / after
-     [:div.income-row-mobile
-      {:class "md:hidden"
-       :style header-style}
-      (label "Item" item-style)
-      (label "before" right-style)
-      (label "change" right-style)
-      (label "after" right-style)]
+(defn- resource-table-header
+  "Render the column-label row for the resource table.
+  Emits two variants: a 4-column mobile row (no bar column) and a 5-column
+  desktop row (with an empty bar column between Item and the value columns).
 
-     ;; Desktop header: Item / blank bar column / before / change / after
+  [] -> hiccup"
+  []
+  (let [header-style {:background "#151f1a" :border-bottom "1px solid #253530"}
+        header-class "gap-2 py-1 px-3 items-center"
+        col-style    {:letter-spacing "0.08em" :color "#4ade80"}
+        item-style   (assoc col-style :letter-spacing "0.1em")
+        col-label    (fn [text style extra-class]
+                       [:span.text-xs.uppercase {:class extra-class :style style} text])
+        value-label  (fn [text]
+                       (col-label text col-style "text-right justify-self-end"))]
+    [:<>
+     [:div.income-row-mobile
+      {:class (str "md:hidden " header-class) :style header-style}
+      (col-label "Item" item-style nil)
+      (value-label "before")
+      (value-label "change")
+      (value-label "after")]
      [:div.income-row-desktop
-      {:class "hidden md:grid"
-       :style header-style}
-      (label "Item" item-style)
+      {:class (str "hidden md:grid " header-class) :style header-style}
+      (col-label "Item" item-style nil)
       [:span]
-      (label "before" right-style)
-      (label "change" right-style)
-      (label "after" right-style)]]))
+      (value-label "before")
+      (value-label "change")
+      (value-label "after")]]))
 
 (defn- resource-table
   "Render the Resource Changes table with before/delta/after columns and SVG bars.
@@ -314,13 +321,9 @@
               {:name "Soldiers" :before (:player/soldiers player) :delta (:mil-soldiers income) :key? false}
               {:name "Fighters" :before (:player/fighters player) :delta (:mil-fighters income) :key? false}
               {:name "Stations" :before (:player/stations player) :delta (:mil-stations income) :key? false}]]
-    [:div {:style {:border "1px solid #253530"
-                   :border-radius "3px"
-                   :background "#161616"
-                   :overflow "hidden"}}
+    [:div.overflow-hidden
+     {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
      (resource-table-header)
-
-     ;; Rows
      (for [{:keys [name before delta key?]} rows]
        (resource-row name before delta key? (str "glow-" (str/lower-case name))))]))
 
@@ -378,54 +381,52 @@
     (ui/page
       {}
       ;; Terminal shell: text-base sets the base font size for all descendants
-      [:div.text-base.w-full.max-w-4xl.mx-auto
+      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
        {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
-                :border-radius "4px" :overflow "hidden"
-                :color "#4ade80"
-                :font-family "'Courier New', monospace"
-                :position "relative"}}
+                :border-radius "4px" :color "#4ade80"
+                :font-family "'Courier New', monospace"}}
        ;; Scanline overlay
-       [:div {:style {:position "absolute" :top 0 :right 0 :bottom 0 :left 0
-                      :pointer-events "none" :z-index 10
-                      :background "repeating-linear-gradient(to bottom, transparent 0px, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 3px)"}}]
+       [:div.absolute.inset-0.pointer-events-none.z-10
+        {:style {:background "repeating-linear-gradient(to bottom, transparent 0px, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 3px)"}}]
 
        ;; Topbar
-       [:div {:style {:background "#161616" :border-bottom "1px solid #1e6e44"
-                      :padding "7px 14px" :display "flex"
-                      :align-items "center" :justify-content "space-between"}}
+       [:div.flex.items-center.justify-between
+        {:style {:background "#161616" :border-bottom "1px solid #1e6e44"
+                 :padding "7px 14px"}}
         [:div
-         ;; text-3xl for empire name, matching expenses.clj h1
-         [:div.text-3xl.font-bold {:style {:color "#4ade80" :letter-spacing "0.05em"}}
+         [:div.text-3xl.font-bold.text-green-400
+          {:style {:letter-spacing "0.05em"}}
           (:player/empire-name player)]
-         ;; text-sm for subtitle
-         [:div.text-sm {:style {:color "#9adaaa" :margin-top "1px"}}
+         [:div.text-sm.mt-px
+          {:style {:color "#9adaaa"}}
           (str "INCOME PHASE · Turn " (:player/current-turn player)
                " · Round " (:player/current-round player))]]
         (phase-stepper (:player/current-phase player))]
 
        ;; Body
-       [:div {:style {:padding "10px 14px" :display "flex" :flex-direction "column" :gap "8px"}}
+       [:div.flex.flex-col.gap-2
+        {:style {:padding "10px 14px"}}
         (source-grid player income)
         (resource-table player income)
         (ui/incoming-alert player)]
 
-       ;; Action bar: text-sm for buttons, matching expenses.clj button style
-       [:div {:style {:padding "8px 14px" :border-top "1px solid #253530"
-                      :display "flex" :gap "8px"}}
-        [:a.text-sm {:href  (str "/app/game/" player-id)
-                     :style {:padding "5px 14px"
-                             :font-family "'Courier New', monospace"
-                             :border "1px solid #1e6e44" :background "transparent"
-                             :color "#9adaaa" :letter-spacing "0.05em"
-                             :border-radius "2px" :text-decoration "none"}}
-         "Pause"]
-        (biff/form
-          {:action (str "/app/game/" player-id "/apply-income") :method "post"
-           :style  {:margin 0}}
-          [:button.text-sm {:type  "submit"
-                            :style {:padding "5px 14px"
-                                    :font-family "'Courier New', monospace"
-                                    :border "1px solid #4ade80" :background "#1a3a28"
-                                    :color "#4ade80" :letter-spacing "0.05em"
-                                    :border-radius "2px"}}
-           "Continue to Expenses"])]])))
+       ;; Action bar
+       [:div.flex.gap-2
+        {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
+        (let [btn-base {:padding "5px 14px" :font-family "'Courier New', monospace"
+                        :letter-spacing "0.05em" :border-radius "2px"}]
+          (list
+            [:a.text-sm.no-underline
+             {:href  (str "/app/game/" player-id)
+              :style (merge btn-base {:border "1px solid #1e6e44" :background "transparent"
+                                      :color "#9adaaa"})}
+             "Pause"]
+            (biff/form
+              {:action (str "/app/game/" player-id "/apply-income") :method "post"
+               :style  {:margin 0}}
+              [:button.text-sm
+               {:type  "submit"
+                :style (merge btn-base {:border "1px solid #4ade80" :background "#1a3a28"
+                                        :color "#4ade80"})}
+               "Continue to Expenses"])))]])))
+
