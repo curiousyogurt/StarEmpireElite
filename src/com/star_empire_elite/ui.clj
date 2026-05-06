@@ -111,6 +111,30 @@
       (when (< phase 6)
         [:span.text-green-400.text-xs.ml-1 "→"])])])
 
+(defn phase-stepper
+  "Render the terminal-shell topbar phase stepper. Current phase is highlighted green with active
+  border; completed phases show a checkmark; future phases are muted. Used across all game phases.
+
+  [current-phase int] -> hiccup"
+  [current-phase]
+  (let [labels ["1" "2" "3" "4" "5" "6"]]
+    [:div.flex.items-center.gap-1
+     (for [[i label] (map-indexed vector labels)
+           :let [phase   (inc i)
+                 active? (= phase current-phase)
+                 done?   (< phase current-phase)]]
+       [:div.flex.items-center.gap-1 {:key phase}
+        [:div.text-xs.flex.items-center.justify-center.rounded-full
+         {:style (merge {:width "22px" :height "22px"
+                         :border "1.5px solid #1e6e44"}
+                        (cond
+                          active? {:border-color "#4ade80" :color "#4ade80" :background "#1a3a28"}
+                          done?   {:border-color "#1e6e44" :background "#162a1e" :color "#4ade80"}
+                          :else   {:color "#7ab88a"}))}
+         (if done? "✓" label)]
+        (when (< phase 6)
+          [:span.text-xs {:style {:color "#7ab88a"}} "›"])])]))
+
 (defn phase-header
   "Render the full phase header: phase name on the left, progress indicator on the right.
   Stacks vertically on mobile, horizontal on large screens. Optional info-str appears as
@@ -293,7 +317,7 @@
       :sync-key      — JS key for syncing value across views
 
   [name value player-id hx-post-path hx-include & [opts]] -> hiccup"
-  [name value player-id hx-post-path hx-include & [{:keys [display-only? input-class sync-key]}]]
+  [name value player-id hx-post-path hx-include & [{:keys [display-only? input-class input-style sync-key]}]]
   [:div.relative
    [:input
     (cond->
@@ -308,6 +332,7 @@
        :class (str "w-full bg-black border border-green-400 text-green-400 "
                    "p-2 pr-6 font-mono "
                    (or input-class ""))
+       :style (or input-style {})
        :oninput
        (str
          "let start=this.selectionStart;"

@@ -160,28 +160,6 @@
 ;;;; UI Components
 ;;;;
 
-(defn- phase-stepper
-  "Render the topbar phase stepper. Current phase is highlighted; done phases show a checkmark.
-
-  [current-phase int] -> hiccup"
-  [current-phase]
-  (let [labels ["1" "2" "3" "4" "5" "6"]]
-    [:div.flex.items-center.gap-1
-     (for [[i label] (map-indexed vector labels)
-           :let [phase   (inc i)
-                 active? (= phase current-phase)
-                 done?   (< phase current-phase)]]
-       [:div.flex.items-center.gap-1 {:key phase}
-        [:div.text-xs.flex.items-center.justify-center.rounded-full
-         {:style (merge {:width "22px" :height "22px"
-                         :border "1.5px solid #1e6e44"}
-                        (cond
-                          active? {:border-color "#4ade80" :color "#4ade80" :background "#1a3a28"}
-                          done?   {:border-color "#1e6e44" :background "#162a1e" :color "#4ade80"}
-                          :else   {:color "#7ab88a"}))}
-         (if done? "✓" label)]
-        (when (< phase 6)
-          [:span.text-xs {:style {:color "#7ab88a"}} "›"])])]))
 
 (defn- source-pills
   "Render income pills for a source card: one pill per non-zero resource.
@@ -229,7 +207,7 @@
                   :income-map {:soldiers (:mil-soldiers income)
                                :fighters (:mil-fighters income)
                                :stations (:mil-stations income)}}
-                 {:name "Tax" :count pop-count
+                 {:name "Taxes" :count pop-count
                   :income-map {:credits (:tax-credits income)}}]]
     [:div
      [:div.text-xs.uppercase.mb-1
@@ -401,7 +379,7 @@
           {:style {:color "#9adaaa"}}
           (str "INCOME PHASE · Turn " (:player/current-turn player)
                " · Round " (:player/current-round player))]]
-        (phase-stepper (:player/current-phase player))]
+        (ui/phase-stepper (:player/current-phase player))]
 
        ;; Body
        [:div.flex.flex-col.gap-2

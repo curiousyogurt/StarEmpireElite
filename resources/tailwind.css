@@ -128,6 +128,12 @@
   .income-row-desktop { grid-template-columns: 160px 12fr 5fr 5fr 5fr; }
 }
 
+/* Expenses phase: two separate row grids, shown at different breakpoints */
+@layer components {
+  .expense-row-mobile { display: grid; grid-template-columns: 80px 1fr 1fr 1fr; }
+  .expense-row-desktop { display: grid; grid-template-columns: 120px minmax(180px, 1fr) 80px 280px 60px; }
+}
+
 /* Show queued-action warning and cancel button when a radio target is selected */
 .queued-warning, .cancel-target { display: none; }
 form:has([name=espionage-action]:checked) .queued-warning,

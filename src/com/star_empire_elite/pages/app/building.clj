@@ -30,7 +30,7 @@
    {:label "Command Ships"    :abbrev "Cmd Ships" :qty-key :cmd-ships    :cost-key :game/cmd-ship-cost}
    {:label "Agents"           :abbrev "Agents"    :qty-key :agents       :cost-key :game/agent-cost}
    {:label "Ore Planets"      :abbrev "Ore Plts"  :qty-key :ore-planets  :cost-key :game/ore-planet-cost}
-   {:label "Energy Planets"     :abbrev "Erg Plts" :qty-key :erg-planets :cost-key :game/erg-planet-cost}
+   {:label "Energy Planets"   :abbrev "Erg Plts" :qty-key :erg-planets :cost-key :game/erg-planet-cost}
    {:label "Military Planets" :abbrev "Mil Plts"  :qty-key :mil-planets  :cost-key :game/mil-planet-cost}])
 
 (def building-hx-include
@@ -232,7 +232,7 @@
                               :player/cmd-ships    (:cmd-ships resources-after)
                               :player/agents       (:agents resources-after)
                               :player/ore-planets  (:ore-planets resources-after)
-                              :player/erg-planets (:erg-planets resources-after)
+                              :player/erg-planets  (:erg-planets resources-after)
                               :player/mil-planets  (:mil-planets resources-after)
                               :player/current-phase 4}])
             {:status 303
