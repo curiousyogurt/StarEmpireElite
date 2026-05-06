@@ -317,8 +317,12 @@
       :sync-key      — JS key for syncing value across views
 
   [name value player-id hx-post-path hx-include & [opts]] -> hiccup"
-  [name value player-id hx-post-path hx-include & [{:keys [display-only? input-class input-style sync-key]}]]
+  [name value player-id hx-post-path hx-include & [{:keys [display-only? input-class input-style sync-key prefix]}]]
   [:div.relative
+   (when prefix
+     [:span {:class "absolute top-1/2 -translate-y-1/2 pointer-events-none select-none"
+             :style {:left "6px" :color "#7ab88a" :font-size "inherit"}}
+      prefix])
    [:input
     (cond->
       {:type "text"
@@ -331,6 +335,7 @@
        :data-form-type "other"
        :class (str "w-full bg-black border border-green-400 text-green-400 "
                    "p-2 pr-6 font-mono "
+                   (when prefix "pl-4 ")
                    (or input-class ""))
        :style (or input-style {})
        :oninput

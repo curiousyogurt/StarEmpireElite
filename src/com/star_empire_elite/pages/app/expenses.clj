@@ -271,7 +271,7 @@
                 :count pop-count
                 :expense-map {:food (:population-food required)
                               :fuel (:population-fuel required)}}
-               {:name "Total"
+               {:name "Totals"
                 :expense-map {:credits (:credits required-totals)
                               :food    (:food    required-totals)
                               :fuel    (:fuel    required-totals)}}]]
@@ -285,7 +285,7 @@
 
 (defn- expense-resource-table-header
   "Render the column-label row for the resource table.
-  Emits two variants: mobile (4-col, no bar) and desktop (5-col, with bar).
+  Emits two variants: mobile/tablet (4-col, no bar) and desktop (5-col, with bar).
 
   [] -> hiccup"
   []
@@ -334,23 +334,36 @@
         ;; Mobile row uses display-only input (no name, no HTMX) to avoid duplicate
         ;; field submission — both rows are always in the DOM, only CSS hides one.
         input-style   {:color "#7ab88a" :border-color "#2d6644" :padding-top "1px" :padding-bottom "1px"}
-        change-cell-m [:div.min-w-0
+        change-cell-m [:div.justify-self-center
+                       {:style {:width "min(160px, 100%)"}}
                        (ui/numeric-input field-name payment player-id
                                          "/calculate-expenses" hx-include
-                                         {:input-class   "text-xs lg:text-sm"
+                                         {:input-class   "text-xs text-right"
                                           :input-style   input-style
-                                          :display-only? true})]
-        change-cell-d [:div.min-w-0.flex.justify-center
-                       [:div {:style {:width "160px"}}
-                        (ui/numeric-input field-name payment player-id
-                                          "/calculate-expenses" hx-include
-                                          {:input-class "text-xs lg:text-sm text-left px-2"
-                                           :input-style input-style})]]]
-        [:<>
-         [:div.expense-row-mobile {:class (str "md:hidden " row-class) :style row-style}
-          name-cell before-cell change-cell-m after-cell-m]
-         [:div.expense-row-desktop {:class (str "hidden md:grid " row-class) :style row-style}
-          name-cell [:div {:id (str "bar-" slug)} (deduction-bar before payment filter-id)] before-cell change-cell-d after-cell-d]]))
+                                          :display-only? true
+                                          :prefix        "-"})]
+        change-cell-d [:div.justify-self-center
+                       {:style {:width "160px"}}
+                       (ui/numeric-input field-name payment player-id
+                                         "/calculate-expenses" hx-include
+                                         {:input-class "text-xs lg:text-sm w-full box-border text-right"
+                                          :input-style input-style
+                                          :prefix      "-"})]]
+    [:<>
+     [:div.expense-row-mobile
+      {:class (str "md:hidden " row-class) :style row-style}
+      name-cell
+      before-cell
+      change-cell-m
+      after-cell-m]
+
+     [:div.expense-row-desktop
+      {:class (str "hidden md:grid " row-class) :style row-style}
+      name-cell
+      [:div {:id (str "bar-" slug)} (deduction-bar before payment filter-id)]
+      before-cell
+      change-cell-d
+      after-cell-d]]))
 
 (defn- submit-button
   "Render the submit button with terminal-shell styling.
