@@ -103,6 +103,17 @@
     }
   }
 
+  /* Responsive grid for building phase purchase table (5 columns: Item, Each, Max, Build, Cost) */
+  .building-purchase-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 0.6fr 0.7fr 1.2fr 0.8fr;
+  }
+  @media (min-width: 768px) {
+    .building-purchase-grid {
+      grid-template-columns: 2fr 0.8fr 1fr 1.2fr 1fr;
+    }
+  }
+
   /* Responsive grid for expense phase table rows (6 columns, wider required-cost column) */
   .expense-row-grid {
     grid-template-columns: 0.7fr 0.4fr 1.3fr 1fr 1fr 1fr;
