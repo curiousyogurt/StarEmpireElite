@@ -313,11 +313,12 @@
   - hx-include    — CSS selector for fields to include in the HTMX request
   - opts (optional map):
       :display-only? — strip name and HTMX wiring (for read-only mirrors)
+      :mirror-of     — field name to sync value into on input; also enables HTMX without a name attr
       :input-class   — extra CSS classes for the <input>
       :sync-key      — JS key for syncing value across views
 
   [name value player-id hx-post-path hx-include & [opts]] -> hiccup"
-  [name value player-id hx-post-path hx-include & [{:keys [display-only? input-class input-style sync-key prefix]}]]
+  [name value player-id hx-post-path hx-include & [{:keys [display-only? mirror-of input-class input-style sync-key prefix]}]]
   [:div.relative
    (when prefix
      [:span {:class "absolute top-1/2 -translate-y-1/2 pointer-events-none select-none"
@@ -334,7 +335,7 @@
        :data-lpignore "true"
        :data-form-type "other"
        :class (str "w-full bg-black border border-green-400 text-green-400 "
-                   "p-2 pr-6 font-mono "
+                   "p-2 font-mono "
                    (when prefix "pl-4 ")
                    (or input-class ""))
        :style (or input-style {})
@@ -352,30 +353,27 @@
          (when sync-key
            (str "if(window.seeSyncBuildingField){"
                 "  window.seeSyncBuildingField('" sync-key "', this);"
-                "}")))
+                "}"
+                ))
+         (when mirror-of
+           (str "var t=document.querySelector('[name=\"" mirror-of "\"]');if(t)t.value=this.value;")))
        :onblur
        (str
          "let val=this.value.replace(/[^0-9]/g,'');"
          "if(val===''||val==='0'){val='0';}"
          "else{val=String(parseInt(val,10));}"
-         "this.value=val;")}
-      (not display-only?)
-      (merge {:name name
-              :hx-post (str "/app/game/" player-id hx-post-path)
+         "this.value=val;"
+         (when mirror-of
+           (str "var t=document.querySelector('[name=\"" mirror-of "\"]');if(t)t.value=this.value;")))}
+      (not display-only?) (assoc :name name)
+      (or (not display-only?) mirror-of)
+      (merge {:hx-post (str "/app/game/" player-id hx-post-path)
               :hx-target "#resources-after"
               :hx-swap "outerHTML"
-              :hx-trigger "load, input"
+              :hx-trigger (if mirror-of "input" "load, input")
               :hx-include hx-include})
       sync-key (assoc :data-sync-key sync-key))]
-   (when (not display-only?)
-     [:button
-      {:type "button"
-       :tabindex "-1"
-       :class "absolute right-2 top-1/2 -translate-y-1/2 text-green-400 hover:text-green-300 transition-colors text-2xl font-bold p-0 bg-none border-none cursor-pointer"
-       :onclick (str "this.previousElementSibling.value='" value "';"
-                     "this.previousElementSibling.dispatchEvent(new Event('input',{bubbles:true}));")
-       :title "Reset"}
-      "\u25e6"])])
+   ])
 
 (defn phase-table-header
   "Render a header row for phase tables, visible on wide screens only.

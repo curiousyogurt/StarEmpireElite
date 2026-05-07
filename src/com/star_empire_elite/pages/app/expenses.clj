@@ -290,15 +290,15 @@
   [] -> hiccup"
   []
   (let [header-style {:background "#151f1a" :border-bottom "1px solid #253530"}
-        header-class "gap-2 py-1 px-3 items-center"
+        header-class "gap-4 py-1 px-2 items-center"
         col-style    {:letter-spacing "0.08em" :color "#4ade80"}
         item-style   (assoc col-style :letter-spacing "0.1em")
         col-label    (fn [text style extra-class]
                        [:span.text-xs.uppercase {:class extra-class :style style} text])
-        value-label  (fn [text]
-                       (col-label text col-style "text-right justify-self-end"))
-        change-label (fn []
-                       (col-label "Change" col-style "text-center justify-self-center"))]
+        value-label   (fn [text]
+                        (col-label text col-style "text-right justify-self-end"))
+        change-label  (fn []
+                        (col-label "Change" col-style "text-center justify-self-center"))]
     [:<>
      [:div.expense-row-mobile {:class (str "md:hidden " header-class) :style header-style}
       (col-label "Item" item-style nil)
@@ -335,18 +335,19 @@
         ;; field submission — both rows are always in the DOM, only CSS hides one.
         input-style   {:color "#7ab88a" :border-color "#2d6644" :padding-top "1px" :padding-bottom "1px"}
         change-cell-m [:div.justify-self-center
-                       {:style {:width "min(160px, 100%)"}}
+                       {:style {:width "min(140px, 100%)"}}
                        (ui/numeric-input field-name payment player-id
                                          "/calculate-expenses" hx-include
                                          {:input-class   "text-xs text-right"
                                           :input-style   input-style
                                           :display-only? true
+                                          :mirror-of     field-name
                                           :prefix        "-"})]
         change-cell-d [:div.justify-self-center
-                       {:style {:width "160px"}}
+                       {:style {:width "min(140px, 100%)"}}
                        (ui/numeric-input field-name payment player-id
                                          "/calculate-expenses" hx-include
-                                         {:input-class "text-xs lg:text-sm w-full box-border text-right"
+                                         {:input-class "text-xs lg:text-sm text-right"
                                           :input-style input-style
                                           :prefix      "-"})]]
     [:<>

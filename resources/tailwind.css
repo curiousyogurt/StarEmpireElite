@@ -130,8 +130,8 @@
 
 /* Expenses phase: two separate row grids, shown at different breakpoints */
 @layer components {
-  .expense-row-mobile { display: grid; grid-template-columns: 80px 1fr 1fr 1fr; }
-  .expense-row-desktop { display: grid; grid-template-columns: 120px minmax(180px, 1fr) 80px 280px 60px; }
+  .expense-row-mobile  { display: grid; grid-template-columns: 40px 4fr 6fr 3fr; }
+  .expense-row-desktop { grid-template-columns: 100px 10fr 4fr 11fr 4fr; }
 }
 
 /* Show queued-action warning and cancel button when a radio target is selected */
