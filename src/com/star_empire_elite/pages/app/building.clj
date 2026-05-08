@@ -286,21 +286,25 @@
                             :suffix "cr"}]
         food-changes      [{:label "Planets"
                             :value (:erg-food income)
-                            :suffix "food"}
+                            :suffix "food"
+                            :id "food-pill-planets"}
                            {:label "Military"
                             :value (- (+ (:soldiers-food required) (:agents-food required)))
-                            :suffix "food"}
+                            :suffix "food"
+                            :id "food-pill-military"}
                            {:label "Population"
                             :value (- (:population-food required))
                             :suffix "food"}]
         fuel-changes      [{:label "Planets"
                             :value (:erg-fuel income)
-                            :suffix "fuel"}
+                            :suffix "fuel"
+                            :id "fuel-pill-planets"}
                            {:label "Military"
                             :value (- (+ (:fighters-fuel required)
                                          (:stations-fuel required)
                                          (:agents-fuel required)))
-                            :suffix "fuel"}
+                            :suffix "fuel"
+                            :id "fuel-pill-military"}
                            {:label "Population"
                             :value (- (:population-fuel required))
                             :suffix "fuel"}]
@@ -321,8 +325,8 @@
       "Resource Projections for Next Turn"]
      [:div {:class "grid grid-cols-1 md:grid-cols-3 gap-1.5"}
       (projection-pill "Credits" credits-total credits-rows {:total-id "projection-credits-total"})
-      (projection-pill "Food"    food-total    food-rows)
-      (projection-pill "Fuel"    fuel-total    fuel-rows)]]))
+      (projection-pill "Food"    food-total    food-rows {:total-id "projection-food-total"})
+      (projection-pill "Fuel"    fuel-total    fuel-rows {:total-id "projection-fuel-total"})]]))
 
 (defn- build-table-header
   "Render the column-label row for the build orders table.
@@ -370,16 +374,25 @@
      ;; Max affordable
      [:div.text-base.text-right
       {:style {:color (if can-afford? "#9adaaa" "#3a5040")}}
-      [:span {:id max-qty-id}
+      [:span {:id max-qty-id :data-value (str (if (neg? max-qty) 0 max-qty))}
        (ui/format-number (if (neg? max-qty) 0 max-qty))]]
-     ;; Build input
-     [:div.justify-self-center
-      {:style {:width "min(120px, 100%)"}}
+     ;; Build input + max button
+     [:div.flex.items-center.gap-1.justify-self-center
       (ui/numeric-input (name (:qty-key spec)) purchase-qty player-id
                         "/calculate-building" building-hx-include
                         {:input-class "text-xs lg:text-sm text-right"
                          :input-style {:color "#7ab88a" :border-color "#2d6644"
-                                       :padding-top "1px" :padding-bottom "1px"}})]
+                                       :padding-top "1px" :padding-bottom "1px"}})
+      [:button.text-xs
+       {:type "button"
+        :style {:border "1px solid #2d6644" :background "transparent" :color "#7ab88a"
+                :padding "1px 4px" :border-radius "2px" :cursor "pointer"
+                :font-family "inherit" :flex-shrink "0"}
+        :onclick (str "var s=document.getElementById('" max-qty-id "');"
+                      "var i=document.querySelector('[name=\"" (name (:qty-key spec)) "\"]');"
+                      "if(s&&i){i.value=s.dataset.value||'0';"
+                      "i.dispatchEvent(new Event('input',{bubbles:true}));}")}
+       "max"]]
      ;; Line cost
      [:div.text-base.text-right
       {:style {:color (if (pos? item-cost) "#4ade80" "#3a5040")}}
@@ -539,10 +552,9 @@
           income              (income-calc/calculate-income player game)
           required            (expenses-calc/calculate-required-expenses player game)
           new-ore-planets      (+ (:player/ore-planets player) (:ore-planets quantities))
+          new-erg-planets      (+ (:player/erg-planets player) (:erg-planets quantities))
           new-mil-planets      (+ (:player/mil-planets player) (:mil-planets quantities))
-          new-total-planets    (+ new-ore-planets
-                                  (:player/erg-planets player) (:erg-planets quantities)
-                                  new-mil-planets)
+          new-total-planets    (+ new-ore-planets new-erg-planets new-mil-planets)
           new-ore-income       (* new-ore-planets (:game/ore-planet-credits game))
           new-planet-expense   (* new-total-planets (:game/planet-upkeep-credits game))
           new-planets-value    (- new-ore-income new-planet-expense)
@@ -558,7 +570,25 @@
                                      (* proj-stations (:game/station-upkeep-credits game))))
           proj-total           (+ credits-after new-planets-value
                                   new-military-value
-                                  (:tax-credits income))]
+                                  (:tax-credits income))
+          ;; Food projection: Planets and Military rows update dynamically
+          new-erg-food-income  (* new-erg-planets (:game/erg-planet-food game))
+          new-planet-food-exp  (* new-total-planets (:game/planet-upkeep-food game))
+          new-planets-food     (- new-erg-food-income new-planet-food-exp)
+          proj-agents          (+ (:player/agents player) (:agents quantities))
+          new-military-food    (- (+ (* proj-soldiers (:game/soldier-upkeep-food game))
+                                     (* proj-agents (:game/agent-upkeep-food game))))
+          food-current         (:player/food player)
+          pop-food             (- (:population-food required))
+          food-proj-total      (+ food-current new-planets-food new-military-food pop-food)
+          ;; Fuel projection: Planets and Military rows update dynamically
+          new-erg-fuel-income  (* new-erg-planets (:game/erg-planet-fuel game))
+          new-military-fuel    (- (+ (* proj-fighters (:game/fighter-upkeep-fuel game))
+                                     (* proj-stations (:game/station-upkeep-fuel game))
+                                     (* proj-agents   (:game/agent-upkeep-fuel   game))))
+          fuel-current         (:player/fuel player)
+          pop-fuel             (- (:population-fuel required))
+          fuel-proj-total      (+ fuel-current new-erg-fuel-income new-military-fuel pop-fuel)]
       (biff/render
         [:div
          ;; Renew HTMX swap-target placeholder for the next request
@@ -587,6 +617,40 @@
          ;; OOB: credits pill total — sum of all rows (current + planets + military + taxes)
          [:span#projection-credits-total {:hx-swap-oob "true" :style {:color "#7ab88a"}}
           (ui/format-number proj-total)]
+         ;; OOB: food pill "Planets" row — updates as erg/ore/mil planet purchases change
+         [:span#food-pill-planets.text-xs.inline-block.rounded-sm.text-green-400
+          {:hx-swap-oob "true" :style {:padding "1px 5px" :background "#1a3a28"}}
+          "Planets "
+          (if (neg? new-planets-food) "-" "+")
+          (ui/format-number (Math/abs (long new-planets-food)))
+          " food"]
+         ;; OOB: food pill "Military" row — updates as soldier/agent purchases change
+         [:span#food-pill-military.text-xs.inline-block.rounded-sm.text-green-400
+          {:hx-swap-oob "true" :style {:padding "1px 5px" :background "#1a3a28"}}
+          "Military "
+          (if (neg? new-military-food) "-" "+")
+          (ui/format-number (Math/abs (long new-military-food)))
+          " food"]
+         ;; OOB: food pill total
+         [:span#projection-food-total {:hx-swap-oob "true" :style {:color "#7ab88a"}}
+          (ui/format-number food-proj-total)]
+         ;; OOB: fuel pill "Planets" row — updates as erg planet purchases change
+         [:span#fuel-pill-planets.text-xs.inline-block.rounded-sm.text-green-400
+          {:hx-swap-oob "true" :style {:padding "1px 5px" :background "#1a3a28"}}
+          "Planets "
+          (if (neg? new-erg-fuel-income) "-" "+")
+          (ui/format-number (Math/abs (long new-erg-fuel-income)))
+          " fuel"]
+         ;; OOB: fuel pill "Military" row — updates as fighter/station/agent purchases change
+         [:span#fuel-pill-military.text-xs.inline-block.rounded-sm.text-green-400
+          {:hx-swap-oob "true" :style {:padding "1px 5px" :background "#1a3a28"}}
+          "Military "
+          (if (neg? new-military-fuel) "-" "+")
+          (ui/format-number (Math/abs (long new-military-fuel)))
+          " fuel"]
+         ;; OOB: fuel pill total
+         [:span#projection-fuel-total {:hx-swap-oob "true" :style {:color "#7ab88a"}}
+          (ui/format-number fuel-proj-total)]
          ;; OOB: after-credits spans (mobile + desktop)
          [:span#after-credits-m {:hx-swap-oob "true" :style after-style} (ui/format-number credits-after)]
          [:span#after-credits-d {:hx-swap-oob "true" :style after-style} (ui/format-number credits-after)]
@@ -600,6 +664,7 @@
            [:span {:id (str "max-qty-" (name item-key))
                    :hx-swap-oob "true"
                    :key (str "max-" item-key)
+                   :data-value (str (if (neg? max-qty) 0 max-qty))
                    :style {:color (if (or (zero? max-qty) (neg? max-qty)) "#3a5040" "#9adaaa")}}
             (ui/format-number (if (neg? max-qty) 0 max-qty))])
          ;; OOB: item line costs

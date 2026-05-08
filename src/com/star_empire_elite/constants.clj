@@ -27,8 +27,8 @@
 ;;;; Turn Structure
 ;;;;
 
-(def turns-per-round      36)
-(def rounds-per-day       10)
+(def turns-per-round      6)
+(def rounds-per-day       2)
 (def hours-between-rounds 2)
 
 ;;;;

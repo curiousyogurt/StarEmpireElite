@@ -36,10 +36,10 @@
 (defn- format-number-core
   "Returns [formatted-string abbreviated?] for a number.
   Abbreviations: K (100K+), M (1M+), B (1B+), T (1T+),
-  Qa (quadrillion), Qi (quintillion), Sx (sextillion), Sp (septillion),
+  Qd (quadrillion), Qn (quintillion), Sx (sextillion), Sp (septillion),
   Oc (octillion), No (nonillion), Dc (decillion)."
   [n]
-  (let [abs-n        (Math/abs n)
+  (let [abs-n        (abs n)
         is-negative? (< n 0)
         formatted    (cond
                        (>= abs-n 1e33) (str (/ (Math/round (/ abs-n 1e32)) 10.0) "Dc")
@@ -47,8 +47,8 @@
                        (>= abs-n 1e27) (str (/ (Math/round (/ abs-n 1e26)) 10.0) "Oc")
                        (>= abs-n 1e24) (str (/ (Math/round (/ abs-n 1e23)) 10.0) "Sp")
                        (>= abs-n 1e21) (str (/ (Math/round (/ abs-n 1e20)) 10.0) "Sx")
-                       (>= abs-n 1e18) (str (/ (Math/round (/ abs-n 1e17)) 10.0) "Qi")
-                       (>= abs-n 1e15) (str (/ (Math/round (/ abs-n 1e14)) 10.0) "Qa")
+                       (>= abs-n 1e18) (str (/ (Math/round (/ abs-n 1e17)) 10.0) "Qn")
+                       (>= abs-n 1e15) (str (/ (Math/round (/ abs-n 1e14)) 10.0) "Qd")
                        (>= abs-n 1e12) (str (/ (Math/round (/ abs-n 1e11)) 10.0) "T")
                        (>= abs-n 1e9)  (str (/ (Math/round (/ abs-n 1e8))  10.0) "B")
                        (>= abs-n 1e6)  (str (/ (Math/round (/ abs-n 1e5))  10.0) "M")
