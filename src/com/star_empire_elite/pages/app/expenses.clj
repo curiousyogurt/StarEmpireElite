@@ -541,4 +541,10 @@
                     :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
                     :font-family "'Courier New', monospace"}}
            "Pause"]
+          [:a.text-sm.no-underline
+           {:href  (str "/app/game/" player-id "/exchange")
+            :style {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
+                    :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
+                    :font-family "'Courier New', monospace"}}
+           "Go to Exchange"]
           (submit-button affordable?)])])))
