@@ -72,9 +72,10 @@
   (let [completed      (:player/last-round-completed-at player)
         current-round  (:player/current-round player)
         rounds-per-day (:game/rounds-per-day game)]
-    (and (> current-round rounds-per-day)
-         completed
-         (same-calendar-day? completed))))
+    (boolean
+     (and (> current-round rounds-per-day)
+          completed
+          (same-calendar-day? completed)))))
 
 (defn round-cooldown-ms
   "Returns ms remaining in cooldown if player is blocked from starting a new round, or nil.

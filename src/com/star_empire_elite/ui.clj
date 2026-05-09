@@ -398,7 +398,7 @@
                ["FUEL"       (:player/fuel player)        nil]
                ["GALAXARS"   (:player/galaxars player)    nil]
                ["POPULATION" (:player/population player)
-                \#(str (str/replace (format "%.1f" (double %)) #"\.0$" "") "M")]
+                #(str (str/replace (format "%.1f" (double %)) #"\.0$" "") "M")]
                ["STABILITY"  (:player/stability player)
                 #(str % "%")]
                ["ORE PLTS"   (:player/ore-planets player) nil]

@@ -407,4 +407,4 @@
                                           (:food-buy rates) 0 500 test-player-id "form"))))
     (testing "Renders without error when max-quantity is zero"
       (is (vector? (exchange/exchange-row "Food" "Food" "food-bought"
-                                          (:food-buy rates) 0 0 test-player-id "form")))))))
+                                          (:food-buy rates) 0 0 test-player-id "form"))))))
