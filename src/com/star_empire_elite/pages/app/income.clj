@@ -63,98 +63,12 @@
 ;;;; SVG Indicator Bar
 ;;;;
 
-(def ^:private nice-scale-multipliers
-  [1 2.5 5 7.5])
-
-(def ^:private nice-scales
-  "Nice scale ceilings for resource bars.
-
-  Generates:
-  10, 25, 50, 75,
-  100, 250, 500, 750,
-  ...
-  up through decillion-scale values."
-  (vec
-    (for [exp (range 1 35)
-          m   nice-scale-multipliers]
-      (* m (Math/pow 10 exp)))))
-
-(defn- choose-scale-max
-  "Choose a nice scale ceiling for a resource bar.
-
-  [before number, after number] -> number"
-  [before after]
-  (let [needed (max 1 (double before) (double after))]
-    (or (first (drop-while #(< % needed) nice-scales))
-        needed)))
-
-(defn- fmt-tick
-  "Format a number for a scale-bar tick label.
-  Values below 1000 are rendered as plain integers; thousands as e.g. '2.5K'
-  with trailing '.0' stripped; larger values delegate to format-number-str.
-
-  [v number] -> string"
-  [v]
-  (let [abs-v (Math/abs (double v))
-        sign  (if (neg? (double v)) "-" "")]
-    (cond
-      (< abs-v 1000) (format "%.0f" (double v))
-      (< abs-v 1000000) (let [s (format "%.1f" (/ abs-v 1000.0))]
-                          (str sign
-                               (str/replace s #"\.0$" "")
-                               "K"))
-      :else
-      (ui/format-number-str v))))
-
 (defn- resource-bar
-  "Render an SVG arrow indicator bar with HTML tick labels below.
+  "Render an SVG arrow indicator bar showing resource gain.
 
   [before int, after int, filter-id str] -> hiccup"
   [before after filter-id]
-  (let [scale-max  (choose-scale-max before after)
-        x-before   (min (* (/ (double before) scale-max) 100.0) 100.0)
-        x-after    (min (* (/ (double after)  scale-max) 100.0) 100.0)
-        has-arrow? (> after before)
-        ly         5
-        arrow-w    3.5
-        arrow-h    2.5]
-    [:div.flex.flex-col.justify-center.h-full.px-8
-     ;; SVG: track line, tick marks, and arrow only -- no text in SVG
-     [:svg.block.w-full.overflow-visible.mt-1.mb-1
-      {:viewBox "0 0 100 10"
-       :preserveAspectRatio "none"
-       :style {:height "8px"}}
-      [:defs
-       [:filter {:id filter-id :x "-50%" :y "-50%" :width "200%" :height "200%"}
-        [:feGaussianBlur {:stdDeviation "0.8" :result "blur"}]
-        [:feMerge
-         [:feMergeNode {:in "blur"}]
-         [:feMergeNode {:in "SourceGraphic"}]]]]
-      [:line {:x1 0 :y1 ly :x2 100 :y2 ly :stroke "#152a1e" :stroke-width "0.8"}]
-      (when has-arrow?
-        (let [tip-x  (- x-after arrow-w)
-              base-x (- x-after (* 2 arrow-w))]
-          (list
-            [:line {:x1 x-before :y1 ly
-                    :x2 (- base-x (* arrow-w 0.55)) :y2 ly
-                    :stroke "#4ade80" :stroke-width "1.2"
-                    :filter (str "url(#" filter-id ")")}]
-            [:polygon {:points (str tip-x "," ly " "
-                                    base-x "," (- ly arrow-h) " "
-                                    base-x "," (+ ly arrow-h))
-                       :fill "#4ade80"
-                       :filter (str "url(#" filter-id ")")}])))
-      [:line {:x1 0   :y1 (+ ly 1) :x2 0   :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
-      [:line {:x1 25  :y1 (+ ly 1) :x2 25  :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
-      [:line {:x1 50  :y1 (+ ly 1) :x2 50  :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
-      [:line {:x1 75  :y1 (+ ly 1) :x2 75  :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
-      [:line {:x1 100 :y1 (+ ly 1) :x2 100 :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]]
-     ;; Tick labels: absolutely positioned so each label centres on its tick mark
-     [:div.text-xs.text-gray-400.relative.mb-2
-      {:style {:height "1em"}}
-      [:span.absolute.left-0 "0"]
-      [:span.absolute {:style {:left "50%" :transform "translateX(-50%)"}} (fmt-tick (* 0.5 scale-max))]
-      [:span.absolute.right-0 (fmt-tick scale-max)]]]))
+  (ui/svg-indicator-bar :gain before after filter-id))
 
 ;;;;
 ;;;; UI Components
@@ -210,9 +124,7 @@
                  {:name "Taxes" :count pop-count
                   :income-map {:credits (:tax-credits income)}}]]
     [:div
-     [:div.text-xs.uppercase.mb-1
-      {:style {:letter-spacing "0.12em" :color "#7ab88a"}}
-      "Sources"]
+     (ui/section-label "Sources")
      [:div {:class "grid grid-cols-2 md:grid-cols-4 gap-1.5"}
       (for [src sources]
         (source-card src))]]))
@@ -364,22 +276,10 @@
                 :border-radius "4px" :color "#4ade80"
                 :font-family "'Courier New', monospace"}}
        ;; Scanline overlay
-       [:div.absolute.inset-0.pointer-events-none.z-10
-        {:style {:background "repeating-linear-gradient(to bottom, transparent 0px, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 3px)"}}]
+       (ui/scanline-overlay)
 
        ;; Topbar
-       [:div.flex.items-center.justify-between
-        {:style {:background "#161616" :border-bottom "1px solid #1e6e44"
-                 :padding "7px 14px"}}
-        [:div
-         [:div.text-3xl.font-bold.text-green-400
-          {:style {:letter-spacing "0.05em"}}
-          (:player/empire-name player)]
-         [:div.text-sm.mt-px
-          {:style {:color "#9adaaa"}}
-          (str "INCOME PHASE · Turn " (:player/current-turn player)
-               " · Round " (:player/current-round player))]]
-        (ui/phase-stepper (:player/current-phase player))]
+       (ui/phase-topbar player "INCOME PHASE")
 
        ;; Body
        [:div.flex.flex-col.gap-2
@@ -394,11 +294,7 @@
         (let [btn-base {:padding "5px 14px" :font-family "'Courier New', monospace"
                         :letter-spacing "0.05em" :border-radius "2px"}]
           (list
-            [:a.text-sm.no-underline
-             {:href  (str "/app/game/" player-id)
-              :style (merge btn-base {:border "1px solid #1e6e44" :background "transparent"
-                                      :color "#9adaaa"})}
-             "Pause"]
+            (ui/action-bar-link (str "/app/game/" player-id) "Pause")
             (biff/form
               {:action (str "/app/game/" player-id "/apply-income") :method "post"
                :style  {:margin 0}}

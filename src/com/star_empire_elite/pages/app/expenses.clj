@@ -125,86 +125,16 @@
 ;;;; SVG Indicator Bar
 ;;;;
 
-(def ^:private nice-scale-multipliers [1 2.5 5 7.5])
-
-(def ^:private nice-scales
-  "Nice scale ceilings for resource bars."
-  (vec (for [exp (range 1 35) m nice-scale-multipliers]
-         (* m (Math/pow 10 exp)))))
-
-(defn- choose-scale-max
-  "Choose a nice scale ceiling for a resource bar.
-
-  [before number, after number] -> number"
-  [before after]
-  (let [needed (max 1 (double before) (double after))]
-    (or (first (drop-while #(< % needed) nice-scales))
-        needed)))
-
-(defn- fmt-tick
-  "Format a number for a scale-bar tick label.
-
-  [v number] -> string"
-  [v]
-  (let [abs-v (Math/abs (double v))
-        sign  (if (neg? (double v)) "-" "")]
-    (cond
-      (< abs-v 1000)    (format "%.0f" (double v))
-      (< abs-v 1000000) (str sign (str/replace (format "%.1f" (/ abs-v 1000.0)) #"\.0$" "") "K")
-      :else             (ui/format-number-str v))))
+;;;;
+;;;; SVG Indicator Bar
+;;;;
 
 (defn- deduction-bar
-  "Render an SVG indicator bar with a left-pointing arrow showing a resource deduction.
-  The arrow runs from x-before (right) toward x-after (left), tip pointing left.
+  "Render an SVG indicator bar showing a left-pointing resource deduction arrow.
 
   [before int, payment int, filter-id str] -> hiccup"
   [before payment filter-id]
-  (let [after      (max 0.0 (- (double before) (double payment)))
-        scale-max  (choose-scale-max before after)
-        x-before   (min (* (/ (double before) scale-max) 100.0) 100.0)
-        x-after    (min (* (/ after            scale-max) 100.0) 100.0)
-        has-arrow? (pos? payment)
-        ly         5
-        arrow-w    3.5
-        arrow-h    2.5]
-    [:div.flex.flex-col.justify-center.h-full.px-8
-     [:svg.block.w-full.overflow-visible.mt-1.mb-1
-      {:viewBox "0 0 100 10" :preserveAspectRatio "none"
-       :style {:height "8px"}}
-      [:defs
-       [:filter {:id filter-id :x "-50%" :y "-50%" :width "200%" :height "200%"}
-        [:feGaussianBlur {:stdDeviation "0.8" :result "blur"}]
-        [:feMerge
-         [:feMergeNode {:in "blur"}]
-         [:feMergeNode {:in "SourceGraphic"}]]]]
-      ;; Track line
-      [:line {:x1 0 :y1 ly :x2 100 :y2 ly :stroke "#152a1e" :stroke-width "0.8"}]
-      ;; Left-pointing arrow: tip at x-after, base to the right
-      (when has-arrow?
-        (let [tip-x  x-after
-              base-x (+ x-after (* 2 arrow-w))]
-          (list
-            [:line {:x1 x-before :y1 ly
-                    :x2 (+ base-x (* arrow-w 0.55)) :y2 ly
-                    :stroke "#4ade80" :stroke-width "1.2"
-                    :filter (str "url(#" filter-id ")")}]
-            [:polygon {:points (str tip-x  "," ly " "
-                                    base-x "," (- ly arrow-h) " "
-                                    base-x "," (+ ly arrow-h))
-                       :fill "#4ade80"
-                       :filter (str "url(#" filter-id ")")}])))
-      ;; Tick marks
-      [:line {:x1 0   :y1 (+ ly 1) :x2 0   :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
-      [:line {:x1 25  :y1 (+ ly 1) :x2 25  :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
-      [:line {:x1 50  :y1 (+ ly 1) :x2 50  :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
-      [:line {:x1 75  :y1 (+ ly 1) :x2 75  :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
-      [:line {:x1 100 :y1 (+ ly 1) :x2 100 :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]]
-     ;; Tick labels
-     [:div.text-xs.text-gray-400.relative.mb-2
-      {:style {:height "1em"}}
-      [:span.absolute.left-0 "0"]
-      [:span.absolute {:style {:left "50%" :transform "translateX(-50%)"}} (fmt-tick (* 0.5 scale-max))]
-      [:span.absolute.right-0 (fmt-tick scale-max)]]]))
+  (ui/svg-indicator-bar :loss before payment filter-id))
 
 ;;;;
 ;;;; UI Components
@@ -276,37 +206,10 @@
                               :food    (:food    required-totals)
                               :fuel    (:fuel    required-totals)}}]]
     [:div
-     [:div.text-xs.uppercase.mb-1
-      {:style {:letter-spacing "0.12em" :color "#7ab88a"}}
-      "Expenses"]
+     (ui/section-label "Expenses")
      [:div {:class "grid grid-cols-2 md:grid-cols-4 gap-1.5"}
       (for [card cards]
         (expense-summary-card card))]]))
-
-(defn- expense-resource-table-header
-  "Render the column-label row for the resource table.
-  Emits two variants: mobile/tablet (4-col, no bar) and desktop (5-col, with bar).
-
-  [] -> hiccup"
-  []
-  (let [header-style {:background "#151f1a" :border-bottom "1px solid #253530"}
-        header-class "gap-4 py-1 px-2 items-center"
-        col-style    {:letter-spacing "0.08em" :color "#4ade80"}
-        item-style   (assoc col-style :letter-spacing "0.1em")
-        col-label    (fn [text style extra-class]
-                       [:span.text-xs.uppercase {:class extra-class :style style} text])
-        value-label   (fn [text]
-                        (col-label text col-style "text-right justify-self-end"))
-        change-label  (fn []
-                        (col-label "Change" col-style "text-center justify-self-center"))]
-    [:<>
-     [:div.expense-row-mobile {:class (str "md:hidden " header-class) :style header-style}
-      (col-label "Item" item-style nil)
-      (value-label "Before") (change-label) (value-label "After")]
-     [:div.expense-row-desktop {:class (str "hidden md:grid " header-class) :style header-style}
-      (col-label "Item" item-style nil)
-      [:span]
-      (value-label "Before") (change-label) (value-label "After")]]))
 
 (defn- expense-resource-row
   "Render one resource row in two variants: mobile (no bar) and desktop (with bar).
@@ -365,25 +268,6 @@
       before-cell
       change-cell-d
       after-cell-d]]))
-
-(defn- submit-button
-  "Render the submit button with terminal-shell styling.
-  Disabled state shows muted appearance when the player cannot afford expenses.
-  extra-attrs is merged into the button element — used for hx-swap-oob in HTMX responses.
-
-  ([affordable?]) ([affordable? extra-attrs map]) -> hiccup"
-  ([affordable?] (submit-button affordable? {}))
-  ([affordable? extra-attrs]
-   [:button#submit-button.text-sm.tracking-wider.rounded-sm
-    (merge {:type "submit"
-            :disabled (not affordable?)
-            :style (merge {:padding "5px 14px"}
-                          (if affordable?
-                            {:border "1px solid #4ade80" :background "#1a3a28" :color "#4ade80"}
-                            {:border "1px solid #253530" :background "transparent"
-                             :color "#7ab88a" :opacity "0.5" :cursor "not-allowed"}))}
-           extra-attrs)
-    "Continue to Building"]))
 
 ;;;;
 ;;;; Actions
@@ -455,7 +339,7 @@
              {:style {:letter-spacing "0.03em"}}
              "⚠ Insufficient resources to pay expenses."])]
          ;; OOB: submit button
-         (submit-button affordable? {:hx-swap-oob "true"})]))))
+         (ui/submit-button affordable? "Continue to Building" {:hx-swap-oob "true"})]))))
 
 ;;;;
 ;;;; Page
@@ -485,21 +369,10 @@
                 :font-family "'Courier New', monospace"}}
 
        ;; Scanline overlay
-       [:div.absolute.inset-0.pointer-events-none.z-10
-        {:style {:background "repeating-linear-gradient(to bottom, transparent 0px, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 3px)"}}]
+       (ui/scanline-overlay)
 
        ;; Topbar
-       [:div.flex.items-center.justify-between
-        {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
-        [:div
-         [:div.text-3xl.font-bold.text-green-400
-          {:style {:letter-spacing "0.05em"}}
-          (:player/empire-name player)]
-         [:div.text-sm.mt-px
-          {:style {:color "#9adaaa"}}
-          (str "EXPENSES PHASE · Turn " (:player/current-turn player)
-               " · Round " (:player/current-round player))]]
-        (ui/phase-stepper (:player/current-phase player))]
+       (ui/phase-topbar player "EXPENSES PHASE")
 
        ;; Form wraps body + action bar so submit button works
        (biff/form
@@ -516,7 +389,7 @@
           ;; Resource table: Credits, Food, Fuel with deduction bars and inputs
           [:div.overflow-hidden
            {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
-           (expense-resource-table-header)
+           (ui/deduction-table-header)
            (expense-resource-row "Credits" (:player/credits player) (:credits required-totals)
                                  "glow-credits" "credits-pay" player-id hx-include)
            (expense-resource-row "Food"    (:player/food    player) (:food    required-totals)
@@ -535,16 +408,6 @@
          ;; Action bar
          [:div.flex.gap-2
           {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
-          [:a.text-sm.no-underline
-           {:href  (str "/app/game/" player-id)
-            :style {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
-                    :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
-                    :font-family "'Courier New', monospace"}}
-           "Pause"]
-          [:a.text-sm.no-underline
-           {:href  (str "/app/game/" player-id "/exchange")
-            :style {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
-                    :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
-                    :font-family "'Courier New', monospace"}}
-           "Go to Exchange"]
-          (submit-button affordable?)])])))
+          (ui/action-bar-link (str "/app/game/" player-id) "Pause")
+          (ui/action-bar-link (str "/app/game/" player-id "/exchange") "Go to Exchange")
+          (ui/submit-button affordable? "Continue to Building")])])))

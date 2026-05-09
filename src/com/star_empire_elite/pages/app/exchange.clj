@@ -73,40 +73,17 @@
 
   [params ring-params] -> {:soldiers-sold int, :transports-sold int, ...}"
   [params]
-  {:soldiers-sold     (utils/parse-numeric-input (:soldiers-sold params))
-   :transports-sold   (utils/parse-numeric-input (:transports-sold params))
-   :generals-sold     (utils/parse-numeric-input (:generals-sold params))
-   :fighters-sold     (utils/parse-numeric-input (:fighters-sold params))
-   :carriers-sold     (utils/parse-numeric-input (:carriers-sold params))
-   :admirals-sold     (utils/parse-numeric-input (:admirals-sold params))
-   :stations-sold     (utils/parse-numeric-input (:stations-sold params))
-   :cmd-ships-sold    (utils/parse-numeric-input (:cmd-ships-sold params))
-   :agents-sold       (utils/parse-numeric-input (:agents-sold params))
-   :mil-planets-sold  (utils/parse-numeric-input (:mil-planets-sold params))
-   :erg-planets-sold  (utils/parse-numeric-input (:erg-planets-sold params))
-   :ore-planets-sold  (utils/parse-numeric-input (:ore-planets-sold params))
-   :food-bought       (utils/parse-numeric-input (:food-bought params))
-   :food-sold         (utils/parse-numeric-input (:food-sold params))
-   :fuel-bought       (utils/parse-numeric-input (:fuel-bought params))
-   :fuel-sold         (utils/parse-numeric-input (:fuel-sold params))})
+  (into {} (for [spec (concat sell-row-specs buy-row-specs)]
+             [(:qty-key spec) (utils/parse-numeric-input (get params (:qty-key spec)))])))
 
 (defn calculate-exchange-credits
   "Calculate net credit change from selling units/planets and buying/selling resources.
 
   [quantities exchange-quantities, rates exchange-rates] -> {:credits-from-sales int, :credits-from-resources int, :total-credits int}"
   [quantities rates]
-  (let [credits-from-sales    (+ (* (:soldiers-sold quantities)    (:soldier-sell rates))
-                                  (* (:transports-sold quantities)  (:transport-sell rates))
-                                  (* (:generals-sold quantities)    (:general-sell rates))
-                                  (* (:fighters-sold quantities)    (:fighter-sell rates))
-                                  (* (:carriers-sold quantities)    (:carrier-sell rates))
-                                  (* (:admirals-sold quantities)    (:admiral-sell rates))
-                                  (* (:stations-sold quantities)    (:station-sell rates))
-                                  (* (:cmd-ships-sold quantities)   (:cmd-ship-sell rates))
-                                  (* (:agents-sold quantities)      (:agent-sell rates))
-                                  (* (:mil-planets-sold quantities) (:mil-planet-sell rates))
-                                  (* (:erg-planets-sold quantities) (:erg-planet-sell rates))
-                                  (* (:ore-planets-sold quantities) (:ore-planet-sell rates)))
+  (let [credits-from-sales    (reduce + (for [spec sell-row-specs
+                                              :when (not (#{:food-sell :fuel-sell} (:rate-key spec)))]
+                                          (* (get quantities (:qty-key spec)) (get rates (:rate-key spec)))))
         credits-from-resources (- (+ (* (:food-sold quantities)   (:food-sell rates))
                                       (* (:fuel-sold quantities)   (:fuel-sell rates)))
                                    (+ (* (:food-bought quantities) (:food-buy rates))
@@ -186,74 +163,6 @@
 ;;;; UI Components
 ;;;;
 
-(defn- snapshot-section
-  "Render the 2-row × 9-column empire snapshot grid.
-
-  [player player-map] -> hiccup"
-  [player]
-  (let [row1 [["CREDITS"    (:player/credits player)    nil]
-               ["FOOD"       (:player/food player)       nil]
-               ["FUEL"       (:player/fuel player)       nil]
-               ["POPULATION" (:player/population player) nil]
-               ["STABILITY"  (:player/stability player)  nil]
-               ["GALAXARS"   (:player/galaxars player)   nil]
-               ["ORE PLTS"   (:player/ore-planets player) nil]
-               ["ERG PLTS"   (:player/erg-planets player) nil]
-               ["MIL PLTS"   (:player/mil-planets player) nil]]
-        row2 [["SOLDIERS"   (:player/soldiers player)   nil]
-               ["TRANSPORTS" (:player/transports player) nil]
-               ["GENERALS"   (:player/generals player)   nil]
-               ["FIGHTERS"   (:player/fighters player)   nil]
-               ["CARRIERS"   (:player/carriers player)   nil]
-               ["ADMIRALS"   (:player/admirals player)   nil]
-               ["STATIONS"   (:player/stations player)   nil]
-               ["CMD SHIPS"  (:player/cmd-ships player)  nil]
-               ["AGENTS"     (:player/agents player)     nil]]
-        render-row
-        (fn [items]
-          [:div {:style {:display "grid" :grid-template-columns "repeat(9, 1fr)" :gap "4px"}}
-           (for [[label v display-fn] items]
-             [:div {:key label}
-              [:div {:style {:color "#4a6a58" :letter-spacing "0.04em" :font-size "9px"
-                             :text-transform "uppercase" :overflow "hidden"
-                             :text-overflow "ellipsis" :white-space "nowrap"}}
-               label]
-              [:div.font-bold {:style {:color "#9adaaa" :font-size "13px"}}
-               (if display-fn (display-fn v) (ui/format-number v))]])])]
-    [:div
-     {:style {:background "#0a120d" :border "1px solid #1e3a2a"
-              :border-radius "3px" :padding "7px 10px" :overflow-x "auto"}}
-     [:div.flex.justify-between.items-center.mb-2
-      [:span.text-xs.uppercase {:style {:letter-spacing "0.15em" :color "#4ade80"}} "Snapshot"]
-      [:span.text-xs {:style {:color "#7ab88a" :letter-spacing "0.1em"}} "STATS @ T-0"]]
-     [:div.flex.flex-col {:style {:gap "6px" :min-width "500px"}}
-      (render-row row1)
-      (render-row row2)]]))
-
-(defn- projection-pill
-  "Render one projection pill matching the building page pill style.
-
-  [title str, total number, rows [{:keys [label value suffix id]}]] -> hiccup"
-  [title total rows & [{:keys [total-id]}]]
-  [:div.flex.flex-col.gap-1
-   {:style {:border "1px solid #253530" :border-radius "3px"
-            :padding "6px 8px" :background "#1e1e1e"}}
-   [:div.flex.justify-between.items-baseline
-    [:span.text-base.font-bold.text-green-400 title]
-    [:span.text-xs
-     (cond-> {:style {:color (if (neg? total) "#f87171" "#7ab88a")}}
-       total-id (assoc :id total-id))
-     (if (neg? total) "-" "+") (ui/format-number (Math/abs (long total)))]]
-   [:div {:class "flex flex-col gap-0.5"}
-    (for [{:keys [label value suffix id]} rows]
-      [:span.text-xs.inline-block.rounded-sm.text-green-400
-       (cond-> {:style {:padding "1px 5px" :background "#1a3a28"}}
-         id (assoc :id id))
-       label " "
-       (if (neg? value) "-" "+")
-       (ui/format-number (Math/abs (long value)))
-       " " suffix])]])
-
 (defn- projections-section
   "Render the three expense-coverage pills: Credits, Food, Fuel.
   Shows current holdings, expense requirements, and exchange impact.
@@ -272,25 +181,23 @@
         fuel-required (:fuel req-totals)
         fuel-total    (- fuel-current fuel-required)]
     [:div
-     [:div.text-xs.uppercase.mb-1
-      {:style {:letter-spacing "0.12em" :color "#7ab88a"}}
-      "Expense Coverage"]
+     (ui/section-label "Expense Coverage")
      [:div {:class "grid grid-cols-1 md:grid-cols-3 gap-1.5"}
-      (projection-pill "Credits" cr-total
+      (ui/projection-pill "Credits" cr-total
         [{:label "Current"  :value cr-current      :suffix "cr"}
          {:label "Required" :value (- cr-required) :suffix "cr"}
          {:label "Exchange" :value 0               :suffix "cr" :id "credits-pill-exchange"}]
-        {:total-id "projection-credits-total"})
-      (projection-pill "Food" food-total
+        {:total-id "projection-credits-total" :signed? true})
+      (ui/projection-pill "Food" food-total
         [{:label "Current"  :value food-current      :suffix "food"}
          {:label "Required" :value (- food-required) :suffix "food"}
          {:label "Exchange" :value 0                  :suffix "food" :id "food-pill-exchange"}]
-        {:total-id "projection-food-total"})
-      (projection-pill "Fuel" fuel-total
+        {:total-id "projection-food-total" :signed? true})
+      (ui/projection-pill "Fuel" fuel-total
         [{:label "Current"  :value fuel-current      :suffix "fuel"}
          {:label "Required" :value (- fuel-required) :suffix "fuel"}
          {:label "Exchange" :value 0                  :suffix "fuel" :id "fuel-pill-exchange"}]
-        {:total-id "projection-fuel-total"})]]))
+        {:total-id "projection-fuel-total" :signed? true})]]))
 
 (defn- exchange-table-header
   "Render the column-label row for a sell or buy table.
@@ -350,24 +257,6 @@
       {:style {:color (if (pos? credit-value) "#4ade80" "#3a5040")}}
       [:span {:id credit-id}
        (if (pos? credit-value) [:<> "+" (ui/format-number credit-value)] "—")]]]))
-
-(defn submit-button
-  "Renders the submit button with terminal-shell styling.
-
-  ([can-execute? bool]) ([can-execute? bool, extra-attrs map]) -> hiccup"
-  ([can-execute?] (submit-button can-execute? {}))
-  ([can-execute? extra-attrs]
-   [:button#submit-button.text-sm.tracking-wider.rounded-sm
-    (merge {:type "submit"
-            :disabled (not can-execute?)
-            :style (merge {:padding "5px 14px" :font-family "'Courier New', monospace"
-                           :letter-spacing "0.05em" :border-radius "2px"}
-                          (if can-execute?
-                            {:border "1px solid #4ade80" :background "#1a3a28" :color "#4ade80"}
-                            {:border "1px solid #253530" :background "transparent"
-                             :color "#7ab88a" :opacity "0.5" :cursor "not-allowed"}))}
-           extra-attrs)
-    "Make Exchange"]))
 
 ;;;;
 ;;;; Actions
@@ -450,24 +339,9 @@
             (ui/format-number max-qty)])
 
          ;; OOB: pill Exchange rows
-         [:span#credits-pill-exchange.text-xs.inline-block.rounded-sm.text-green-400
-          {:hx-swap-oob "true" :style {:padding "1px 5px" :background "#1a3a28"}}
-          "Exchange "
-          (if (neg? exchange-credits) "-" "+")
-          (ui/format-number (Math/abs (long exchange-credits)))
-          " cr"]
-         [:span#food-pill-exchange.text-xs.inline-block.rounded-sm.text-green-400
-          {:hx-swap-oob "true" :style {:padding "1px 5px" :background "#1a3a28"}}
-          "Exchange "
-          (if (neg? exchange-food) "-" "+")
-          (ui/format-number (Math/abs (long exchange-food)))
-          " food"]
-         [:span#fuel-pill-exchange.text-xs.inline-block.rounded-sm.text-green-400
-          {:hx-swap-oob "true" :style {:padding "1px 5px" :background "#1a3a28"}}
-          "Exchange "
-          (if (neg? exchange-fuel) "-" "+")
-          (ui/format-number (Math/abs (long exchange-fuel)))
-          " fuel"]
+         (ui/oob-pill "credits-pill-exchange" "Exchange" exchange-credits "cr")
+         (ui/oob-pill "food-pill-exchange"    "Exchange" exchange-food    "food")
+         (ui/oob-pill "fuel-pill-exchange"    "Exchange" exchange-fuel    "fuel")
 
          ;; OOB: pill totals
          [:span#projection-credits-total
@@ -499,7 +373,7 @@
                  "⚠ Cannot buy more than you can afford."])))]
 
          ;; OOB: submit button
-         (submit-button can-execute? {:hx-swap-oob "true"})]))))
+         (ui/submit-button can-execute? "Make Exchange" {:hx-swap-oob "true"})]))))
 
 ;;;;
 ;;;; Page
@@ -523,21 +397,10 @@
                 :font-family "'Courier New', monospace"}}
 
        ;; Scanline overlay
-       [:div.absolute.inset-0.pointer-events-none.z-10
-        {:style {:background "repeating-linear-gradient(to bottom, transparent 0px, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 3px)"}}]
+       (ui/scanline-overlay)
 
        ;; Topbar
-       [:div.flex.items-center.justify-between
-        {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
-        [:div
-         [:div.text-3xl.font-bold.text-green-400
-          {:style {:letter-spacing "0.05em"}}
-          (:player/empire-name player)]
-         [:div.text-sm.mt-px
-          {:style {:color "#9adaaa"}}
-          (str "EXCHANGE · Turn " (:player/current-turn player)
-               " · Round " (:player/current-round player))]]
-        (ui/phase-stepper (:player/current-phase player))]
+       (ui/phase-topbar player "EXCHANGE")
 
        ;; Form wraps body + action bar
        (biff/form
@@ -549,16 +412,14 @@
           {:style {:padding "10px 14px"}}
 
           ;; 1. Snapshot
-          (snapshot-section player)
+          (ui/snapshot-section player)
 
           ;; 2. Expense coverage pills
           (projections-section player game)
 
           ;; 3. Sell table
           [:div
-           [:div.text-xs.uppercase.mb-1
-            {:style {:letter-spacing "0.12em" :color "#7ab88a"}}
-            "Sell Assets"]
+           (ui/section-label "Sell Assets")
            [:div.overflow-hidden
             {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
             (exchange-table-header "Sell")
@@ -569,9 +430,7 @@
 
           ;; 4. Buy table
           [:div
-           [:div.text-xs.uppercase.mb-1
-            {:style {:letter-spacing "0.12em" :color "#7ab88a"}}
-            "Buy Resources"]
+           (ui/section-label "Buy Resources")
            [:div.overflow-hidden
             {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
             (exchange-table-header "Buy")
@@ -591,10 +450,5 @@
          ;; Action bar
          [:div.flex.gap-2
           {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
-          [:a.text-sm.no-underline
-           {:href  (str "/app/game/" player-id "/expenses")
-            :style {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
-                    :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
-                    :font-family "'Courier New', monospace"}}
-           "Back to Expenses"]
-          (submit-button false)])])))
+          (ui/action-bar-link (str "/app/game/" player-id "/expenses") "Back to Expenses")
+          (ui/submit-button false "Make Exchange")])])))

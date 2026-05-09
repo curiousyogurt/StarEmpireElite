@@ -76,6 +76,14 @@
   .btn {
     @apply bg-blue-500 hover:bg-blue-700 text-center py-2 px-4 rounded disabled:opacity-50 text-white;
   }
+
+  /* Income phase: two separate row grids, shown at different breakpoints */
+  .income-row-mobile  { display: grid; grid-template-columns: 80px 1fr 1fr 1fr; }
+  .income-row-desktop { grid-template-columns: 160px 12fr 5fr 5fr 5fr; }
+
+  /* Expenses phase: two separate row grids, shown at different breakpoints */
+  .expense-row-mobile  { display: grid; grid-template-columns: 40px 4fr 6fr 3fr; }
+  .expense-row-desktop { grid-template-columns: 100px 10fr 4fr 11fr 4fr; }
 }
 
 @layer utilities {
@@ -132,18 +140,6 @@
 }
 
 .grecaptcha-badge { visibility: hidden; }
-
-/* Income phase: two separate row grids, shown at different breakpoints */
-@layer components {
-  .income-row-mobile  { display: grid; grid-template-columns: 80px 1fr 1fr 1fr; }
-  .income-row-desktop { grid-template-columns: 160px 12fr 5fr 5fr 5fr; }
-}
-
-/* Expenses phase: two separate row grids, shown at different breakpoints */
-@layer components {
-  .expense-row-mobile  { display: grid; grid-template-columns: 40px 4fr 6fr 3fr; }
-  .expense-row-desktop { grid-template-columns: 100px 10fr 4fr 11fr 4fr; }
-}
 
 /* Show queued-action warning and cancel button when a radio target is selected */
 .queued-warning, .cancel-target { display: none; }

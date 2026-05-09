@@ -10,6 +10,7 @@
 (ns com.star-empire-elite.ui
   (:require [cheshire.core :as cheshire]
             [clojure.java.io :as io]
+            [clojure.string :as str]
             [com.star-empire-elite.settings :as settings]
             [com.biffweb :as biff]
             [ring.middleware.anti-forgery :as csrf]
@@ -90,6 +91,99 @@
         :else           (str r)))))
 
 ;;;;
+;;;; SVG Indicator Bar
+;;;;
+
+(def ^:private nice-scale-multipliers [1 2.5 5 7.5])
+
+(def ^:private nice-scales
+  "Nice scale ceilings for SVG resource bars."
+  (vec (for [exp (range 1 35) m nice-scale-multipliers]
+         (* m (Math/pow 10 exp)))))
+
+(defn- choose-scale-max
+  "Choose a nice scale ceiling for a resource bar.
+
+  [before number, after number] -> number"
+  [before after]
+  (let [needed (max 1 (double before) (double after))]
+    (or (first (drop-while #(< % needed) nice-scales))
+        needed)))
+
+(defn- fmt-tick
+  "Format a number for a scale-bar tick label. Values below 1000 are rendered as plain
+  integers; thousands as e.g. '2.5K' with trailing '.0' stripped; larger values delegate
+  to format-number-str.
+
+  [v number] -> string"
+  [v]
+  (let [abs-v (Math/abs (double v))
+        sign  (if (neg? (double v)) "-" "")]
+    (cond
+      (< abs-v 1000)    (format "%.0f" (double v))
+      (< abs-v 1000000) (str sign (str/replace (format "%.1f" (/ abs-v 1000.0)) #"\.0$" "") "K")
+      :else             (format-number-str v))))
+
+(defn svg-indicator-bar
+  "Render an SVG arrow indicator bar with HTML tick labels below.
+
+  direction :gain renders a right-pointing arrow showing a resource increase;
+  direction :loss renders a left-pointing arrow showing a resource deduction.
+
+  For :gain pass amount as the 'after' value; for :loss pass amount as the 'payment'.
+
+  [direction keyword, before number, amount number, filter-id str] -> hiccup"
+  [direction before amount filter-id]
+  (let [after      (if (= direction :gain)
+                     (double amount)
+                     (max 0.0 (- (double before) (double amount))))
+        scale-max  (choose-scale-max before after)
+        x-before   (min (* (/ (double before) scale-max) 100.0) 100.0)
+        x-after    (min (* (/ after           scale-max) 100.0) 100.0)
+        has-arrow? (if (= direction :gain) (> after before) (pos? amount))
+        ly         5
+        arrow-w    3.5
+        arrow-h    2.5]
+    [:div.flex.flex-col.justify-center.h-full.px-8
+     [:svg.block.w-full.overflow-visible.mt-1.mb-1
+      {:viewBox "0 0 100 10" :preserveAspectRatio "none" :style {:height "8px"}}
+      [:defs
+       [:filter {:id filter-id :x "-50%" :y "-50%" :width "200%" :height "200%"}
+        [:feGaussianBlur {:stdDeviation "0.8" :result "blur"}]
+        [:feMerge
+         [:feMergeNode {:in "blur"}]
+         [:feMergeNode {:in "SourceGraphic"}]]]]
+      [:line {:x1 0 :y1 ly :x2 100 :y2 ly :stroke "#152a1e" :stroke-width "0.8"}]
+      (when has-arrow?
+        (let [[tip-x base-x line-x2]
+              (if (= direction :gain)
+                [(- x-after arrow-w)
+                 (- x-after (* 2 arrow-w))
+                 (- x-after (* 2.55 arrow-w))]
+                [x-after
+                 (+ x-after (* 2 arrow-w))
+                 (+ x-after (* 2.55 arrow-w))])]
+          (list
+            [:line {:x1 x-before :y1 ly :x2 line-x2 :y2 ly
+                    :stroke "#4ade80" :stroke-width "1.2"
+                    :filter (str "url(#" filter-id ")")}]
+            [:polygon {:points (str tip-x "," ly " "
+                                    base-x "," (- ly arrow-h) " "
+                                    base-x "," (+ ly arrow-h))
+                       :fill "#4ade80"
+                       :filter (str "url(#" filter-id ")")}])))
+      [:line {:x1 0   :y1 (+ ly 1) :x2 0   :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
+      [:line {:x1 25  :y1 (+ ly 1) :x2 25  :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
+      [:line {:x1 50  :y1 (+ ly 1) :x2 50  :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
+      [:line {:x1 75  :y1 (+ ly 1) :x2 75  :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
+      [:line {:x1 100 :y1 (+ ly 1) :x2 100 :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]]
+     [:div.text-xs.text-gray-400.relative.mb-2
+      {:style {:height "1em"}}
+      [:span.absolute.left-0 "0"]
+      [:span.absolute {:style {:left "50%" :transform "translateX(-50%)"}} (fmt-tick (* 0.5 scale-max))]
+      [:span.absolute.right-0 (fmt-tick scale-max)]]]))
+
+;;;;
 ;;;; Phase Navigation
 ;;;;
 
@@ -156,6 +250,35 @@
      (phase-indicator current-phase)]]))
 
 ;;;;
+;;;; Terminal Shell Components
+;;;;
+
+(defn scanline-overlay
+  "Render the absolute-positioned scanline overlay used in all terminal-shell pages.
+
+  [] -> hiccup"
+  []
+  [:div.absolute.inset-0.pointer-events-none.z-10
+   {:style {:background "repeating-linear-gradient(to bottom, transparent 0px, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 3px)"}}])
+
+(defn phase-topbar
+  "Render the terminal-shell topbar with empire name, turn/round subtitle, and phase stepper.
+
+  [player player-map, phase-label str] -> hiccup"
+  [player phase-label]
+  [:div.flex.items-center.justify-between
+   {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
+   [:div
+    [:div.text-3xl.font-bold.text-green-400
+     {:style {:letter-spacing "0.05em"}}
+     (:player/empire-name player)]
+    [:div.text-sm.mt-px
+     {:style {:color "#9adaaa"}}
+     (str phase-label " · Turn " (:player/current-turn player)
+          " · Round " (:player/current-round player))]]
+   (phase-stepper (:player/current-phase player))])
+
+;;;;
 ;;;; Page Shell
 ;;;;
 
@@ -217,6 +340,164 @@
               (if (= status 404)
                 "Page not found."
                 "Something went wrong.")]))})
+
+;;;;
+;;;; Shared Phase Components
+;;;;
+
+(defn submit-button
+  "Render the terminal-shell submit button. Disabled state shows muted appearance.
+  extra-attrs is merged into the button element — used for hx-swap-oob in HTMX responses.
+
+  ([affordable? bool, label str])
+  ([affordable? bool, label str, extra-attrs map]) -> hiccup"
+  ([affordable? label] (submit-button affordable? label {}))
+  ([affordable? label extra-attrs]
+   [:button#submit-button.text-sm.tracking-wider.rounded-sm
+    (merge {:type "submit"
+            :disabled (not affordable?)
+            :style (merge {:padding "5px 14px" :font-family "'Courier New', monospace"
+                           :letter-spacing "0.05em" :border-radius "2px"}
+                          (if affordable?
+                            {:border "1px solid #4ade80" :background "#1a3a28" :color "#4ade80"}
+                            {:border "1px solid #253530" :background "transparent"
+                             :color "#7ab88a" :opacity "0.5" :cursor "not-allowed"}))}
+           extra-attrs)
+    label]))
+
+(defn section-label
+  "Render a small uppercase section-label div used above every phase section.
+
+  [text str] -> hiccup"
+  [text]
+  [:div.text-xs.uppercase.mb-1
+   {:style {:letter-spacing "0.12em" :color "#7ab88a"}}
+   text])
+
+(defn action-bar-link
+  "Render a navigation link styled to match the terminal-shell action bar.
+
+  [href str, label str] -> hiccup"
+  [href label]
+  [:a.text-sm.no-underline
+   {:href  href
+    :style {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
+            :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
+            :font-family "'Courier New', monospace"}}
+   label])
+
+(defn snapshot-section
+  "Render the 2-row × 9-column empire snapshot grid used on the building and exchange pages.
+  Row 1: Credits, Food, Fuel, Galaxars, Population, Stability, Ore Plts, Erg Plts, Mil Plts.
+  Row 2: Soldiers, Transports, Generals, Fighters, Carriers, Admirals, Stations, Cmd Ships, Agents.
+
+  [player player-map] -> hiccup"
+  [player]
+  (let [row1 [["CREDITS"    (:player/credits player)     nil]
+               ["FOOD"       (:player/food player)        nil]
+               ["FUEL"       (:player/fuel player)        nil]
+               ["GALAXARS"   (:player/galaxars player)    nil]
+               ["POPULATION" (:player/population player)  #(str (str/replace (format "%.1f" (double %)) #"\.0$" "") "M")]
+               ["STABILITY"  (:player/stability player)   #(str % "%")]
+               ["ORE PLTS"   (:player/ore-planets player) nil]
+               ["ERG PLTS"   (:player/erg-planets player) nil]
+               ["MIL PLTS"   (:player/mil-planets player) nil]]
+        row2 [["SOLDIERS"   (:player/soldiers player)   nil]
+               ["TRANSPORTS" (:player/transports player) nil]
+               ["GENERALS"   (:player/generals player)   nil]
+               ["FIGHTERS"   (:player/fighters player)   nil]
+               ["CARRIERS"   (:player/carriers player)   nil]
+               ["ADMIRALS"   (:player/admirals player)   nil]
+               ["STATIONS"   (:player/stations player)   nil]
+               ["CMD SHIPS"  (:player/cmd-ships player)  nil]
+               ["AGENTS"     (:player/agents player)     nil]]
+        render-row
+        (fn [items]
+          [:div {:style {:display "grid" :grid-template-columns "repeat(9, 1fr)" :gap "4px"}}
+           (for [[label v display-fn] items]
+             [:div {:key label}
+              [:div {:style {:color "#4a6a58" :letter-spacing "0.04em" :font-size "9px"
+                             :text-transform "uppercase" :overflow "hidden"
+                             :text-overflow "ellipsis" :white-space "nowrap"}}
+               label]
+              [:div.font-bold {:style {:color "#9adaaa" :font-size "13px"}}
+               (if display-fn (display-fn v) (format-number v))]])])]
+    [:div
+     {:style {:background "#0a120d" :border "1px solid #1e3a2a"
+              :border-radius "3px" :padding "7px 10px" :overflow-x "auto"}}
+     [:div.flex.justify-between.items-center.mb-2
+      [:span.text-xs.uppercase
+       {:style {:letter-spacing "0.15em" :color "#4ade80"}}
+       "Snapshot"]
+      [:span.text-xs
+       {:style {:color "#7ab88a" :letter-spacing "0.1em"}}
+       "STATS @ T-0"]]
+     [:div.flex.flex-col {:style {:gap "6px" :min-width "500px"}}
+      (render-row row1)
+      (render-row row2)]]))
+
+(defn projection-pill
+  "Render one projection pill card with a title, right-aligned total, and breakdown rows.
+
+  opts may contain:
+  - :total-id — element id for HTMX OOB updates on the total span
+  - :signed?  — when true, prefix total with a sign and color it red when negative (default false)
+
+  [title str, total number, rows [{:keys [label value suffix id]}], opts map] -> hiccup"
+  [title total rows & [{:keys [total-id signed?]}]]
+  [:div.flex.flex-col.gap-1
+   {:style {:border "1px solid #253530" :border-radius "3px"
+            :padding "6px 8px" :background "#1e1e1e"}}
+   [:div.flex.justify-between.items-baseline
+    [:span.text-base.font-bold.text-green-400 title]
+    [:span.text-xs
+     (cond-> {:style {:color (if (and signed? (neg? total)) "#f87171" "#7ab88a")}}
+       total-id (assoc :id total-id))
+     (if signed?
+       (list (if (neg? total) "-" "+") (format-number (Math/abs (long total))))
+       (format-number total))]]
+   [:div {:class "flex flex-col gap-0.5"}
+    (for [{:keys [label value suffix id]} rows]
+      [:span.text-xs.inline-block.rounded-sm.text-green-400
+       (cond-> {:style {:padding "1px 5px" :background "#1a3a28"}}
+         id (assoc :id id))
+       label " "
+       (if (neg? value) "-" "+")
+       (format-number (Math/abs (long value)))
+       " " suffix])]])
+
+(defn deduction-table-header
+  "Render the Item/Before/Change/After column-label row for expense and building deduction tables.
+  Emits two variants: mobile (4-col, no bar) and desktop (5-col, with bar placeholder).
+
+  [] -> hiccup"
+  []
+  (let [header-style {:background "#151f1a" :border-bottom "1px solid #253530"}
+        header-class "gap-4 py-1 px-2 items-center"
+        col-style    {:letter-spacing "0.08em" :color "#4ade80"}
+        item-style   (assoc col-style :letter-spacing "0.1em")
+        label        (fn [text style extra-class]
+                       [:span.text-xs.uppercase {:class extra-class :style style} text])
+        r            (fn [text] (label text col-style "text-right justify-self-end"))
+        c            (fn [text] (label text col-style "text-center justify-self-center"))]
+    [:<>
+     [:div.expense-row-mobile {:class (str "md:hidden " header-class) :style header-style}
+      (label "Item" item-style nil) (r "Before") (c "Change") (r "After")]
+     [:div.expense-row-desktop {:class (str "hidden md:grid " header-class) :style header-style}
+      (label "Item" item-style nil) [:span] (r "Before") (c "Change") (r "After")]]))
+
+(defn oob-pill
+  "Render a signed OOB pill span for HTMX out-of-band updates.
+  Prefixes value with + or - sign and appends suffix.
+
+  [id str, label str, value number, suffix str] -> hiccup"
+  [id label value suffix]
+  [:span.text-xs.inline-block.rounded-sm.text-green-400
+   {:id id :hx-swap-oob "true" :style {:padding "1px 5px" :background "#1a3a28"}}
+   label " "
+   (if (neg? value) "-" "+")
+   (format-number (Math/abs (long value)))
+   " " suffix])
 
 ;;;;
 ;;;; Resource Display
