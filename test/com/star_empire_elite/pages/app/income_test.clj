@@ -278,35 +278,80 @@
         (is (nil? (:player/current-round (first @tx-atom)))))))  )
 
 ;;;;
-;;;; income-row Tests
+;;;; calculate-resources-after-income Tests
 ;;;;
-;;;; income-row is a pure UI function that renders hiccup. Meaningful assertions are limited
-;;;; to structure (root element) and the fact that sparse income maps are handled correctly
-;;;; — not all planet types produce all resources, so missing keys default to 0.
+;;;; calculate-resources-after-income is a pure function. Tests verify resource deltas and
+;;;; that non-income resources pass through unchanged.
 ;;;;
 
-(deftest test-income-row-renders-hiccup
-  (testing "Returns a hiccup vector with the correct root element"
-    (let [result (income/income-row "Ore" 3 {:credits 500 :fuel 200 :galaxars 100})]
-      (is (vector? result))
-      (is (= :div.border-b.border-green-400.last:border-b-0 (first result))))))
+(def full-test-player
+  "Player with all keys populated, used for calculate-resources-after-income tests."
+  (assoc test-player
+         :player/stability   80
+         :player/transports  3
+         :player/generals    1
+         :player/carriers    2
+         :player/admirals    0
+         :player/cmd-ships   0))
 
-(deftest test-income-row-sparse-income-map
-  (testing "Handles income-map with only a subset of resource keys"
-    ;; Energy planets only produce :food; other keys default to 0 via (or (k m) 0)
-    (is (vector? (income/income-row "Food" 2 {:food 400})))
-    (is (vector? (income/income-row "Mil"  4 {:soldiers 100 :fighters 60 :stations 20})))))
+(deftest test-calculate-resources-after-income-basic
+  (testing "Applies income deltas to the correct resources"
+    (let [income {:ore-credits 300 :erg-food 400 :erg-fuel 100
+                  :mil-soldiers 25 :mil-fighters 15 :mil-stations 5
+                  :tax-credits 500}
+          after  (income/calculate-resources-after-income full-test-player income)]
+      ;; Credits: base + ore + tax
+      (is (= (+ (:player/credits full-test-player) 300 500) (:credits after)))
+      ;; Food: base + erg-food
+      (is (= (+ (:player/food full-test-player) 400) (:food after)))
+      ;; Fuel: base + erg-fuel
+      (is (= (+ (:player/fuel full-test-player) 100) (:fuel after)))
+      ;; Military units increased
+      (is (= (+ (:player/soldiers full-test-player) 25)  (:soldiers after)))
+      (is (= (+ (:player/fighters full-test-player) 15)  (:fighters after)))
+      (is (= (+ (:player/stations full-test-player) 5)   (:stations after))))))
 
-(deftest test-income-row-all-zeros
-  (testing "Renders without error when all income values are zero"
-    ;; Desktop layout dims zero values; this verifies no crash with all-zero input
-    (is (vector? (income/income-row "Ore" 0 {:credits 0 :fuel 0
-                                              :food 0 :soldiers 0 :fighters 0
-                                              :stations 0})))))
+(deftest test-calculate-resources-after-income-pass-through
+  (testing "Non-income resources pass through unchanged"
+    (let [income {:ore-credits 0 :erg-food 0 :erg-fuel 0
+                  :mil-soldiers 0 :mil-fighters 0 :mil-stations 0
+                  :tax-credits 0}
+          after  (income/calculate-resources-after-income full-test-player income)]
+      (is (= (:player/population  full-test-player) (:population after)))
+      (is (= (:player/stability   full-test-player) (:stability  after)))
+      (is (= (:player/galaxars    full-test-player) (:galaxars   after)))
+      (is (= (:player/transports  full-test-player) (:transports after)))
+      (is (= (:player/generals    full-test-player) (:generals   after)))
+      (is (= (:player/carriers    full-test-player) (:carriers   after)))
+      (is (= (:player/admirals    full-test-player) (:admirals   after)))
+      (is (= (:player/cmd-ships   full-test-player) (:cmd-ships  after)))
+      (is (= (:player/agents      full-test-player) (:agents     after)))
+      (is (= (:player/ore-planets full-test-player) (:ore-planets after)))
+      (is (= (:player/erg-planets full-test-player) (:erg-planets after)))
+      (is (= (:player/mil-planets full-test-player) (:mil-planets after))))))
 
-(deftest test-income-row-large-values
-  (testing "Renders without error for very large resource values"
-    (is (vector? (income/income-row "Ore" 1000 {:credits 1234567890 :fuel 999999999})))))
+(deftest test-calculate-resources-after-income-zero-income
+  (testing "All resources unchanged when income is all zeros"
+    (let [zero-income {:ore-credits 0 :erg-food 0 :erg-fuel 0
+                       :mil-soldiers 0 :mil-fighters 0 :mil-stations 0
+                       :tax-credits 0}
+          after       (income/calculate-resources-after-income full-test-player zero-income)]
+      (is (= (:player/credits  full-test-player) (:credits  after)))
+      (is (= (:player/food     full-test-player) (:food     after)))
+      (is (= (:player/fuel     full-test-player) (:fuel     after)))
+      (is (= (:player/soldiers full-test-player) (:soldiers after)))
+      (is (= (:player/fighters full-test-player) (:fighters after)))
+      (is (= (:player/stations full-test-player) (:stations after))))))
+
+(deftest test-calculate-resources-after-income-large-values
+  (testing "Handles large income values without overflow"
+    (let [income {:ore-credits 1000000000 :erg-food 999999999 :erg-fuel 500000000
+                  :mil-soldiers 1000000 :mil-fighters 500000 :mil-stations 100000
+                  :tax-credits 750000000}
+          after  (income/calculate-resources-after-income full-test-player income)]
+      (is (= (+ (:player/credits  full-test-player) 1000000000 750000000) (:credits  after)))
+      (is (= (+ (:player/food     full-test-player) 999999999)             (:food     after)))
+      (is (= (+ (:player/soldiers full-test-player) 1000000)               (:soldiers after))))))
 
 ;;;;
 ;;;; income-page Tests

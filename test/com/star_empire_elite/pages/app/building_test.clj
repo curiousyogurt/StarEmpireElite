@@ -27,7 +27,29 @@
    :game/agent-cost      90
    :game/mil-planet-cost  700
    :game/erg-planet-cost 800
-   :game/ore-planet-cost  900})
+   :game/ore-planet-cost  900
+   ;; Income constants needed by projections-section
+   :game/ore-planet-credits     0
+   :game/erg-planet-food       0
+   :game/erg-planet-fuel       0
+   :game/mil-planet-soldiers    0
+   :game/mil-planet-fighters    0
+   :game/mil-planet-stations    0
+   :game/population-tax-credits 0
+   ;; Upkeep constants needed by projections-section
+   :game/planet-upkeep-credits  0
+   :game/planet-upkeep-food     0
+   :game/soldier-upkeep-credits 0
+   :game/soldier-upkeep-food    0
+   :game/fighter-upkeep-credits 0
+   :game/fighter-upkeep-fuel    0
+   :game/station-upkeep-credits 0
+   :game/station-upkeep-fuel    0
+   :game/agent-upkeep-food      0
+   :game/agent-upkeep-fuel      0
+   :game/population-upkeep-food 0
+   :game/population-upkeep-fuel 0
+   :game/expense-stability-penalty 0})
 
 ;; Player in phase 3 with enough credits to buy most things.
 (def test-player
@@ -35,6 +57,10 @@
    :player/game          test-game-id
    :player/current-phase 3
    :player/empire-name   "Test Empire"
+   :player/current-turn  1
+   :player/current-round 1
+   :player/population    6
+   :player/stability     75
    :player/credits       10000
    :player/soldiers      10
    :player/transports    2
@@ -259,21 +285,3 @@
 (deftest test-building-page-renders
   (testing "Returns a hiccup vector for a standard player"
     (is (vector? (building/building-page {:player test-player :game test-game})))))
-
-(deftest test-purchase-row-renders
-  (testing "Returns a hiccup vector for a typical purchase row"
-    (is (vector? (building/purchase-row "Soldiers" "Soldiers" :soldiers :game/soldier-cost
-                                        0 0 100 test-game test-player-id "form"))))
-  (testing "Renders without error when max-quantity is negative (shown as 0)"
-    (is (vector? (building/purchase-row "Soldiers" "Soldiers" :soldiers :game/soldier-cost
-                                        0 0 -5 test-game test-player-id "form")))))
-
-(deftest test-submit-button-renders
-  (testing "Enabled submit button"
-    (let [btn (building/submit-button true)]
-      (is (vector? btn))
-      (is (not (get (second btn) :disabled)))))
-  (testing "Disabled submit button"
-    (let [btn (building/submit-button false)]
-      (is (vector? btn))
-      (is (get (second btn) :disabled)))))

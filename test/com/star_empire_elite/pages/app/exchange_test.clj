@@ -31,13 +31,39 @@
    :game/food-buy           6
    :game/food-sell          2
    :game/fuel-buy           6
-   :game/fuel-sell          3})
+   :game/fuel-sell          3
+   ;; Income constants needed by projections-section
+   :game/ore-planet-credits     0
+   :game/erg-planet-food       0
+   :game/erg-planet-fuel       0
+   :game/mil-planet-soldiers    0
+   :game/mil-planet-fighters    0
+   :game/mil-planet-stations    0
+   :game/population-tax-credits 0
+   ;; Upkeep constants needed by projections-section
+   :game/planet-upkeep-credits  0
+   :game/planet-upkeep-food     0
+   :game/soldier-upkeep-credits 0
+   :game/soldier-upkeep-food    0
+   :game/fighter-upkeep-credits 0
+   :game/fighter-upkeep-fuel    0
+   :game/station-upkeep-credits 0
+   :game/station-upkeep-fuel    0
+   :game/agent-upkeep-food      0
+   :game/agent-upkeep-fuel      0
+   :game/population-upkeep-food 0
+   :game/population-upkeep-fuel 0
+   :game/expense-stability-penalty 0})
 
 (def test-player
   {:xt/id               test-player-id
    :player/game         test-game-id
    :player/current-phase 2
    :player/empire-name  "Test Empire"
+   :player/current-turn  1
+   :player/current-round 1
+   :player/population   6
+   :player/stability    75
    :player/credits      5000
    :player/soldiers     100
    :player/transports   5
@@ -381,14 +407,4 @@
                                           (:food-buy rates) 0 500 test-player-id "form"))))
     (testing "Renders without error when max-quantity is zero"
       (is (vector? (exchange/exchange-row "Food" "Food" "food-bought"
-                                          (:food-buy rates) 0 0 test-player-id "form"))))))
-
-(deftest test-submit-button-renders
-  (testing "Enabled submit button"
-    (let [btn (exchange/submit-button true)]
-      (is (vector? btn))
-      (is (not (get (second btn) :disabled)))))
-  (testing "Disabled submit button"
-    (let [btn (exchange/submit-button false)]
-      (is (vector? btn))
-      (is (get (second btn) :disabled)))))
+                                          (:food-buy rates) 0 0 test-player-id "form")))))))

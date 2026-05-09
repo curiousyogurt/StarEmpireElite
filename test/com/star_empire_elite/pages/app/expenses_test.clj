@@ -78,24 +78,18 @@
 ;; Use atoms and with-redefs to verify that biff/submit-tx is called with expected data
 (deftest test-apply-expenses-submits-tx
   (testing "Correct transaction data is submitted and player is advanced to phase 3"
-    ;; Test inputs: all expenses paid for, check calculations
+    ;; Test inputs: consolidated three-resource payments.
+    ;; credits-pay = 225 (planets) + 18 (soldiers) + 28 (fighters) + 24 (stations) = 295
+    ;; food-pay    = 3 (planets) + 27 (soldiers) + 24 (agents) + 18 (population)   = 72
+    ;; fuel-pay    = 21 (fighters) + 16 (stations) + 13 (agents) + 63 (population) = 113
     (let [tx-called (atom nil)
-          params {:planets-pay "225"       ; 3 planets * 75 credits/planet
-                  :planets-food "3"        ; 3 planets * 1 food/planet
-                  :soldiers-credits "18"   ; small number to test math
-                  :soldiers-food "27"
-                  :fighters-credits "28"   ; 7 fighters * 4 credits/fighter
-                  :fighters-fuel "21"      ; 7 fighters * 3 fuel/fighter
-                  :stations-credits "24"   ; 2 stations * 12 credits
-                  :stations-fuel "16"      ; 2 stations * 8 fuel
-                  :agents-food "24"
-                  :agents-fuel "13"
-                  :population-food "18"
-                  :population-fuel "63"}
-          ;; Expected new resource totals, based on params above
-          expected-credits (- 1000 225 18 28 24)
-          expected-food    (- 800 3 27 24 18)
-          expected-fuel    (- 200 21 16 13 63)]
+          params {:credits-pay "295"
+                  :food-pay    "72"
+                  :fuel-pay    "113"}
+          ;; Expected new resource totals match the original per-category breakdown
+          expected-credits (- 1000 295)
+          expected-food    (- 800 72)
+          expected-fuel    (- 200 113)]
       (with-redefs [xt/entity (helpers/fake-entity [test-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
         (let [ctx {:path-params {:player-id (str test-player-id)}
