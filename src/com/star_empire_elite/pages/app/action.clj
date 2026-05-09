@@ -92,10 +92,6 @@
 ;;;; Page
 ;;;;
 
-;;;;
-;;;; Page
-;;;;
-
 (defn action-page
   "Show the action phase: choose a target empire to attack, or skip combat.
 

@@ -103,10 +103,6 @@
 ;;;; Page
 ;;;;
 
-;;;;
-;;;; Page
-;;;;
-
 (defn espionage-page
   "Show the espionage phase: choose a target and operation, or skip.
 
