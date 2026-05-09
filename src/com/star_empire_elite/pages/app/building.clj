@@ -184,7 +184,7 @@
      [:div {:class "grid grid-cols-1 md:grid-cols-3 gap-1.5"}
       (ui/projection-pill "Credits" credits-total credits-rows {:total-id "projection-credits-total"})
       (ui/projection-pill "Food"    food-total    food-rows {:total-id "projection-food-total"})
-      (ui/projection-pill "Fuel"    fuel-total    fuel-rows {:total-id "projection-fuel-total"})]])
+      (ui/projection-pill "Fuel"    fuel-total    fuel-rows {:total-id "projection-fuel-total"})]]))
 
 (defn- build-table-header
   "Render the column-label row for the build orders table.

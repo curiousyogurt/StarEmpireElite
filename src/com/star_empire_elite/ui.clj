@@ -393,24 +393,26 @@
 
   [player player-map] -> hiccup"
   [player]
-  (let [row1 [["CREDITS"    (:player/credits player)     nil]
+  (let [row1 [["CREDITS"    (:player/credits player)      nil]
                ["FOOD"       (:player/food player)        nil]
                ["FUEL"       (:player/fuel player)        nil]
                ["GALAXARS"   (:player/galaxars player)    nil]
-               ["POPULATION" (:player/population player)  #(str (str/replace (format "%.1f" (double %)) #"\.0$" "") "M")]
-               ["STABILITY"  (:player/stability player)   #(str % "%")]
+               ["POPULATION" (:player/population player)
+                \#(str (str/replace (format "%.1f" (double %)) #"\.0$" "") "M")]
+               ["STABILITY"  (:player/stability player)
+                #(str % "%")]
                ["ORE PLTS"   (:player/ore-planets player) nil]
                ["ERG PLTS"   (:player/erg-planets player) nil]
                ["MIL PLTS"   (:player/mil-planets player) nil]]
-        row2 [["SOLDIERS"   (:player/soldiers player)   nil]
-               ["TRANSPORTS" (:player/transports player) nil]
-               ["GENERALS"   (:player/generals player)   nil]
-               ["FIGHTERS"   (:player/fighters player)   nil]
-               ["CARRIERS"   (:player/carriers player)   nil]
-               ["ADMIRALS"   (:player/admirals player)   nil]
-               ["STATIONS"   (:player/stations player)   nil]
-               ["CMD SHIPS"  (:player/cmd-ships player)  nil]
-               ["AGENTS"     (:player/agents player)     nil]]
+        row2 [["SOLDIERS"   (:player/soldiers player)     nil]
+               ["TRANSPORTS" (:player/transports player)  nil]
+               ["GENERALS"   (:player/generals player)    nil]
+               ["FIGHTERS"   (:player/fighters player)    nil]
+               ["CARRIERS"   (:player/carriers player)    nil]
+               ["ADMIRALS"   (:player/admirals player)    nil]
+               ["STATIONS"   (:player/stations player)    nil]
+               ["CMD SHIPS"  (:player/cmd-ships player)   nil]
+               ["AGENTS"     (:player/agents player)      nil]]
         render-row
         (fn [items]
           [:div {:style {:display "grid" :grid-template-columns "repeat(9, 1fr)" :gap "4px"}}
