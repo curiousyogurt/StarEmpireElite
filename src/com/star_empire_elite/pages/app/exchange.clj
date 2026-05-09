@@ -164,6 +164,78 @@
    :invalid-fuel-purchase?      (and (> (:fuel-bought quantities) 0) (< (:credits resources-after) 0))})
 
 ;;;;
+;;;; SVG Indicator Bar
+;;;;
+
+(defn- exchange-resource-bar
+  "Render a bidirectional SVG indicator bar for exchange resources.
+  Points right when after >= before (gain), left when after < before (loss).
+
+  [before int, after int, filter-id str] -> hiccup"
+  [before after filter-id]
+  (if (>= after before)
+    (ui/svg-indicator-bar :gain before after filter-id)
+    (ui/svg-indicator-bar :loss before (- before after) filter-id)))
+
+(defn- exchange-bar-row
+  "Render one resource row in two variants: mobile (no bar) and desktop (with bar).
+  Bar direction is determined dynamically based on net change.
+
+  [name str, before int, after int, filter-id str] -> hiccup"
+  [name before after filter-id]
+  (let [delta      (- after before)
+        slug       (str/lower-case name)
+        row-class  "items-center gap-2 py-1 px-3"
+        row-style  {:border-bottom "1px solid #1a2820" :background "#121a18"}
+        name-cell  [:div.text-base.font-bold.text-green-400 name]
+        before-cell [:div.text-base.text-right
+                     {:style {:color "#7ab88a"}}
+                     (ui/format-number before)]
+        change-cell (fn [id]
+                      [:div.text-base.text-right.whitespace-nowrap
+                       {:style {:letter-spacing "0.03em"
+                                :color (cond (zero? delta) "#7ab88a"
+                                             (pos? delta)  "#4ade80"
+                                             :else         "#f87171")}}
+                       [:span {:id id}
+                        (if (zero? delta)
+                          "-"
+                          [:<> (if (pos? delta) "+" "−") (ui/format-number (Math/abs (long delta)))])]])
+        after-cell  (fn [id]
+                      [:div.text-base.text-right
+                       [:span {:id id
+                               :style {:color (if (neg? after) "#f87171" "#4ade80")
+                                       :font-weight "bold"}}
+                        (ui/format-number after)]])]
+    [:<>
+     ;; Mobile: 4-col grid, no bar
+     [:div.expense-row-mobile
+      {:class (str "md:hidden " row-class) :style row-style}
+      name-cell before-cell
+      (change-cell (str "change-exchange-" slug "-m"))
+      (after-cell  (str "after-exchange-"  slug "-m"))]
+     ;; Desktop: 5-col grid, with bar
+     [:div.expense-row-desktop
+      {:class (str "hidden md:grid " row-class) :style row-style}
+      name-cell
+      [:div {:id (str "bar-exchange-" slug)} (exchange-resource-bar before after filter-id)]
+      before-cell
+      (change-cell (str "change-exchange-" slug "-d"))
+      (after-cell  (str "after-exchange-"  slug "-d"))]]))
+
+(defn- exchange-bar-table
+  "Render the Credits/Food/Fuel indicator bar table showing net resource changes from exchange.
+
+  [player player-map, resources-after {:credits int, :food int, :fuel int}] -> hiccup"
+  [player resources-after]
+  [:div.overflow-hidden
+   {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
+   (ui/deduction-table-header)
+   (exchange-bar-row "Credits" (:player/credits player) (:credits resources-after) "glow-ex-credits")
+   (exchange-bar-row "Food"    (:player/food    player) (:food    resources-after) "glow-ex-food")
+   (exchange-bar-row "Fuel"    (:player/fuel    player) (:fuel    resources-after) "glow-ex-fuel")])
+
+;;;;
 ;;;; UI Components
 ;;;;
 
@@ -358,6 +430,51 @@
           {:hx-swap-oob "true" :style {:color (if (neg? fuel-total) "#f87171" "#7ab88a")}}
           (if (neg? fuel-total) "-" "+") (ui/format-number (Math/abs (long fuel-total)))]
 
+         ;; OOB: exchange summary bar table — bars, change spans, after spans
+         (let [cr-before   (:player/credits player)
+               food-before (:player/food    player)
+               fuel-before (:player/fuel    player)
+               cr-after    (:credits resources-after)
+               food-after  (:food    resources-after)
+               fuel-after  (:fuel    resources-after)
+               cr-delta    (- cr-after   cr-before)
+               food-delta  (- food-after food-before)
+               fuel-delta  (- fuel-after fuel-before)
+               oob-bar     (fn [id before after filter-id]
+                             [:div {:id id :hx-swap-oob "true"}
+                              (exchange-resource-bar before after filter-id)])
+               oob-after   (fn [id v]
+                             [:span {:id id :hx-swap-oob "true"
+                                     :style {:color (if (neg? v) "#f87171" "#4ade80")
+                                             :font-weight "bold"}}
+                              (ui/format-number v)])
+               oob-change  (fn [id delta]
+                             [:span {:id id :hx-swap-oob "true"
+                                     :style {:letter-spacing "0.03em"
+                                             :color (cond (zero? delta) "#7ab88a"
+                                                          (pos? delta)  "#4ade80"
+                                                          :else         "#f87171")}}
+                              (if (zero? delta)
+                                "-"
+                                [:<> (if (pos? delta) "+" "−")
+                                 (ui/format-number (Math/abs (long delta)))])])]
+           (list
+             (oob-bar    "bar-exchange-credits"    cr-before   cr-after   "glow-ex-credits")
+             (oob-bar    "bar-exchange-food"        food-before food-after "glow-ex-food")
+             (oob-bar    "bar-exchange-fuel"        fuel-before fuel-after "glow-ex-fuel")
+             (oob-change "change-exchange-credits-m" cr-delta)
+             (oob-change "change-exchange-credits-d" cr-delta)
+             (oob-change "change-exchange-food-m"    food-delta)
+             (oob-change "change-exchange-food-d"    food-delta)
+             (oob-change "change-exchange-fuel-m"    fuel-delta)
+             (oob-change "change-exchange-fuel-d"    fuel-delta)
+             (oob-after  "after-exchange-credits-m"  cr-after)
+             (oob-after  "after-exchange-credits-d"  cr-after)
+             (oob-after  "after-exchange-food-m"     food-after)
+             (oob-after  "after-exchange-food-d"     food-after)
+             (oob-after  "after-exchange-fuel-m"     fuel-after)
+             (oob-after  "after-exchange-fuel-d"     fuel-after)))
+
          ;; OOB: warning message
          [:div#exchange-warning.flex.items-center
           {:hx-swap-oob "true"}
@@ -431,6 +548,13 @@
               (exchange-row (:label spec) (:abbrev spec) (:field spec)
                             (get rates (:rate-key spec)) 0
                             (get player (:player-key spec)) player-id exchange-hx-include))]]
+
+          ;; 3b. Exchange summary bar table
+          [:div
+           (ui/section-label "Exchange Summary")
+           (exchange-bar-table player {:credits (:player/credits player)
+                                       :food    (:player/food    player)
+                                       :fuel    (:player/fuel    player)})]
 
           ;; 4. Buy table
           [:div
