@@ -460,8 +460,8 @@
                                  (ui/format-number (Math/abs (long delta)))])])]
            (list
              (oob-bar    "bar-exchange-credits"    cr-before   cr-after   "glow-ex-credits")
-             (oob-bar    "bar-exchange-food"        food-before food-after "glow-ex-food")
-             (oob-bar    "bar-exchange-fuel"        fuel-before fuel-after "glow-ex-fuel")
+             (oob-bar    "bar-exchange-food"       food-before food-after "glow-ex-food")
+             (oob-bar    "bar-exchange-fuel"       fuel-before fuel-after "glow-ex-fuel")
              (oob-change "change-exchange-credits-m" cr-delta)
              (oob-change "change-exchange-credits-d" cr-delta)
              (oob-change "change-exchange-food-m"    food-delta)
