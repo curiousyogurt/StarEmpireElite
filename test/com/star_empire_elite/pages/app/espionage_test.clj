@@ -18,6 +18,9 @@
    :player/game         test-game-id
    :player/empire-name  "Test Empire"
    :player/current-phase 5
+   :player/current-turn  1
+   :player/current-round 1
+   :player/population    0
    :player/score        1000
    :player/agents       3})
 
@@ -65,12 +68,13 @@
   (testing "Returns a hiccup table row"
     (let [result (espionage/target-row test-target)]
       (is (vector? result))
-      (is (= :tr.border-b.border-green-400 (first result)))))
+      (is (= :tr (first result)))))
 
   (testing "Displays correct total planet count"
-    ;; test-target: 2 mil + 1 food + 3 ore = 6 planets.
-    (let [planet-td (nth (espionage/target-row test-target) 2)]
-      (is (= 6 (second planet-td))))))
+    ;; row: [:tr {attrs} [:td empire-name] [:td total-planets] [:td score] [:td op] [:td op] [:td op]]
+    ;; index 0=:tr, 1=attrs-map, 2=empire-td, 3=planets-td; planets-td is [:td {attrs} 6].
+    (let [planet-td (nth (espionage/target-row test-target) 3)]
+      (is (= 6 (last planet-td))))))
 
 ;;;;
 ;;;; espionage-page Tests

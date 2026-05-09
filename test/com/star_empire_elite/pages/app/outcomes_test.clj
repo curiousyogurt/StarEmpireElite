@@ -28,6 +28,7 @@
    :player/turns-used               0
    ;; Resources (needed for score calculation)
    :player/credits                  5000
+   :player/population               0
    :player/mil-planets              3
    :player/erg-planets             2
    :player/ore-planets              1

@@ -131,18 +131,20 @@
    {:label "Military" :pt-key :mil  :separator? true}])
 
 (defn- incoming-battle-row [label dc dl al unit-key loss-key special? separator-below?]
-  [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
-   [:td.py-1 label]
-   [:td.text-right.px-3 (get dc unit-key)]
-   [:td.text-right.px-3 (get dl loss-key)]
-   [:td.text-right (if special? "—" (get al loss-key))]])
+  [:tr {:style {:border-bottom (if separator-below? "1px solid #4ade80" "1px solid #253530")
+                :background "#121a18"}}
+   [:td {:style {:padding "4px 0" :color "#9adaaa"}} label]
+   [:td {:style {:text-align "right" :padding "4px 12px" :color "#9adaaa"}} (get dc unit-key)]
+   [:td {:style {:text-align "right" :padding "4px 12px" :color "#9adaaa"}} (get dl loss-key)]
+   [:td {:style {:text-align "right" :color "#9adaaa"}} (if special? "—" (get al loss-key))]])
 
 (defn- incoming-planet-row [label def-losses separator-below?]
-  [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
-   [:td.py-1 label]
-   [:td.text-right.px-3 "—"]
-   [:td.text-right.px-3 def-losses]
-   [:td.text-right "—"]])
+  [:tr {:style {:border-bottom (if separator-below? "1px solid #4ade80" "1px solid #253530")
+                :background "#121a18"}}
+   [:td {:style {:padding "4px 0" :color "#9adaaa"}} label]
+   [:td {:style {:text-align "right" :padding "4px 12px" :color "#9adaaa"}} "—"]
+   [:td {:style {:text-align "right" :padding "4px 12px" :color "#9adaaa"}} def-losses]
+   [:td {:style {:text-align "right" :color "#9adaaa"}} "—"]])
 
 (defn- incoming-attack-section [result]
   (let [att-wins? (:attacker-wins? result)
@@ -150,20 +152,22 @@
         dc        (:defender-counts result)
         al        (:attacker-losses result)
         dl        (:defender-losses result)
-        pt        (:planets-transferred result)]
-    [:div.border.border-green-400.p-4.mb-4
-     [:h3.font-bold.mb-3
+        pt        (:planets-transferred result)
+        th-style  {:color "#4ade80"}]
+    [:div {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"
+                   :padding "12px"}}
+     [:h3.font-bold.mb-3 {:style {:color "#4ade80"}}
       (if att-wins?
         (str "Attacked by " att-name " — defeat")
         (str "Attacked by " att-name " — repelled"))]
      [:div.overflow-x-auto
       [:table.w-full.text-xs.table-fixed
        [:thead
-        [:tr.border-b.border-green-400
-         [:th.text-left.py-1  {:style {:width "10%"}} "Item"]
-         [:th.text-right.py-1 {:style {:width "30%"}} "Your Forces"]
-         [:th.text-right.py-1 {:style {:width "30%"}} "Your Losses"]
-         [:th.text-right.py-1 {:style {:width "30%"}} (str att-name " Losses")]]]
+        [:tr {:style {:border-bottom "1px solid #4ade80"}}
+         [:th.text-left.py-1  {:style (assoc th-style :width "10%")} "Item"]
+         [:th.text-right.py-1 {:style (assoc th-style :width "30%")} "Your Forces"]
+         [:th.text-right.py-1 {:style (assoc th-style :width "30%")} "Your Losses"]
+         [:th.text-right.py-1 {:style (assoc th-style :width "30%")} (str att-name " Losses")]]]
        [:tbody
         (for [spec battle-unit-specs]
           (incoming-battle-row (:label spec) dc dl al (:unit-key spec) (:loss-key spec)
@@ -172,22 +176,20 @@
           (incoming-planet-row (:label spec) (get pt (:pt-key spec)) (:separator? spec)))]]]]))
 
 (defn- battle-row [label af al dl att-key loss-key special? separator-below?]
-  [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
-   [:td.py-1 label]
-   [:td.text-right.px-3 (if special? "—" (get af att-key))]
-   [:td.text-right.px-3 (if special? "—" (get al loss-key))]
-   [:td.text-right (get dl loss-key)]])
+  [:tr {:style {:border-bottom (if separator-below? "1px solid #4ade80" "1px solid #253530")
+                :background "#121a18"}}
+   [:td {:style {:padding "4px 0" :color "#9adaaa"}} label]
+   [:td {:style {:text-align "right" :padding "4px 12px" :color "#9adaaa"}} (if special? "—" (get af att-key))]
+   [:td {:style {:text-align "right" :padding "4px 12px" :color "#9adaaa"}} (if special? "—" (get al loss-key))]
+   [:td {:style {:text-align "right" :color "#9adaaa"}} (get dl loss-key)]])
 
 (defn- planet-row [label enemy-losses att-wins? separator-below?]
-  [:tr {:class (if separator-below? "border-b border-green-400" "border-b border-green-400 border-opacity-30")}
-   [:td.py-1 label]
-   [:td.text-right.px-3 "—"]
-   [:td.text-right.px-3 "—"]
-   [:td.text-right (if att-wins? enemy-losses "—")]])
-
-;;;;
-;;;; Actions
-;;;;
+  [:tr {:style {:border-bottom (if separator-below? "1px solid #4ade80" "1px solid #253530")
+                :background "#121a18"}}
+   [:td {:style {:padding "4px 0" :color "#9adaaa"}} label]
+   [:td {:style {:text-align "right" :padding "4px 12px" :color "#9adaaa"}} "—"]
+   [:td {:style {:text-align "right" :padding "4px 12px" :color "#9adaaa"}} "—"]
+   [:td {:style {:text-align "right" :color "#9adaaa"}} (if att-wins? enemy-losses "—")]])
 
 (defn apply-outcomes
   "Advance turn/round/phase and clear stored battle and espionage results.
@@ -247,164 +249,173 @@
   [{:keys [player game battle-result espionage-result pop-growth expense-penalty breakaway-result recovery-result eliminated?]}]
   (let [current-turn       (:player/current-turn player)
         turns-per-round    (:game/turns-per-round game)
-        end-current-round? (>= current-turn turns-per-round)]
+        end-current-round? (>= current-turn turns-per-round)
+        card-style         {:border "1px solid #253530" :border-radius "3px" :background "#161616"
+                            :padding "12px"}
+        th-style           {:color "#4ade80"}]
     (ui/page
      {}
-     [:div.mx-auto.max-w-4xl.w-full.text-green-400.font-mono
-      [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
+     [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
+      {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
+               :border-radius "4px" :color "#4ade80"
+               :font-family "'Courier New', monospace"}}
+      (ui/scanline-overlay)
+      (ui/phase-topbar player "OUTCOMES PHASE")
+      ;; Body
+      [:div.flex.flex-col.gap-2
+       {:style {:padding "10px 14px"}}
 
-      (ui/phase-header (:player/current-phase player) "OUTCOMES"
-                       (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
+       ;; Incoming attacks section (attacks received from other players this turn)
+       (let [incoming         (seq (:player/incoming-attacks player))
+             esp-fails        (or (:player/incoming-espionage-fails player) 0)
+             esp-agents       (or (:player/incoming-espionage-agents-gained player) 0)
+             incite-stab-lost (or (:player/incoming-incite-stability-lost player) 0)
+             bomb-result      (some-> (:player/incoming-bomb-result player) clojure.core/read-string)]
+         (when (or incoming (pos? esp-fails) (pos? incite-stab-lost) bomb-result)
+           [:div.flex.flex-col.gap-2
+            (for [r incoming]
+              (incoming-attack-section (clojure.core/read-string r)))
+            (when (pos? esp-fails)
+              [:div {:style card-style}
+               [:p.font-bold {:style {:color "#4ade80"}}
+                (str esp-fails " covert operation(s) against your empire were discovered and neutralized.")
+                (when (pos? esp-agents)
+                  (str " " esp-agents " captured agent(s) joined your forces."))]])
+            (when (pos? incite-stab-lost)
+              [:div {:style card-style}
+               [:p.font-bold {:style {:color "#facc15"}}
+                (str "Enemy agents successfully incited unrest in your empire. Stability reduced by "
+                     incite-stab-lost ".")]])
+            (when bomb-result
+              [:div {:style card-style}
+               [:p.font-bold.mb-2 {:style {:color "#facc15"}} "Enemy bombing raid struck your empire:"]
+               [:div.grid.grid-cols-2.gap-x-8.gap-y-1
+                [:p.text-xs {:style {:color "#9adaaa"}} (str "Soldiers lost:   " (:soldiers-destroyed   bomb-result))]
+                [:p.text-xs {:style {:color "#9adaaa"}} (str "Transports lost: " (:transports-destroyed bomb-result))]
+                [:p.text-xs {:style {:color "#9adaaa"}} (str "Fighters lost:   " (:fighters-destroyed   bomb-result))]
+                [:p.text-xs {:style {:color "#9adaaa"}} (str "Carriers lost:   " (:carriers-destroyed   bomb-result))]]])]))
 
-      ;; Incoming attacks section (attacks received from other players this turn)
-      (let [incoming         (seq (:player/incoming-attacks player))
-            esp-fails        (or (:player/incoming-espionage-fails player) 0)
-            esp-agents       (or (:player/incoming-espionage-agents-gained player) 0)
-            incite-stab-lost (or (:player/incoming-incite-stability-lost player) 0)
-            bomb-result      (some-> (:player/incoming-bomb-result player) clojure.core/read-string)]
-        (when (or incoming (pos? esp-fails) (pos? incite-stab-lost) bomb-result)
-          [:div
-           (for [r incoming]
-             (incoming-attack-section (clojure.core/read-string r)))
-           (when (pos? esp-fails)
-             [:div.border.border-green-400.p-4.mb-4
-              [:p.font-bold
-               (str esp-fails " covert operation(s) against your empire were discovered and neutralized.")
-               (when (pos? esp-agents)
-                 (str " " esp-agents " captured agent(s) joined your forces."))]])
-           (when (pos? incite-stab-lost)
-             [:div.border.border-green-400.p-4.mb-4
-              [:p.font-bold.text-yellow-400
-               (str "Enemy agents successfully incited unrest in your empire. Stability reduced by "
-                    incite-stab-lost ".")]])
-           (when bomb-result
-             [:div.border.border-green-400.p-4.mb-4
-              [:p.font-bold.text-yellow-400.mb-2 "Enemy bombing raid struck your empire:"]
-              [:div.grid.grid-cols-2.gap-x-8.gap-y-1
-               [:p.text-xs (str "Soldiers lost:   " (:soldiers-destroyed   bomb-result))]
-               [:p.text-xs (str "Transports lost: " (:transports-destroyed bomb-result))]
-               [:p.text-xs (str "Fighters lost:   " (:fighters-destroyed   bomb-result))]
-               [:p.text-xs (str "Carriers lost:   " (:carriers-destroyed   bomb-result))]]])]))
+       ;; Battle result section (only shown when an attack was declared)
+       (when battle-result
+         (let [att-wins? (:attacker-wins? battle-result)
+               ac        (:attacker-counts battle-result)
+               al        (:attacker-losses battle-result)
+               dl        (:defender-losses battle-result)
+               def-name  (:defender-name battle-result)
+               pt        (:planets-transferred battle-result)]
+           [:div {:style card-style}
+            [:h3.font-bold.mb-3 {:style {:color "#4ade80"}}
+             (if att-wins? (str "Victory against " def-name) (str "Defeat by " def-name))]
+            [:div.overflow-x-auto
+             [:table.w-full.text-xs.table-fixed
+              [:thead
+               [:tr {:style {:border-bottom "1px solid #4ade80"}}
+                [:th.text-left.py-1  {:style (assoc th-style :width "10%")} "Item"]
+                [:th.text-right.py-1 {:style (assoc th-style :width "30%")} "Your Forces"]
+                [:th.text-right.py-1 {:style (assoc th-style :width "30%")} "Your Losses"]
+                [:th.text-right.py-1 {:style (assoc th-style :width "30%")} (str def-name " Losses")]]]
+              [:tbody
+               (for [spec battle-unit-specs]
+                 (battle-row (:label spec) ac al dl (:unit-key spec) (:loss-key spec)
+                             (:special? spec) (:separator? spec)))
+               (for [spec planet-specs]
+                 (planet-row (:label spec) (get pt (:pt-key spec)) att-wins? (:separator? spec)))]]]]))
 
-      ;; Battle result section (only shown when an attack was declared)
-      (when battle-result
-        (let [att-wins? (:attacker-wins? battle-result)
-              ac        (:attacker-counts battle-result)
-              al        (:attacker-losses battle-result)
-              dl        (:defender-losses battle-result)
-              def-name  (:defender-name battle-result)
-              pt        (:planets-transferred battle-result)]
-          [:div.border.border-green-400.p-4.mb-4
-           [:h3.font-bold.mb-3
-            (if att-wins? (str "Victory against " def-name) (str "Defeat by " def-name))]
-           [:div.overflow-x-auto
-            [:table.w-full.text-xs.table-fixed
-             [:thead
-              [:tr.border-b.border-green-400
-               [:th.text-left.py-1   {:style {:width "10%"}} "Item"]
-               [:th.text-right.py-1  {:style {:width "30%"}} "Your Forces"]
-               [:th.text-right.py-1  {:style {:width "30%"}} "Your Losses"]
-               [:th.text-right.py-1  {:style {:width "30%"}} (str def-name " Losses")]]]
-             [:tbody
-              (for [spec battle-unit-specs]
-                (battle-row (:label spec) ac al dl (:unit-key spec) (:loss-key spec)
-                            (:special? spec) (:separator? spec)))
-              (for [spec planet-specs]
-                (planet-row (:label spec) (get pt (:pt-key spec)) att-wins? (:separator? spec)))]]]]))
-
-      ;; Espionage result section (only shown when an operation was declared)
-      (when espionage-result
-        (let [won?  (:attacker-wins? espionage-result)
-              op    (get espionage-result :op "spy")
-              intel (:intel espionage-result)
-              lost  (or (:agents-captured espionage-result) 0)
-              stab  (:stability-damage espionage-result)]
-          [:div.border.border-green-400.p-4.mb-4
-           [:h3.font-bold.mb-2
+       ;; Espionage result section (only shown when an operation was declared)
+       (when espionage-result
+         (let [won?  (:attacker-wins? espionage-result)
+               op    (get espionage-result :op "spy")
+               intel (:intel espionage-result)
+               lost  (or (:agents-captured espionage-result) 0)
+               stab  (:stability-damage espionage-result)]
+           [:div {:style card-style}
+            [:h3.font-bold.mb-2 {:style {:color "#4ade80"}}
+             (cond
+               (and won? (= op "spy"))    (str "Spy operation against " (:defender-name espionage-result) " succeeded")
+               (and won? (= op "incite")) (str "Incite operation against " (:defender-name espionage-result) " succeeded")
+               (and won? (= op "bomb"))   (str "Bombing raid against " (:defender-name espionage-result) " succeeded")
+               :else                      (str "Operation against " (:defender-name espionage-result) " failed — agents captured"))]
             (cond
-              (and won? (= op "spy"))    (str "Spy operation against " (:defender-name espionage-result) " succeeded")
-              (and won? (= op "incite")) (str "Incite operation against " (:defender-name espionage-result) " succeeded")
-              (and won? (= op "bomb"))   (str "Bombing raid against " (:defender-name espionage-result) " succeeded")
-              :else                      (str "Operation against " (:defender-name espionage-result) " failed — agents captured"))]
-           (cond
-             (and won? (= op "spy"))
-             [:div.grid.grid-cols-2.gap-x-8.gap-y-1
-              [:p.text-xs.font-bold.col-span-2.mb-1 (str (:defender-name espionage-result) "'s military")]
-              [:p.text-xs (str "Soldiers:   " (:soldiers   intel))]
-              [:p.text-xs (str "Transports: " (:transports intel))]
-              [:p.text-xs (str "Generals:   " (:generals   intel))]
-              [:p.text-xs (str "Fighters:   " (:fighters   intel))]
-              [:p.text-xs (str "Carriers:   " (:carriers   intel))]
-              [:p.text-xs (str "Admirals:   " (:admirals   intel))]
-              [:p.text-xs (str "Stations:   " (:stations   intel))]
-              [:p.text-xs (str "Cmd Ships:  " (:cmd-ships  intel))]
-              [:p.text-xs (str "Agents:     " (:agents     intel))]]
+              (and won? (= op "spy"))
+              [:div.grid.grid-cols-2.gap-x-8.gap-y-1
+               [:p.text-xs.font-bold.col-span-2.mb-1 {:style {:color "#4ade80"}}
+                (str (:defender-name espionage-result) "'s military")]
+               [:p.text-xs {:style {:color "#9adaaa"}} (str "Soldiers:   " (:soldiers   intel))]
+               [:p.text-xs {:style {:color "#9adaaa"}} (str "Transports: " (:transports intel))]
+               [:p.text-xs {:style {:color "#9adaaa"}} (str "Generals:   " (:generals   intel))]
+               [:p.text-xs {:style {:color "#9adaaa"}} (str "Fighters:   " (:fighters   intel))]
+               [:p.text-xs {:style {:color "#9adaaa"}} (str "Carriers:   " (:carriers   intel))]
+               [:p.text-xs {:style {:color "#9adaaa"}} (str "Admirals:   " (:admirals   intel))]
+               [:p.text-xs {:style {:color "#9adaaa"}} (str "Stations:   " (:stations   intel))]
+               [:p.text-xs {:style {:color "#9adaaa"}} (str "Cmd Ships:  " (:cmd-ships  intel))]
+               [:p.text-xs {:style {:color "#9adaaa"}} (str "Agents:     " (:agents     intel))]]
 
-             (and won? (= op "incite"))
-             [:p.text-xs
-              (str "Your agents successfully stirred unrest. "
-                   (:defender-name espionage-result) "'s stability was reduced by " stab ".")]
+              (and won? (= op "incite"))
+              [:p.text-xs {:style {:color "#9adaaa"}}
+               (str "Your agents successfully stirred unrest. "
+                    (:defender-name espionage-result) "'s stability was reduced by " stab ".")]
 
-             (and won? (= op "bomb"))
-             [:div.grid.grid-cols-2.gap-x-8.gap-y-1
-              [:p.text-xs.font-bold.col-span-2.mb-1 (str "Units destroyed in " (:defender-name espionage-result) ":")]
-              [:p.text-xs (str "Soldiers:   " (or (:soldiers-destroyed   espionage-result) 0))]
-              [:p.text-xs (str "Transports: " (or (:transports-destroyed espionage-result) 0))]
-              [:p.text-xs (str "Fighters:   " (or (:fighters-destroyed   espionage-result) 0))]
-              [:p.text-xs (str "Carriers:   " (or (:carriers-destroyed   espionage-result) 0))]]
+              (and won? (= op "bomb"))
+              [:div.grid.grid-cols-2.gap-x-8.gap-y-1
+               [:p.text-xs.font-bold.col-span-2.mb-1 {:style {:color "#4ade80"}}
+                (str "Units destroyed in " (:defender-name espionage-result) ":")]
+               [:p.text-xs {:style {:color "#9adaaa"}} (str "Soldiers:   " (or (:soldiers-destroyed   espionage-result) 0))]
+               [:p.text-xs {:style {:color "#9adaaa"}} (str "Transports: " (or (:transports-destroyed espionage-result) 0))]
+               [:p.text-xs {:style {:color "#9adaaa"}} (str "Fighters:   " (or (:fighters-destroyed   espionage-result) 0))]
+               [:p.text-xs {:style {:color "#9adaaa"}} (str "Carriers:   " (or (:carriers-destroyed   espionage-result) 0))]]
 
-             :else
-             [:p.text-xs
-              (str "Your agents were unable to complete their mission. "
-                   lost " agent(s) were captured by " (:defender-name espionage-result) ".")])]))
+              :else
+              [:p.text-xs {:style {:color "#9adaaa"}}
+               (str "Your agents were unable to complete their mission. "
+                    lost " agent(s) were captured by " (:defender-name espionage-result) ".")])]))
 
-      ;; Stability section — only shown when at least one stability event occurred
-      (let [has-penalty?   (and (some? expense-penalty) (pos? expense-penalty))
-            has-breakaway? (and (some? breakaway-result) (:triggered? breakaway-result))
-            has-recovery?  (and (some? recovery-result) (:triggered? recovery-result))]
-        (when (or has-penalty? has-breakaway? has-recovery?)
-          [:div.border.border-green-400.p-4.mb-4
-           [:h3.font-bold.mb-3 "Stability"]
-           (when has-penalty?
-             [:p.text-xs.mb-2.text-yellow-400
-              (str "Empire stability decreases due to unpaid expenses: −" expense-penalty "%")])
-           (when has-breakaway?
-             (let [lost-str (clojure.string/join ", "
-                              (keep identity
-                                [(when (pos? (:ore-lost breakaway-result))
-                                   (str (:ore-lost breakaway-result) " ore planet(s)"))
-                                 (when (pos? (:erg-lost breakaway-result))
-                                   (str (:erg-lost breakaway-result) " energy planet(s)"))
-                                 (when (pos? (:mil-lost breakaway-result))
-                                   (str (:mil-lost breakaway-result) " military planet(s)"))]))]
-               [:p.text-xs.mb-2.text-red-400
-                (str "Empire instability prompts revolution. Lost: " lost-str)]))
-           (when has-recovery?
-             [:p.text-xs.text-green-400
-              (str "Empire stability increases due to paid expenses: +" (:amount recovery-result) "%")])]))
+       ;; Stability section — only shown when at least one stability event occurred
+       (let [has-penalty?   (and (some? expense-penalty) (pos? expense-penalty))
+             has-breakaway? (and (some? breakaway-result) (:triggered? breakaway-result))
+             has-recovery?  (and (some? recovery-result) (:triggered? recovery-result))]
+         (when (or has-penalty? has-breakaway? has-recovery?)
+           [:div {:style card-style}
+            [:h3.font-bold.mb-3 {:style {:color "#4ade80"}} "Stability"]
+            (when has-penalty?
+              [:p.text-xs.mb-2 {:style {:color "#facc15"}}
+               (str "Empire stability decreases due to unpaid expenses: −" expense-penalty "%")])
+            (when has-breakaway?
+              (let [lost-str (clojure.string/join ", "
+                               (keep identity
+                                 [(when (pos? (:ore-lost breakaway-result))
+                                    (str (:ore-lost breakaway-result) " ore planet(s)"))
+                                  (when (pos? (:erg-lost breakaway-result))
+                                    (str (:erg-lost breakaway-result) " energy planet(s)"))
+                                  (when (pos? (:mil-lost breakaway-result))
+                                    (str (:mil-lost breakaway-result) " military planet(s)"))]))]
+                [:p.text-xs.mb-2 {:style {:color "#f87171"}}
+                 (str "Empire instability prompts revolution. Lost: " lost-str)]))
+            (when has-recovery?
+              [:p.text-xs {:style {:color "#4ade80"}}
+               (str "Empire stability increases due to paid expenses: +" (:amount recovery-result) "%")])]))
 
-      ;; Elimination notice (only shown when player has 0 planets)
-      (when eliminated?
-        [:div.border.border-red-400.p-4.mb-4
-         [:h3.font-bold.mb-2.text-red-400 "Empire Eliminated"]
-         [:p.text-xs.text-red-400
-          "Your empire has no planets remaining. You have been eliminated."]])
+       ;; Elimination notice (only shown when player has 0 planets)
+       (when eliminated?
+         [:div {:style (assoc card-style :border "1px solid #f87171")}
+          [:h3.font-bold.mb-2 {:style {:color "#f87171"}} "Empire Eliminated"]
+          [:p.text-xs {:style {:color "#f87171"}}
+           "Your empire has no planets remaining. You have been eliminated."]])
 
-      ;; Population growth section (only shown at end of round)
-      (when (some? pop-growth)
-        [:div.border.border-green-400.p-4.mb-4
-         (if (pos? pop-growth)
-           [:p.font-bold (str "Population grew by " pop-growth " million this round.")]
-           [:p.font-bold "Population held steady this round."])])
+       ;; Population growth section (only shown at end of round)
+       (when (some? pop-growth)
+         [:div {:style card-style}
+          (if (pos? pop-growth)
+            [:p.font-bold {:style {:color "#4ade80"}} (str "Population grew by " pop-growth " million this round.")]
+            [:p.font-bold {:style {:color "#9adaaa"}} "Population held steady this round."])])
 
-      (ui/resource-display-grid player "Resources" false)
+       (ui/snapshot-section player)]
 
-      (biff/form
-       {:action (str "/app/game/" (:xt/id player) "/apply-outcomes")
-        :method "post"}
-       [:div.flex.gap-4.mt-6
-        [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-         {:href (str "/app/game/" (:xt/id player))} "Pause"]
-        [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
-         {:type "submit"}
-         (if end-current-round? "End the Current Round" "Continue to Next Turn")]])])))
+      ;; Action bar
+      [:div.flex.gap-2
+       {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
+       (ui/action-bar-link (str "/app/game/" (:xt/id player)) "Pause")
+       (biff/form
+        {:action (str "/app/game/" (:xt/id player) "/apply-outcomes")
+         :method "post"
+         :style  {:margin 0}}
+        (ui/submit-button true (if end-current-round? "End the Current Round" "Continue to Next Turn")))]])))

@@ -66,18 +66,16 @@
   (let [total-planets (+ (:player/mil-planets player)
                          (:player/erg-planets player)
                          (:player/ore-planets player))
-        player-id-str (str (:xt/id player))]
-    [:tr.border-b.border-green-400
-     [:td.border-r.border-green-400.px-3.py-2.w-56 (:player/empire-name player)]
-     [:td.border-r.border-green-400.px-3.py-2.text-right.w-36 total-planets]
-     [:td.border-r.border-green-400.px-3.py-2.text-right.w-36 (:player/score player)]
-     [:td.border-r.border-green-400.px-3.py-2.w-24 (op-radio "spy"    player-id-str "Spy")]
-     [:td.border-r.border-green-400.px-3.py-2.w-24 (op-radio "incite" player-id-str "Incite")]
-     [:td.px-3.py-2.w-24                           (op-radio "bomb"   player-id-str "Bomb")]]))
-
-;;;;
-;;;; Actions
-;;;;
+        player-id-str (str (:xt/id player))
+        td-border     {:border-right "1px solid #253530" :padding "4px 12px" :color "#9adaaa"}
+        td-right      (assoc td-border :text-align "right")]
+    [:tr {:style {:border-bottom "1px solid #1a2820" :background "#121a18"}}
+     [:td {:style td-border} (:player/empire-name player)]
+     [:td {:style td-right}  total-planets]
+     [:td {:style td-right}  (:player/score player)]
+     [:td {:style td-border} (op-radio "spy"    player-id-str "Spy")]
+     [:td {:style td-border} (op-radio "incite" player-id-str "Incite")]
+     [:td {:style {:padding "4px 12px"}} (op-radio "bomb" player-id-str "Bomb")]]))
 
 (defn apply-espionage
   "Parse the chosen operation and target, store them as pending espionage, and advance to outcomes.
@@ -105,65 +103,73 @@
 ;;;; Page
 ;;;;
 
+;;;;
+;;;; Page
+;;;;
+
 (defn espionage-page
   "Show the espionage phase: choose a target and operation, or skip.
 
   [{:keys [player game db]}] -> hiccup"
   [{:keys [player game db]}]
   (let [player-id     (:xt/id player)
-        other-players (get-other-players db (:player/game player) player-id)]
+        other-players (get-other-players db (:player/game player) player-id)
+        th-style      {:color "#4ade80" :font-size "11px" :letter-spacing "0.08em"
+                       :text-transform "uppercase"}]
     (ui/page
      {}
-     [:div.text-green-400.font-mono
-      [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
-
-      (ui/phase-header (:player/current-phase player) "ESPIONAGE"
-                       (str "Turn " (:player/current-turn player) " | Round " (:player/current-round player)))
-
-      (ui/resource-display-grid player "Resources" false)
-
+     [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
+      {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
+               :border-radius "4px" :color "#4ade80"
+               :font-family "'Courier New', monospace"}}
+      (ui/scanline-overlay)
+      (ui/phase-topbar player "ESPIONAGE PHASE")
       (biff/form
        {:action (str "/app/game/" player-id "/apply-espionage")
-        :method "post"}
+        :method "post"
+        :style  {:margin 0}}
+       ;; Body
+       [:div.flex.flex-col.gap-2
+        {:style {:padding "10px 14px"}}
+        (ui/snapshot-section player)
+        (cond
+          (zero? (:player/agents player))
+          [:p.text-sm {:style {:color "#facc15"}}
+           "\u26a0 You have no agents. You cannot undertake covert operations this turn."]
 
-       (cond
-         (zero? (:player/agents player))
-         [:p.text-yellow-400.mb-6
-          "\u26a0 You have no agents. You cannot undertake covert operations this turn."]
+          (empty? other-players)
+          [:p.text-sm {:style {:color "#9adaaa"}} "There are no other empires to target."]
 
-         (empty? other-players)
-         [:p.mb-6 "There are no other empires to target."]
-
-         :else
-         [:div.mb-6
-          [:h2.text-xl.font-bold.mb-4 "Choose a Target"]
-          [:p.text-sm.mb-4.text-green-400.text-opacity-75
-           "Spy reveals the target's military. Incite reduces their stability. Bomb covertly destroys units."]
-          [:div.overflow-x-auto
-           [:table.w-full.text-sm.border.border-green-400
-            [:thead
-             [:tr.border-b.border-green-400
-              [:th.border-r.border-green-400.px-3.py-2.text-left.w-56 "Empire"]
-              [:th.border-r.border-green-400.px-3.py-2.text-right.w-36 "Planets"]
-              [:th.border-r.border-green-400.px-3.py-2.text-right.w-36 "Score"]
-              [:th.border-green-400.px-3.py-2 {:colspan 3} "Operations"]]]
-            [:tbody
-             (for [target other-players]
-               (target-row target))]]]])
-
-       ;; Warning banner — shown by CSS when an operation is selected
-       [:div.queued-warning.items-center
-        [:p.text-yellow-400 "\u26a0 Operation queued for Outcomes phase."]]
-
-       (ui/incoming-alert player)
-
-       [:div.flex.gap-4
-        [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-         {:href (str "/app/game/" player-id)} "Pause"]
-        [:button.cancel-target.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+          :else
+          [:div
+           (ui/section-label "Choose a Target")
+           [:p.text-xs.mb-2 {:style {:color "#7ab88a"}}
+            "Spy reveals the target's military. Incite reduces their stability. Bomb covertly destroys units."]
+           [:div.overflow-x-auto
+            [:table.w-full.text-sm
+             {:style {:border "1px solid #253530" :border-collapse "collapse"}}
+             [:thead
+              [:tr {:style {:background "#151f1a" :border-bottom "1px solid #253530"}}
+               [:th.text-left.px-3.py-1  {:style th-style} "Empire"]
+               [:th.text-right.px-3.py-1 {:style th-style} "Planets"]
+               [:th.text-right.px-3.py-1 {:style th-style} "Score"]
+               [:th.px-3.py-1 {:colspan 3 :style th-style} "Operations"]]]
+             [:tbody
+              (for [target other-players]
+                (target-row target))]]]])
+        ;; Warning banner — shown by CSS when an operation is selected
+        [:div.queued-warning.items-center
+         [:p.text-sm {:style {:color "#facc15"}} "\u26a0 Operation queued for Outcomes phase."]]
+        (ui/incoming-alert player)]
+       ;; Action bar
+       [:div.flex.gap-2
+        {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
+        (ui/action-bar-link (str "/app/game/" player-id) "Pause")
+        [:button.cancel-target.text-sm
          {:type    "button"
-          :onclick "document.querySelectorAll('[name=espionage-action]').forEach(function(r){r.checked=false;r.dataset.was='false';});"}
+          :onclick "document.querySelectorAll('[name=espionage-action]').forEach(function(r){r.checked=false;r.dataset.was='false';});"
+          :style   {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
+                    :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
+                    :font-family "'Courier New', monospace" :cursor "pointer"}}
          "Cancel Operation"]
-        [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
-         {:type "submit"}
-         "Continue to Outcomes"]])])))
+        (ui/submit-button true "Continue to Outcomes")])])))

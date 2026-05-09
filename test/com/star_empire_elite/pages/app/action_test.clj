@@ -19,6 +19,9 @@
    :player/game         test-game-id
    :player/empire-name  "Test Empire"
    :player/current-phase 4
+   :player/current-turn  1
+   :player/current-round 1
+   :player/population    0
    :player/score        1000})
 
 (def test-target
@@ -82,15 +85,15 @@
   (testing "Returns a hiccup table row vector"
     (let [result (action/target-row test-target)]
       (is (vector? result))
-      (is (= :tr.border-b.border-green-400 (first result)))))
+      (is (= :tr (first result)))))
 
   (testing "Displays total planet count (mil + food + ore)"
     ;; test-target has 2 mil + 1 food + 3 ore = 6 total planets.
-    ;; The planet count appears as the second :td child — we check it contains 6.
+    ;; row: [:tr {attrs} [:td empire-name] [:td total-planets] [:td score] [:td button]]
+    ;; index 0=:tr, 1=attrs-map, 2=empire-td, 3=planets-td; planets-td is [:td {attrs} 6].
     (let [result (action/target-row test-target)
-          ;; row: [:tr ... [:td empire-name] [:td total-planets] [:td score] [:td button]]
-          planet-td (nth result 2)]
-      (is (= 6 (second planet-td))))))
+          planet-td (nth result 3)]
+      (is (= 6 (last planet-td))))))
 
 ;;;;
 ;;;; action-page Tests
