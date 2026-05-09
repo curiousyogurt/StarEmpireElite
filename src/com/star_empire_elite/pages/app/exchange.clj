@@ -46,6 +46,10 @@
     (for [spec (concat sell-row-specs buy-row-specs)]
       (str "[name='" (:field spec) "']"))))
 
+(def ^:private resource-rate-keys
+  "Rate keys for food and fuel that are handled separately from unit/planet credit sales."
+  #{:food-sell :fuel-sell})
+
 (defn get-exchange-rates
   "Extract exchange rates from the game entity.
 
@@ -82,7 +86,7 @@
   [quantities exchange-quantities, rates exchange-rates] -> {:credits-from-sales int, :credits-from-resources int, :total-credits int}"
   [quantities rates]
   (let [credits-from-sales    (reduce + (for [spec sell-row-specs
-                                              :when (not (#{:food-sell :fuel-sell} (:rate-key spec)))]
+                                              :when (not (resource-rate-keys (:rate-key spec)))]
                                           (* (get quantities (:qty-key spec)) (get rates (:rate-key spec)))))
         credits-from-resources (- (+ (* (:food-sold quantities)   (:food-sell rates))
                                       (* (:fuel-sold quantities)   (:fuel-sell rates)))
