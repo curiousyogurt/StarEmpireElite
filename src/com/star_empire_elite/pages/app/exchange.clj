@@ -549,12 +549,6 @@
                             (get rates (:rate-key spec)) 0
                             (get player (:player-key spec)) player-id exchange-hx-include))]]
 
-          ;; 3b. Exchange summary bar table
-          [:div
-           (ui/section-label "Exchange Summary")
-           (exchange-bar-table player {:credits (:player/credits player)
-                                       :food    (:player/food    player)
-                                       :fuel    (:player/fuel    player)})]
 
           ;; 4. Buy table
           [:div
@@ -566,6 +560,13 @@
               (exchange-row (:label spec) (:abbrev spec) (:field spec)
                             (get rates (:rate-key spec)) 0
                             (get max-buy-quantities (:max-key spec)) player-id exchange-hx-include))]]
+
+          ;; 5. Exchange summary bar table
+          [:div
+           (ui/section-label "Exchange Summary")
+           (exchange-bar-table player {:credits (:player/credits player)
+                                       :food    (:player/food    player)
+                                       :fuel    (:player/fuel    player)})]
 
           ;; HTMX swap target (hidden)
           [:div#resources-after {:style {:display "none"}}]
