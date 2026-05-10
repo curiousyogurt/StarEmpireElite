@@ -92,14 +92,29 @@
   (>= (:credits resources-after) 0))
 
 (defn calculate-max-quantities
-  "Calculate the maximum quantity of each item that can be purchased with remaining credits,
-  taking into account credits already committed to other items in the current selection.
+  "Calculate the maximum total quantity of each item that can be selected.
+
+  For each item, the max is computed after accounting for credits committed
+  to all other items, but not the current item's own selected quantity. This
+  keeps an item's max stable when the player enters that item's current max,
+  while still reducing it when other purchases consume credits.
 
   [player player-map, quantities purchase-quantities, game game-map] -> {:soldiers int, :transports int, ...}"
   [player quantities game]
-  (let [remaining-credits (- (:player/credits player) (total-cost quantities game))]
-    (into {} (for [spec purchase-row-specs]
-               [(:qty-key spec) (quot remaining-credits (get game (:cost-key spec)))]))))
+  (let [credits (:player/credits player)]
+    (into {}
+          (for [spec purchase-row-specs
+                :let [qty-key       (:qty-key spec)
+                      cost-per-unit (get game (:cost-key spec))
+                      other-cost    (reduce
+                                      +
+                                      (for [other-spec purchase-row-specs
+                                            :when (not= (:qty-key other-spec) qty-key)]
+                                        (* (get quantities (:qty-key other-spec) 0)
+                                           (get game (:cost-key other-spec)))))
+                      remaining-for-this (- credits other-cost)
+                      max-qty            (quot remaining-for-this cost-per-unit)]]
+            [qty-key max-qty]))))
 
 ;;;;
 ;;;; SVG Deduction Bar
@@ -217,45 +232,67 @@
     [:div.building-purchase-grid
      {:class "building-purchase-grid items-center gap-2 py-1 px-3"
       :style row-style}
+
      ;; Item name: abbreviated on mobile, full on desktop
      [:div.text-base.font-bold.text-green-400
       [:span.lg:hidden (:abbrev spec)]
       [:span.hidden.lg:inline (:label spec)]]
+
      ;; Each (cost per unit)
      [:div.text-base.text-right
       {:style {:color "#7ab88a"}}
       (ui/format-number cost-per-unit)]
+
      ;; Max affordable
      [:div.text-base.text-right
       {:style {:color (if can-afford? "#9adaaa" "#3a5040")}}
-      [:span {:id max-qty-id :data-value (str (if (neg? max-qty) 0 max-qty))}
+      [:span {:id max-qty-id
+              :data-value (str (if (neg? max-qty) 0 max-qty))}
        (ui/format-number (if (neg? max-qty) 0 max-qty))]]
+
      ;; Build input + max button
-     ;; The outer div stretches to fill the grid cell; the input is centered inside it;
-     ;; the max button is positioned absolutely so it doesn't shift the input off-center.
-     [:div.relative.flex.items-center.justify-center
-      [:div {:style {:width "min(120px, 100%)"}}
-       (ui/numeric-input (name (:qty-key spec)) purchase-qty player-id
-                         "/calculate-building" building-hx-include
-                         {:input-class "text-xs lg:text-sm text-right"
-                          :input-style {:color "#7ab88a" :border-color "#2d6644"
-                                        :padding-top "1px" :padding-bottom "1px"}})]
-      [:button.text-xs
-       {:type "button"
-        :style {:position "absolute" :right "0"
-                :border "1px solid #2d6644" :background "transparent" :color "#7ab88a"
-                :padding "1px 4px" :border-radius "2px" :cursor "pointer"
-                :font-family "inherit"}
-        :onclick (str "var s=document.getElementById('" max-qty-id "');"
-                      "var i=document.querySelector('[name=\"" (name (:qty-key spec)) "\"]');"
-                      "if(s&&i){i.value=s.dataset.value||'0';"
-                      "i.dispatchEvent(new Event('input',{bubbles:true}));}")}
-       "max"]]
+     [:div.flex.items-center.justify-center
+      {:style {:min-width "0"}}
+
+      [:div.flex.items-center.gap-1
+       {:style {:min-width "0"
+                :transform "translateX(16px)"}}
+
+       [:div
+        {:style {:width "min(120px, 100%)"
+                 :min-width "0"}}
+        (ui/numeric-input (name (:qty-key spec)) purchase-qty player-id
+                          "/calculate-building" building-hx-include
+                          {:input-class "text-xs lg:text-sm text-right min-w-0"
+                           :input-style {:color "#7ab88a"
+                                         :border-color "#2d6644"
+                                         :padding-top "1px"
+                                         :padding-bottom "1px"}})]
+
+       [:button.text-xs
+        {:type "button"
+         :style {:flex "0 0 auto"
+                 :border "1px solid #2d6644"
+                 :background "transparent"
+                 :color "#7ab88a"
+                 :padding "1px 4px"
+                 :border-radius "2px"
+                 :cursor "pointer"
+                 :font-family "inherit"
+                 :white-space "nowrap"}
+         :onclick (str "var s=document.getElementById('" max-qty-id "');"
+                       "var i=document.querySelector('[name=\"" (name (:qty-key spec)) "\"]');"
+                       "if(s&&i){i.value=s.dataset.value||'0';"
+                                 "i.dispatchEvent(new Event('input',{bubbles:true}));}")}
+        "max"]]]
+
      ;; Line cost
      [:div.text-base.text-right
       {:style {:color (if (pos? item-cost) "#4ade80" "#3a5040")}}
       [:span {:id cost-id}
-       (if (pos? item-cost) (ui/format-number item-cost) "—")]]]))
+       (if (pos? item-cost)
+         (ui/format-number item-cost)
+         "—")]]]))
 
 (defn- build-table
   "Render the full build orders table with header and all purchase rows.
