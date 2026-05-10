@@ -379,12 +379,26 @@
 
   [href str, label str] -> hiccup"
   [href label]
-  [:a
+  [:a.text-sm
    {:href  href
     :style {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
             :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
-            :font-family "'Courier New', monospace" :font-size "13px"
+            :font-family "'Courier New', monospace"
             :text-decoration "none" :display "inline-block"}}
+   label])
+
+(defn action-bar-button
+  "Render a button styled to match the terminal-shell action bar secondary style.
+  Use instead of action-bar-link when an onclick handler is required.
+
+  [label str, onclick str] -> hiccup"
+  [label onclick]
+  [:button.text-sm
+   {:type    "button"
+    :onclick onclick
+    :style   {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
+              :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
+              :font-family "'Courier New', monospace" :cursor "pointer"}}
    label])
 
 (defn snapshot-section

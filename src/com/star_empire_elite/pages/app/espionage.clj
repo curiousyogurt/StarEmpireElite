@@ -143,11 +143,6 @@
        [:div.flex.gap-2
         {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
-        [:button.cancel-target.text-sm
-         {:type    "button"
-          :onclick "document.querySelectorAll('[name=espionage-action]').forEach(function(r){r.checked=false;r.dataset.was='false';});"
-          :style   {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
-                    :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
-                    :font-family "'Courier New', monospace" :cursor "pointer"}}
-         "Cancel Operation"]
+        (ui/action-bar-button "Cancel Operation"
+          "document.querySelectorAll('[name=espionage-action]').forEach(function(r){r.checked=false;r.dataset.was='false';});")
         (ui/submit-button true "Continue to Outcomes")])])))

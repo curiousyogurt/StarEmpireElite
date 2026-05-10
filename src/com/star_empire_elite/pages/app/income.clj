@@ -279,16 +279,9 @@
        ;; Action bar
        [:div.flex.gap-2
         {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
-        (let [btn-base {:padding "5px 14px" :font-family "'Courier New', monospace"
-                        :letter-spacing "0.05em" :border-radius "2px"}]
-          (list
-            (ui/action-bar-link (str "/app/game/" player-id) "Pause")
-            (biff/form
-              {:action (str "/app/game/" player-id "/apply-income") :method "post"
-               :style  {:margin 0}}
-              [:button.text-sm
-               {:type  "submit"
-                :style (merge btn-base {:border "1px solid #4ade80" :background "#1a3a28"
-                                        :color "#4ade80"})}
-               "Continue to Expenses"])))]])))
+        (ui/action-bar-link (str "/app/game/" player-id) "Pause")
+        (biff/form
+          {:action (str "/app/game/" player-id "/apply-income") :method "post"
+           :style  {:margin 0}}
+          (ui/submit-button true "Continue to Expenses"))]])))
 
