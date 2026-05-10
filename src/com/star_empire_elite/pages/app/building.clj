@@ -478,8 +478,8 @@
          ;; OOB: deduction bar (desktop)
          [:div#bar-build-credits {:hx-swap-oob "true"} (deduction-bar (:player/credits player) total "glow-build-credits")]
          ;; OOB: cost change display (mobile + desktop)
-         [:span#build-cost-display-m {:hx-swap-oob "true" :style {:color "#f87171"}} cost-display]
-         [:span#build-cost-display-d {:hx-swap-oob "true" :style {:color "#f87171"}} cost-display]
+         [:span#build-cost-display-m {:hx-swap-oob "true" :style {:color "#4ade80"}} cost-display]
+         [:span#build-cost-display-d {:hx-swap-oob "true" :style {:color "#4ade80"}} cost-display]
          ;; OOB: max quantities per item
          (for [[item-key max-qty] max-quantities]
            [:span {:id (str "max-qty-" (name item-key))
