@@ -279,7 +279,7 @@
        ;; Action bar
        [:div.flex.gap-2
         {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
-        (let [btn-base {:padding "5px 14px" :font-family "'Courier New', monospace"
+        (let [btn-base {:padding "8px 14px" :font-family "'Courier New', monospace"
                         :letter-spacing "0.05em" :border-radius "2px"}]
           (list
             (ui/action-bar-link (str "/app/game/" player-id) "Pause")

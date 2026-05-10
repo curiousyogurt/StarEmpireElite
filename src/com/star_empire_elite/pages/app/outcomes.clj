@@ -415,7 +415,6 @@
        {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
        (ui/action-bar-link (str "/app/game/" (:xt/id player)) "Pause")
        (biff/form
-        {:action (str "/app/game/" (:xt/id player) "/apply-outcomes")
-         :method "post"
+        {:action (str "/app/game/" (:xt/id player) "/apply-outcomes") :method "post"
          :style  {:margin 0}}
         (ui/submit-button true (if end-current-round? "End the Current Round" "Continue to Next Turn")))]])))
