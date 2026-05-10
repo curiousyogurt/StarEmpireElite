@@ -163,12 +163,11 @@
 ;;;;
 
 (deftest test-action-bar-link
-  (testing "Returns an anchor hiccup element with the correct href"
-    (let [result (ui/action-bar-link "/app/game/123" "Pause")]
-      (is (vector? result))
-      (is (= :a.text-sm.no-underline (first result)))
-      (is (= "/app/game/123" (:href (second result))))
-      (is (= "Pause" (last result))))))
+  (testing "Returns an anchor hiccup element with the correct href and label"
+    (let [[tag attrs label] (ui/action-bar-link "/app/game/123" "Pause")]
+      (is (= :a tag))
+      (is (= "/app/game/123" (:href attrs)))
+      (is (= "Pause" label)))))
 
 ;;;;
 ;;;; phase-stepper Tests

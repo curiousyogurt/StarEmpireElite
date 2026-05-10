@@ -3,6 +3,7 @@
             [com.star-empire-elite.pages.app.espionage :as espionage]
             [com.star-empire-elite.test-helpers :as helpers]
             [xtdb.api :as xt]
+            [com.star-empire-elite.utils :as utils]
             [com.biffweb :as biff]))
 
 ;;;;
@@ -49,7 +50,7 @@
     (let [higher {:xt/id (java.util.UUID/randomUUID) :player/score 900}
           lower  {:xt/id (java.util.UUID/randomUUID) :player/score 100}]
       (with-redefs [biff/q (fn [_ _ & _] [lower higher])]
-        (let [result (espionage/get-other-players nil test-game-id test-player-id)]
+        (let [result (utils/get-other-players nil test-game-id test-player-id)]
           (is (= 2 (count result)))
           ;; Higher score first.
           (is (= 900 (:player/score (first  result))))
@@ -58,7 +59,7 @@
 (deftest test-get-other-players-empty
   (testing "Returns empty seq when no other players exist"
     (with-redefs [biff/q (fn [_ _ & _] [])]
-      (is (empty? (espionage/get-other-players nil test-game-id test-player-id))))))
+      (is (empty? (utils/get-other-players nil test-game-id test-player-id))))))
 
 ;;;;
 ;;;; target-row Tests

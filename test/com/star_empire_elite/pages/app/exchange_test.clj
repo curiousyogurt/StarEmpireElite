@@ -94,7 +94,7 @@
 ;;;;
 ;;;; get-exchange-rates Tests
 ;;;;
-;;;; get-exchange-rates is a pure function that extracts rates from the game entity.
+;;;; get-exchange-rate- is a pure function that extracts rates from the game entity.
 ;;;;
 
 (deftest test-get-exchange-rates

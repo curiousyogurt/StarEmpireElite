@@ -3,6 +3,7 @@
             [com.star-empire-elite.pages.app.action :as action]
             [com.star-empire-elite.test-helpers :as helpers]
             [xtdb.api :as xt]
+            [com.star-empire-elite.utils :as utils]
             [com.biffweb :as biff]))
 
 ;;;;
@@ -55,7 +56,7 @@
   (testing "Returns other players in the same game sorted by score descending"
     ;; biff/q returns a seq of pull results — we return them as a flat list.
     (with-redefs [biff/q (fn [_ _ & _] [test-target test-target-2])]
-      (let [result (action/get-other-players nil test-game-id test-player-id)]
+      (let [result (utils/get-other-players nil test-game-id test-player-id)]
         (is (= 2 (count result)))
         ;; Higher score (750) should come first after sort-by score descending.
         (is (= test-target-id-2 (:xt/id (first result))))
@@ -66,13 +67,13 @@
     ;; In practice XTDB filters this via the :where clause, but we verify the
     ;; function handles whatever the query returns.
     (with-redefs [biff/q (fn [_ _ & _] [test-target])]
-      (let [result (action/get-other-players nil test-game-id test-player-id)]
+      (let [result (utils/get-other-players nil test-game-id test-player-id)]
         (is (not (some #(= test-player-id (:xt/id %)) result)))))))
 
 (deftest test-get-other-players-empty-game
   (testing "Returns an empty seq when there are no other players"
     (with-redefs [biff/q (fn [_ _ & _] [])]
-      (let [result (action/get-other-players nil test-game-id test-player-id)]
+      (let [result (utils/get-other-players nil test-game-id test-player-id)]
         (is (empty? result))))))
 
 ;;;;
