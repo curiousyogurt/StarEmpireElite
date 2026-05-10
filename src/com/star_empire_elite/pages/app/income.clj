@@ -63,7 +63,6 @@
 ;;;; UI Components
 ;;;;
 
-
 (defn- source-pills
   "Render income pills for a source card: one pill per non-zero resource.
 

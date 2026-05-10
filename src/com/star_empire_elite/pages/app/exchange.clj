@@ -203,7 +203,8 @@
                        [:span {:id id}
                         (if (zero? delta)
                           "-"
-                          [:<> (if (pos? delta) "+" "−") (ui/format-number (Math/abs (long delta)))])]])
+                          [:<> (if (pos? delta) "+" "−")
+                           (ui/format-number (Math/abs (long delta)))])]])
         after-cell  (fn [id]
                       [:div.text-base.text-right
                        [:span {:id id
