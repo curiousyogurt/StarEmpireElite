@@ -21,7 +21,7 @@
 ;;;; Calculations
 ;;;;
 
-(def sell-row-specs
+(def sell-asset-row-specs
   [{:label "Soldiers"         :abbrev "Soldiers"   :field "soldiers-sold"     :qty-key :soldiers-sold     :rate-key :soldier-sell    :player-key :player/soldiers}
    {:label "Transports"       :abbrev "Transports" :field "transports-sold"   :qty-key :transports-sold   :rate-key :transport-sell  :player-key :player/transports}
    {:label "Generals"         :abbrev "Generals"   :field "generals-sold"     :qty-key :generals-sold     :rate-key :general-sell    :player-key :player/generals}
@@ -33,9 +33,14 @@
    {:label "Agents"           :abbrev "Agents"     :field "agents-sold"       :qty-key :agents-sold       :rate-key :agent-sell      :player-key :player/agents}
    {:label "Military Planets" :abbrev "Mil Plts"   :field "mil-planets-sold"  :qty-key :mil-planets-sold  :rate-key :mil-planet-sell :player-key :player/mil-planets}
    {:label "Energy Planets"   :abbrev "Erg Plts"   :field "erg-planets-sold"  :qty-key :erg-planets-sold  :rate-key :erg-planet-sell :player-key :player/erg-planets}
-   {:label "Ore Planets"      :abbrev "Ore Plts"   :field "ore-planets-sold"  :qty-key :ore-planets-sold  :rate-key :ore-planet-sell :player-key :player/ore-planets}
-   {:label "Food"             :abbrev "Food"       :field "food-sold"         :qty-key :food-sold         :rate-key :food-sell       :player-key :player/food}
+   {:label "Ore Planets"      :abbrev "Ore Plts"   :field "ore-planets-sold"  :qty-key :ore-planets-sold  :rate-key :ore-planet-sell :player-key :player/ore-planets}])
+
+(def sell-resource-row-specs
+  [{:label "Food"             :abbrev "Food"       :field "food-sold"         :qty-key :food-sold         :rate-key :food-sell       :player-key :player/food}
    {:label "Fuel"             :abbrev "Fuel"       :field "fuel-sold"         :qty-key :fuel-sold         :rate-key :fuel-sell       :player-key :player/fuel}])
+
+(def sell-row-specs
+  (concat sell-asset-row-specs sell-resource-row-specs))
 
 (def buy-row-specs
   [{:label "Food" :abbrev "Food" :field "food-bought" :qty-key :food-bought :rate-key :food-buy :max-key :max-food}
@@ -538,19 +543,29 @@
           ;; 2. Expense coverage pills
           (projections-section player game)
 
-          ;; 3. Sell table
+          ;; 3. Sell Assets table
           [:div
            (ui/section-label "Sell Assets")
            [:div.overflow-hidden
             {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
             (exchange-table-header "Sell")
-            (for [spec sell-row-specs]
+            (for [spec sell-asset-row-specs]
               (exchange-row (:label spec) (:abbrev spec) (:field spec)
                             (get rates (:rate-key spec)) 0
                             (get player (:player-key spec)) player-id exchange-hx-include))]]
 
+          ;; 4. Sell Resources table
+          [:div
+           (ui/section-label "Sell Resources")
+           [:div.overflow-hidden
+            {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
+            (exchange-table-header "Sell")
+            (for [spec sell-resource-row-specs]
+              (exchange-row (:label spec) (:abbrev spec) (:field spec)
+                            (get rates (:rate-key spec)) 0
+                            (get player (:player-key spec)) player-id exchange-hx-include))]]
 
-          ;; 4. Buy table
+          ;; 5. Buy table
           [:div
            (ui/section-label "Buy Resources")
            [:div.overflow-hidden
