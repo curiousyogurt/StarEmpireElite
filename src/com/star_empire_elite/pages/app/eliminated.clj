@@ -92,22 +92,45 @@
     (let [error (get-in ctx [:query-params :error])]
       (ui/page
        {}
-       [:div.mx-auto.max-w-lg.mt-16.p-8.border.border-red-400.text-green-400.font-mono
-        [:h1.text-2xl.font-bold.mb-4.text-red-400 "Empire Eliminated"]
-        [:p.text-sm.mb-8
-         (str "The " (:player/empire-name player) " has fallen. "
-              "You may rejoin as a new empire, or return to your games.")]
-        (when error
-          [:p.text-xs.text-red-400.mb-4 (java.net.URLDecoder/decode error "UTF-8")])
-        (biff/form
-         {:action (str "/app/game/" player-id "/rejoin")
-          :method "post"}
-         [:div.mb-4
-          [:label.block.text-xs.mb-1 "New Empire Name"]
-          [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.font-mono
-           {:type "text" :name "empire-name" :required true :maxlength 100 :autofocus true}]]
-         [:div.flex.gap-4.mt-2
-          [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
-           {:type "submit"} "Rejoin Game"]
-          [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-           {:href "/app"} "Back to Games"]])]))))
+       [:div.text-base.w-full.max-w-lg.mx-auto.overflow-hidden.relative
+        {:style {:background "#0e0e0e" :border "1.5px solid #7f1d1d"
+                 :border-radius "4px" :color "#4ade80"
+                 :font-family "'Courier New', monospace"}}
+        (ui/scanline-overlay)
+
+        ;; Header
+        [:div {:style {:background "#1a0808" :border-bottom "1px solid #7f1d1d" :padding "7px 14px"}}
+         [:div {:style {:font-size "18px" :font-weight "bold" :color "#f87171"
+                        :letter-spacing "0.05em"}}
+          "EMPIRE ELIMINATED"]]
+
+        ;; Body
+        [:div {:style {:padding "16px 14px"}}
+         [:p.text-sm.mb-6 {:style {:color "#9adaaa"}}
+          (str "The " (:player/empire-name player) " has fallen. "
+               "You may rejoin as a new empire, or return to your games.")]
+         (when error
+           [:p.text-xs.mb-4 {:style {:color "#f87171"}}
+            (java.net.URLDecoder/decode error "UTF-8")])
+         (biff/form
+          {:action (str "/app/game/" player-id "/rejoin")
+           :method "post"
+           :style  {:margin 0}}
+          [:div.mb-4
+           [:label.block.mb-1
+            {:style {:font-size "11px" :text-transform "uppercase"
+                     :letter-spacing "0.1em" :color "#7ab88a"}}
+            "New Empire Name"]
+           [:input
+            {:type "text" :name "empire-name" :required true :maxlength 100 :autofocus true
+             :style {:width "100%" :background "#0a0a0a" :border "1px solid #1e6e44"
+                     :color "#4ade80" :padding "6px 10px" :font-family "'Courier New', monospace"
+                     :border-radius "2px" :font-size "14px" :box-sizing "border-box"}}]]
+          [:div.flex.gap-2.mt-2
+           [:button
+            {:type "submit"
+             :style {:padding "6px 20px" :border "1px solid #4ade80" :background "#1a3a28"
+                     :color "#4ade80" :border-radius "2px" :font-family "'Courier New', monospace"
+                     :cursor "pointer" :font-size "14px" :letter-spacing "0.05em"}}
+            "Rejoin Game"]
+           (ui/action-bar-link "/app" "Back to Games")])]]))))

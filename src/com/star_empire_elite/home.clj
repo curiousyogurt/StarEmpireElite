@@ -15,6 +15,51 @@
             [com.star-empire-elite.pages.main.about :as main-about]))
 
 ;;;;
+;;;; Styles
+;;;;
+
+(def ^:private card-style
+  {:background "#0e0e0e" :border "1.5px solid #1e6e44" :border-radius "4px"
+   :color "#4ade80" :font-family "'Courier New', monospace"})
+
+(def ^:private input-style
+  {:width "100%" :background "#0a0a0a" :border "1px solid #1e6e44" :color "#4ade80"
+   :padding "6px 10px" :font-family "'Courier New', monospace" :border-radius "2px"
+   :font-size "14px" :box-sizing "border-box" :outline "none"})
+
+(def ^:private label-style
+  {:display "block" :font-size "11px" :text-transform "uppercase"
+   :letter-spacing "0.1em" :color "#7ab88a" :margin-bottom "6px"})
+
+(def ^:private submit-style
+  {:width "100%" :padding "8px 0" :border "1px solid #4ade80" :background "#1a3a28"
+   :color "#4ade80" :font-family "'Courier New', monospace" :font-size "14px"
+   :letter-spacing "0.1em" :cursor "pointer" :border-radius "2px"})
+
+(def ^:private link-style
+  {:padding "5px 16px" :border "1px solid #1e6e44" :background "transparent"
+   :color "#9adaaa" :border-radius "2px" :font-family "'Courier New', monospace"
+   :font-size "13px" :letter-spacing "0.04em" :text-decoration "none"})
+
+(defn- auth-card
+  "Wrap auth-page body in the standard terminal card shell with a header title.
+
+  [title str, & body hiccup] -> hiccup"
+  [title & body]
+  [:div.text-base.w-full.max-w-lg.mx-auto.overflow-hidden.relative
+   {:style card-style}
+   (ui/scanline-overlay)
+   ;; Header
+   [:div.text-center
+    {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "16px 14px"}}
+    [:div {:style {:font-size "22px" :font-weight "bold" :color "#4ade80"
+                   :letter-spacing "0.1em"}}
+     title]]
+   ;; Body
+   [:div {:style {:padding "20px 24px"}}
+    body]])
+
+;;;;
 ;;;; Pages
 ;;;;
 
@@ -25,61 +70,49 @@
   [{:keys [recaptcha/site-key params] :as ctx}]
   (ui/page
    (assoc ctx ::ui/recaptcha true)
-   [:div.min-h-screen.flex.flex-col.items-center.justify-center.text-green-400.font-mono.p-4
-
-    [:div.text-center.mb-8
-     [:span.star.text-2xl "☆ "]
-     [:h1.text-4xl.font-bold.glow "SIGN UP"]
-     [:span.star.text-2xl " ☆"]]
-
-    [:div.w-96.border-t.border-green-400.mb-8]
-
+   (auth-card
+    "SIGN UP"
     (biff/form
      {:action "/auth/send-code"
-      :id "signup"
+      :id     "signup"
       :hidden {:on-error "/signup"}
-      :class "w-full max-w-md"}
+      :style  {:margin 0}}
      (biff/recaptcha-callback "submitSignup" "signup")
 
-     [:div.mb-6
-      [:label.block.mb-3 {:for "email"} "Enter your email address:"]
-      [:input#email.w-full.bg-black.border.border-green-400.text-green-400.p-2.font-mono
-       {:name "email"
-        :type "email"
+     [:div.mb-4
+      [:label {:for "email" :style label-style} "Enter your email address"]
+      [:input#email
+       {:name         "email"
+        :type         "email"
         :autocomplete "email"
-        :placeholder "commander@bennington.edu"}]]
+        :placeholder  "commander@bennington.edu"
+        :style        input-style}]]
 
      (when-some [error (:error params)]
-       [:<>
-        [:.mb-4
-         [:.text-sm.text-red-600
-          (case error
-            "recaptcha"     (str "You failed the recaptcha test. Try again, "
-                                 "and make sure you aren't blocking scripts from Google.")
-            "invalid-email" "You must have a Bennington College email address to play. If you believe you should have access, contact the game administrator."
-            "send-failed"   (str "We weren't able to send an email to that address. "
-                                 "If the problem persists, try another address.")
-            "There was an error.")]]])
+       [:p {:style {:font-size "12px" :color "#f87171" :margin-bottom "12px"}}
+        (case error
+          "recaptcha"     (str "You failed the recaptcha test. Try again, "
+                               "and make sure you aren't blocking scripts from Google.")
+          "invalid-email" "You must have a Bennington College email address to play. If you believe you should have access, contact the game administrator."
+          "send-failed"   (str "We weren't able to send an email to that address. "
+                               "If the problem persists, try another address.")
+          "There was an error.")])
 
-     [:button.bg-green-400.text-black.px-6.py-2.font-bold.w-full.hover:bg-green-300.transition-colors.g-recaptcha
-      (merge (when site-key
-               {:data-sitekey site-key
-                :data-callback "submitSignup"})
-             {:type "submit"})
+     [:button.g-recaptcha
+      (merge {:type "submit" :style submit-style}
+             (when site-key
+               {:data-sitekey site-key :data-callback "submitSignup"}))
       "Send Sign-Up Code"])
 
-    [:div.w-96.border-t.border-green-400.my-8]
+    [:div {:style {:border-top "1px solid #1a3020" :margin-top "20px" :padding-top "16px"}}
+     [:p {:style {:font-size "13px" :color "#9adaaa" :margin-bottom "10px" :text-align "center"}}
+      "Already have an account?"]
+     [:div.flex.justify-center.gap-3
+      [:a {:href "/signin" :style link-style} "Sign In"]
+      [:a {:href "/" :hx-boost "true" :style link-style} "Home"]]]
 
-    [:div.text-center
-     [:p.text-sm.mb-4 "Already have an account?"]
-     [:div.flex.gap-4.justify-center
-      [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors.inline-block
-       {:href "/signin"} "Sign In"]
-      [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors.inline-block
-       {:href "/" :hx-boost "true"} "Home"]]]
-
-    [:.text-xs.text-green-400.text-opacity-75.mt-8
-     biff/recaptcha-disclosure]]))
+    [:div {:style {:margin-top "16px" :font-size "11px" :color "#4a6a58"}}
+     biff/recaptcha-disclosure])))
 
 (defn link-sent
   "Confirmation page shown after a sign-up link is emailed.
@@ -88,8 +121,11 @@
   [{:keys [params] :as ctx}]
   (ui/page
    ctx
-   [:h2.text-xl.font-bold "Check your inbox"]
-   [:p "We've sent a sign-up link to " [:span.font-bold (:email params)] "."]))
+   (auth-card
+    "CHECK YOUR INBOX"
+    [:p {:style {:color "#9adaaa" :font-size "14px" :line-height "1.7"}}
+     "We've sent a sign-up link to "
+     [:span {:style {:color "#4ade80" :font-weight "bold"}} (:email params)] "."])))
 
 (defn verify-email-page
   "Cross-device email verification fallback — shown when a magic link is opened on a
@@ -99,28 +135,25 @@
   [{:keys [params] :as ctx}]
   (ui/page
    ctx
-   [:h2.text-2xl.font-bold (str "Sign up for " settings/app-name)]
-   [:.h-3]
-   (biff/form
-    {:action "/auth/verify-link"
-     :hidden {:token (:token params)}}
-    [:div [:label {:for "email"}
-           "It looks like you opened this link on a different device or browser than the one "
-           "you signed up on. For verification, please enter the email you signed up with:"]]
-    [:.h-3]
-    [:.flex
-     [:input#email {:name "email" :type "email"
-                    :placeholder "Enter your email address"}]
-     [:.w-3]
-     [:button.btn {:type "submit"}
-      "Sign in"]])
-   (when-some [error (:error params)]
-     [:<>
-      [:.h-1]
-      [:.text-sm.text-red-600
+   (auth-card
+    (str "SIGN UP FOR " settings/app-name)
+    (biff/form
+     {:action "/auth/verify-link"
+      :hidden {:token (:token params)}
+      :style  {:margin 0}}
+     [:p {:style {:color "#9adaaa" :font-size "13px" :margin-bottom "12px" :line-height "1.6"}}
+      "It looks like you opened this link on a different device or browser than the one "
+      "you signed up on. For verification, please enter the email you signed up with:"]
+     [:div.mb-4
+      [:label {:for "email" :style label-style} "Email address"]
+      [:input#email {:name "email" :type "email" :placeholder "Enter your email address"
+                     :style input-style}]]
+     [:button {:type "submit" :style submit-style} "Sign In"])
+    (when-some [error (:error params)]
+      [:p {:style {:font-size "12px" :color "#f87171" :margin-top "10px"}}
        (case error
          "incorrect-email" "Incorrect email address. Try again."
-         "There was an error.")]])))
+         "There was an error.")]))))
 
 (defn signin-page
   "Sign-in page with email input and reCAPTCHA. Sends a 6-digit code to the submitted address.
@@ -129,63 +162,51 @@
   [{:keys [recaptcha/site-key params] :as ctx}]
   (ui/page
    (assoc ctx ::ui/recaptcha true)
-   [:div.min-h-screen.flex.flex-col.items-center.justify-center.text-green-400.font-mono.p-4
-
-    [:div.text-center.mb-8
-     [:span.star.text-2xl "☆ "]
-     [:h1.text-4xl.font-bold.glow "SIGN IN"]
-     [:span.star.text-2xl " ☆"]]
-
-    [:div.w-96.border-t.border-green-400.mb-8]
-
+   (auth-card
+    "SIGN IN"
     (biff/form
      {:action "/auth/send-code"
-      :id "signin"
+      :id     "signin"
       :hidden {:on-error "/signin"}
-      :class "w-full max-w-md"}
+      :style  {:margin 0}}
      (biff/recaptcha-callback "submitSignin" "signin")
 
-     [:div.mb-6
-      [:label.block.mb-3 {:for "email"} "Enter your email address:"]
-      [:input#email.w-full.bg-black.border.border-green-400.text-green-400.p-2.font-mono
-       {:name "email"
-        :type "email"
+     [:div.mb-4
+      [:label {:for "email" :style label-style} "Enter your email address"]
+      [:input#email
+       {:name         "email"
+        :type         "email"
         :autocomplete "email"
-        :placeholder "commander@galaxy.com"}]]
+        :placeholder  "commander@galaxy.com"
+        :style        input-style}]]
 
      (when-some [error (:error params)]
-       [:<>
-        [:.mb-4
-         [:.text-sm.text-red-600
-          (case error
-            "recaptcha"     (str "You failed the recaptcha test. Try again, "
-                                 "and make sure you aren't blocking scripts from Google.")
-            "invalid-email" "You must have a Bennington College email address to play. If you believe you should have access, contact the game administrator."
-            "send-failed"   (str "We weren't able to send an email to that address. "
-                                 "If the problem persists, try another address.")
-            "invalid-link"  "Invalid or expired link. Sign in to get a new link."
-            "not-signed-in" "You must be signed in to view that page."
-            "There was an error.")]]])
+       [:p {:style {:font-size "12px" :color "#f87171" :margin-bottom "12px"}}
+        (case error
+          "recaptcha"     (str "You failed the recaptcha test. Try again, "
+                               "and make sure you aren't blocking scripts from Google.")
+          "invalid-email" "You must have a Bennington College email address to play. If you believe you should have access, contact the game administrator."
+          "send-failed"   (str "We weren't able to send an email to that address. "
+                               "If the problem persists, try another address.")
+          "invalid-link"  "Invalid or expired link. Sign in to get a new link."
+          "not-signed-in" "You must be signed in to view that page."
+          "There was an error.")])
 
-     [:button.bg-green-400.text-black.px-6.py-2.font-bold.w-full.hover:bg-green-300.transition-colors.g-recaptcha
-      (merge (when site-key
-               {:data-sitekey site-key
-                :data-callback "submitSignin"})
-             {:type "submit"})
+     [:button.g-recaptcha
+      (merge {:type "submit" :style submit-style}
+             (when site-key
+               {:data-sitekey site-key :data-callback "submitSignin"}))
       "Send Sign-In Code"])
 
-    [:div.w-96.border-t.border-green-400.my-8]
+    [:div {:style {:border-top "1px solid #1a3020" :margin-top "20px" :padding-top "16px"}}
+     [:p {:style {:font-size "13px" :color "#9adaaa" :margin-bottom "10px" :text-align "center"}}
+      "Don't have an account yet?"]
+     [:div.flex.justify-center.gap-3
+      [:a {:href "/signup" :style link-style} "Sign Up"]
+      [:a {:href "/" :hx-boost "true" :style link-style} "Home"]]]
 
-    [:div.text-center
-     [:p.text-sm.mb-4 "Don't have an account yet?"]
-     [:div.flex.gap-4.justify-center
-      [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors.inline-block
-       {:href "/signup"} "Sign Up"]
-      [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors.inline-block
-       {:href "/" :hx-boost "true"} "Home"]]]
-
-    [:.text-xs.text-green-400.text-opacity-75.mt-8
-     biff/recaptcha-disclosure]]))
+    [:div {:style {:margin-top "16px" :font-size "11px" :color "#4a6a58"}}
+     biff/recaptcha-disclosure])))
 
 (defn enter-code-page
   "Code entry page shown after a sign-in email is sent. Accepts the 6-digit verification code.
@@ -194,58 +215,54 @@
   [{:keys [recaptcha/site-key params] :as ctx}]
   (ui/page
    (assoc ctx ::ui/recaptcha true)
-   [:div.min-h-screen.flex.flex-col.items-center.justify-center.text-green-400.font-mono.p-4
-
-    [:div.text-center.mb-8
-     [:span.star.text-2xl "☆ "]
-     [:h1.text-4xl.font-bold.glow "ENTER CODE"]
-     [:span.star.text-2xl " ☆"]]
-
-    [:div.w-96.border-t.border-green-400.mb-8]
-
+   (auth-card
+    "ENTER CODE"
     (biff/form
      {:action "/auth/verify-code"
-      :id "code-form"
+      :id     "code-form"
       :hidden {:email (:email params)}
-      :class "w-full max-w-md"}
+      :style  {:margin 0}}
      (biff/recaptcha-callback "submitCode" "code-form")
 
-     [:div.mb-6
-      [:label.block.mb-3 {:for "code"}
-       "We sent a 6-digit code to " [:span.font-bold (:email params)]]
-      [:input#code.w-full.bg-black.border.border-green-400.text-green-400.p-2.font-mono.text-center.text-2xl.tracking-widest
-       {:name "code" :type "text" :placeholder "000000"}]]
+     [:div.mb-4
+      [:label {:for "code" :style label-style}
+       "6-digit code sent to "
+       [:span {:style {:color "#4ade80"}} (:email params)]]
+      [:input#code
+       {:name        "code"
+        :type        "text"
+        :placeholder "000000"
+        :style       (merge input-style {:text-align "center" :font-size "22px"
+                                         :letter-spacing "0.4em"})}]]
 
      (when-some [error (:error params)]
-       [:<>
-        [:.mb-4
-         [:.text-sm.text-red-600
-          (case error
-            "invalid-code" "Invalid code. Try again."
-            "There was an error.")]]])
+       [:p {:style {:font-size "12px" :color "#f87171" :margin-bottom "12px"}}
+        (case error
+          "invalid-code" "Invalid code. Try again."
+          "There was an error.")])
 
-     [:button.bg-green-400.text-black.px-6.py-2.font-bold.w-full.hover:bg-green-300.transition-colors.g-recaptcha
-      (merge (when site-key
-               {:data-sitekey site-key
-                :data-callback "submitCode"})
-             {:type "submit"})
+     [:button.g-recaptcha
+      (merge {:type "submit" :style submit-style}
+             (when site-key
+               {:data-sitekey site-key :data-callback "submitCode"}))
       "Verify Code"])
 
-    [:div.w-96.border-t.border-green-400.my-8]
-
-    [:div.text-center
+    [:div {:style {:border-top "1px solid #1a3020" :margin-top "20px" :padding-top "16px"
+                   :text-align "center"}}
      (biff/form
       {:action "/auth/send-code"
-       :id "signin"
-       :hidden {:email (:email params)
-                :on-error "/signin"}}
+       :id     "signin"
+       :hidden {:email (:email params) :on-error "/signin"}
+       :style  {:margin 0 :display "inline"}}
       (biff/recaptcha-callback "submitSignin" "signin")
-      [:button.text-green-400.hover:text-green-300.transition-colors.underline.g-recaptcha
-       (merge (when site-key
-                {:data-sitekey site-key
-                 :data-callback "submitSignin"})
-              {:type "submit"})
-       "Send another code"])]]))
+      [:button.g-recaptcha
+       (merge {:type "submit"
+               :style {:background "transparent" :border "none" :color "#9adaaa"
+                       :font-family "'Courier New', monospace" :font-size "13px"
+                       :cursor "pointer" :text-decoration "underline" :padding 0}}
+              (when site-key
+                {:data-sitekey site-key :data-callback "submitSignin"}))
+       "Send another code"])])))
 
 ;;;;
 ;;;; Routes

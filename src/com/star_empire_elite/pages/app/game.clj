@@ -41,10 +41,10 @@
   [db xtdb-db, game-id uuid] -> [player-map]"
   [db game-id]
   (let [results        (filter #(not= (:player/status %) const/player-status-eliminated)
-                              (q db '{:find (pull player [*])
-                                       :in [game-id]
-                                       :where [[player :player/game game-id]]}
-                                   game-id))
+                               (q db '{:find (pull player [*])
+                                        :in [game-id]
+                                        :where [[player :player/game game-id]]}
+                                    game-id))
         sorted-players (sort-by :player/score > (seq results))]
     (map-indexed (fn [idx player]
                    (assoc player :rank (inc idx)))
@@ -54,78 +54,36 @@
 ;;;; UI Components
 ;;;;
 
-(defn game-header
-  "Render a responsive resource bar showing key empire stats.
-  Adapts from 3 columns on mobile to 10 columns on large screens.
-
-  [{:keys [player game]}] -> hiccup"
-  [{:keys [player game]}]
-  [:div.grid.grid-cols-3.md:grid-cols-5.lg:grid-cols-9.gap-2.mb-6.pb-4.border-b.border-green-400
-
-   ;; Economic resources
-   [:div
-    [:p.text-xs "Credits"]
-    [:p.font-mono (ui/format-number (:player/credits player))]]
-   [:div
-    [:p.text-xs "Food"]
-    [:p.font-mono (ui/format-number (:player/food player))]]
-   [:div
-    [:p.text-xs "Fuel"]
-    [:p.font-mono (ui/format-number (:player/fuel player))]]
-   [:div
-    [:p.text-xs "Galaxars"]
-    [:p.font-mono (ui/format-number (:player/galaxars player))]]
-
-   ;; Empire metrics
-   [:div
-    [:p.text-xs "Population"]
-    [:p.font-mono (str (:player/population player) "M")]]
-   [:div
-    [:p.text-xs "Stability"]
-    [:p.font-mono (:player/stability player) "%"]]
-   [:div
-    [:p.text-xs "Planets"]
-    [:p.font-mono (ui/format-number (+ (:player/mil-planets player)
-                     (:player/erg-planets player)
-                     (:player/ore-planets player)))]]
-
-   ;; Turn progression
-   (let [{:keys [turn round]} (utils/display-turn-round player game)]
-     (list
-      [:div
-       [:p.text-xs "Turn"]
-       [:p.font-mono turn]]
-      [:div
-       [:p.text-xs "Round"]
-       [:p.font-mono round]]))])
-
 (defn players-table
   "Render the leaderboard showing all players in the game ranked by score.
 
   [{:keys [players]}] -> hiccup"
   [{:keys [players]}]
-  [:div.mt-8
-   [:h2.text-xl.font-bold.mb-4 "Players"]
-   [:div.overflow-x-auto
-    [:table.w-full.text-sm.border.border-green-400
-
-     [:thead
-      [:tr.border-b.border-green-400
-       [:th.border-r.border-green-400.px-3.py-2 "Rank"]
-       [:th.border-r.border-green-400.px-3.py-2 "Empire"]
-       [:th.border-r.border-green-400.px-3.py-2 "Planets"]
-       [:th.px-3.py-2 "Score"]]]
-
-     [:tbody
-      (for [player players]
-        [:tr.border-b.border-green-400
-         [:td.border-r.border-green-400.px-3.py-2 (:rank player)]
-         [:td.border-r.border-green-400.px-3.py-2 (:player/empire-name player)]
-         [:td.border-r.border-green-400.px-3.py-2
-          (ui/format-number (+ (:player/mil-planets player)
-                               (:player/erg-planets player)
-                               (:player/ore-planets player)))]
-         [:td.px-3.py-2 (ui/format-number (:player/score player))]])]]]])
+  (let [th-style  {:color "#4ade80" :font-size "11px" :letter-spacing "0.08em"
+                   :text-transform "uppercase"}
+        td-border {:border-right "1px solid #253530" :padding "4px 12px" :color "#9adaaa"}
+        td-right  (assoc td-border :text-align "right")]
+    [:div.mt-2
+     (ui/section-label "Players")
+     [:div.overflow-x-auto
+      [:table.w-full.text-sm
+       {:style {:border "1px solid #253530" :border-collapse "collapse"}}
+       [:thead
+        [:tr {:style {:background "#151f1a" :border-bottom "1px solid #253530"}}
+         [:th.text-left.px-3.py-1  {:style th-style} "Rank"]
+         [:th.text-left.px-3.py-1  {:style th-style} "Empire"]
+         [:th.text-right.px-3.py-1 {:style th-style} "Planets"]
+         [:th.text-right.px-3.py-1 {:style th-style} "Score"]]]
+       [:tbody
+        (for [player players]
+          [:tr {:style {:border-bottom "1px solid #1a2820" :background "#121a18"}}
+           [:td {:style td-border} (:rank player)]
+           [:td {:style td-border} (:player/empire-name player)]
+           [:td {:style td-right}
+            (ui/format-number (+ (:player/mil-planets player)
+                                 (:player/erg-planets player)
+                                 (:player/ore-planets player)))]
+           [:td {:style td-right} (ui/format-number (:player/score player))]])]]]]))
 
 ;;;;
 ;;;; Page
@@ -145,21 +103,29 @@
           cooldown-ms (when-not mid-turn? (utils/round-cooldown-ms player game))]
       (ui/page
        {}
-       [:div.text-green-400.font-mono
-        [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
-
-        (game-header {:player player :game game})
-        (players-table {:players players})
-        [:.h-6]
-
+       [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
+        {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
+                 :border-radius "4px" :color "#4ade80"
+                 :font-family "'Courier New', monospace"}}
+        (ui/scanline-overlay)
+        (ui/phase-topbar player "GAME OVERVIEW")
+        [:div.flex.flex-col.gap-2
+         {:style {:padding "10px 14px"}}
+         (ui/snapshot-section player)
+         (players-table {:players players})]
         ;; Play button or cooldown message depending on round availability
-        [:div.flex.gap-4
+        [:div.flex.gap-2
+         {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
+         (ui/action-bar-link "/app" "Dashboard")
          (if cooldown-ms
-           [:div.border.border-yellow-400.px-6.py-2.text-yellow-400
+           [:div {:style {:padding "5px 14px" :border "1px solid #b45309"
+                          :color "#facc15" :border-radius "2px" :font-size "14px"
+                          :font-family "'Courier New', monospace" :letter-spacing "0.05em"}}
             (if (utils/day-exhausted? player game)
               (str "Rounds reset in " (utils/format-cooldown-duration cooldown-ms))
               (str "Next round opens in " (utils/format-cooldown-duration cooldown-ms)))]
-           [:a.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
-            {:href (get-phase-url (:xt/id player) (:player/current-phase player))} "Play"])
-         [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-          {:href "/app"} "Back to Games"]]]))))
+           [:a {:href (get-phase-url (:xt/id player) (:player/current-phase player))
+                :style {:padding "5px 14px" :border "1px solid #4ade80" :background "#1a3a28"
+                        :color "#4ade80" :border-radius "2px" :letter-spacing "0.05em"
+                        :font-family "'Courier New', monospace" :text-decoration "none"}}
+            "Play"])]]))))

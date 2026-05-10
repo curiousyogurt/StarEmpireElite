@@ -89,9 +89,14 @@
   (biff/form
    {:action  (str "/app/delete-game/" game-id)
     :method  "post"
-    :onsubmit "return confirm('Delete this game and all its players?')"}
-   [:button.border.border-green-400.text-green-400.px-2.py-1.text-sm.hover:border-yellow-400.hover:text-yellow-400.transition-colors
-    {:type "submit"} "X"]))
+    :onsubmit "return confirm('Delete this game and all its players?')"
+    :style   {:margin 0}}
+   [:button
+    {:type "submit"
+     :style {:padding "3px 10px" :border "1px solid #7ab88a" :background "transparent"
+             :color "#9adaaa" :border-radius "2px" :font-family "'Courier New', monospace"
+             :cursor "pointer" :font-size "12px"}}
+    "X"]))
 
 (defn available-game-card
   "Render a card for a game the user has not yet joined, showing player count and a join link.
@@ -99,18 +104,33 @@
 
   [{:keys [game player-count admin?]}] -> hiccup"
   [{:keys [game player-count admin?]}]
-  [:div.border.border-green-400.p-4.mb-4.max-w-6xl
+  [:div
+   {:style {:border "1px solid #1e6e44" :padding "12px 14px" :margin-bottom "8px"
+            :background "#0e1810" :border-radius "3px"}}
    [:div.flex.justify-between.items-center
     [:div
-     [:h3.font-bold (:game/name game)]
-     [:p.text-xs.text-green-400.text-opacity-75
-      (str player-count " player(s)")]]
+     [:div.font-bold {:style {:color "#4ade80" :font-size "15px"}} (:game/name game)]
+     [:div.text-xs.mt-px {:style {:color "#7ab88a"}} (str player-count " player(s)")]]
     [:div.flex.items-center.gap-2
-     [:a.border.border-green-400.px-4.py-2.text-sm.transition-colors.hover:border-yellow-400.hover:text-yellow-400
-      {:href (str "/app/join-game/" (:xt/id game))}
+     [:a {:href  (str "/app/join-game/" (:xt/id game))
+          :style {:padding "4px 12px" :border "1px solid #1e6e44" :background "transparent"
+                  :color "#9adaaa" :border-radius "2px" :font-family "'Courier New', monospace"
+                  :font-size "13px" :letter-spacing "0.04em" :text-decoration "none"}}
       "Join Game"]
      (when admin?
        (delete-game-button (:xt/id game)))]]])
+
+(defn- stat-cell
+  "Render a single labeled stat cell for the dashboard game-card grids.
+
+  [label str, val any] -> hiccup"
+  [label val]
+  [:div
+   [:div {:style {:color "#4a6a58" :font-size "9px" :text-transform "uppercase"
+                  :letter-spacing "0.04em" :overflow "hidden" :text-overflow "ellipsis"
+                  :white-space "nowrap"}} label]
+   [:div {:style {:color "#9adaaa" :font-size "13px" :font-weight "bold"}}
+    (if (string? val) val (ui/format-number val))]])
 
 (defn game-card
   "Render a full empire snapshot card for a game the player has joined.
@@ -118,7 +138,9 @@
 
   [{:keys [player game admin?]}] -> hiccup"
   [{:keys [player game admin?]}]
-  [:div.border.border-green-400.p-4.mb-4.max-w-6xl.relative.hover:bg-green-400.hover:bg-opacity-10.transition-colors.cursor-pointer
+  [:div.relative
+   {:style {:border "1px solid #1e6e44" :padding "12px 14px" :margin-bottom "8px"
+            :background "#0e1810" :border-radius "3px" :cursor "pointer"}}
 
    ;; Stretched link covers the whole card
    [:a.absolute.inset-0 {:href (str "/app/game/" (:xt/id player))}]
@@ -126,43 +148,46 @@
    ;; Header row: game/empire info left, rank/score/delete right
    [:div.flex.justify-between.mb-3
     [:div
-     [:h3.text-2xl.font-bold (:player/empire-name player)]
-     [:p.text-sm (:game/name game)]
-     [:p.text-xs.text-green-400.text-opacity-75
-      (format-turn-round player game)]]
-    [:div.flex.gap-8.items-start.relative.z-10
+     [:div {:style {:font-size "18px" :font-weight "bold" :color "#4ade80"}}
+      (:player/empire-name player)]
+     [:div.text-sm {:style {:color "#9adaaa"}} (:game/name game)]
+     [:div.text-xs {:style {:color "#7ab88a"}} (format-turn-round player game)]]
+    [:div.flex.gap-6.items-start.relative.z-10
      [:div.text-right
-      [:p.text-xs "Rank"]
-      [:p.font-bold (:player/rank player)]]
+      [:div.text-xs {:style {:color "#7ab88a"}} "Rank"]
+      [:div {:style {:font-weight "bold" :color "#4ade80"}} (:player/rank player)]]
      [:div.text-right
-      [:p.text-xs "Score"]
-      [:p.font-bold (ui/format-number (:player/score player))]]
+      [:div.text-xs {:style {:color "#7ab88a"}} "Score"]
+      [:div {:style {:font-weight "bold" :color "#4ade80"}}
+       (ui/format-number (:player/score player))]]
      (when admin?
        (delete-game-button (:xt/id game)))]]
 
    ;; Row 1: currencies, population, and planets
-   [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2.mb-3.pb-3.border-b.border-green-400
-    [:div [:p.text-xs "Credits"]    [:p.font-mono (ui/format-number (:player/credits player))]]
-    [:div [:p.text-xs "Food"]       [:p.font-mono (ui/format-number (:player/food player))]]
-    [:div [:p.text-xs "Fuel"]       [:p.font-mono (ui/format-number (:player/fuel player))]]
-    [:div [:p.text-xs "Galaxars"]   [:p.font-mono (ui/format-number (:player/galaxars player))]]
-    [:div [:p.text-xs "Population"] [:p.font-mono (str (:player/population player) "M")]]
-    [:div [:p.text-xs "Stability"]  [:p.font-mono (:player/stability player) "%"]]
-    [:div [:p.text-xs "Ore Plts"]   [:p.font-mono (ui/format-number (:player/ore-planets player))]]
-    [:div [:p.text-xs "Erg Plts"]   [:p.font-mono (ui/format-number (:player/erg-planets player))]]
-    [:div [:p.text-xs "Mil Plts"]   [:p.font-mono (ui/format-number (:player/mil-planets player))]]]
+   [:div {:style {:display "grid" :grid-template-columns "repeat(9, 1fr)" :gap "6px"
+                  :margin-bottom "10px" :padding-bottom "10px"
+                  :border-bottom "1px solid #1a3020"}}
+    (stat-cell "Credits"    (ui/format-number (:player/credits player)))
+    (stat-cell "Food"       (ui/format-number (:player/food player)))
+    (stat-cell "Fuel"       (ui/format-number (:player/fuel player)))
+    (stat-cell "Galaxars"   (ui/format-number (:player/galaxars player)))
+    (stat-cell "Population" (str (:player/population player) "M"))
+    (stat-cell "Stability"  (str (:player/stability player) "%"))
+    (stat-cell "Ore Plts"   (ui/format-number (:player/ore-planets player)))
+    (stat-cell "Erg Plts"   (ui/format-number (:player/erg-planets player)))
+    (stat-cell "Mil Plts"   (ui/format-number (:player/mil-planets player)))]
 
    ;; Row 2: military units and leadership
-   [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2.mb-3.pb-3.border-b.border-green-400
-    [:div [:p.text-xs "Generals"]   [:p.font-mono (ui/format-number (:player/generals player))]]
-    [:div [:p.text-xs "Soldiers"]   [:p.font-mono (ui/format-number (:player/soldiers player))]]
-    [:div [:p.text-xs "Transports"] [:p.font-mono (ui/format-number (:player/transports player))]]
-    [:div [:p.text-xs "Admirals"]   [:p.font-mono (ui/format-number (:player/admirals player))]]
-    [:div [:p.text-xs "Fighters"]   [:p.font-mono (ui/format-number (:player/fighters player))]]
-    [:div [:p.text-xs "Carriers"]   [:p.font-mono (ui/format-number (:player/carriers player))]]
-    [:div [:p.text-xs "Def Stns"]   [:p.font-mono (ui/format-number (:player/stations player))]]
-    [:div [:p.text-xs "Cmd Ships"]  [:p.font-mono (ui/format-number (:player/cmd-ships player))]]
-    [:div [:p.text-xs "Agents"]     [:p.font-mono (ui/format-number (:player/agents player))]]]])
+   [:div {:style {:display "grid" :grid-template-columns "repeat(9, 1fr)" :gap "6px"}}
+    (stat-cell "Generals"   (ui/format-number (:player/generals player)))
+    (stat-cell "Soldiers"   (ui/format-number (:player/soldiers player)))
+    (stat-cell "Transports" (ui/format-number (:player/transports player)))
+    (stat-cell "Admirals"   (ui/format-number (:player/admirals player)))
+    (stat-cell "Fighters"   (ui/format-number (:player/fighters player)))
+    (stat-cell "Carriers"   (ui/format-number (:player/carriers player)))
+    (stat-cell "Def Stns"   (ui/format-number (:player/stations player)))
+    (stat-cell "Cmd Ships"  (ui/format-number (:player/cmd-ships player)))
+    (stat-cell "Agents"     (ui/format-number (:player/agents player)))]])
 
 ;;;;
 ;;;; Page
@@ -179,34 +204,49 @@
         admin?          (boolean (const/admin-emails (:user/email user)))]
     (ui/page
      {}
-     [:div.text-green-400.font-mono
+     [:div.text-base.w-full.max-w-5xl.mx-auto.overflow-hidden.relative
+      {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
+               :border-radius "4px" :color "#4ade80"
+               :font-family "'Courier New', monospace"}}
+      (ui/scanline-overlay)
 
       ;; Header with user info and sign-out button
-      [:div.flex.justify-between.items-center.mb-6
-       [:h1.text-3xl.font-bold "Your Games"]
-       [:div.flex.items-center.gap-4
-        [:span.text-sm (:user/email user)]
-        (biff/form
-         {:action "/auth/signout"
-          :method "post"}
-         [:button.border.border-green-400.px-4.py-2.text-sm.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-          {:type "submit"}
-          "Sign Out"])]]
+      [:div.flex.items-center.justify-between
+       {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
+       [:div
+        [:div {:style {:font-size "18px" :font-weight "bold" :color "#4ade80"
+                       :letter-spacing "0.05em"}} "YOUR GAMES"]
+        [:div.text-sm.mt-px {:style {:color "#9adaaa"}} (:user/email user)]]
+       (biff/form
+        {:action "/auth/signout" :method "post" :style {:margin 0}}
+        [:button
+         {:type "submit"
+          :style {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
+                  :color "#9adaaa" :border-radius "2px" :font-family "'Courier New', monospace"
+                  :cursor "pointer" :font-size "13px" :letter-spacing "0.05em"}}
+         "Sign Out"])]
 
-      ;; Active games — one card per joined game
-      (if (empty? my-games)
-        [:p.mb-6 "You are not currently in any games."]
-        [:div.mb-6
-         (map #(game-card (assoc % :admin? admin?)) my-games)])
+      [:div {:style {:padding "10px 14px"}}
 
-      ;; Available games to join — only shown when any exist
-      (when (seq available-games)
-        [:div.mb-6
-         [:h2.text-xl.font-bold.mb-4 "Available Games"]
-         (map #(available-game-card (assoc % :admin? admin?)) available-games)])
+       ;; Active games — one card per joined game
+       (if (empty? my-games)
+         [:p.text-sm.mb-4 {:style {:color "#9adaaa"}}
+          "You are not currently in any games."]
+         [:div.mb-4
+          (map #(game-card (assoc % :admin? admin?)) my-games)])
 
-      ;; Create game button — admin only
-      (when admin?
-        [:a.bg-green-400.text-black.px-4.py-2.font-bold.hover:bg-green-300.transition-colors.inline-block
-         {:href "/app/create-game"}
-         "Create Game"])])))
+       ;; Available games to join — only shown when any exist
+       (when (seq available-games)
+         [:div.mb-4
+          (ui/section-label "Available Games")
+          (map #(available-game-card (assoc % :admin? admin?)) available-games)])
+
+       ;; Create game button — admin only
+       (when admin?
+         [:a
+          {:href  "/app/create-game"
+           :style {:display "inline-block" :padding "6px 16px" :border "1px solid #4ade80"
+                   :background "#1a3a28" :color "#4ade80" :border-radius "2px"
+                   :font-family "'Courier New', monospace" :font-size "13px"
+                   :letter-spacing "0.08em" :text-decoration "none"}}
+          "Create Game"])]])))

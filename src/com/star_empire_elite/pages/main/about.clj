@@ -6,24 +6,35 @@
 
 ;;;; Components
 
-(defn section [title & body]
+(defn- section [title & body]
   [:<>
-   [:h2.text-2xl.font-bold.mb-4 title]
-   [:p.text-left.w-full.mb-8.text-sm.max-w-3xl body]])
+   [:h2 {:style {:font-size "16px" :font-weight "bold" :margin-bottom "8px" :color "#4ade80"
+                 :letter-spacing "0.04em"}}
+    title]
+   [:p {:style {:font-size "13px" :color "#9adaaa" :margin-bottom "20px" :text-align "left"
+                :line-height "1.7" :max-width "48rem"}}
+    body]])
 
-(defn nav-link [href label & [attrs]]
-  [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-   (merge {:href href} attrs)
+(defn- nav-link [href label & [attrs]]
+  [:a (merge {:href  href
+              :style {:padding "5px 16px" :border "1px solid #1e6e44" :background "transparent"
+                      :color "#9adaaa" :border-radius "2px" :font-family "'Courier New', monospace"
+                      :font-size "13px" :letter-spacing "0.04em" :text-decoration "none"}}
+             attrs)
    label])
 
-(defn tab-button
+(defn- tab-button
   "Renders a tab button. active? controls filled vs. outline style."
   [href label active?]
-  [:a.border.border-green-400.px-6.py-2.transition-colors.text-sm.font-bold
-   (merge {:href href :hx-boost "true"}
-          (if active?
-            {:class "bg-green-400 text-black"}
-            {:class "hover:bg-green-400 hover:bg-opacity-10 text-green-400"}))
+  [:a {:href      href
+       :hx-boost  "true"
+       :style     (if active?
+                    {:padding "4px 14px" :border "1px solid #4ade80" :background "#1a3a28"
+                     :color "#4ade80" :border-radius "2px" :font-size "13px"
+                     :font-weight "bold" :letter-spacing "0.04em" :text-decoration "none"}
+                    {:padding "4px 14px" :border "1px solid #1e6e44" :background "transparent"
+                     :color "#9adaaa" :border-radius "2px" :font-size "13px"
+                     :letter-spacing "0.04em" :text-decoration "none"})}
    label])
 
 ;;;; Content sections
@@ -66,9 +77,12 @@
 
 (defn essay-content []
   (let [p (fn [& body]
-             [:p.text-sm.mb-6.max-w-3xl.text-left.leading-relaxed body])]
+             [:p {:style {:font-size "13px" :margin-bottom "20px" :max-width "48rem"
+                          :text-align "left" :line-height "1.7" :color "#9adaaa"}}
+              body])]
     [:<>
-     [:h2.text-2xl.font-bold.mb-8 "From " [:em "The Sumerian Game"] " to " [:em "Star Empire Elite"]]
+     [:h2 {:style {:font-size "18px" :font-weight "bold" :margin-bottom "20px" :color "#4ade80"}}
+      "From " [:em "The Sumerian Game"] " to " [:em "Star Empire Elite"]]
 
      (p "When people talk about the history of strategy games, they usually begin in the wrong place. "
         "They begin with the commercial successes of the 1990s, or with the better-known computer titles "
@@ -171,7 +185,7 @@
         "constraints, and feedback loops; but also to confront the limits of planning in a world "
         "shared with others. They are games about administration and prudence; about growth and fragility; about "
         "dependence on systems that uncertainty built into the equation.")
-        
+
      (p "That is the long thread that runs from " [:em "The Sumerian Game"] " to " [:em "Star Empire Elite"]
         ". Across sixty years, different platforms and communities have rediscovered the same insight: that "
         "rule itself can be a form of play. Not rule as fantasy omnipotence, but rule as a sequence of "
@@ -259,26 +273,37 @@
   [tab]
   (ui/page
     {}
-    [:div.min-h-screen.flex.flex-col.items-center.justify-center.text-green-400.font-mono.p-4
-     [:h1.text-4xl.font-bold.mb-6 "About"]
+    [:div.text-base.w-full.max-w-3xl.mx-auto.overflow-hidden.relative
+     {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
+              :border-radius "4px" :color "#4ade80"
+              :font-family "'Courier New', monospace"}}
+     (ui/scanline-overlay)
 
-     ;; Tab bar
-     [:div.flex.gap-2.mb-10
-      (tab-button "/about"              "Overview"     (= tab :about))
-      (tab-button "/about/essay"        "History"      (= tab :essay))
-      (tab-button "/about/design" "Design" (= tab :design))]
+     ;; Page header
+     [:div {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
+      [:div {:style {:font-size "22px" :font-weight "bold" :color "#4ade80"
+                     :letter-spacing "0.05em"}} "ABOUT"]]
 
-     ;; Tab content
-     (case tab
-       :about        (about-content)
-       :essay        (essay-content)
-       :design (design-content))
+     [:div {:style {:padding "16px 20px"}}
 
-     ;; Navigation links
-     [:div.flex.gap-4.mt-8
-      (nav-link "/signup" "Sign Up")
-      (nav-link "/signin" "Sign In")
-      (nav-link "/" "Home" {:hx-boost "true"})]]))
+      ;; Tab bar
+      [:div.flex.gap-2.mb-6
+       (tab-button "/about"        "Overview" (= tab :about))
+       (tab-button "/about/essay"  "History"  (= tab :essay))
+       (tab-button "/about/design" "Design"   (= tab :design))]
+
+      ;; Tab content
+      (case tab
+        :about  (about-content)
+        :essay  (essay-content)
+        :design (design-content))
+
+      ;; Navigation links
+      [:div {:style {:border-top "1px solid #1a3020" :padding-top "12px" :margin-top "8px"}}
+       [:div.flex.gap-3
+        (nav-link "/signup" "Sign Up")
+        (nav-link "/signin" "Sign In")
+        (nav-link "/" "Home" {:hx-boost "true"})]]]]))
 
 ;;;;
 ;;;; Handlers

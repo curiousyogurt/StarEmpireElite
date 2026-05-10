@@ -4,72 +4,82 @@
 ;;; Main landing page for Star Empire Elite: the first page visitors see. Uses the same retro terminal
 ;;; styling as the rest of the application to establish the game's visual language.
 
-(defn nav-link [href label & [attrs]]
-  [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-   (merge {:href href} attrs)
+(defn- nav-link [href label & [attrs]]
+  [:a (merge {:href  href
+              :style {:padding "5px 16px" :border "1px solid #1e6e44" :background "transparent"
+                      :color "#9adaaa" :border-radius "2px" :font-family "'Courier New', monospace"
+                      :font-size "13px" :letter-spacing "0.04em" :text-decoration "none"}}
+             attrs)
    label])
 
-(defn pillar [icon title body]
-  [:div.border.border-green-400.p-4
-   [:div.text-2xl.mb-2 icon]
-   [:h3.font-bold.mb-2 title]
-   [:p.text-xs body]])
+(defn- pillar [icon title body]
+  [:div {:style {:border "1px solid #1e6e44" :padding "12px" :border-radius "3px"
+                 :background "#0e1810"}}
+   [:div {:style {:font-size "20px" :margin-bottom "6px"}} icon]
+   [:div.font-bold {:style {:margin-bottom "4px" :color "#4ade80"}} title]
+   [:p {:style {:font-size "12px" :color "#9adaaa" :margin 0}} body]])
 
 (defn home [ctx]
   (ui/page
     {}
-    [:div.min-h-screen.flex.flex-col.items-center.justify-center.text-green-400.font-mono.p-4
+    [:div.text-base.w-full.max-w-3xl.mx-auto.overflow-hidden.relative
+     {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
+              :border-radius "4px" :color "#4ade80"
+              :font-family "'Courier New', monospace"}}
+     (ui/scanline-overlay)
 
-     ;; Title section with decorative stars
-     [:div.text-center.mb-8
-      [:span.star.text-2xl "★ "]
-      [:h1.text-5xl.font-bold.glow "STAR EMPIRE ELITE"]
-      [:span.star.text-2xl " ★"]]
+     ;; Title header
+     [:div.text-center
+      {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "20px 14px"}}
+      [:div {:style {:font-size "11px" :letter-spacing "0.3em" :color "#7ab88a"
+                     :margin-bottom "6px" :text-transform "uppercase"}} "★ ★ ★"]
+      [:div {:style {:font-size "28px" :font-weight "bold" :color "#4ade80"
+                     :letter-spacing "0.08em"}} "STAR EMPIRE ELITE"]
+      [:div.mt-2 {:style {:color "#9adaaa" :font-style "italic" :font-size "13px"}}
+       "Rule the universe with your friends. Or instead of them."]]
 
-     ;; Subtitle
-     [:p.text-lg.italic.mb-8 "Rule the universe with your friends. Or instead of them."]
+     ;; Body
+     [:div {:style {:padding "16px 20px"}}
 
-     ;; Divider line
-     [:div.w-96.border-t.border-green-400.mb-8]
+      ;; Game description
+      [:p.text-center.mb-6 {:style {:color "#9adaaa" :font-size "13px" :line-height "1.7"}}
+       "Star Empire Elite is a turn-based strategy game where you build a galactic empire. "
+       "Acquire planets, manage resources, conduct diplomacy, and use covert operations to chart your "
+       "galactic destiny."]
 
-     ;; Welcome greeting
-     [:h2.text-3xl.font-bold.mb-8 "Welcome, Player One"]
+      ;; Four game pillars in a 2x2 grid
+      [:div {:style {:display "grid" :grid-template-columns "1fr 1fr" :gap "10px"
+                     :margin-bottom "20px"}}
 
-     ;; Game description
-     [:p.text-center.w-full.mb-12.text-sm.leading-relaxed.max-w-3xl
-      "Star Empire Elite is a turn-based strategy game where you build a galactic empire. "
-      "Acquire planets, manage resources, conduct diplomacy, and use covert operations to chart your "
-      "galactic destiny."]
+       ;; Empire building pillar
+       (pillar "🪐" "Empire Building"
+         "Acquire and manage planets, feed your people, and grow your economy.")
 
-     ;; Four game pillars in a 2x2 grid
-     [:div.grid.grid-cols-2.gap-6.mb-12.w-full.max-w-2xl
+       ;; Military power pillar
+       (pillar "🚀" "Military Power"
+         "Build fleets, attack rivals, and defend your territory from invasion.")
 
-      ;; Empire building pillar
-      (pillar "🪐" "Empire Building"
-        "Acquire and manage planets, feed your people, and grow your economy.")
+       ;; Diplomacy pillar
+       (pillar "🎁" "Diplomacy"
+         "Form alliances, negotiate peace, and scheme against your enemies.")
 
-      ;; Military power pillar
-      (pillar "🚀" "Military Power"
-        "Build fleets, attack rivals, and defend your territory from invasion.")
+       ;; Covert operations pillar
+       (pillar "🔍" "Covert Ops"
+         "Deploy agents to spy, sabotage, and destabilize rival empires.")]
 
-      ;; Diplomacy pillar
-      (pillar "🎁" "Diplomacy"
-        "Form alliances, negotiate peace, and scheme against your enemies.")
+      ;; Divider
+      [:div {:style {:border-top "1px solid #1e6e44" :margin-bottom "16px"}}]
 
-      ;; Covert operations pillar
-      (pillar "🔍" "Covert Ops"
-        "Deploy agents to spy, sabotage, and destabilize rival empires.")]
+      ;; Call to action section
+      [:div.text-center.mb-4
+       [:div {:style {:font-size "13px" :font-weight "bold" :color "#4ade80"
+                      :letter-spacing "0.1em" :margin-bottom "10px"}} "GET STARTED"]]
+      [:div.flex.justify-center.gap-3.mb-6
+       (nav-link "/signup" "Sign Up")
+       (nav-link "/signin" "Sign In")
+       (nav-link "/about" "About" {:hx-boost "true"})]
 
-     ;; Call to action section
-     [:h3.text-2xl.font-bold.mb-4 "Get Started"]
-     [:div.flex.gap-4
-      (nav-link "/signup" "Sign Up")
-      (nav-link "/signin" "Sign In")
-      (nav-link "/about" "About" {:hx-boost "true"})]
-
-     ;; Footer divider
-     [:div.w-96.border-t.border-green-400.mt-12.mb-4]
-
-     ;; Footer attribution
-     [:p.text-xs.text-green-400.text-opacity-75
-      "Inspired by the classic BBS game Space Dynasty by Hollie Satterfield"]]))
+      ;; Footer attribution
+      [:div {:style {:border-top "1px solid #1a3020" :padding-top "10px"}}
+       [:p.text-center {:style {:font-size "11px" :color "#4a6a58" :margin 0}}
+        "Inspired by the classic BBS game Space Dynasty by Hollie Satterfield"]]]]))
