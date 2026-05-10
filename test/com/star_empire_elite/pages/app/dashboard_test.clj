@@ -104,3 +104,138 @@
            (dashboard/format-turn-round
             (make-player 1 1 0 nil)
             standard-game)))))
+
+;;
+;; game-card
+;;
+;; game-card renders a stretched-link div with empire stats. It takes a map with :player,
+;; :game, and :admin?. All fields come from the DB but are plain Clojure maps in tests.
+;;
+
+(def ^:private minimal-game
+  {:xt/id                test-game-id
+   :game/name            "Galactic Conquest"
+   :game/turns-per-round 4
+   :game/rounds-per-day  3})
+
+(def ^:private minimal-player
+  {:xt/id                     test-player-id
+   :player/empire-name        "Star Federation"
+   :player/rank               2
+   :player/score              12000
+   :player/current-turn       2
+   :player/current-round      1
+   :player/turns-used         1
+   :player/last-round-completed-at nil
+   :player/credits            10000
+   :player/food               5000
+   :player/fuel               3000
+   :player/galaxars           500
+   :player/population         7
+   :player/stability          80
+   :player/ore-planets        1
+   :player/erg-planets        2
+   :player/mil-planets        3
+   :player/soldiers           200
+   :player/transports         10
+   :player/generals           2
+   :player/fighters           50
+   :player/carriers           3
+   :player/admirals           1
+   :player/stations           5
+   :player/cmd-ships          1
+   :player/agents             8})
+
+(deftest test-game-card-renders
+  (testing "Returns a relative hiccup div for a player+game pair"
+    (let [result (dashboard/game-card {:player minimal-player
+                                        :game   minimal-game
+                                        :admin? false})]
+      (is (vector? result))
+      (is (= :div.relative (first result))))))
+
+(deftest test-game-card-contains-empire-name
+  (testing "The empire name appears in the rendered hiccup"
+    (let [result (pr-str (dashboard/game-card {:player minimal-player
+                                               :game   minimal-game
+                                               :admin? false}))]
+      (is (clojure.string/includes? result "Star Federation")))))
+
+(deftest test-game-card-contains-game-name
+  (testing "The game name appears in the rendered hiccup"
+    (let [result (pr-str (dashboard/game-card {:player minimal-player
+                                               :game   minimal-game
+                                               :admin? false}))]
+      (is (clojure.string/includes? result "Galactic Conquest")))))
+
+(deftest test-game-card-no-delete-button-for-non-admin
+  (testing "Non-admin player does not see the delete button"
+    (let [result (pr-str (dashboard/game-card {:player minimal-player
+                                               :game   minimal-game
+                                               :admin? false}))]
+      ;; The delete game action URL should not be present
+      (is (not (clojure.string/includes? result "delete-game"))))))
+
+(deftest test-game-card-delete-button-for-admin
+  (testing "Admin player sees the delete game button"
+    (let [result (pr-str (dashboard/game-card {:player minimal-player
+                                               :game   minimal-game
+                                               :admin? true}))]
+      (is (clojure.string/includes? result "delete-game")))))
+
+(deftest test-game-card-stretched-link
+  (testing "Card contains an absolute-positioned anchor linking to the game page"
+    (let [result (dashboard/game-card {:player minimal-player
+                                        :game   minimal-game
+                                        :admin? false})
+          tree   (pr-str result)]
+      (is (clojure.string/includes? tree (str "/app/game/" test-player-id))))))
+
+;;
+;; available-game-card
+;;
+;; available-game-card renders a card for games the user hasn't joined yet.
+;;
+
+(deftest test-available-game-card-renders
+  (testing "Returns a hiccup div for a game the user can join"
+    (let [result (dashboard/available-game-card {:game         minimal-game
+                                                  :player-count 3
+                                                  :admin?       false})]
+      (is (vector? result))
+      (is (= :div (first result))))))
+
+(deftest test-available-game-card-shows-game-name
+  (testing "The game name appears in the rendered card"
+    (let [result (pr-str (dashboard/available-game-card {:game         minimal-game
+                                                          :player-count 3
+                                                          :admin?       false}))]
+      (is (clojure.string/includes? result "Galactic Conquest")))))
+
+(deftest test-available-game-card-shows-player-count
+  (testing "The player count appears in the rendered card"
+    (let [result (pr-str (dashboard/available-game-card {:game         minimal-game
+                                                          :player-count 7
+                                                          :admin?       false}))]
+      (is (clojure.string/includes? result "7")))))
+
+(deftest test-available-game-card-join-link
+  (testing "Card contains a join-game link pointing to the game id"
+    (let [result (pr-str (dashboard/available-game-card {:game         minimal-game
+                                                          :player-count 2
+                                                          :admin?       false}))]
+      (is (clojure.string/includes? result (str "/app/join-game/" test-game-id))))))
+
+(deftest test-available-game-card-admin-sees-delete
+  (testing "Admin sees the delete button alongside the join link"
+    (let [result (pr-str (dashboard/available-game-card {:game         minimal-game
+                                                          :player-count 1
+                                                          :admin?       true}))]
+      (is (clojure.string/includes? result "delete-game")))))
+
+(deftest test-available-game-card-non-admin-no-delete
+  (testing "Non-admin does not see the delete button"
+    (let [result (pr-str (dashboard/available-game-card {:game         minimal-game
+                                                          :player-count 1
+                                                          :admin?       false}))]
+      (is (not (clojure.string/includes? result "delete-game"))))))

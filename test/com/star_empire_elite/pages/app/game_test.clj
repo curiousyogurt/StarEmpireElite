@@ -101,3 +101,57 @@
   (testing "Throws when player-id is not a valid UUID"
     (let [ctx {:path-params {:player-id "not-a-uuid"} :biff/db nil}]
       (is (thrown? IllegalArgumentException (game/game-view ctx))))))
+
+;;
+;; players-table
+;;
+;; players-table renders the leaderboard div+table. No DB access — purely structural.
+;; Each player is expected to have :rank, :player/empire-name, :player/score, and the
+;; three planet-count fields (:player/mil-planets, :player/erg-planets, :player/ore-planets).
+;;
+
+(deftest test-players-table-empty
+  (testing "Renders a hiccup div for an empty player list"
+    (let [result (game/players-table {:players []})]
+      (is (vector? result))
+      (is (= :div.mt-2 (first result))))))
+
+(deftest test-players-table-with-players
+  (testing "Returns a hiccup structure for a list of players"
+    (let [players [{:xt/id         test-player-id
+                    :rank          1
+                    :player/empire-name "Solar Syndicate"
+                    :player/score  5000
+                    :player/mil-planets 2
+                    :player/erg-planets 3
+                    :player/ore-planets 1}]
+          result (game/players-table {:players players})]
+      (is (vector? result))
+      ;; Hiccup tree should contain the empire name
+      (is (clojure.string/includes? (pr-str result) "Solar Syndicate")))))
+
+(deftest test-players-table-planet-count-sum
+  (testing "Planet count displayed is the sum of mil, erg, and ore planets"
+    ;; We verify that the total is computed by examining what format-number is called with.
+    ;; A direct test on the ui/format-number call is fragile; instead we check that the
+    ;; planets fields are correctly summed by inspecting the rendered hiccup tree.
+    (let [player {:xt/id test-player-id
+                  :rank  1
+                  :player/empire-name "Test"
+                  :player/score  0
+                  :player/mil-planets 2
+                  :player/erg-planets 3
+                  :player/ore-planets 5}   ; total = 10
+          result (game/players-table {:players [player]})]
+      (is (vector? result))
+      ;; "10" should appear somewhere as a planet count
+      (is (clojure.string/includes? (pr-str result) "10")))))
+
+(deftest test-players-table-multiple-players-order-preserved
+  (testing "Players are rendered in the order provided"
+    (let [p1 {:xt/id (helpers/uuid) :rank 1 :player/empire-name "Alpha"
+              :player/score 9999 :player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0}
+          p2 {:xt/id (helpers/uuid) :rank 2 :player/empire-name "Beta"
+              :player/score 1000 :player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0}
+          rendered (pr-str (game/players-table {:players [p1 p2]}))]
+      (is (< (.indexOf rendered "Alpha") (.indexOf rendered "Beta"))))))
