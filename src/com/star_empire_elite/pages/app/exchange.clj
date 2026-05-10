@@ -36,8 +36,8 @@
    {:label "Ore Planets"      :abbrev "Ore Plts"   :field "ore-planets-sold"  :qty-key :ore-planets-sold  :rate-key :ore-planet-sell :player-key :player/ore-planets}])
 
 (def sell-resource-row-specs
-  [{:label "Food"             :abbrev "Food"       :field "food-sold"         :qty-key :food-sold         :rate-key :food-sell       :player-key :player/food}
-   {:label "Fuel"             :abbrev "Fuel"       :field "fuel-sold"         :qty-key :fuel-sold         :rate-key :fuel-sell       :player-key :player/fuel}])
+  [{:label "Food"             :abbrev "Food"       :field "food-sold"         :qty-key :food-sold         :rate-key :food-sell       :player-key :player/food :resource-key :food :ex-tooltip "Sell excess food"}
+   {:label "Fuel"             :abbrev "Fuel"       :field "fuel-sold"         :qty-key :fuel-sold         :rate-key :fuel-sell       :player-key :player/fuel :resource-key :fuel :ex-tooltip "Sell excess fuel"}])
 
 (def sell-row-specs
   (concat sell-asset-row-specs sell-resource-row-specs))
@@ -340,7 +340,7 @@
         has-max?     (pos? max-quantity)
         ex-onclick   (when (some? ex-value)
                        (str "var i=document.querySelector('[name=\"" field-key "\"]');"
-                            "if(i){i.value='" ex-value "';"
+                            "if(i){i.value='" (long ex-value) "';"
                             "i.dispatchEvent(new Event('input',{bubbles:true}));}"))
         input-node   (ui/numeric-input field-key current-quantity player-id "/calculate-exchange" hx-include
                                        {:input-class "text-xs lg:text-sm text-right"
@@ -569,9 +569,7 @@
                                       [(:qty-key spec) 0]))
         max-buy-quantities (calculate-max-buy-quantities player zero-quantities rates)
         required           (expenses-calc/calculate-required-expenses player game)
-        req-totals         (expenses-calc/calculate-required-expense-totals required)
-        food-excess        (max 0 (- (:player/food player) (:food req-totals)))
-        fuel-excess        (max 0 (- (:player/fuel player) (:fuel req-totals)))]
+        req-totals         (expenses-calc/calculate-required-expense-totals required)]
     (ui/page
       {}
       [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
@@ -617,14 +615,13 @@
            [:div.overflow-hidden
             {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
             (exchange-table-header "Sell")
-            (exchange-row "Food" "Food" "food-sold"
-                          (:food-sell rates) 0
-                          (:player/food player) player-id exchange-hx-include
-                          {:ex-value food-excess :ex-tooltip "Sell excess food"})
-            (exchange-row "Fuel" "Fuel" "fuel-sold"
-                          (:fuel-sell rates) 0
-                          (:player/fuel player) player-id exchange-hx-include
-                          {:ex-value fuel-excess :ex-tooltip "Sell excess fuel"})]]
+            (for [spec sell-resource-row-specs
+                  :let [ex-val (max 0 (- (get player (:player-key spec))
+                                         (get req-totals (:resource-key spec) 0)))]]
+              (exchange-row (:label spec) (:abbrev spec) (:field spec)
+                            (get rates (:rate-key spec)) 0
+                            (get player (:player-key spec)) player-id exchange-hx-include
+                            {:ex-value ex-val :ex-tooltip (:ex-tooltip spec)}))]]
 
           ;; 5. Buy table
           [:div
