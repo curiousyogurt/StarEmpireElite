@@ -311,6 +311,102 @@
       (is (= 0 max-fuel)))))
 
 ;;;;
+;;;; calculate-required-expense-reduction Tests
+;;;;
+;;;; Tests use a game with concrete upkeep values so that reductions are verifiable.
+;;;;
+
+;; Game with real upkeep constants (matching constants.clj defaults).
+(def upkeep-game
+  (merge test-game
+         {:game/soldier-upkeep-credits 25
+          :game/soldier-upkeep-food    10
+          :game/fighter-upkeep-credits 100
+          :game/fighter-upkeep-fuel    10
+          :game/station-upkeep-credits 100
+          :game/station-upkeep-fuel    10
+          :game/agent-upkeep-food      10
+          :game/agent-upkeep-fuel      10
+          :game/planet-upkeep-credits  2500
+          :game/planet-upkeep-food     100}))
+
+(deftest test-calculate-required-expense-reduction-soldiers
+  (testing "Selling soldiers reduces credits and food requirements"
+    (let [q (merge zero-quantities {:soldiers-sold 10})
+          r (exchange/calculate-required-expense-reduction q upkeep-game)]
+      (is (= (* 10 25) (:credits r)))   ; 250 credits
+      (is (= (* 10 10) (:food r)))      ; 100 food
+      (is (= 0         (:fuel r))))))
+
+(deftest test-calculate-required-expense-reduction-fighters
+  (testing "Selling fighters reduces credits and fuel requirements"
+    (let [q (merge zero-quantities {:fighters-sold 5})
+          r (exchange/calculate-required-expense-reduction q upkeep-game)]
+      (is (= (* 5 100) (:credits r)))   ; 500 credits
+      (is (= 0         (:food r)))
+      (is (= (* 5 10)  (:fuel r))))))   ; 50 fuel
+
+(deftest test-calculate-required-expense-reduction-stations
+  (testing "Selling stations reduces credits and fuel requirements"
+    (let [q (merge zero-quantities {:stations-sold 3})
+          r (exchange/calculate-required-expense-reduction q upkeep-game)]
+      (is (= (* 3 100) (:credits r)))   ; 300 credits
+      (is (= 0         (:food r)))
+      (is (= (* 3 10)  (:fuel r))))))   ; 30 fuel
+
+(deftest test-calculate-required-expense-reduction-agents
+  (testing "Selling agents reduces food and fuel requirements (no credits)"
+    (let [q (merge zero-quantities {:agents-sold 4})
+          r (exchange/calculate-required-expense-reduction q upkeep-game)]
+      (is (= 0         (:credits r)))
+      (is (= (* 4 10)  (:food r)))      ; 40 food
+      (is (= (* 4 10)  (:fuel r))))))   ; 40 fuel
+
+(deftest test-calculate-required-expense-reduction-planets
+  (testing "Selling mil, erg, and ore planets all reduce credits and food"
+    (let [q (merge zero-quantities {:mil-planets-sold 1 :erg-planets-sold 1 :ore-planets-sold 1})
+          r (exchange/calculate-required-expense-reduction q upkeep-game)]
+      (is (= (* 3 2500) (:credits r)))  ; 7500 credits
+      (is (= (* 3 100)  (:food r)))     ; 300 food
+      (is (= 0          (:fuel r)))))
+  (testing "Only sold planet types contribute"
+    (let [q (merge zero-quantities {:ore-planets-sold 2})
+          r (exchange/calculate-required-expense-reduction q upkeep-game)]
+      (is (= (* 2 2500) (:credits r)))
+      (is (= (* 2 100)  (:food r))))))
+
+(deftest test-calculate-required-expense-reduction-combined
+  (testing "All reductions accumulate correctly across unit and planet types"
+    ;; Sell 10 soldiers, 5 fighters, 3 stations, 4 agents, 1 mil + 1 erg + 1 ore planet
+    (let [q (merge zero-quantities {:soldiers-sold 10 :fighters-sold 5 :stations-sold 3
+                                    :agents-sold 4
+                                    :mil-planets-sold 1 :erg-planets-sold 1 :ore-planets-sold 1})
+          r (exchange/calculate-required-expense-reduction q upkeep-game)
+          expected-credits (+ (* 10 25) (* 5 100) (* 3 100) (* 3 2500))
+          expected-food    (+ (* 10 10) (* 4 10)  (* 3 100))
+          expected-fuel    (+ (* 5 10)  (* 3 10)  (* 4 10))]
+      (is (= expected-credits (:credits r)))
+      (is (= expected-food    (:food    r)))
+      (is (= expected-fuel    (:fuel    r))))))
+
+(deftest test-calculate-required-expense-reduction-no-upkeep-units
+  (testing "Transports, generals, carriers, admirals, and cmd-ships produce zero reduction"
+    (let [q (merge zero-quantities {:transports-sold 5 :generals-sold 2
+                                    :carriers-sold 1   :admirals-sold 1
+                                    :cmd-ships-sold 1})
+          r (exchange/calculate-required-expense-reduction q upkeep-game)]
+      (is (= 0 (:credits r)))
+      (is (= 0 (:food    r)))
+      (is (= 0 (:fuel    r))))))
+
+(deftest test-calculate-required-expense-reduction-zero-quantities
+  (testing "All-zero quantities produce zero reduction in all resources"
+    (let [r (exchange/calculate-required-expense-reduction zero-quantities upkeep-game)]
+      (is (= 0 (:credits r)))
+      (is (= 0 (:food    r)))
+      (is (= 0 (:fuel    r))))))
+
+;;;;
 ;;;; apply-exchange Tests
 ;;;;
 ;;;; apply-exchange writes to the database and redirects, so xt/entity and

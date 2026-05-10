@@ -166,6 +166,29 @@
    :invalid-food-purchase?      (and (> (:food-bought quantities) 0) (< (:credits resources-after) 0))
    :invalid-fuel-purchase?      (and (> (:fuel-bought quantities) 0) (< (:credits resources-after) 0))})
 
+(defn calculate-required-expense-reduction
+  "Calculate how much each required-expense total decreases when the player sells units or planets.
+  Selling units/planets reduces their upkeep, so the Required rows in the expense-coverage pills
+  should drop accordingly.
+
+  Returns the per-resource reduction amounts (not the new totals).
+
+  [quantities exchange-quantities, game game-map] -> {:credits int, :food int, :fuel int}"
+  [quantities game]
+  (let [planets-sold (+ (:mil-planets-sold quantities)
+                        (:erg-planets-sold quantities)
+                        (:ore-planets-sold quantities))]
+    {:credits (+ (* (:soldiers-sold  quantities) (:game/soldier-upkeep-credits  game))
+                 (* (:fighters-sold  quantities) (:game/fighter-upkeep-credits  game))
+                 (* (:stations-sold  quantities) (:game/station-upkeep-credits  game))
+                 (* planets-sold                  (:game/planet-upkeep-credits   game)))
+     :food    (+ (* (:soldiers-sold  quantities) (:game/soldier-upkeep-food     game))
+                 (* (:agents-sold    quantities) (:game/agent-upkeep-food       game))
+                 (* planets-sold                  (:game/planet-upkeep-food      game)))
+     :fuel    (+ (* (:fighters-sold  quantities) (:game/fighter-upkeep-fuel     game))
+                 (* (:stations-sold  quantities) (:game/station-upkeep-fuel     game))
+                 (* (:agents-sold    quantities) (:game/agent-upkeep-fuel       game)))}))
+
 ;;;;
 ;;;; SVG Indicator Bar
 ;;;;
@@ -265,17 +288,17 @@
      [:div {:class "grid grid-cols-1 md:grid-cols-3 gap-1.5"}
       (ui/projection-pill "Credits" cr-total
         [{:label "Current"  :value cr-current      :suffix "cr"}
-         {:label "Required" :value (- cr-required) :suffix "cr"}
-         {:label "Exchange" :value 0               :suffix "cr" :id "credits-pill-exchange"}]
+         {:label "Required" :value (- cr-required) :suffix "cr"   :id "credits-pill-required"}
+         {:label "Exchange" :value 0               :suffix "cr"   :id "credits-pill-exchange"}]
         {:total-id "projection-credits-total" :signed? true})
       (ui/projection-pill "Food" food-total
         [{:label "Current"  :value food-current      :suffix "food"}
-         {:label "Required" :value (- food-required) :suffix "food"}
+         {:label "Required" :value (- food-required) :suffix "food" :id "food-pill-required"}
          {:label "Exchange" :value 0                  :suffix "food" :id "food-pill-exchange"}]
         {:total-id "projection-food-total" :signed? true})
       (ui/projection-pill "Fuel" fuel-total
         [{:label "Current"  :value fuel-current      :suffix "fuel"}
-         {:label "Required" :value (- fuel-required) :suffix "fuel"}
+         {:label "Required" :value (- fuel-required) :suffix "fuel" :id "fuel-pill-required"}
          {:label "Exchange" :value 0                  :suffix "fuel" :id "fuel-pill-exchange"}]
         {:total-id "projection-fuel-total" :signed? true})]]))
 
@@ -393,12 +416,16 @@
           ;; Pill exchange values
           required           (expenses-calc/calculate-required-expenses player game)
           req-totals         (expenses-calc/calculate-required-expense-totals required)
+          expense-reduction  (calculate-required-expense-reduction quantities game)
           exchange-credits   (:total-credits credit-changes)
           exchange-food      (- (:food-bought quantities) (:food-sold quantities))
           exchange-fuel      (- (:fuel-bought quantities) (:fuel-sold quantities))
-          cr-total           (+ (- (:player/credits player) (:credits req-totals)) exchange-credits)
-          food-total         (+ (- (:player/food player) (:food req-totals)) exchange-food)
-          fuel-total         (+ (- (:player/fuel player) (:fuel req-totals)) exchange-fuel)]
+          adj-cr-required    (- (:credits req-totals) (:credits expense-reduction))
+          adj-food-required  (- (:food    req-totals) (:food    expense-reduction))
+          adj-fuel-required  (- (:fuel    req-totals) (:fuel    expense-reduction))
+          cr-total           (+ (- (:player/credits player) adj-cr-required)   exchange-credits)
+          food-total         (+ (- (:player/food    player) adj-food-required) exchange-food)
+          fuel-total         (+ (- (:player/fuel    player) adj-fuel-required) exchange-fuel)]
       (biff/render
         [:div
          ;; Renew HTMX swap-target so subsequent requests can find it
@@ -417,6 +444,11 @@
            [:span {:id (str "max-qty-" (:field spec)) :hx-swap-oob "true"
                    :style {:color (if (pos? max-qty) "#9adaaa" "#3a5040")}}
             (ui/format-number max-qty)])
+
+         ;; OOB: pill Required rows (adjusted for proposed unit/planet sales)
+         (ui/oob-pill "credits-pill-required" "Required" (- adj-cr-required)   "cr")
+         (ui/oob-pill "food-pill-required"    "Required" (- adj-food-required) "food")
+         (ui/oob-pill "fuel-pill-required"    "Required" (- adj-fuel-required) "fuel")
 
          ;; OOB: pill Exchange rows
          (ui/oob-pill "credits-pill-exchange" "Exchange" exchange-credits "cr")
