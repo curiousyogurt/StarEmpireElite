@@ -374,6 +374,12 @@
    {:style {:letter-spacing "0.12em" :color "#7ab88a"}}
    text])
 
+(def ^:private action-bar-secondary-style
+  "Shared inline style map for secondary action-bar controls (links and buttons)."
+  {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
+   :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
+   :font-family "'Courier New', monospace"})
+
 (defn action-bar-link
   "Render a navigation link styled to match the terminal-shell action bar.
 
@@ -381,24 +387,20 @@
   [href label]
   [:a.text-sm
    {:href  href
-    :style {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
-            :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
-            :font-family "'Courier New', monospace"
-            :text-decoration "none" :display "inline-block"}}
+    :style (assoc action-bar-secondary-style
+                  :text-decoration "none" :display "inline-block")}
    label])
 
 (defn action-bar-button
   "Render a button styled to match the terminal-shell action bar secondary style.
   Use instead of action-bar-link when an onclick handler is required.
 
-  [label str, onclick str] -> hiccup"
-  [label onclick]
+  [onclick str, label str] -> hiccup"
+  [onclick label]
   [:button.text-sm
    {:type    "button"
     :onclick onclick
-    :style   {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
-              :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
-              :font-family "'Courier New', monospace" :cursor "pointer"}}
+    :style   (assoc action-bar-secondary-style :cursor "pointer")}
    label])
 
 (defn snapshot-section
