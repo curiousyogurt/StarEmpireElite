@@ -364,6 +364,7 @@
      ;; Quantity input (with optional "Ex" button)
      [:div.justify-self-center
       (if (some? ex-value)
+        ;; Extra 30px (150 vs 120) accommodates the "Ex" button alongside the input
         [:div.flex.items-center.gap-1 {:style {:width "min(150px, 100%)"}}
          input-node
          [:button
