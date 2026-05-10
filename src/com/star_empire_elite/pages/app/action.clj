@@ -9,27 +9,9 @@
 ;;;;;
 
 (ns com.star-empire-elite.pages.app.action
-  (:require [com.biffweb :as biff :refer [q]]
-            [com.star-empire-elite.constants :as const]
+  (:require [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
-
-;;;;
-;;;; Data Fetching
-;;;;
-
-(defn get-other-players
-  "Fetch all other players in the same game, sorted by score descending.
-
-  [db xtdb-db, game-id uuid, current-player-id uuid] -> seq of player maps"
-  [db game-id current-player-id]
-  (let [players (filter #(not= (:player/status %) const/player-status-eliminated)
-                        (q db '{:find (pull player [*])
-                                :in [game-id current-player-id]
-                                :where [[player :player/game game-id]
-                                        [(not= player current-player-id)]]}
-                             game-id current-player-id))]
-    (sort-by :player/score > (seq players))))
 
 ;;;;
 ;;;; UI Components
@@ -98,7 +80,7 @@
   [{:keys [player game db]}] -> hiccup"
   [{:keys [player game db]}]
   (let [player-id     (:xt/id player)
-        other-players (get-other-players db (:player/game player) player-id)
+        other-players (utils/get-other-players db (:player/game player) player-id)
         th-style      {:color "#4ade80" :font-size "11px" :letter-spacing "0.08em"
                        :text-transform "uppercase"}]
     (ui/page

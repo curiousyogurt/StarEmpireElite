@@ -69,24 +69,20 @@
 
   [player player-map, quantities purchase-quantities, cost-info {:total-cost int}] -> {:credits int, :soldiers int, ...}"
   [player quantities cost-info]
-  {:credits      (- (:player/credits player)      (:total-cost cost-info))
-   :food         (:player/food player)
-   :fuel         (:player/fuel player)
-   :population   (:player/population player)
-   :stability    (:player/stability player)
-   :galaxars     (:player/galaxars player)
-   :soldiers     (+ (:player/soldiers player)     (:soldiers quantities))
-   :transports   (+ (:player/transports player)   (:transports quantities))
-   :generals     (+ (:player/generals player)     (:generals quantities))
-   :carriers     (+ (:player/carriers player)     (:carriers quantities))
-   :fighters     (+ (:player/fighters player)     (:fighters quantities))
-   :admirals     (+ (:player/admirals player)     (:admirals quantities))
-   :stations     (+ (:player/stations player)     (:stations quantities))
-   :cmd-ships    (+ (:player/cmd-ships player)    (:cmd-ships quantities))
-   :agents       (+ (:player/agents player)       (:agents quantities))
-   :ore-planets  (+ (:player/ore-planets player)  (:ore-planets quantities))
-   :erg-planets  (+ (:player/erg-planets player)  (:erg-planets quantities))
-   :mil-planets  (+ (:player/mil-planets player)  (:mil-planets quantities))})
+  (-> (utils/player-snapshot player)
+      (update :credits     - (:total-cost cost-info))
+      (update :soldiers    + (:soldiers   quantities))
+      (update :transports  + (:transports quantities))
+      (update :generals    + (:generals   quantities))
+      (update :carriers    + (:carriers   quantities))
+      (update :fighters    + (:fighters   quantities))
+      (update :admirals    + (:admirals   quantities))
+      (update :stations    + (:stations   quantities))
+      (update :cmd-ships   + (:cmd-ships  quantities))
+      (update :agents      + (:agents     quantities))
+      (update :ore-planets + (:ore-planets quantities))
+      (update :erg-planets + (:erg-planets quantities))
+      (update :mil-planets + (:mil-planets quantities))))
 
 (defn can-afford-purchases?
   "Returns true if player has enough credits for all purchases.

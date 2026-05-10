@@ -7,7 +7,9 @@
 ;;;;;
 
 (ns com.star-empire-elite.utils
-  (:require [xtdb.api :as xt]))
+  (:require [com.biffweb :refer [q]]
+            [com.star-empire-elite.constants :as const]
+            [xtdb.api :as xt]))
 
 ;;;;
 ;;;; Input Parsing
@@ -138,6 +140,59 @@
               day-complete?   rounds-per-day
               between-rounds? (dec current-round)
               :else           current-round)}))
+
+;;;;
+;;;; Player Resource Snapshot
+;;;;
+
+;;; Strips the :player/ namespace prefix from a player entity and returns a plain resource map with
+;;; all 18 standard resource/unit/planet keys. Used by the calculate-resources-after-* functions in
+;;; the income, expenses, building, and exchange phases to eliminate repeated boilerplate.
+(defn player-snapshot
+  "Extract the standard resource map from a player entity, using unqualified keys.
+  Returns a map with all 18 resource/unit/planet keys; values default to 0 when absent.
+
+  [player player-map] -> resource-map"
+  [player]
+  {:credits     (get player :player/credits 0)
+   :food        (get player :player/food 0)
+   :fuel        (get player :player/fuel 0)
+   :galaxars    (get player :player/galaxars 0)
+   :population  (get player :player/population 0)
+   :stability   (get player :player/stability 0)
+   :soldiers    (get player :player/soldiers 0)
+   :transports  (get player :player/transports 0)
+   :generals    (get player :player/generals 0)
+   :fighters    (get player :player/fighters 0)
+   :carriers    (get player :player/carriers 0)
+   :admirals    (get player :player/admirals 0)
+   :stations    (get player :player/stations 0)
+   :cmd-ships   (get player :player/cmd-ships 0)
+   :agents      (get player :player/agents 0)
+   :ore-planets (get player :player/ore-planets 0)
+   :erg-planets (get player :player/erg-planets 0)
+   :mil-planets (get player :player/mil-planets 0)})
+
+;;;;
+;;;; Other-Player Fetching
+;;;;
+
+;;; Both the action phase (combat targeting) and the espionage phase (covert-op targeting) need the
+;;; same query: all non-eliminated players in the same game, sorted by score. Centralised here to
+;;; avoid duplication across those two page namespaces.
+(defn get-other-players
+  "Fetch all non-eliminated players in the same game as current-player-id, sorted by score
+  descending.
+
+  [db xtdb-db, game-id uuid, current-player-id uuid] -> seq of player maps"
+  [db game-id current-player-id]
+  (let [players (filter #(not= (:player/status %) const/player-status-eliminated)
+                        (q db '{:find (pull player [*])
+                                :in [game-id current-player-id]
+                                :where [[player :player/game game-id]
+                                        [(not= player current-player-id)]]}
+                           game-id current-player-id))]
+    (sort-by :player/score > (seq players))))
 
 ;;;;
 ;;;; Entity Loading

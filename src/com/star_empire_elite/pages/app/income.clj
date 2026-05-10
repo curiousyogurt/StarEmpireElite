@@ -40,24 +40,13 @@
 
   [player player-map, income income-map] -> {:credits int, :food int, ...}"
   [player income]
-  {:credits     (+ (:player/credits player) (:ore-credits income) (:tax-credits income))
-   :food        (+ (:player/food player) (:erg-food income))
-   :fuel        (+ (:player/fuel player) (:erg-fuel income))
-   :population  (:player/population player)
-   :stability   (:player/stability player)
-   :galaxars    (:player/galaxars player)
-   :soldiers    (+ (:player/soldiers player) (:mil-soldiers income))
-   :transports  (:player/transports player)
-   :generals    (:player/generals player)
-   :fighters    (+ (:player/fighters player) (:mil-fighters income))
-   :carriers    (:player/carriers player)
-   :admirals    (:player/admirals player)
-   :stations    (+ (:player/stations player) (:mil-stations income))
-   :cmd-ships   (:player/cmd-ships player)
-   :agents      (:player/agents player)
-   :ore-planets (:player/ore-planets player)
-   :erg-planets (:player/erg-planets player)
-   :mil-planets (:player/mil-planets player)})
+  (-> (utils/player-snapshot player)
+      (update :credits + (:ore-credits income) (:tax-credits income))
+      (update :food    + (:erg-food     income))
+      (update :fuel    + (:erg-fuel     income))
+      (update :soldiers + (:mil-soldiers income))
+      (update :fighters + (:mil-fighters income))
+      (update :stations + (:mil-stations income))))
 
 ;;;;
 ;;;; SVG Indicator Bar

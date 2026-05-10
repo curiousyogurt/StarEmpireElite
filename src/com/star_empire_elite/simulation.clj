@@ -119,17 +119,12 @@
          net-fuel    (- fuel-in fuel-out)
 
          ;; How many rounds until each stockpile runs out at current burn rate
-         rounds-until-bankrupt
-         (when (neg? net-credits)
-           (long (Math/floor (/ starting-credits (Math/abs (double net-credits))))))
-
-         rounds-until-food-shortage
-         (when (neg? net-food)
-           (long (Math/floor (/ starting-food (Math/abs (double net-food))))))
-
-         rounds-until-fuel-shortage
-         (when (neg? net-fuel)
-           (long (Math/floor (/ starting-fuel (Math/abs (double net-fuel))))))
+         rounds-until-depletion (fn [stockpile net]
+                                  (when (neg? net)
+                                    (long (Math/floor (/ stockpile (Math/abs (double net)))))))
+         rounds-until-bankrupt       (rounds-until-depletion starting-credits net-credits)
+         rounds-until-food-shortage  (rounds-until-depletion starting-food    net-food)
+         rounds-until-fuel-shortage  (rounds-until-depletion starting-fuel    net-fuel)
 
          ;; Balanced = no resource is running a deficit this round
          balanced? (and (>= net-credits 0) (>= net-food 0) (>= net-fuel 0))

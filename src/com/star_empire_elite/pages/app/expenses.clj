@@ -64,24 +64,10 @@
 
   [player payments {:credits-pay int, :food-pay int, :fuel-pay int}] -> {:credits int, ...}"
   [player payments]
-  {:credits     (- (:player/credits   player) (:credits-pay payments))
-   :food        (- (:player/food      player) (:food-pay    payments))
-   :fuel        (- (:player/fuel      player) (:fuel-pay    payments))
-   :population  (:player/population  player)
-   :stability   (:player/stability   player)
-   :galaxars    (:player/galaxars    player)
-   :soldiers    (:player/soldiers    player)
-   :transports  (:player/transports  player)
-   :generals    (:player/generals    player)
-   :fighters    (:player/fighters    player)
-   :carriers    (:player/carriers    player)
-   :admirals    (:player/admirals    player)
-   :stations    (:player/stations    player)
-   :cmd-ships   (:player/cmd-ships   player)
-   :agents      (:player/agents      player)
-   :ore-planets (:player/ore-planets player)
-   :erg-planets (:player/erg-planets player)
-   :mil-planets (:player/mil-planets player)})
+  (-> (utils/player-snapshot player)
+      (update :credits - (:credits-pay payments))
+      (update :food    - (:food-pay    payments))
+      (update :fuel    - (:fuel-pay    payments))))
 
 (defn calculate-expense-stability-penalty
   "Calculate stability penalty for underpaying expenses.
