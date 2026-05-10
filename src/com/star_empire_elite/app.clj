@@ -60,20 +60,29 @@
       {:status 303 :headers {"location" "/app"}}
       (ui/page
        {}
-       [:div.text-green-400.font-mono
-        [:h1.text-3xl.font-bold.mb-6 "Create Game"]
-        (biff/form
-         {:action "/app/create-game"
-          :method "post"}
-         [:div.mb-4
-          [:label.block.text-xs.mb-1 "Galaxy Name"]
-          [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.font-mono
-           {:type "text" :name "game-name" :required true :maxlength 100 :autofocus true}]]
-         [:div.flex.gap-4
-          [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-           {:href "/app"} "Cancel"]
-          [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
-           {:type "submit"} "Create"]])]))))
+       [:div.text-base.w-full.max-w-2xl.mx-auto.overflow-hidden.relative
+        {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
+                 :border-radius "4px" :color "#4ade80"
+                 :font-family "'Courier New', monospace"}}
+        (ui/scanline-overlay)
+        [:div.flex.items-center
+         {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
+         [:div {:style {:font-size "18px" :font-weight "bold" :color "#4ade80"
+                        :letter-spacing "0.05em"}} "CREATE GAME"]]
+        [:div {:style {:padding "14px"}}
+         (biff/form
+          {:action "/app/create-game"
+           :method "post"}
+          [:div {:style {:margin-bottom "14px"}}
+           (ui/section-label "Galaxy Name")
+           [:input.w-full
+            {:type "text" :name "game-name" :required true :maxlength 100 :autofocus true
+             :style {:background "#0e1810" :border "1px solid #1e6e44" :color "#4ade80"
+                     :padding "6px 8px" :font-family "'Courier New', monospace"
+                     :font-size "14px" :border-radius "2px" :outline "none" :width "100%"}}]]
+          [:div.flex.gap-3
+           (ui/action-bar-link "/app" "Cancel")
+           (ui/submit-button true "Create")])]]))))
 
 (defn create-game
   "Create a new game entity with all constants baked in. Admin only.
@@ -200,24 +209,33 @@
       {:status 404 :body "Game not found"}
       (ui/page
        {}
-       [:div.text-green-400.font-mono
-        [:h1.text-3xl.font-bold.mb-6 "Join Game"]
-        [:p.mb-4 (str "Galaxy: " (:game/name game))]
-        (when error
-          [:p.text-red-400.mb-4 error])
-        (biff/form
-         {:action (str "/app/join-game/" game-id)
-          :method "post"}
-         [:div.mb-4
-          [:label.block.text-xs.mb-1 "Empire Name"]
-          [:input.w-full.bg-black.border.border-green-400.text-green-400.p-2.font-mono
-           {:type "text" :name "empire-name" :required true :maxlength 50
-            :autofocus true}]]
-         [:div.flex.gap-4
-          [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-           {:href "/app"} "Cancel"]
-          [:button.bg-green-400.text-black.px-6.py-2.font-bold.hover:bg-green-300.transition-colors
-           {:type "submit"} "Join"]])]))))
+       [:div.text-base.w-full.max-w-2xl.mx-auto.overflow-hidden.relative
+        {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
+                 :border-radius "4px" :color "#4ade80"
+                 :font-family "'Courier New', monospace"}}
+        (ui/scanline-overlay)
+        [:div.flex.items-center
+         {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
+         [:div
+          [:div {:style {:font-size "18px" :font-weight "bold" :color "#4ade80"
+                         :letter-spacing "0.05em"}} "JOIN GAME"]
+          [:div.text-sm.mt-px {:style {:color "#9adaaa"}} (:game/name game)]]]
+        [:div {:style {:padding "14px"}}
+         (when error
+           [:div {:style {:color "#f87171" :font-size "13px" :margin-bottom "10px"}} error])
+         (biff/form
+          {:action (str "/app/join-game/" game-id)
+           :method "post"}
+          [:div {:style {:margin-bottom "14px"}}
+           (ui/section-label "Empire Name")
+           [:input.w-full
+            {:type "text" :name "empire-name" :required true :maxlength 50 :autofocus true
+             :style {:background "#0e1810" :border "1px solid #1e6e44" :color "#4ade80"
+                     :padding "6px 8px" :font-family "'Courier New', monospace"
+                     :font-size "14px" :border-radius "2px" :outline "none" :width "100%"}}]]
+          [:div.flex.gap-3
+           (ui/action-bar-link "/app" "Cancel")
+           (ui/submit-button true "Join")])])))))
 
 (defn join-game
   "Create a player entity in the chosen game after validating empire name uniqueness.

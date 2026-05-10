@@ -379,11 +379,12 @@
 
   [href str, label str] -> hiccup"
   [href label]
-  [:a.text-sm.no-underline
+  [:a
    {:href  href
     :style {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
             :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
-            :font-family "'Courier New', monospace"}}
+            :font-family "'Courier New', monospace" :font-size "13px"
+            :text-decoration "none" :display "inline-block"}}
    label])
 
 (defn snapshot-section

@@ -96,7 +96,7 @@
      :style {:padding "3px 10px" :border "1px solid #7ab88a" :background "transparent"
              :color "#9adaaa" :border-radius "2px" :font-family "'Courier New', monospace"
              :cursor "pointer" :font-size "12px"}}
-    "X"]))
+    "Delete"]))
 
 (defn available-game-card
   "Render a card for a game the user has not yet joined, showing player count and a join link.
@@ -116,7 +116,7 @@
           :style {:padding "4px 12px" :border "1px solid #1e6e44" :background "transparent"
                   :color "#9adaaa" :border-radius "2px" :font-family "'Courier New', monospace"
                   :font-size "13px" :letter-spacing "0.04em" :text-decoration "none"}}
-      "Join Game"]
+      "Join"]
      (when admin?
        (delete-game-button (:xt/id game)))]]])
 
