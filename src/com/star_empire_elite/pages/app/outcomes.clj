@@ -26,7 +26,7 @@
   [player player-map] -> int"
   [player]
   (+ (* (:player/mil-planets  player) 500)
-     (* (:player/erg-planets player) 300)
+     (* (:player/erg-planets  player) 300)
      (* (:player/ore-planets  player) 200)
      (* (:player/soldiers     player) 1)
      (* (:player/fighters     player) 3)
