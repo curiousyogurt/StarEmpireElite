@@ -235,7 +235,7 @@
                      :font-size "14px" :border-radius "2px" :outline "none" :width "100%"}}]]
           [:div.flex.gap-3
            (ui/action-bar-link "/app" "Cancel")
-           (ui/submit-button true "Join")])])))))
+           (ui/submit-button true "Join")])]]))))
 
 (defn join-game
   "Create a player entity in the chosen game after validating empire name uniqueness.

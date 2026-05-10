@@ -594,5 +594,5 @@
          ;; Action bar
          [:div.flex.gap-2
           {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
-          (ui/action-bar-link (str "/app/game/" player-id "/expenses") "Back to Expenses")
+          (ui/action-bar-link (str "/app/game/" player-id "/expenses") "Cancel Expenses")
           (ui/submit-button false "Make Exchange")])])))

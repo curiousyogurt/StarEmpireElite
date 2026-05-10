@@ -95,8 +95,8 @@
     {:type "submit"
      :style {:padding "3px 10px" :border "1px solid #7ab88a" :background "transparent"
              :color "#9adaaa" :border-radius "2px" :font-family "'Courier New', monospace"
-             :cursor "pointer" :font-size "12px"}}
-    "Delete"]))
+             :cursor "pointer" :font-size "26px"}}
+    "✕"]))
 
 (defn available-game-card
   "Render a card for a game the user has not yet joined, showing player count and a join link.
@@ -123,14 +123,23 @@
 (defn- stat-cell
   "Render a single labeled stat cell for the dashboard game-card grids.
 
-  [label str, val any] -> hiccup"
+  [label str, val string|number] -> hiccup"
   [label val]
   [:div
    [:div {:style {:color "#4a6a58" :font-size "9px" :text-transform "uppercase"
                   :letter-spacing "0.04em" :overflow "hidden" :text-overflow "ellipsis"
-                  :white-space "nowrap"}} label]
+                  :white-space "nowrap"}}
+    label]
    [:div {:style {:color "#9adaaa" :font-size "13px" :font-weight "bold"}}
-    (if (string? val) val (ui/format-number val))]])
+    (cond
+      (string? val) val
+      (number? val) (ui/format-number val)
+      (nil? val)    "0"
+      :else         (throw
+                      (ex-info "stat-cell expected a string or number"
+                               {:label label
+                                :value val
+                                :type  (type val)})))]])
 
 (defn game-card
   "Render a full empire snapshot card for a game the player has joined.
@@ -167,27 +176,27 @@
    [:div {:style {:display "grid" :grid-template-columns "repeat(9, 1fr)" :gap "6px"
                   :margin-bottom "10px" :padding-bottom "10px"
                   :border-bottom "1px solid #1a3020"}}
-    (stat-cell "Credits"    (ui/format-number (:player/credits player)))
-    (stat-cell "Food"       (ui/format-number (:player/food player)))
-    (stat-cell "Fuel"       (ui/format-number (:player/fuel player)))
-    (stat-cell "Galaxars"   (ui/format-number (:player/galaxars player)))
+    (stat-cell "Credits"    (:player/credits player))
+    (stat-cell "Food"       (:player/food player))
+    (stat-cell "Fuel"       (:player/fuel player))
+    (stat-cell "Galaxars"   (:player/galaxars player))
     (stat-cell "Population" (str (:player/population player) "M"))
     (stat-cell "Stability"  (str (:player/stability player) "%"))
-    (stat-cell "Ore Plts"   (ui/format-number (:player/ore-planets player)))
-    (stat-cell "Erg Plts"   (ui/format-number (:player/erg-planets player)))
-    (stat-cell "Mil Plts"   (ui/format-number (:player/mil-planets player)))]
+    (stat-cell "Ore Plts"   (:player/ore-planets player))
+    (stat-cell "Erg Plts"   (:player/erg-planets player))
+    (stat-cell "Mil Plts"   (:player/mil-planets player))]
 
    ;; Row 2: military units and leadership
    [:div {:style {:display "grid" :grid-template-columns "repeat(9, 1fr)" :gap "6px"}}
-    (stat-cell "Generals"   (ui/format-number (:player/generals player)))
-    (stat-cell "Soldiers"   (ui/format-number (:player/soldiers player)))
-    (stat-cell "Transports" (ui/format-number (:player/transports player)))
-    (stat-cell "Admirals"   (ui/format-number (:player/admirals player)))
-    (stat-cell "Fighters"   (ui/format-number (:player/fighters player)))
-    (stat-cell "Carriers"   (ui/format-number (:player/carriers player)))
-    (stat-cell "Def Stns"   (ui/format-number (:player/stations player)))
-    (stat-cell "Cmd Ships"  (ui/format-number (:player/cmd-ships player)))
-    (stat-cell "Agents"     (ui/format-number (:player/agents player)))]])
+    (stat-cell "Generals"   (:player/generals player))
+    (stat-cell "Soldiers"   (:player/soldiers player))
+    (stat-cell "Transports" (:player/transports player))
+    (stat-cell "Admirals"   (:player/admirals player))
+    (stat-cell "Fighters"   (:player/fighters player))
+    (stat-cell "Carriers"   (:player/carriers player))
+    (stat-cell "Def Stns"   (:player/stations player))
+    (stat-cell "Cmd Ships"  (:player/cmd-ships player))
+    (stat-cell "Agents"     (:player/agents player))]])
 
 ;;;;
 ;;;; Page
