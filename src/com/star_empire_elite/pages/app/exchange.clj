@@ -195,7 +195,7 @@
                      {:style {:color "#7ab88a"}}
                      (ui/format-number before)]
         change-cell (fn [id]
-                      [:div.text-base.text-right.whitespace-nowrap
+                      [:div.text-base.justify-self-center.whitespace-nowrap
                        {:style {:letter-spacing "0.03em"
                                 :color (cond (zero? delta) "#7ab88a"
                                              (pos? delta)  "#4ade80"

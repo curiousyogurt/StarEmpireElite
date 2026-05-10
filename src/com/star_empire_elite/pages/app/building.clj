@@ -231,17 +231,21 @@
       [:span {:id max-qty-id :data-value (str (if (neg? max-qty) 0 max-qty))}
        (ui/format-number (if (neg? max-qty) 0 max-qty))]]
      ;; Build input + max button
-     [:div.flex.items-center.gap-1.justify-self-center
-      (ui/numeric-input (name (:qty-key spec)) purchase-qty player-id
-                        "/calculate-building" building-hx-include
-                        {:input-class "text-xs lg:text-sm text-right"
-                         :input-style {:color "#7ab88a" :border-color "#2d6644"
-                                       :padding-top "1px" :padding-bottom "1px"}})
+     ;; The outer div stretches to fill the grid cell; the input is centered inside it;
+     ;; the max button is positioned absolutely so it doesn't shift the input off-center.
+     [:div.relative.flex.items-center.justify-center
+      [:div {:style {:width "min(120px, 100%)"}}
+       (ui/numeric-input (name (:qty-key spec)) purchase-qty player-id
+                         "/calculate-building" building-hx-include
+                         {:input-class "text-xs lg:text-sm text-right"
+                          :input-style {:color "#7ab88a" :border-color "#2d6644"
+                                        :padding-top "1px" :padding-bottom "1px"}})]
       [:button.text-xs
        {:type "button"
-        :style {:border "1px solid #2d6644" :background "transparent" :color "#7ab88a"
+        :style {:position "absolute" :right "0"
+                :border "1px solid #2d6644" :background "transparent" :color "#7ab88a"
                 :padding "1px 4px" :border-radius "2px" :cursor "pointer"
-                :font-family "inherit" :flex-shrink "0"}
+                :font-family "inherit"}
         :onclick (str "var s=document.getElementById('" max-qty-id "');"
                       "var i=document.querySelector('[name=\"" (name (:qty-key spec)) "\"]');"
                       "if(s&&i){i.value=s.dataset.value||'0';"
