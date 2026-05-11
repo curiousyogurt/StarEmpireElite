@@ -124,8 +124,6 @@
             (if (utils/day-exhausted? player game)
               (str "Rounds reset in " (utils/format-cooldown-duration cooldown-ms))
               (str "Next round opens in " (utils/format-cooldown-duration cooldown-ms)))]
-           [:a {:href (get-phase-url (:xt/id player) (:player/current-phase player))
-                :style {:padding "5px 14px" :border "1px solid #4ade80" :background "#1a3a28"
-                        :color "#4ade80" :border-radius "2px" :letter-spacing "0.05em"
-                        :font-family "'Courier New', monospace" :text-decoration "none"}}
-            "Play"])]]))))
+           (ui/action-bar-primary-link
+             (get-phase-url (:xt/id player) (:player/current-phase player))
+             "Play"))]]))))

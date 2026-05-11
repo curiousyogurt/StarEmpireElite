@@ -112,11 +112,7 @@
      [:div.font-bold {:style {:color "#4ade80" :font-size "15px"}} (:game/name game)]
      [:div.text-xs.mt-px {:style {:color "#7ab88a"}} (str player-count " player(s)")]]
     [:div.flex.items-center.gap-2
-     [:a {:href  (str "/app/join-game/" (:xt/id game))
-          :style {:padding "4px 12px" :border "1px solid #1e6e44" :background "transparent"
-                  :color "#9adaaa" :border-radius "2px" :font-family "'Courier New', monospace"
-                  :font-size "13px" :letter-spacing "0.04em" :text-decoration "none"}}
-      "Join"]
+     (ui/action-bar-link (str "/app/join-game/" (:xt/id game)) "Join")
      (when admin?
        (delete-game-button (:xt/id game)))]]])
 
@@ -252,10 +248,4 @@
 
        ;; Create game button — admin only
        (when admin?
-         [:a
-          {:href  "/app/create-game"
-           :style {:display "inline-block" :padding "6px 16px" :border "1px solid #4ade80"
-                   :background "#1a3a28" :color "#4ade80" :border-radius "2px"
-                   :font-family "'Courier New', monospace" :font-size "13px"
-                   :letter-spacing "0.08em" :text-decoration "none"}}
-          "Create Game"])]])))
+         (ui/action-bar-primary-link "/app/create-game" "Create Game"))]])))

@@ -353,11 +353,11 @@
   ([affordable? bool, label str, extra-attrs map]) -> hiccup"
   ([affordable? label] (submit-button affordable? label {}))
   ([affordable? label extra-attrs]
-   [:button#submit-button.text-sm.tracking-wider.rounded-sm
+   [:button#submit-button.tracking-wider.rounded-sm
     (merge {:type "submit"
             :disabled (not affordable?)
             :style (merge {:padding "5px 14px" :font-family "'Courier New', monospace"
-                           :letter-spacing "0.05em" :border-radius "2px"}
+                           :font-size "14px" :letter-spacing "0.05em" :border-radius "2px"}
                           (if affordable?
                             {:border "1px solid #4ade80" :background "#1a3a28" :color "#4ade80"}
                             {:border "1px solid #253530" :background "transparent"
@@ -375,7 +375,7 @@
    text])
 
 (defn action-bar-link
-  "Render a navigation link styled to match the terminal-shell action bar.
+  "Render a navigation anchor styled to match the terminal-shell action bar (secondary style).
 
   [href str, label str] -> hiccup"
   [href label]
@@ -383,8 +383,36 @@
    {:href  href
     :style {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
             :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
-            :font-family "'Courier New', monospace" :font-size "13px"
+            :font-family "'Courier New', monospace" :font-size "14px"
             :text-decoration "none" :display "inline-block"}}
+   label])
+
+(defn action-bar-primary-link
+  "Render a navigation anchor styled as the primary action (green fill), for use in action bars.
+
+  [href str, label str] -> hiccup"
+  [href label]
+  [:a
+   {:href  href
+    :style {:padding "5px 14px" :border "1px solid #4ade80" :background "#1a3a28"
+            :color "#4ade80" :border-radius "2px" :letter-spacing "0.05em"
+            :font-family "'Courier New', monospace" :font-size "14px"
+            :text-decoration "none" :display "inline-block"}}
+   label])
+
+(defn action-bar-button
+  "Render a <button type='button'> styled to match the terminal-shell action bar (secondary style).
+  extra-attrs is merged into the button element — used for onclick, CSS classes, etc.
+
+  [label str, extra-attrs map] -> hiccup"
+  [label extra-attrs]
+  [:button
+   (merge {:type  "button"
+           :style {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
+                   :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
+                   :font-family "'Courier New', monospace" :font-size "14px"
+                   :cursor "pointer"}}
+          extra-attrs)
    label])
 
 (defn snapshot-section
