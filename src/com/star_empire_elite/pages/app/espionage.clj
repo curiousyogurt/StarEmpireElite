@@ -20,7 +20,7 @@
 ;;;; UI Components
 ;;;;
 
-(def ^:private op-hs
+(def ^:private op-hyperscript
   (str "on click set p to my @data-was is 'true'"
        " then set <[name=espionage-action]>'s @data-was to 'false'"
        " then if p then set my *checked to false"
@@ -36,7 +36,7 @@
     {:type    "radio"
      :name    "espionage-action"
      :value   (str op ":" player-id-str)
-     :_ op-hs}]
+     :_ op-hyperscript}]
    [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
     {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
     label]])
