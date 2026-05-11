@@ -20,10 +20,11 @@
 ;;;; UI Components
 ;;;;
 
-(def ^:private op-js
-  (str "var p=this.dataset.was==='true';"
-       "document.querySelectorAll('[name=espionage-action]').forEach(function(r){r.dataset.was='false';});"
-       "if(p){this.checked=false;}else{this.dataset.was='true';}"))
+(def ^:private op-hs
+  (str "on click set p to my @data-was is 'true'"
+       " then set <[name=espionage-action]>'s @data-was to 'false'"
+       " then if p then set my *checked to false"
+       " else set my @data-was to 'true' end"))
 
 (defn- op-radio
   "Render a radio input + styled label for one operation on one target.
@@ -35,7 +36,7 @@
     {:type    "radio"
      :name    "espionage-action"
      :value   (str op ":" player-id-str)
-     :onclick op-js}]
+     :_ op-hs}]
    [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
     {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
     label]])
@@ -144,6 +145,7 @@
         {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
         (ui/action-bar-button
-          "document.querySelectorAll('[name=espionage-action]').forEach(function(r){r.checked=false;r.dataset.was='false';});"
+          {:class "cancel-target"
+           :_ "on click set <[name=espionage-action]>'s *checked to false then set <[name=espionage-action]>'s @data-was to 'false'"}
           "Cancel Operation")
         (ui/submit-button true "Continue to Outcomes")])])))

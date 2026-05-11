@@ -40,9 +40,10 @@
         {:type "radio"
          :name "target-player-id"
          :value player-id-str
-         :onclick (str "var p=this.dataset.was==='true';"
-                       "document.querySelectorAll('[name=target-player-id]').forEach(function(r){r.dataset.was='false';});"
-                       "if(p){this.checked=false;}else{this.dataset.was='true';}")}]
+         :_ (str "on click set p to my @data-was is 'true'"
+                 " then set <[name=target-player-id]>'s @data-was to 'false'"
+                 " then if p then set my *checked to false"
+                 " else set my @data-was to 'true' end")}]
        [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
         {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
         "Attack"]]]]))
@@ -127,6 +128,7 @@
         {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
         (ui/action-bar-button
-          "document.querySelectorAll('[name=target-player-id]').forEach(function(r){r.checked=false;r.dataset.was='false';});"
+          {:class "cancel-target"
+           :_ "on click set <[name=target-player-id]>'s *checked to false then set <[name=target-player-id]>'s @data-was to 'false'"}
           "Cancel Attack")
         (ui/submit-button true "Continue to Espionage")])])))

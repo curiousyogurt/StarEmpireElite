@@ -393,14 +393,14 @@
 
 (defn action-bar-button
   "Render a button styled to match the terminal-shell action bar secondary style.
-  Use instead of action-bar-link when an onclick handler is required.
+  extra-attrs is merged onto the button element — use to pass :_ (hyperscript), :class, etc.
 
-  [onclick str, label str] -> hiccup"
-  [onclick label]
+  [extra-attrs map, label str] -> hiccup"
+  [extra-attrs label]
   [:button.text-sm
-   {:type    "button"
-    :onclick onclick
-    :style   (assoc action-bar-secondary-style :cursor "pointer")}
+   (merge {:type  "button"
+           :style (assoc action-bar-secondary-style :cursor "pointer")}
+          extra-attrs)
    label])
 
 (defn snapshot-section
