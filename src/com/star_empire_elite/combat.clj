@@ -75,7 +75,7 @@
      (* (rand) (* 2 const/combat-variance))))
 
 ;;;;
-;;;; Resolution
+;;;; Attack Resolution
 ;;;;
 
 (defn- compute-losses
@@ -105,6 +105,73 @@
     {:mil  (get taken :mil  0)
      :food (get taken :food 0)
      :ore  (get taken :ore  0)}))
+
+(defn resolve-combat
+  "Resolve a full combat engagement between attacker and defender. Returns a result map containing 
+  both sides' force counts, losses, rolls, and any planets transferred. UUIDs stored as strings for 
+  safe pr-str round-trip.
+
+  [game game-map, attacker player-map, defender player-map] -> result-map"
+  [game attacker defender]
+  (let [att-forces (effective-forces attacker)
+        def-forces (effective-defending-forces defender)
+        att-power  (base-power game att-forces true)
+        def-power  (base-power game def-forces false)
+        att-roll   (* att-power (random-factor))
+        def-roll   (* def-power (random-factor))
+        att-wins?  (> att-roll def-roll)
+        max-roll   (max att-roll def-roll)
+        ;; Normalised relative difference (always between 0.0 and 1.0) Lower margin means rolls were 
+        ;; nearly identical; higher margin means one side overwhelmed the other.
+        margin     (if (zero? max-roll) 0.0
+                     (/ (Math/abs (- att-roll def-roll)) max-roll))
+        ;; If margin is small, loser-rate is small (survives with most of their forces.  Capped at 75% 
+        ;; as margin increases.
+        loser-rate  (min margin 0.75)
+        ;; Cap winner losses at 50% of loser's losses, ensuring that even in victory, there is some 
+        ;; cost to combat.
+        winner-rate (/ loser-rate 2.0)
+        def-total-planets (+ (:player/mil-planets  defender)
+                              (:player/erg-planets defender)
+                              (:player/ore-planets  defender))
+        ;; The margin also determines whether any territory is gained.  A close battle will result in 
+        ;; no new territory; but a crushing victory will allow the attacker to capture a large number 
+        ;; of planets.
+        planets-count       (if att-wins? (long (* margin def-total-planets)) 0)
+        ;; Randomly select planets to be transferred to the attacker.
+        planets-transferred (select-planets defender planets-count)]
+    {:attacker-id     (str (:xt/id attacker))
+     :attacker-name   (:player/empire-name attacker)
+     :defender-id     (str (:xt/id defender))
+     :defender-name   (:player/empire-name defender)
+     :attacker-counts {:soldiers   (:player/soldiers   attacker)
+                       :transports (:player/transports attacker)
+                       :generals   (:player/generals   attacker)
+                       :fighters   (:player/fighters   attacker)
+                       :carriers   (:player/carriers   attacker)
+                       :admirals   (:player/admirals   attacker)
+                       :cmd-ships  (:player/cmd-ships  attacker)}
+     :defender-counts {:soldiers   (:player/soldiers   defender)
+                       :transports (:player/transports defender)
+                       :generals   (:player/generals   defender)
+                       :fighters   (:player/fighters   defender)
+                       :carriers   (:player/carriers   defender)
+                       :admirals   (:player/admirals   defender)
+                       :cmd-ships  (:player/cmd-ships  defender)
+                       :stations   (:player/stations   defender)}
+     :attacker-forces att-forces
+     :defender-forces def-forces
+     :attacker-roll   att-roll
+     :defender-roll   def-roll
+     :attacker-wins?  att-wins?
+     :margin          margin
+     :attacker-losses (compute-losses att-forces (if att-wins? winner-rate loser-rate))
+     :defender-losses (compute-losses def-forces (if att-wins? loser-rate winner-rate))
+     :planets-transferred planets-transferred}))
+
+;;;;
+;;;; Espionage Resolution
+;;;;
 
 (defn- espionage-roll
   "Compute attacker/defender agent rolls and determine the winner.
@@ -184,65 +251,4 @@
      :carriers-destroyed   (when att-wins? (long (* (:player/carriers   defender) const/bomb-damage-rate)))
      :agents-captured      agents-captured}))
 
-(defn resolve-combat
-  "Resolve a full combat engagement between attacker and defender. Returns a result map containing 
-  both sides' force counts, losses, rolls, and any planets transferred. UUIDs stored as strings for 
-  safe pr-str round-trip.
 
-  [game game-map, attacker player-map, defender player-map] -> result-map"
-  [game attacker defender]
-  (let [att-forces (effective-forces attacker)
-        def-forces (effective-defending-forces defender)
-        att-power  (base-power game att-forces true)
-        def-power  (base-power game def-forces false)
-        att-roll   (* att-power (random-factor))
-        def-roll   (* def-power (random-factor))
-        att-wins?  (> att-roll def-roll)
-        max-roll   (max att-roll def-roll)
-        ;; Normalised relative difference (always between 0.0 and 1.0) Lower margin means rolls were 
-        ;; nearly identical; higher margin means one side overwhelmed the other.
-        margin     (if (zero? max-roll) 0.0
-                     (/ (Math/abs (- att-roll def-roll)) max-roll))
-        ;; If margin is small, loser-rate is small (survives with most of their forces.  Capped at 75% 
-        ;; as margin increases.
-        loser-rate  (min margin 0.75)
-        ;; Cap winner losses at 50% of loser's losses, ensuring that even in victory, there is some 
-        ;; cost to combat.
-        winner-rate (/ loser-rate 2.0)
-        def-total-planets (+ (:player/mil-planets  defender)
-                              (:player/erg-planets defender)
-                              (:player/ore-planets  defender))
-        ;; The margin also determines whether any territory is gained.  A close battle will result in 
-        ;; no new territory; but a crushing victory will allow the attacker to capture a large number 
-        ;; of planets.
-        planets-count       (if att-wins? (long (* margin def-total-planets)) 0)
-        ;; Randomly select planets to be transferred to the attacker.
-        planets-transferred (select-planets defender planets-count)]
-    {:attacker-id     (str (:xt/id attacker))
-     :attacker-name   (:player/empire-name attacker)
-     :defender-id     (str (:xt/id defender))
-     :defender-name   (:player/empire-name defender)
-     :attacker-counts {:soldiers   (:player/soldiers   attacker)
-                       :transports (:player/transports attacker)
-                       :generals   (:player/generals   attacker)
-                       :fighters   (:player/fighters   attacker)
-                       :carriers   (:player/carriers   attacker)
-                       :admirals   (:player/admirals   attacker)
-                       :cmd-ships  (:player/cmd-ships  attacker)}
-     :defender-counts {:soldiers   (:player/soldiers   defender)
-                       :transports (:player/transports defender)
-                       :generals   (:player/generals   defender)
-                       :fighters   (:player/fighters   defender)
-                       :carriers   (:player/carriers   defender)
-                       :admirals   (:player/admirals   defender)
-                       :cmd-ships  (:player/cmd-ships  defender)
-                       :stations   (:player/stations   defender)}
-     :attacker-forces att-forces
-     :defender-forces def-forces
-     :attacker-roll   att-roll
-     :defender-roll   def-roll
-     :attacker-wins?  att-wins?
-     :margin          margin
-     :attacker-losses (compute-losses att-forces (if att-wins? winner-rate loser-rate))
-     :defender-losses (compute-losses def-forces (if att-wins? loser-rate winner-rate))
-     :planets-transferred planets-transferred}))
