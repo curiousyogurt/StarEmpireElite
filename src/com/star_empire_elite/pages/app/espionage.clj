@@ -32,12 +32,15 @@
      :name  "espionage-action"
      :value (str op ":" player-id-str)
      :_     (str "on click"
-                 " if my @data-was is 'true'"
-                 " set my's checked to false"
-                 " set my @data-was to 'false'"
+                 " if my @data-was is 'true' then"
+                 " prevent default"
+                 " set my.checked to false"
+                 " set @data-was to 'false'"
                  " else"
-                 " for r in <[name=espionage-action]> set r's @data-was to 'false' end"
-                 " set my @data-was to 'true'"
+                 " for r in <[name=espionage-action]>"
+                 " tell r to set @data-was to 'false'"
+                 " end"
+                 " set @data-was to 'true'"
                  " end")}]
    [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
     {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
@@ -149,8 +152,8 @@
         (ui/action-bar-button
          (str "on click"
               " for r in <[name=espionage-action]>"
-              " set r's checked to false"
-              " set r's @data-was to 'false'"
+              " set r.checked to false"
+              " tell r to set @data-was to 'false'"
               " end")
          "Cancel Operation"
          {:class "cancel-target"})
