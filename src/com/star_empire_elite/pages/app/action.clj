@@ -20,7 +20,7 @@
 (defn target-row
   "Render a single row in the targets table with a radio-button attack selector.
   The radio input is visually hidden; its label renders as the attack button.
-  A small onclick handler enables deselect, since radio buttons don't natively uncheck on re-click.
+  A hyperscript handler enables deselect, since radio buttons don't natively uncheck on re-click.
 
   [player player-map] -> hiccup"
   [player]
@@ -37,12 +37,17 @@
      [:td {:style {:padding "4px 12px"}}
       [:label.block.cursor-pointer
        [:input.peer.sr-only
-        {:type "radio"
-         :name "target-player-id"
+        {:type  "radio"
+         :name  "target-player-id"
          :value player-id-str
-         :onclick (str "var p=this.dataset.was==='true';"
-                       "document.querySelectorAll('[name=target-player-id]').forEach(function(r){r.dataset.was='false';});"
-                       "if(p){this.checked=false;}else{this.dataset.was='true';}")}]
+         :_     (str "on click"
+                     " if my @data-was is 'true'"
+                     " set my's checked to false"
+                     " set my @data-was to 'false'"
+                     " else"
+                     " for r in <[name=target-player-id]> set r's @data-was to 'false' end"
+                     " set my @data-was to 'true'"
+                     " end")}]
        [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
         {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
         "Attack"]]]]))
@@ -126,11 +131,8 @@
        [:div.flex.gap-2
         {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
-        [:button.cancel-target.text-sm
-         {:type    "button"
-          :onclick "document.querySelectorAll('[name=target-player-id]').forEach(function(r){r.checked=false;r.dataset.was='false';});"
-          :style   {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
-                    :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
-                    :font-family "'Courier New', monospace" :cursor "pointer"}}
-         "Cancel Attack"]
+        (ui/action-bar-button
+         "on click for r in <[name=target-player-id]> set r's checked to false set r's @data-was to 'false' end"
+         "Cancel Attack"
+         {:class "cancel-target"})
         (ui/submit-button true "Continue to Espionage")])])))

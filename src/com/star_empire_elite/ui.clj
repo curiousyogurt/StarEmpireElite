@@ -374,6 +374,15 @@
    {:style {:letter-spacing "0.12em" :color "#7ab88a"}}
    text])
 
+(defn- action-bar-secondary-style
+  "Shared inline style map for secondary action-bar elements (links and buttons).
+
+  [] -> map"
+  []
+  {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
+   :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
+   :font-family "'Courier New', monospace" :font-size "13px"})
+
 (defn action-bar-link
   "Render a navigation link styled to match the terminal-shell action bar.
 
@@ -381,11 +390,25 @@
   [href label]
   [:a
    {:href  href
-    :style {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
-            :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
-            :font-family "'Courier New', monospace" :font-size "13px"
-            :text-decoration "none" :display "inline-block"}}
+    :style (merge (action-bar-secondary-style)
+                  {:text-decoration "none" :display "inline-block"})}
    label])
+
+(defn action-bar-button
+  "Render a terminal-shell action bar button (type=button, not submit).
+  hs is a hyperscript string placed in the _ attribute for client-side behaviour.
+  extra-attrs is merged into the button element — use it to add CSS classes (e.g. cancel-target).
+
+  ([hs str, label str])
+  ([hs str, label str, extra-attrs map]) -> hiccup"
+  ([hs label] (action-bar-button hs label {}))
+  ([hs label extra-attrs]
+   [:button.text-sm
+    (merge {:type "button"
+            :_    hs
+            :style (merge (action-bar-secondary-style) {:cursor "pointer"})}
+           extra-attrs)
+    label]))
 
 (defn snapshot-section
   "Render the 2-row × 9-column empire snapshot grid used on the building and exchange pages.
