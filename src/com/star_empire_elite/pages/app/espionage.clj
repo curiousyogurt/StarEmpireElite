@@ -147,7 +147,11 @@
         {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
         (ui/action-bar-button
-         "on click for r in <[name=espionage-action]> set r's checked to false set r's @data-was to 'false' end"
+         (str "on click"
+              " for r in <[name=espionage-action]>"
+              " set r's checked to false"
+              " set r's @data-was to 'false'"
+              " end")
          "Cancel Operation"
          {:class "cancel-target"})
         (ui/submit-button true "Continue to Outcomes")])])))
