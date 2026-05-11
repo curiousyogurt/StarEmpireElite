@@ -24,4 +24,4 @@ Beware the computer-controlled Radoffian Dynasty! This powerful AI opponent has 
 
 ## Technology 🖥
 
-This remake is built entirely in Clojure, a powerful Lisp dialect very much like Racket, using a purely functional approach with modern web technologies.
+This remake is built in Clojure, a powerful Lisp dialect very much like Racket, using a purely functional approach to modern web technologies.
