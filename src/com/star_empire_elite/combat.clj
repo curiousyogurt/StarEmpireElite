@@ -63,8 +63,8 @@
      (* (:cmd-ships forces) (:game/cmd-ship-power game))
      (* (:generals  forces) (:game/general-power  game))
      (* (:admirals  forces) (:game/admiral-power  game))
-     (if attacker? 0
-       (* (:stations forces) (:game/station-power game)))))
+     ;; If attacker, then 0 for stations; otherwise add stations to power
+     (if attacker? 0 (* (:stations forces) (:game/station-power game)))))
 
 (defn random-factor
   "Return a random multiplier in [1 - variance, 1 + variance].
@@ -123,8 +123,7 @@
         max-roll   (max att-roll def-roll)
         ;; Normalised relative difference (always between 0.0 and 1.0) Lower margin means rolls were 
         ;; nearly identical; higher margin means one side overwhelmed the other.
-        margin     (if (zero? max-roll) 0.0
-                     (/ (Math/abs (- att-roll def-roll)) max-roll))
+        margin     (if (zero? max-roll) 0.0 (/ (Math/abs (- att-roll def-roll)) max-roll))
         ;; If margin is small, loser-rate is small (survives with most of their forces.  Capped at 75% 
         ;; as margin increases.
         loser-rate  (min margin 0.75)

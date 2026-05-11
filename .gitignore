@@ -57,6 +57,9 @@ data/
 # Metals build server
 .bloop/
 
+# Racket backups
+*.*~
+
 # === macOS System Files ===
 .DS_Store
 .AppleDouble
@@ -66,4 +69,3 @@ data/
 .Trashes
 Icon\r
 
-resources/config.edn

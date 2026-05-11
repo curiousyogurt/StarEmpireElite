@@ -47,6 +47,7 @@
    fighters carriers  admirals
    cmd-ships stations
    mil-planets erg-planets ore-planets))
+
 ;;; A Player is a (make-player String
 ;;;                            Natural Natural Natural
 ;;;                            Natural Natural Natural
@@ -109,7 +110,7 @@
 ;;; (check-expect (take '()        3) '())
 ;;;
 (define (take lst n)
-  (cond [(= n 0)      '()]
+  (cond [(zero? n)      '()]
         [(empty? lst) '()]
         [else 
           (cons (first lst) (take (rest lst) (- n 1)))]))
@@ -129,7 +130,7 @@
 ;;; (check-expect (remove-nth '(a b c d) 2) '(a b d))
 ;;;
 (define (remove-nth lst n)
-  (cond [(= n 0) (rest lst)]
+  (cond [(zero? n) (rest lst)]
         [else 
           (cons (first lst) (remove-nth (rest lst) (- n 1)))]))
 
