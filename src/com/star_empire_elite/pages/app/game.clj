@@ -116,7 +116,7 @@
         ;; Play button or cooldown message depending on round availability
         [:div.flex.gap-2
          {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
-         (ui/action-bar-link "/app" "Games")
+         (ui/action-bar-link "/app" "Back to Games")
          (if cooldown-ms
            [:div {:style {:padding "5px 14px" :border "1px solid #b45309"
                           :color "#facc15" :border-radius "2px" :font-size "14px"
