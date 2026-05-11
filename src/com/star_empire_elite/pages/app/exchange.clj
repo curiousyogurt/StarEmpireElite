@@ -343,46 +343,73 @@
                             "if(i){i.value='" (long ex-value) "';"
                             "i.dispatchEvent(new Event('input',{bubbles:true}));}"))
         input-node   (ui/numeric-input field-key current-quantity player-id "/calculate-exchange" hx-include
-                                       {:input-class "text-xs lg:text-sm text-right"
-                                        :input-style {:color "#7ab88a" :border-color "#2d6644"
-                                                      :padding-top "1px" :padding-bottom "1px"}})]
+                                        {:input-class "text-xs lg:text-sm text-right min-w-0"
+                                         :input-style {:color "#7ab88a"
+                                                       :border-color "#2d6644"
+                                                       :padding-top "1px"
+                                                       :padding-bottom "1px"}})]
     [:div.building-purchase-grid
      {:class "building-purchase-grid items-center gap-2 py-1 px-3"
       :style row-style}
+
      ;; Item name: abbreviated on mobile, full on desktop
      [:div.text-base.font-bold.text-green-400
       [:span.lg:hidden item-name-mobile]
       [:span.hidden.lg:inline item-name]]
+
      ;; Rate per unit
-     [:div.text-base.text-right {:style {:color "#7ab88a"}}
+     [:div.text-base.text-right
+      {:style {:color "#7ab88a"}}
       (ui/format-number price-per-unit)]
+
      ;; Max available/affordable
      [:div.text-base.text-right
       {:style {:color (if has-max? "#9adaaa" "#3a5040")}}
       [:span {:id max-qty-id}
        (ui/format-number (if (neg? max-quantity) 0 max-quantity))]]
-     ;; Quantity input (with optional "Ex" button)
-     [:div.justify-self-center
-      (if (some? ex-value)
-        ;; Extra 30px (150 vs 120) accommodates the "Ex" button alongside the input
-        [:div.flex.items-center.gap-1 {:style {:width "min(150px, 100%)"}}
-         input-node
+
+     ;; Quantity input.
+     ;; The input box itself is always centered in the same 120px slot.
+     ;; The optional Ex button hangs off the right side, so rows with and without
+     ;; Ex buttons keep their text fields aligned.
+     [:div.flex.items-center.justify-center
+      {:style {:min-width "0"}}
+
+      [:div
+       {:style {:position "relative"
+                :width "min(120px, 100%)"
+                :min-width "0"
+                :transform "translateX(16px)"}}
+
+       input-node
+
+       (when (some? ex-value)
          [:button
           {:type "button"
            :title ex-tooltip
            :onclick ex-onclick
-           :style {:border "1px solid #2d6644" :background "#0e1f16" :color "#7ab88a"
-                   :font-family "'Courier New', monospace" :font-size "11px"
-                   :padding "1px 4px" :border-radius "2px" :cursor "pointer"
-                   :white-space "nowrap" :flex-shrink "0"}}
-          "Ex"]]
-        [:div {:style {:width "min(120px, 100%)"}}
-         input-node])]
+           :style {:position "absolute"
+                   :left "calc(100% + 4px)"
+                   :top "50%"
+                   :transform "translateY(-50%)"
+                   :border "1px solid #2d6644"
+                   :background "#0e1f16"
+                   :color "#7ab88a"
+                   :font-family "'Courier New', monospace"
+                   :font-size "11px"
+                   :padding "1px 4px"
+                   :border-radius "2px"
+                   :cursor "pointer"
+                   :white-space "nowrap"}}
+          "ex"])]]
+
      ;; Credits value
      [:div.text-base.text-right
       {:style {:color (if (pos? credit-value) "#4ade80" "#3a5040")}}
       [:span {:id credit-id}
-       (if (pos? credit-value) [:<> "+" (ui/format-number credit-value)] "—")]]]))
+       (if (pos? credit-value)
+         [:<> "+" (ui/format-number credit-value)]
+         "—")]]]))
 
 ;;;;
 ;;;; Actions
