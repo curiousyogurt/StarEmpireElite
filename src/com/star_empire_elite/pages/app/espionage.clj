@@ -21,9 +21,10 @@
 ;;;;
 
 (def ^:private op-hyperscript
-  (str "on click set p to my @data-was is 'true'"
-       " then set <[name=espionage-action]>'s @data-was to 'false'"
-       " then if p then set my *checked to false"
+  (str "on click"
+       " set p to my @data-was is 'true'"
+       " then for r in <[name=espionage-action]> set r's @data-was to 'false' end"
+       " then if p set my *checked to false"
        " else set my @data-was to 'true' end"))
 
 (defn- op-radio
@@ -146,6 +147,6 @@
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
         (ui/action-bar-button
           {:class "cancel-target"
-           :_ "on click set <[name=espionage-action]>'s *checked to false then set <[name=espionage-action]>'s @data-was to 'false'"}
+           :_ "on click for r in <[name=espionage-action]> set r's *checked to false then set r's @data-was to 'false' end"}
           "Cancel Operation")
         (ui/submit-button true "Continue to Outcomes")])])))

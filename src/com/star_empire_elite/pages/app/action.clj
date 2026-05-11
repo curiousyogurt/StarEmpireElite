@@ -40,9 +40,10 @@
         {:type "radio"
          :name "target-player-id"
          :value player-id-str
-         :_ (str "on click set p to my @data-was is 'true'"
-                 " then set <[name=target-player-id]>'s @data-was to 'false'"
-                 " then if p then set my *checked to false"
+         :_ (str "on click"
+                 " set p to my @data-was is 'true'"
+                 " then for r in <[name=target-player-id]> set r's @data-was to 'false' end"
+                 " then if p set my *checked to false"
                  " else set my @data-was to 'true' end")}]
        [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
         {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
@@ -129,6 +130,6 @@
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
         (ui/action-bar-button
           {:class "cancel-target"
-           :_ "on click set <[name=target-player-id]>'s *checked to false then set <[name=target-player-id]>'s @data-was to 'false'"}
+           :_ "on click for r in <[name=target-player-id]> set r's *checked to false then set r's @data-was to 'false' end"}
           "Cancel Attack")
         (ui/submit-button true "Continue to Espionage")])])))
