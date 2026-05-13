@@ -25,8 +25,8 @@
   [{:label "Soldiers"         :abbrev "Soldiers"  :qty-key :soldiers     :cost-key :game/soldier-cost}
    {:label "Transports"       :abbrev "Transport" :qty-key :transports   :cost-key :game/transport-cost}
    {:label "Generals"         :abbrev "Generals"  :qty-key :generals     :cost-key :game/general-cost}
-   {:label "Carriers"         :abbrev "Carriers"  :qty-key :carriers     :cost-key :game/carrier-cost}
    {:label "Fighters"         :abbrev "Fighters"  :qty-key :fighters     :cost-key :game/fighter-cost}
+   {:label "Carriers"         :abbrev "Carriers"  :qty-key :carriers     :cost-key :game/carrier-cost}
    {:label "Admirals"         :abbrev "Admirals"  :qty-key :admirals     :cost-key :game/admiral-cost}
    {:label "Defence Stations" :abbrev "Def Stns"  :qty-key :stations     :cost-key :game/station-cost}
    {:label "Command Ships"    :abbrev "Cmd Ships" :qty-key :cmd-ships    :cost-key :game/cmd-ship-cost}
@@ -74,8 +74,8 @@
       (update :soldiers    + (:soldiers   quantities))
       (update :transports  + (:transports quantities))
       (update :generals    + (:generals   quantities))
-      (update :carriers    + (:carriers   quantities))
       (update :fighters    + (:fighters   quantities))
+      (update :carriers    + (:carriers   quantities))
       (update :admirals    + (:admirals   quantities))
       (update :stations    + (:stations   quantities))
       (update :cmd-ships   + (:cmd-ships  quantities))
@@ -372,8 +372,8 @@
                               :player/soldiers     (:soldiers resources-after)
                               :player/transports   (:transports resources-after)
                               :player/generals     (:generals resources-after)
-                              :player/carriers     (:carriers resources-after)
                               :player/fighters     (:fighters resources-after)
+                              :player/carriers     (:carriers resources-after)
                               :player/admirals     (:admirals resources-after)
                               :player/stations     (:stations resources-after)
                               :player/cmd-ships    (:cmd-ships resources-after)

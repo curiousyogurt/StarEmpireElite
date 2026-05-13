@@ -116,27 +116,6 @@
      (when admin?
        (delete-game-button (:xt/id game)))]]])
 
-(defn- stat-cell
-  "Render a single labeled stat cell for the dashboard game-card grids.
-
-  [label str, val string|number] -> hiccup"
-  [label val]
-  [:div
-   [:div {:style {:color "#4a6a58" :font-size "9px" :text-transform "uppercase"
-                  :letter-spacing "0.04em" :overflow "hidden" :text-overflow "ellipsis"
-                  :white-space "nowrap"}}
-    label]
-   [:div {:style {:color "#9adaaa" :font-size "13px" :font-weight "bold"}}
-    (cond
-      (string? val) val
-      (number? val) (ui/format-number val)
-      (nil? val)    "0"
-      :else         (throw
-                      (ex-info "stat-cell expected a string or number"
-                               {:label label
-                                :value val
-                                :type  (type val)})))]])
-
 (defn game-card
   "Render a full empire snapshot card for a game the player has joined.
   The entire card is a stretched link to the game page. Admin users also see a delete button.
@@ -153,9 +132,10 @@
    ;; Header row: game/empire info left, rank/score/delete right
    [:div.flex.justify-between.mb-3
     [:div
-     [:div {:style {:font-size "18px" :font-weight "bold" :color "#4ade80"}}
-      (:player/empire-name player)]
-     [:div.text-sm {:style {:color "#9adaaa"}} (:game/name game)]
+     [:div.flex.items-baseline.gap-2
+      [:div {:style {:font-size "18px" :font-weight "bold" :color "#4ade80"}}
+       (:player/empire-name player)]
+      [:div.text-sm {:style {:color "#9adaaa"}} " — " (:game/name game)]]
      [:div.text-xs {:style {:color "#7ab88a"}} (format-turn-round player game)]]
     [:div.flex.gap-6.items-start.relative.z-10
      [:div.text-right
@@ -168,31 +148,7 @@
      (when admin?
        (delete-game-button (:xt/id game)))]]
 
-   ;; Row 1: currencies, population, and planets
-   [:div {:style {:display "grid" :grid-template-columns "repeat(9, 1fr)" :gap "6px"
-                  :margin-bottom "10px" :padding-bottom "10px"
-                  :border-bottom "1px solid #1a3020"}}
-    (stat-cell "Credits"    (:player/credits player))
-    (stat-cell "Food"       (:player/food player))
-    (stat-cell "Fuel"       (:player/fuel player))
-    (stat-cell "Galaxars"   (:player/galaxars player))
-    (stat-cell "Population" (str (:player/population player) "M"))
-    (stat-cell "Stability"  (str (:player/stability player) "%"))
-    (stat-cell "Ore Plts"   (:player/ore-planets player))
-    (stat-cell "Erg Plts"   (:player/erg-planets player))
-    (stat-cell "Mil Plts"   (:player/mil-planets player))]
-
-   ;; Row 2: military units and leadership
-   [:div {:style {:display "grid" :grid-template-columns "repeat(9, 1fr)" :gap "6px"}}
-    (stat-cell "Generals"   (:player/generals player))
-    (stat-cell "Soldiers"   (:player/soldiers player))
-    (stat-cell "Transports" (:player/transports player))
-    (stat-cell "Admirals"   (:player/admirals player))
-    (stat-cell "Fighters"   (:player/fighters player))
-    (stat-cell "Carriers"   (:player/carriers player))
-    (stat-cell "Def Stns"   (:player/stations player))
-    (stat-cell "Cmd Ships"  (:player/cmd-ships player))
-    (stat-cell "Agents"     (:player/agents player))]])
+   (ui/snapshot-section player)])
 
 ;;;;
 ;;;; Page

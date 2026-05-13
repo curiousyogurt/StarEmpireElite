@@ -294,7 +294,6 @@
     (-> ctx
         (merge #:base{:title settings/app-name
                       :lang "en-US"
-                      :icon "/img/glider.png"
                       :description "Shape destiny. Write history. Become legend."
                       :image "https://clojure.org/images/clojure-logo-120b.png"})
         (update :base/head (fn [head]
@@ -303,6 +302,11 @@
                                       [:script {:src "https://unpkg.com/htmx.org@2.0.7"}]
                                       [:script {:src "https://unpkg.com/htmx-ext-ws@2.0.2/ws.js"}]
                                       [:script {:src "https://unpkg.com/hyperscript.org@0.9.14"}]
+                                      [:link {:rel "icon" :type "image/x-icon" :href "/fav/favicon.ico"}]
+                                      [:link {:rel "icon" :type "image/png" :sizes "16x16" :href "/fav/favicon-16x16.png"}]
+                                      [:link {:rel "icon" :type "image/png" :sizes "32x32" :href "/fav/favicon-32x32.png"}]
+                                      [:link {:rel "icon" :type "image/png" :sizes "48x48" :href "/fav/favicon-48x48.png"}]
+                                      [:link {:rel "apple-touch-icon" :sizes "180x180" :href "/fav/apple-touch-icon.png"}]
                                       (when recaptcha
                                         [:script {:src "https://www.google.com/recaptcha/api.js"
                                                   :async "async" :defer "defer"}])]
@@ -461,10 +465,10 @@
      [:div.flex.justify-between.items-center.mb-2
       [:span.text-xs.uppercase
        {:style {:letter-spacing "0.15em" :color "#4ade80"}}
-       "Snapshot"]
+       "Empire Status"]
       [:span.text-xs
        {:style {:color "#7ab88a" :letter-spacing "0.1em"}}
-       "STATS @ T-0"]]
+       ""]]
      [:div.flex.flex-col {:style {:gap "6px" :min-width "500px"}}
       (render-row row1)
       (render-row row2)]]))
