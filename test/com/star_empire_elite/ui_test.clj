@@ -347,3 +347,65 @@
   (testing "Renders without error for various population values (double formatting)"
     (doseq [pop [0 1 6 100 1000]]
       (is (vector? (ui/snapshot-section (assoc sample-player :player/population pop)))))))
+
+;;;;
+;;;; stat-pill Tests
+;;;;
+;;;; stat-pill renders a pill with labelled rows. Tests verify structure, value
+;;;; color variants (:highlight?, :warn?, both), and the :display string override.
+;;;;
+;;;; Structure:
+;;;;   result[0]       = :div.flex.flex-col.gap-1
+;;;;   result[2]       = [:span ... title]
+;;;;   result[3]       = [:div {:class ...} (for-lazy-seq-of-rows ...)]
+;;;;   result[3][2]    = lazy seq of row hiccup
+;;;;   first row[3]    = [:span.text-xs.font-bold {:style {:color <value-color>}} value]
+;;;;
+
+(defn- stat-pill-first-row
+  "Navigate to the first data row in a stat-pill result."
+  [pill]
+  (first (nth (nth pill 3) 2)))
+
+(deftest test-stat-pill-renders
+  (testing "Returns a hiccup div with the correct root tag"
+    (let [result (ui/stat-pill "Ground" [{:label "Soldiers" :value 100}])]
+      (is (vector? result))
+      (is (= :div.flex.flex-col.gap-1 (first result))))))
+
+(deftest test-stat-pill-default-color
+  (testing "Plain row (no :highlight? or :warn?) renders value in the dim color"
+    (let [row (stat-pill-first-row (ui/stat-pill "T" [{:label "L" :value 5}]))]
+      (is (= "#9adaaa" (get-in row [3 1 :style :color]))))))
+
+(deftest test-stat-pill-highlight-color
+  (testing ":highlight? true renders the value in bright green"
+    (let [row (stat-pill-first-row (ui/stat-pill "T" [{:label "L" :value 5 :highlight? true}]))]
+      (is (= "#4ade80" (get-in row [3 1 :style :color]))))))
+
+(deftest test-stat-pill-warn-color
+  (testing ":warn? true renders the value in yellow"
+    (let [row (stat-pill-first-row (ui/stat-pill "T" [{:label "L" :value 5 :warn? true}]))]
+      (is (= "#facc15" (get-in row [3 1 :style :color]))))))
+
+(deftest test-stat-pill-warn-overrides-highlight
+  (testing ":warn? takes priority over :highlight? when both are set"
+    (let [row (stat-pill-first-row (ui/stat-pill "T" [{:label "L" :value 5 :warn? true :highlight? true}]))]
+      (is (= "#facc15" (get-in row [3 1 :style :color]))))))
+
+(deftest test-stat-pill-display-override
+  (testing ":display renders a custom string instead of format-number"
+    ;; row = [:div attrs label-span value-span]
+    ;; value-span = [:span attrs display-string]
+    (let [row        (stat-pill-first-row (ui/stat-pill "T" [{:label "Limit" :display "Trans" :value 0}]))
+          value-span (nth row 3)]
+      (is (= "Trans" (last value-span))))))
+
+(deftest test-stat-pill-row-count
+  (testing "Renders one hiccup div per entry in the rows collection"
+    (let [rows-seq (nth (nth (ui/stat-pill "T"
+                               [{:label "A" :value 1}
+                                {:label "B" :value 2}
+                                {:label "C" :value 3}])
+                             3) 2)]
+      (is (= 3 (count rows-seq))))))
