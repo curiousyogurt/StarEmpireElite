@@ -22,8 +22,15 @@
    :player/current-phase 4
    :player/current-turn  1
    :player/current-round 1
+   :player/turns-used    0
    :player/population    0
-   :player/score        1000})
+   :player/score         1000
+   :player/soldiers      100
+   :player/transports    5
+   :player/generals      2
+   :player/fighters      50
+   :player/carriers      3
+   :player/admirals      1})
 
 (def test-target
   {:xt/id              test-target-id

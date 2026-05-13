@@ -504,6 +504,25 @@
        (format-number (Math/abs (long value)))
        " " suffix])]])
 
+(defn stat-pill
+  "Render a pill showing a set of plain label/value statistics.
+  Rows are maps with :label, :value, optional :display (string override for value),
+  optional :highlight? (bright green), and optional :warn? (yellow).
+
+  [title str, rows [{:keys [label value display highlight? warn?]}]] -> hiccup"
+  [title rows]
+  [:div.flex.flex-col.gap-1
+   {:style {:border "1px solid #253530" :border-radius "3px"
+            :padding "6px 8px" :background "#1e1e1e"}}
+   [:span.text-base.font-bold.text-green-400 title]
+   [:div {:class "flex flex-col gap-0.5"}
+    (for [{:keys [label value display highlight? warn?]} rows]
+      [:div.flex.justify-between.items-baseline
+       {:style {:padding "1px 5px" :background "#1a3a28" :border-radius "2px"}}
+       [:span.text-xs {:style {:color "#7ab88a"}} label]
+       [:span.text-xs.font-bold {:style {:color (cond warn? "#facc15" highlight? "#4ade80" :else "#9adaaa")}}
+        (or display (format-number value))]])]])
+
 (defn deduction-table-header
   "Render the Item/Before/Change/After column-label row for expense and building deduction tables.
   Emits two variants: mobile (4-col, no bar) and desktop (5-col, with bar placeholder).

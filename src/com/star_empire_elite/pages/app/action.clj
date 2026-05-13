@@ -10,6 +10,8 @@
 
 (ns com.star-empire-elite.pages.app.action
   (:require [com.biffweb :as biff]
+            [com.star-empire-elite.combat :as combat]
+            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
 
@@ -99,6 +101,49 @@
        [:div.flex.flex-col.gap-2
         {:style {:padding "10px 14px"}}
         (ui/snapshot-section player)
+        ;; Army / Fleet readiness pills
+        (let [ef              (combat/effective-forces player)
+              soldiers-avail  (:soldiers ef)
+              fighters-avail  (:fighters ef)
+              soldiers-total  (get player :player/soldiers 0)
+              fighters-total  (get player :player/fighters 0)
+              trans-cap       (* (get player :player/transports 0) const/soldiers-per-transport)
+              gen-cap         (* (get player :player/generals   0) const/soldiers-per-general)
+              carrier-cap     (* (get player :player/carriers   0) const/fighters-per-carrier)
+              admiral-cap     (* (get player :player/admirals   0) const/fighters-per-admiral)
+              army-limit      (when (< soldiers-avail soldiers-total)
+                                (cond
+                                  (and (= soldiers-avail trans-cap)
+                                       (= soldiers-avail gen-cap)) "Trans/Gen"
+                                  (= soldiers-avail trans-cap)     "Trans"
+                                  :else                            "Gen"))
+              fleet-limit     (when (< fighters-avail fighters-total)
+                                (cond
+                                  (and (= fighters-avail carrier-cap)
+                                       (= fighters-avail admiral-cap)) "Carr/Adm"
+                                  (= fighters-avail carrier-cap)       "Carr"
+                                  :else                                "Adm"))]
+          [:div {:class "grid grid-cols-1 md:grid-cols-3 gap-1.5"}
+           (ui/stat-pill "Ground"
+             (cond-> [{:label "Soldiers"   :value soldiers-total}
+                      {:label "Transports" :value (:player/transports player)}
+                      {:label "Generals"   :value (:player/generals   player)}
+                      {:label "Deployable" :value soldiers-avail
+                       :highlight? (= soldiers-avail soldiers-total)
+                       :warn?      (< soldiers-avail soldiers-total)}]
+               army-limit (conj {:label "Limit" :display army-limit})))
+           (ui/stat-pill "Fleet"
+             (cond-> [{:label "Fighters"   :value fighters-total}
+                      {:label "Carriers"   :value (:player/carriers player)}
+                      {:label "Admirals"   :value (:player/admirals player)}
+                      {:label "Deployable" :value fighters-avail
+                       :highlight? (= fighters-avail fighters-total)
+                       :warn?      (< fighters-avail fighters-total)}]
+               fleet-limit (conj {:label "Limit" :display fleet-limit})))
+           (ui/stat-pill "Operations"
+             [{:label "Cmd Ships" :value (:player/cmd-ships player)}
+              {:label "Agents"    :value (:player/agents    player)}
+              {:label "Advisors"  :value 0}])])
         (if (empty? other-players)
           [:p.text-sm {:style {:color "#9adaaa"}}
            "There are no other empires in the galaxy to attack."]
