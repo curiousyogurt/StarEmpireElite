@@ -67,6 +67,7 @@
                    :game/erg-planet-cost const/erg-planet-cost
                    :game/ore-planet-cost const/ore-planet-cost
                    :game/agent-cost const/agent-cost
+                   :game/advisor-cost const/advisor-cost
                    :game/population-tax-credits const/population-tax-credits
                    ;; Stability constants
                    :game/expense-stability-penalty    const/expense-stability-penalty
@@ -121,6 +122,9 @@
                      :player/fighters 10
                      :player/cmd-ships 1
                      :player/agents 5
+                     :player/advisors 2
+                     :player/governance 0
+                     :player/strain 0
                      :player/last-population-growth nil}]
 
     (biff/submit-tx ctx

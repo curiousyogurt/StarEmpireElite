@@ -71,6 +71,7 @@
           [:game/station-cost            :int]
           [:game/cmd-ship-cost           :int]
           [:game/agent-cost              :int]
+          [:game/advisor-cost            :int]
           [:game/mil-planet-cost         :int]
           [:game/erg-planet-cost        :int]
           [:game/ore-planet-cost         :int]
@@ -144,6 +145,11 @@
             [:player/generals              :int]
             [:player/admirals              :int]
             [:player/agents                :int]
+            [:player/advisors              :int]
+
+            ;; Hidden governance resources (not shown to player; used for expansion mechanics)
+            [:player/governance            :int]
+            [:player/strain                :int]
 
             ;; Diplomatic relationships
             [:player/allies {:optional true}   [:set :player/id]]

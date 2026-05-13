@@ -141,6 +141,7 @@
             :game/station-cost const/station-cost
             :game/cmd-ship-cost const/cmd-ship-cost
             :game/agent-cost    const/agent-cost
+            :game/advisor-cost  const/advisor-cost
             :game/mil-planet-cost const/mil-planet-cost
             :game/erg-planet-cost const/erg-planet-cost
             :game/ore-planet-cost const/ore-planet-cost
@@ -296,6 +297,9 @@
             :player/fighters      const/starting-fighters
             :player/cmd-ships               const/starting-cmd-ships
             :player/agents                  const/starting-agents
+            :player/advisors                const/starting-advisors
+            :player/governance              0
+            :player/strain                  0
             :player/last-population-growth  nil}])
         {:status 303
          :headers {"location" (str "/app/game/" player-id)}}))))

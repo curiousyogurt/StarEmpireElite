@@ -423,23 +423,25 @@
    label])
 
 (defn snapshot-section
-  "Render the 2-row × 9-column empire snapshot grid used on the building and exchange pages.
-  Row 1: Credits, Food, Fuel, Galaxars, Population, Stability, Ore Plts, Erg Plts, Mil Plts.
-  Row 2: Soldiers, Transports, Generals, Fighters, Carriers, Admirals, Stations, Cmd Ships, Agents.
+  "Render the 2-row × 10-column empire snapshot grid used on the building and exchange pages.
+  Row 1: Credits, Food, Fuel, Galaxars, Population, Ore Plts, Erg Plts, Mil Plts, Stability, Control.
+  Row 2: Soldiers, Transports, Generals, Fighters, Carriers, Admirals, Stations, Cmd Ships, Agents, Advisors.
 
   [player player-map] -> hiccup"
   [player]
-  (let [row1 [["CREDITS"    (:player/credits player)      nil]
+  (let [control (- (get player :player/governance 0) (get player :player/strain 0))
+        row1 [["CREDITS"    (:player/credits player)      nil]
                ["FOOD"       (:player/food player)        nil]
                ["FUEL"       (:player/fuel player)        nil]
                ["GALAXARS"   (:player/galaxars player)    nil]
                ["POPULATION" (:player/population player)
                 #(str (str/replace (format "%.1f" (double %)) #"\.0$" "") "M")]
-               ["STABILITY"  (:player/stability player)
-                #(str % "%")]
                ["ORE PLTS"   (:player/ore-planets player) nil]
                ["ERG PLTS"   (:player/erg-planets player) nil]
-               ["MIL PLTS"   (:player/mil-planets player) nil]]
+               ["MIL PLTS"   (:player/mil-planets player) nil]
+               ["STABILITY"  (:player/stability player)
+                #(str % "%")]
+               ["CONTROL"    control                     nil]]
         row2 [["SOLDIERS"   (:player/soldiers player)     nil]
                ["TRANSPORTS" (:player/transports player)  nil]
                ["GENERALS"   (:player/generals player)    nil]
@@ -448,18 +450,22 @@
                ["ADMIRALS"   (:player/admirals player)    nil]
                ["STATIONS"   (:player/stations player)    nil]
                ["CMD SHIPS"  (:player/cmd-ships player)   nil]
-               ["AGENTS"     (:player/agents player)      nil]]
+               ["AGENTS"     (:player/agents player)      nil]
+               ["ADVISORS"   (:player/advisors player)    nil]]
         render-row
         (fn [items]
-          [:div {:style {:display "grid" :grid-template-columns "repeat(9, 1fr)" :gap "4px"}}
-           (for [[label v display-fn] items]
-             [:div {:key label}
-              [:div {:style {:color "#4a6a58" :letter-spacing "0.04em" :font-size "9px"
-                             :text-transform "uppercase" :overflow "hidden"
-                             :text-overflow "ellipsis" :white-space "nowrap"}}
-               label]
-              [:div.font-bold {:style {:color "#9adaaa" :font-size "13px"}}
-               (if display-fn (display-fn v) (format-number v))]])])]
+          [:div {:style {:display "grid" :grid-template-columns "repeat(10, 1fr)" :gap "4px"}}
+           (for [item items]
+             (if (nil? item)
+               [:div]
+               (let [[label v display-fn] item]
+                 [:div {:key label}
+                  [:div {:style {:color "#4a6a58" :letter-spacing "0.04em" :font-size "9px"
+                                 :text-transform "uppercase" :overflow "hidden"
+                                 :text-overflow "ellipsis" :white-space "nowrap"}}
+                   label]
+                  [:div.font-bold {:style {:color "#9adaaa" :font-size "13px"}}
+                   (if display-fn (display-fn v) (format-number v))]])))])]
     [:div
      {:style {:background "#0a120d" :border "1px solid #1e3a2a"
               :border-radius "3px" :padding "7px 10px" :overflow-x "auto"}}

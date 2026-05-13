@@ -31,6 +31,7 @@
    {:label "Defence Stations" :abbrev "Def Stns"  :qty-key :stations     :cost-key :game/station-cost}
    {:label "Command Ships"    :abbrev "Cmd Ships" :qty-key :cmd-ships    :cost-key :game/cmd-ship-cost}
    {:label "Agents"           :abbrev "Agents"    :qty-key :agents       :cost-key :game/agent-cost}
+   {:label "Advisors"         :abbrev "Advisors"  :qty-key :advisors     :cost-key :game/advisor-cost}
    {:label "Ore Planets"      :abbrev "Ore Plts"  :qty-key :ore-planets  :cost-key :game/ore-planet-cost}
    {:label "Energy Planets"   :abbrev "Erg Plts"  :qty-key :erg-planets  :cost-key :game/erg-planet-cost}
    {:label "Military Planets" :abbrev "Mil Plts"  :qty-key :mil-planets  :cost-key :game/mil-planet-cost}])
@@ -80,6 +81,7 @@
       (update :stations    + (:stations   quantities))
       (update :cmd-ships   + (:cmd-ships  quantities))
       (update :agents      + (:agents     quantities))
+      (update :advisors    + (:advisors   quantities))
       (update :ore-planets + (:ore-planets quantities))
       (update :erg-planets + (:erg-planets quantities))
       (update :mil-planets + (:mil-planets quantities))))
@@ -378,6 +380,7 @@
                               :player/stations     (:stations resources-after)
                               :player/cmd-ships    (:cmd-ships resources-after)
                               :player/agents       (:agents resources-after)
+                              :player/advisors     (:advisors resources-after)
                               :player/ore-planets  (:ore-planets resources-after)
                               :player/erg-planets  (:erg-planets resources-after)
                               :player/mil-planets  (:mil-planets resources-after)

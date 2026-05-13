@@ -107,6 +107,7 @@
             :game/erg-planet-cost const/erg-planet-cost
             :game/ore-planet-cost const/ore-planet-cost
             :game/agent-cost const/agent-cost
+            :game/advisor-cost const/advisor-cost
             :game/population-tax-credits const/population-tax-credits
             ;; Stability constants
             :game/expense-stability-penalty    const/expense-stability-penalty
@@ -182,8 +183,11 @@
             :player/generals 5
             :player/admirals 3
             :player/agents 10
+            :player/advisors const/starting-advisors
+            :player/governance 0
+            :player/strain 0
             :player/last-population-growth nil}])
-        
+
         (let [db (xt/db node)
               player (xt/entity db player-id)]
           (is (some? player))
@@ -251,6 +255,7 @@
                 :game/erg-planet-cost const/erg-planet-cost
                 :game/ore-planet-cost const/ore-planet-cost
                 :game/agent-cost const/agent-cost
+                :game/advisor-cost const/advisor-cost
                 :game/population-tax-credits const/population-tax-credits
                 ;; Stability constants
                 :game/expense-stability-penalty    const/expense-stability-penalty
@@ -304,6 +309,9 @@
                 :player/fighters 50
                 :player/cmd-ships 1
                 :player/agents 10
+                :player/advisors const/starting-advisors
+                :player/governance 0
+                :player/strain 0
                 :player/last-population-growth nil}])
           db (xt/db node)
           game (xt/entity db game-id)

@@ -169,6 +169,7 @@
    :stations    (get player :player/stations 0)
    :cmd-ships   (get player :player/cmd-ships 0)
    :agents      (get player :player/agents 0)
+   :advisors    (get player :player/advisors 0)
    :ore-planets (get player :player/ore-planets 0)
    :erg-planets (get player :player/erg-planets 0)
    :mil-planets (get player :player/mil-planets 0)})

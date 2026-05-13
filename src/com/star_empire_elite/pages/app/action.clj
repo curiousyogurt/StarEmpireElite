@@ -143,7 +143,7 @@
            (ui/stat-pill "Operations"
              [{:label "Cmd Ships" :value (:player/cmd-ships player)}
               {:label "Agents"    :value (:player/agents    player)}
-              {:label "Advisors"  :value 0}])])
+              {:label "Advisors"  :value (:player/advisors player)}])])
         (if (empty? other-players)
           [:p.text-sm {:style {:color "#9adaaa"}}
            "There are no other empires in the galaxy to attack."]

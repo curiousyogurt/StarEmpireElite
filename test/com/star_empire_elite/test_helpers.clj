@@ -62,6 +62,7 @@
    :game/mil-planet-fighters  0
    :game/mil-planet-soldiers  0
    :game/agent-cost           0
+   :game/advisor-cost         0
 
    ;; Population tax
    :game/population-tax-credits 0
@@ -123,12 +124,15 @@
    :player/fighters           50
    :player/soldiers           1000
    :player/agents             10
+   :player/advisors           2
    :player/admirals           3
    :player/generals           5
    :player/transports         10
    :player/carriers           2
    :player/cmd-ships          1
    :player/stations           5
+   :player/governance         0
+   :player/strain             0
 
    ;; planet summaries
    :player/ore-planets        1

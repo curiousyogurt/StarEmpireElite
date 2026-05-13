@@ -87,6 +87,7 @@
 (def starting-stations   0)
 (def starting-cmd-ships  0)
 (def starting-agents     2)
+(def starting-advisors   2)
 
 ;;;;
 ;;;; Income Generation
@@ -168,7 +169,8 @@
 (def erg-planet-cost 11000)
 (def ore-planet-cost 22000)
 
-(def agent-cost 5000)
+(def agent-cost    5000)
+(def advisor-cost  15000)
 
 ;;;;
 ;;;; Espionage
