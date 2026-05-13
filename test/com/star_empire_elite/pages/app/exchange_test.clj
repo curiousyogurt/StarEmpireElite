@@ -53,7 +53,9 @@
    :game/agent-upkeep-fuel      0
    :game/population-upkeep-food 0
    :game/population-upkeep-fuel 0
-   :game/expense-stability-penalty 0})
+   :game/expense-stability-penalty 0
+   :game/turns-per-round        6
+   :game/rounds-per-day         2})
 
 (def test-player
   {:xt/id               test-player-id

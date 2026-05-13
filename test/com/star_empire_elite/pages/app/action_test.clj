@@ -106,12 +106,12 @@
 (deftest test-action-page-renders-with-targets
   (testing "Returns a hiccup vector when other players are available"
     (with-redefs [biff/q (fn [_ _ & _] [test-target])]
-      (is (vector? (action/action-page {:player test-player :game {} :db nil}))))))
+      (is (vector? (action/action-page {:player test-player :game {:game/turns-per-round 6 :game/rounds-per-day 2} :db nil}))))))
 
 (deftest test-action-page-renders-without-targets
   (testing "Returns a hiccup vector when no other players exist"
     (with-redefs [biff/q (fn [_ _ & _] [])]
-      (is (vector? (action/action-page {:player test-player :game {} :db nil}))))))
+      (is (vector? (action/action-page {:player test-player :game {:game/turns-per-round 6 :game/rounds-per-day 2} :db nil}))))))
 
 ;;;;
 ;;;; apply-action Tests

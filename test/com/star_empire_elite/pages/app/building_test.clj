@@ -49,7 +49,9 @@
    :game/agent-upkeep-fuel      0
    :game/population-upkeep-food 0
    :game/population-upkeep-fuel 0
-   :game/expense-stability-penalty 0})
+   :game/expense-stability-penalty 0
+   :game/turns-per-round        6
+   :game/rounds-per-day         2})
 
 ;; Player in phase 3 with enough credits to buy most things.
 (def test-player
@@ -187,13 +189,14 @@
       (is (= (quot 10000 90)  (:agents      maxq))))))
 
 (deftest test-calculate-max-quantities-with-prior-spend
-  (testing "Prior selections reduce the remaining credit pool and thus the max quantities"
+  (testing "Prior selections reduce the max of OTHER items but not the item itself"
     (let [with-prior (building/calculate-max-quantities test-player
                                                         (assoc zero-quantities :soldiers 100)
                                                         test-game)
           remaining-after-soldiers (- 10000 (* 100 10))]
-      ;; After committing 1000 credits to soldiers, remaining is 9000.
-      (is (= (quot remaining-after-soldiers 10)  (:soldiers    with-prior)))
+      ;; Soldiers' own max is NOT reduced by the soldiers already entered — this keeps
+      ;; the max stable while the player is typing. Other items' maxes DO shrink.
+      (is (= (quot 10000 10)                     (:soldiers    with-prior)))
       (is (= (quot remaining-after-soldiers 700) (:mil-planets with-prior))))))
 
 ;;;;

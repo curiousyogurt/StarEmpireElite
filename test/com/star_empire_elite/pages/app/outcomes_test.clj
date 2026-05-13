@@ -15,7 +15,8 @@
 ;; Game with 3 turns per round (so turn 3 triggers end-of-round).
 (def test-game
   {:xt/id                  test-game-id
-   :game/turns-per-round   3})
+   :game/turns-per-round   3
+   :game/rounds-per-day    2})
 
 ;; Player in phase 6 (outcomes), mid-round at turn 1 of 3.
 (def test-player

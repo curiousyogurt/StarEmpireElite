@@ -20,7 +20,9 @@
    :game/mil-planet-soldiers    25
    :game/mil-planet-fighters    15
    :game/mil-planet-stations    5
-   :game/population-tax-credits 100})
+   :game/population-tax-credits 100
+   :game/turns-per-round        6
+   :game/rounds-per-day         2})
 
 ;; Base player in phase 1, turn 1, round 1 with no previous round completed.
 (def test-player

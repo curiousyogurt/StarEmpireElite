@@ -87,18 +87,18 @@
 (deftest test-espionage-page-renders-with-agents-and-targets
   (testing "Returns a hiccup vector when player has agents and targets exist"
     (with-redefs [biff/q (fn [_ _ & _] [test-target])]
-      (is (vector? (espionage/espionage-page {:player test-player :game {} :db nil}))))))
+      (is (vector? (espionage/espionage-page {:player test-player :game {:game/turns-per-round 6 :game/rounds-per-day 2} :db nil}))))))
 
 (deftest test-espionage-page-renders-without-agents
   (testing "Returns a hiccup vector with a warning when player has no agents"
     ;; When agents == 0 the page shows a warning instead of the target table.
     (with-redefs [biff/q (fn [_ _ & _] [test-target])]
-      (is (vector? (espionage/espionage-page {:player agent-less-player :game {} :db nil}))))))
+      (is (vector? (espionage/espionage-page {:player agent-less-player :game {:game/turns-per-round 6 :game/rounds-per-day 2} :db nil}))))))
 
 (deftest test-espionage-page-renders-without-targets
   (testing "Returns a hiccup vector when no other players exist"
     (with-redefs [biff/q (fn [_ _ & _] [])]
-      (is (vector? (espionage/espionage-page {:player test-player :game {} :db nil}))))))
+      (is (vector? (espionage/espionage-page {:player test-player :game {:game/turns-per-round 6 :game/rounds-per-day 2} :db nil}))))))
 
 ;;;;
 ;;;; apply-espionage Tests
