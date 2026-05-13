@@ -322,9 +322,10 @@
   (base
     ctx
     [:.flex-grow]
-    [:div.min-h-screen.flex.flex-col.items-center.justify-center.mx-auto.text-green-400.font-mono.p-4.border-8.border-green-400.rounded-lg.bg-black.bg-opacity-10
+    [:div.min-h-screen.flex.flex-col.items-center.justify-center.mx-auto.text-green-400.font-mono.p-4.rounded-lg.bg-black.bg-opacity-10
      (merge
-       {:class "m-2 w-full sm:m-4 md:m-10 md:w-11/12"}
+       {:class "m-2 w-full sm:m-4 md:m-10 md:w-11/12"
+        :style {:border "1px solid #1e6e44"}}
        (when (bound? #'csrf/*anti-forgery-token*)
          {:hx-headers (cheshire/generate-string
                         {:x-csrf-token csrf/*anti-forgery-token*})}))
