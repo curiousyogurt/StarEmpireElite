@@ -36,15 +36,15 @@
    {:label "Ore Planets"      :abbrev "Ore Plts"   :field "ore-planets-sold"  :qty-key :ore-planets-sold  :rate-key :ore-planet-sell :player-key :player/ore-planets}])
 
 (def sell-resource-row-specs
-  [{:label "Food"             :abbrev "Food"       :field "food-sold"         :qty-key :food-sold         :rate-key :food-sell       :player-key :player/food :resource-key :food :ex-tooltip "Sell excess food"}
-   {:label "Fuel"             :abbrev "Fuel"       :field "fuel-sold"         :qty-key :fuel-sold         :rate-key :fuel-sell       :player-key :player/fuel :resource-key :fuel :ex-tooltip "Sell excess fuel"}])
+  [{:label "Food"             :abbrev "Food"       :field "food-sold"         :qty-key :food-sold         :rate-key :food-sell       :player-key :player/food :resource-key :food :ex-tooltip "Sell food excess"}
+   {:label "Fuel"             :abbrev "Fuel"       :field "fuel-sold"         :qty-key :fuel-sold         :rate-key :fuel-sell       :player-key :player/fuel :resource-key :fuel :ex-tooltip "Sell fuel excess"}])
 
 (def sell-row-specs
   (concat sell-asset-row-specs sell-resource-row-specs))
 
 (def buy-row-specs
-  [{:label "Food" :abbrev "Food" :field "food-bought" :qty-key :food-bought :rate-key :food-buy :max-key :max-food}
-   {:label "Fuel" :abbrev "Fuel" :field "fuel-bought" :qty-key :fuel-bought :rate-key :fuel-buy :max-key :max-fuel}])
+  [{:label "Food" :abbrev "Food" :field "food-bought" :qty-key :food-bought :rate-key :food-buy :max-key :max-food :resource-key :food :player-key :player/food :sf-tooltip "Buy food shortfall"}
+   {:label "Fuel" :abbrev "Fuel" :field "fuel-bought" :qty-key :fuel-bought :rate-key :fuel-buy :max-key :max-fuel :resource-key :fuel :player-key :player/fuel :sf-tooltip "Buy fuel shortfall"}])
 
 (def exchange-hx-include
   (str/join ","
@@ -332,16 +332,28 @@
      :ex-value   — when provided, adds an 'Ex' button that fills the input with this amount
      :ex-tooltip — tooltip text for the 'Ex' button] -> hiccup"
   [item-name item-name-mobile field-key price-per-unit current-quantity max-quantity player-id hx-include
-   & [{:keys [ex-value ex-tooltip]}]]
+   & [{:keys [ex-value ex-tooltip sf-value sf-tooltip]}]]
   (let [credit-value (* price-per-unit current-quantity)
         credit-id    (str "credit-" field-key)
         max-qty-id   (str "max-qty-" field-key)
         row-style    {:border-bottom "1px solid #1a2820" :background "#121a18"}
         has-max?     (pos? max-quantity)
-        ex-onclick   (when (some? ex-value)
+        fill-onclick (fn [v]
                        (str "var i=document.querySelector('[name=\"" field-key "\"]');"
-                            "if(i){i.value='" (long ex-value) "';"
+                            "if(i){i.value='" (long v) "';"
                             "i.dispatchEvent(new Event('input',{bubbles:true}));}"))
+        btn-style    {:position "absolute"
+                      :top "50%"
+                      :transform "translateY(-50%)"
+                      :border "1px solid #2d6644"
+                      :background "#0e1f16"
+                      :color "#7ab88a"
+                      :font-family "'Courier New', monospace"
+                      :font-size "11px"
+                      :padding "1px 4px"
+                      :border-radius "2px"
+                      :cursor "pointer"
+                      :white-space "nowrap"}
         input-node   (ui/numeric-input field-key current-quantity player-id "/calculate-exchange" hx-include
                                         {:input-class "text-xs lg:text-sm text-right min-w-0"
                                          :input-style {:color "#7ab88a"
@@ -385,23 +397,15 @@
 
        (when (some? ex-value)
          [:button
-          {:type "button"
-           :title ex-tooltip
-           :onclick ex-onclick
-           :style {:position "absolute"
-                   :left "calc(100% + 4px)"
-                   :top "50%"
-                   :transform "translateY(-50%)"
-                   :border "1px solid #2d6644"
-                   :background "#0e1f16"
-                   :color "#7ab88a"
-                   :font-family "'Courier New', monospace"
-                   :font-size "11px"
-                   :padding "1px 4px"
-                   :border-radius "2px"
-                   :cursor "pointer"
-                   :white-space "nowrap"}}
-          "ex"])]]
+          {:type "button" :title ex-tooltip :onclick (fill-onclick ex-value)
+           :style (assoc btn-style :left "calc(100% + 4px)")}
+          "ex"])
+
+       (when (some? sf-value)
+         [:button
+          {:type "button" :title sf-tooltip :onclick (fill-onclick sf-value)
+           :style (assoc btn-style :left "calc(100% + 4px)")}
+          "sf"])]]
 
      ;; Credits value
      [:div.text-base.text-right
@@ -657,10 +661,13 @@
            [:div.overflow-hidden
             {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
             (exchange-table-header "Buy")
-            (for [spec buy-row-specs]
+            (for [spec buy-row-specs
+                  :let [sf-val (max 0 (- (get req-totals (:resource-key spec) 0)
+                                         (get player (:player-key spec))))]]
               (exchange-row (:label spec) (:abbrev spec) (:field spec)
                             (get rates (:rate-key spec)) 0
-                            (get max-buy-quantities (:max-key spec)) player-id exchange-hx-include))]]
+                            (get max-buy-quantities (:max-key spec)) player-id exchange-hx-include
+                            {:sf-value sf-val :sf-tooltip (:sf-tooltip spec)}))]]
 
           ;; 5. Exchange summary bar table
           [:div
