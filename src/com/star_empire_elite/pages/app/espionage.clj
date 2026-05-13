@@ -101,7 +101,7 @@
                :border-radius "4px" :color "#4ade80"
                :font-family "'Courier New', monospace"}}
       (ui/scanline-overlay)
-      (ui/phase-topbar player "ESPIONAGE PHASE")
+      (ui/phase-topbar player game "ESPIONAGE PHASE")
       (biff/form
        {:action (str "/app/game/" player-id "/apply-espionage")
         :method "post"

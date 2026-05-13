@@ -609,7 +609,7 @@
        (ui/scanline-overlay)
 
        ;; Topbar
-       (ui/phase-topbar player "EXCHANGE")
+       (ui/phase-topbar player game "EXCHANGE")
 
        ;; Form wraps body + action bar
        (biff/form

@@ -267,7 +267,7 @@
        (ui/scanline-overlay)
 
        ;; Topbar
-       (ui/phase-topbar player "INCOME PHASE")
+       (ui/phase-topbar player game "INCOME PHASE")
 
        ;; Body
        [:div.flex.flex-col.gap-2

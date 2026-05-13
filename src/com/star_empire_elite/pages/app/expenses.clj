@@ -358,7 +358,7 @@
        (ui/scanline-overlay)
 
        ;; Topbar
-       (ui/phase-topbar player "EXPENSES PHASE")
+       (ui/phase-topbar player game "EXPENSES PHASE")
 
        ;; Form wraps body + action bar so submit button works
        (biff/form

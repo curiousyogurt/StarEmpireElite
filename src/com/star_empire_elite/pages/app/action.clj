@@ -90,7 +90,7 @@
                :border-radius "4px" :color "#4ade80"
                :font-family "'Courier New', monospace"}}
       (ui/scanline-overlay)
-      (ui/phase-topbar player "ACTION PHASE")
+      (ui/phase-topbar player game "ACTION PHASE")
       (biff/form
        {:action (str "/app/game/" player-id "/apply-action")
         :method "post"

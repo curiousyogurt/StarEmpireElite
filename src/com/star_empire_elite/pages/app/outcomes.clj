@@ -260,7 +260,7 @@
                :border-radius "4px" :color "#4ade80"
                :font-family "'Courier New', monospace"}}
       (ui/scanline-overlay)
-      (ui/phase-topbar player "OUTCOMES PHASE")
+      (ui/phase-topbar player game "OUTCOMES PHASE")
       ;; Body
       [:div.flex.flex-col.gap-2
        {:style {:padding "10px 14px"}}

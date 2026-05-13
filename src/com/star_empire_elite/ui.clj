@@ -12,6 +12,7 @@
             [clojure.java.io :as io]
             [clojure.string :as str]
             [com.star-empire-elite.settings :as settings]
+            [com.star-empire-elite.utils :as utils]
             [com.biffweb :as biff]
             [ring.middleware.anti-forgery :as csrf]
             [ring.util.response :as ring-response]
@@ -264,19 +265,20 @@
 (defn phase-topbar
   "Render the terminal-shell topbar with empire name, turn/round subtitle, and phase stepper.
 
-  [player player-map, phase-label str] -> hiccup"
-  [player phase-label]
-  [:div.flex.items-center.justify-between
-   {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
-   [:div
-    [:div.text-3xl.font-bold.text-green-400
-     {:style {:letter-spacing "0.05em"}}
-     (:player/empire-name player)]
-    [:div.text-sm.mt-px
-     {:style {:color "#9adaaa"}}
-     (str phase-label " · Turn " (:player/current-turn player)
-          " · Round " (:player/current-round player))]]
-   (phase-stepper (:player/current-phase player))])
+  [player player-map, game game-map, phase-label str] -> hiccup"
+  [player game phase-label]
+  (let [{:keys [turn round]} (utils/display-turn-round player game)]
+    [:div.flex.items-center.justify-between
+     {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
+     [:div
+      [:div.text-3xl.font-bold.text-green-400
+       {:style {:letter-spacing "0.05em"}}
+       (:player/empire-name player)]
+      [:div.text-sm.mt-px
+       {:style {:color "#9adaaa"}}
+       (str phase-label " · Turn " turn "/" (:game/turns-per-round game)
+            " · Round " round "/" (:game/rounds-per-day game))]]
+     (phase-stepper (:player/current-phase player))]))
 
 ;;;;
 ;;;; Page Shell
