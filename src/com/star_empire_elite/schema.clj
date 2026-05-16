@@ -44,6 +44,10 @@
           [:game/mil-planet-fighters       :int]
           [:game/mil-planet-stations       :int]
           
+          ;; Industrial synergy constants
+          [:game/synergy-credits-per-paired :int]
+          [:game/synergy-fuel-per-paired    :int]
+
           ;; Population tax
           [:game/population-tax-credits    :int]
 

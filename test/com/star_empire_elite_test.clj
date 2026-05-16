@@ -108,6 +108,8 @@
             :game/ore-planet-cost const/ore-planet-cost
             :game/agent-cost const/agent-cost
             :game/advisor-cost const/advisor-cost
+            :game/synergy-credits-per-paired const/synergy-credits-per-paired
+            :game/synergy-fuel-per-paired    const/synergy-fuel-per-paired
             :game/population-tax-credits const/population-tax-credits
             ;; Stability constants
             :game/expense-stability-penalty    const/expense-stability-penalty
@@ -256,6 +258,8 @@
                 :game/ore-planet-cost const/ore-planet-cost
                 :game/agent-cost const/agent-cost
                 :game/advisor-cost const/advisor-cost
+                :game/synergy-credits-per-paired const/synergy-credits-per-paired
+                :game/synergy-fuel-per-paired    const/synergy-fuel-per-paired
                 :game/population-tax-credits const/population-tax-credits
                 ;; Stability constants
                 :game/expense-stability-penalty    const/expense-stability-penalty

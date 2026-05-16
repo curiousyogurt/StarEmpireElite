@@ -13,16 +13,18 @@
 (def test-player-id #uuid "00000000-0000-0000-0000-000000000002")
 
 (def test-game
-  {:xt/id                       test-game-id
-   :game/ore-planet-credits     100
-   :game/erg-planet-food       200
-   :game/erg-planet-fuel       50
-   :game/mil-planet-soldiers    25
-   :game/mil-planet-fighters    15
-   :game/mil-planet-stations    5
-   :game/population-tax-credits 100
-   :game/turns-per-round        6
-   :game/rounds-per-day         2})
+  {:xt/id                        test-game-id
+   :game/ore-planet-credits      100
+   :game/erg-planet-food        200
+   :game/erg-planet-fuel        50
+   :game/mil-planet-soldiers     25
+   :game/mil-planet-fighters     15
+   :game/mil-planet-stations     5
+   :game/population-tax-credits  100
+   :game/synergy-credits-per-paired 1000
+   :game/synergy-fuel-per-paired    200
+   :game/turns-per-round         6
+   :game/rounds-per-day          2})
 
 ;; Base player in phase 1, turn 1, round 1 with no previous round completed.
 (def test-player
@@ -98,13 +100,15 @@
 (deftest test-calculate-income-zero-rates
   (testing "Returns zero income when all game rates are zero"
     (let [zero-game (assoc test-game
-                           :game/ore-planet-credits     0
-                           :game/erg-planet-food       0
-                           :game/erg-planet-fuel       0
-                           :game/mil-planet-soldiers    0
-                           :game/mil-planet-fighters    0
-                           :game/mil-planet-stations    0
-                           :game/population-tax-credits 0)
+                           :game/ore-planet-credits      0
+                           :game/erg-planet-food        0
+                           :game/erg-planet-fuel        0
+                           :game/mil-planet-soldiers     0
+                           :game/mil-planet-fighters     0
+                           :game/mil-planet-stations     0
+                           :game/population-tax-credits  0
+                           :game/synergy-credits-per-paired 0
+                           :game/synergy-fuel-per-paired    0)
           income (income/calculate-income test-player zero-game)]
       (is (= 0 (:ore-credits income)))
       (is (= 0 (:erg-food income)))
@@ -199,9 +203,9 @@
           (is (= test-player-id (:xt/id tx)))
           (is (= 2              (:player/current-phase tx)))
           ;; Resource deltas
-          (is (= (+ (:player/credits  test-player) (:ore-credits  income) (:tax-credits income)) (:player/credits  tx)))
+          (is (= (+ (:player/credits  test-player) (:ore-credits income) (:tax-credits income) (:synergy-credits income)) (:player/credits  tx)))
           (is (= (+ (:player/food     test-player) (:erg-food    income)) (:player/food     tx)))
-          (is (= (+ (:player/fuel     test-player) (:erg-fuel    income)) (:player/fuel     tx)))
+          (is (= (+ (:player/fuel     test-player) (:erg-fuel    income) (:synergy-fuel income)) (:player/fuel     tx)))
           (is (= (+ (:player/soldiers test-player) (:mil-soldiers income)) (:player/soldiers tx)))
           (is (= (+ (:player/fighters test-player) (:mil-fighters income)) (:player/fighters tx)))
           (is (= (+ (:player/stations test-player) (:mil-stations income)) (:player/stations tx))))))))
@@ -300,7 +304,7 @@
   (testing "Applies income deltas to the correct resources"
     (let [income {:ore-credits 300 :erg-food 400 :erg-fuel 100
                   :mil-soldiers 25 :mil-fighters 15 :mil-stations 5
-                  :tax-credits 500}
+                  :tax-credits 500 :synergy-credits 0 :synergy-fuel 0}
           after  (income/calculate-resources-after-income full-test-player income)]
       ;; Credits: base + ore + tax
       (is (= (+ (:player/credits full-test-player) 300 500) (:credits after)))
@@ -317,7 +321,7 @@
   (testing "Non-income resources pass through unchanged"
     (let [income {:ore-credits 0 :erg-food 0 :erg-fuel 0
                   :mil-soldiers 0 :mil-fighters 0 :mil-stations 0
-                  :tax-credits 0}
+                  :tax-credits 0 :synergy-credits 0 :synergy-fuel 0}
           after  (income/calculate-resources-after-income full-test-player income)]
       (is (= (:player/population  full-test-player) (:population after)))
       (is (= (:player/stability   full-test-player) (:stability  after)))
@@ -336,7 +340,7 @@
   (testing "All resources unchanged when income is all zeros"
     (let [zero-income {:ore-credits 0 :erg-food 0 :erg-fuel 0
                        :mil-soldiers 0 :mil-fighters 0 :mil-stations 0
-                       :tax-credits 0}
+                       :tax-credits 0 :synergy-credits 0 :synergy-fuel 0}
           after       (income/calculate-resources-after-income full-test-player zero-income)]
       (is (= (:player/credits  full-test-player) (:credits  after)))
       (is (= (:player/food     full-test-player) (:food     after)))
@@ -349,7 +353,7 @@
   (testing "Handles large income values without overflow"
     (let [income {:ore-credits 1000000000 :erg-food 999999999 :erg-fuel 500000000
                   :mil-soldiers 1000000 :mil-fighters 500000 :mil-stations 100000
-                  :tax-credits 750000000}
+                  :tax-credits 750000000 :synergy-credits 0 :synergy-fuel 0}
           after  (income/calculate-resources-after-income full-test-player income)]
       (is (= (+ (:player/credits  full-test-player) 1000000000 750000000) (:credits  after)))
       (is (= (+ (:player/food     full-test-player) 999999999)             (:food     after)))
@@ -379,3 +383,52 @@
                                     :player/credits     1234567890)
           game   (assoc test-game :game/ore-planet-credits 9999)]
       (is (vector? (income/income-page {:player player :game game}))))))
+
+;;;;
+;;;; Industrial Synergy Tests
+;;;;
+
+(deftest synergy-pure-ore-stacker
+  (testing "Player with ore planets but no erg planets gets no synergy"
+    (let [player (assoc test-player :player/ore-planets 10 :player/erg-planets 0)
+          income (income/calculate-income player test-game)]
+      (is (= 0 (:synergy-credits income)))
+      (is (= 0 (:synergy-fuel    income))))))
+
+(deftest synergy-pure-erg-stacker
+  (testing "Player with erg planets but no ore planets gets no synergy"
+    (let [player (assoc test-player :player/ore-planets 0 :player/erg-planets 10)
+          income (income/calculate-income player test-game)]
+      (is (= 0 (:synergy-credits income)))
+      (is (= 0 (:synergy-fuel    income))))))
+
+(deftest synergy-balanced-player
+  (testing "Player with equal ore and erg gets synergy on all pairs"
+    (let [player (assoc test-player :player/ore-planets 5 :player/erg-planets 5)
+          income (income/calculate-income player test-game)]
+      (is (= (* 5 (:game/synergy-credits-per-paired test-game)) (:synergy-credits income)))  ; 5000
+      (is (= (* 5 (:game/synergy-fuel-per-paired    test-game)) (:synergy-fuel    income))))));  1000
+
+(deftest synergy-asymmetric-uses-min
+  (testing "Player with 10 ore and 3 erg gets synergy on 3 pairs"
+    (let [player (assoc test-player :player/ore-planets 10 :player/erg-planets 3)
+          income (income/calculate-income player test-game)]
+      (is (= (* 3 (:game/synergy-credits-per-paired test-game)) (:synergy-credits income)))  ; 3000
+      (is (= (* 3 (:game/synergy-fuel-per-paired    test-game)) (:synergy-fuel    income))))))  ; 600
+
+(deftest synergy-applied-to-resources
+  (testing "Synergy credits and fuel are added to player totals via calculate-resources-after-income"
+    (let [player (assoc test-player :player/ore-planets 4 :player/erg-planets 4
+                                    :player/credits 1000 :player/fuel 500)
+          income (income/calculate-income player test-game)
+          after  (income/calculate-resources-after-income player income)]
+      ;; 4 pairs → 4000 synergy credits, 800 synergy fuel
+      (is (= (+ 1000
+                (:ore-credits     income)
+                (:tax-credits     income)
+                (:synergy-credits income))
+             (:credits after)))
+      (is (= (+ 500
+                (:erg-fuel     income)
+                (:synergy-fuel income))
+             (:fuel after))))))

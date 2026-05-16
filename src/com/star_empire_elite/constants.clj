@@ -104,6 +104,15 @@
 (def mil-planet-stations 1)
 
 ;;;;
+;;;; Industrial Synergy
+;;;; Bonus output for paired ore/erg planets. The first min(ore, erg) planets
+;;;; on each side contribute a Treasury credit and fuel bonus, representing
+;;;; efficiency gains from coordinated industrial and energy operations.
+
+(def synergy-credits-per-paired 1000)
+(def synergy-fuel-per-paired     200)
+
+;;;;
 ;;;; Population Tax
 ;;;; Population is stored in millions, so these are per-population-unit.
 
@@ -166,7 +175,7 @@
 (def cmd-ship-cost   60000)
 
 (def mil-planet-cost 17000)
-(def erg-planet-cost 11000)
+(def erg-planet-cost 22000)
 (def ore-planet-cost 22000)
 
 (def agent-cost    5000)
@@ -206,4 +215,4 @@
 (def food-buy  6)
 (def food-sell 2)
 (def fuel-buy  6)
-(def fuel-sell 3)
+(def fuel-sell 2)

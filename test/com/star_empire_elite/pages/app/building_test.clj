@@ -30,13 +30,15 @@
    :game/erg-planet-cost 800
    :game/ore-planet-cost  900
    ;; Income constants needed by projections-section
-   :game/ore-planet-credits     0
-   :game/erg-planet-food       0
-   :game/erg-planet-fuel       0
-   :game/mil-planet-soldiers    0
-   :game/mil-planet-fighters    0
-   :game/mil-planet-stations    0
-   :game/population-tax-credits 0
+   :game/ore-planet-credits      0
+   :game/erg-planet-food        0
+   :game/erg-planet-fuel        0
+   :game/mil-planet-soldiers     0
+   :game/mil-planet-fighters     0
+   :game/mil-planet-stations     0
+   :game/synergy-credits-per-paired 0
+   :game/synergy-fuel-per-paired    0
+   :game/population-tax-credits  0
    ;; Upkeep constants needed by projections-section
    :game/planet-upkeep-credits  0
    :game/planet-upkeep-food     0

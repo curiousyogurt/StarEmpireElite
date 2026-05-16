@@ -42,6 +42,8 @@
                    :game/mil-planet-soldiers const/mil-planet-soldiers
                    :game/mil-planet-fighters const/mil-planet-fighters
                    :game/mil-planet-stations const/mil-planet-stations
+                   :game/synergy-credits-per-paired const/synergy-credits-per-paired
+                   :game/synergy-fuel-per-paired    const/synergy-fuel-per-paired
                    :game/planet-upkeep-credits const/planet-upkeep-credits
                    :game/planet-upkeep-food const/planet-upkeep-food
                    :game/soldier-upkeep-credits const/soldier-upkeep-credits
