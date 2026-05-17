@@ -11,7 +11,8 @@
 ;;;;;
 
 (ns com.star-empire-elite.pages.app.outcomes
-  (:require [com.biffweb :as biff]
+  (:require [clojure.string :as str]
+            [com.biffweb :as biff]
             [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
@@ -112,96 +113,160 @@
 ;;;; UI Components
 ;;;;
 
-;; Specs for combat unit rows. :special? marks stations (defender-only): in incoming sections
-;; it suppresses the attacker-losses column; in outgoing sections it suppresses your-forces and
-;; your-losses columns. :separator? marks the last row before the planet rows.
+;; Unit row specs for the 3-column battle table.
+;; :defender-only? true for stations — the defender fights with stations, the attacker does not.
 (def ^:private battle-unit-specs
-  [{:label "Soldiers"   :unit-key :soldiers   :loss-key :soldiers-lost   :special? false :separator? false}
-   {:label "Transports" :unit-key :transports :loss-key :transports-lost :special? false :separator? false}
-   {:label "Generals"   :unit-key :generals   :loss-key :generals-lost   :special? false :separator? false}
-   {:label "Fighters"   :unit-key :fighters   :loss-key :fighters-lost   :special? false :separator? false}
-   {:label "Carriers"   :unit-key :carriers   :loss-key :carriers-lost   :special? false :separator? false}
-   {:label "Admirals"   :unit-key :admirals   :loss-key :admirals-lost   :special? false :separator? false}
-   {:label "Cmd Ships"  :unit-key :cmd-ships  :loss-key :cmd-ships-lost  :special? false :separator? false}
-   {:label "Stations"   :unit-key :stations   :loss-key :stations-lost   :special? true  :separator? true}])
+  [{:label "soldiers"   :unit-key :soldiers   :loss-key :soldiers-lost   :defender-only? false}
+   {:label "transports" :unit-key :transports :loss-key :transports-lost :defender-only? false}
+   {:label "generals"   :unit-key :generals   :loss-key :generals-lost   :defender-only? false}
+   {:label "fighters"   :unit-key :fighters   :loss-key :fighters-lost   :defender-only? false}
+   {:label "carriers"   :unit-key :carriers   :loss-key :carriers-lost   :defender-only? false}
+   {:label "admirals"   :unit-key :admirals   :loss-key :admirals-lost   :defender-only? false}
+   {:label "cmd ships"  :unit-key :cmd-ships  :loss-key :cmd-ships-lost  :defender-only? false}
+   {:label "def stns"   :unit-key :stations   :loss-key :stations-lost   :defender-only? true}])
 
-(def ^:private planet-specs
-  [{:label "Ore"      :pt-key :ore  :separator? false}
-   {:label "Food"     :pt-key :food :separator? false}
-   {:label "Military" :pt-key :mil  :separator? true}])
+(defn- mode-badge [mode]
+  [:span {:style {:border "1px solid #4ade80" :padding "2px 7px"
+                  :font-size "11px" :letter-spacing "0.12em" :color "#4ade80"}}
+   (case mode :raid "RAID" :strike "STRIKE" "INVASION")])
 
-(defn- incoming-battle-row [label dc dl al unit-key loss-key special? separator-below?]
-  [:tr {:style {:border-bottom (if separator-below? "1px solid #4ade80" "1px solid #253530")
-                :background "#121a18"}}
-   [:td {:style {:padding "4px 0" :color "#9adaaa"}} label]
-   [:td {:style {:text-align "right" :padding "4px 12px" :color "#9adaaa"}} (get dc unit-key)]
-   [:td {:style {:text-align "right" :padding "4px 12px" :color "#9adaaa"}} (get dl loss-key)]
-   [:td {:style {:text-align "right" :color "#9adaaa"}} (if special? "—" (get al loss-key))]])
+(defn- outcome-label [won?]
+  [:span {:style {:font-size "12px" :letter-spacing "0.1em"
+                  :color (if won? "#4ade80" "#f87171")}}
+   (if won? "▲ VICTORY ▲" "▼ DEFEAT ▼")])
 
-(defn- incoming-planet-row [label def-losses separator-below?]
-  [:tr {:style {:border-bottom (if separator-below? "1px solid #4ade80" "1px solid #253530")
-                :background "#121a18"}}
-   [:td {:style {:padding "4px 0" :color "#9adaaa"}} label]
-   [:td {:style {:text-align "right" :padding "4px 12px" :color "#9adaaa"}} "—"]
-   [:td {:style {:text-align "right" :padding "4px 12px" :color "#9adaaa"}} def-losses]
-   [:td {:style {:text-align "right" :color "#9adaaa"}} "—"]])
+(defn- gain-cell [n]
+  [:span {:style {:color "#4ade80"}} (str "+" (ui/format-number n))])
 
-(defn- incoming-attack-section [result]
-  (let [att-wins? (:attacker-wins? result)
-        mode      (get result :mode :invade)
-        att-name  (:attacker-name result)
-        dc        (:defender-counts result)
-        al        (:attacker-losses result)
-        dl        (:defender-losses result)
-        pt        (:planets-transferred result)
-        rc        (:resources-captured result)
-        th-style  {:color "#4ade80"}]
-    [:div {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"
-                   :padding "12px"}}
-     [:h3.font-bold.mb-3 {:style {:color "#4ade80"}}
-      (if att-wins?
-        (str (if (= mode :raid) "Raided by " "Attacked by ") att-name " — defeat")
-        (str (if (= mode :raid) "Raid by "   "Attacked by ") att-name " — repelled"))]
+(defn- opp-loss-cell [n]
+  (if (pos? (or n 0))
+    [:span {:style {:color "#f87171"}} (str "−" (ui/format-number n))]
+    [:span {:style {:color "#4a6a58"}} "0"]))
+
+(defn- combat-row [left center right]
+  [:tr {:style {:border-bottom "1px solid #1a2820" :background "#121a18"}}
+   [:td {:style {:text-align "right" :padding "4px 12px"
+                 :border-right "1px solid #1a2820"}} left]
+   [:td {:style {:text-align "center" :padding "4px 8px"
+                 :border-right "1px solid #1a2820" :color "#7ab88a"}} center]
+   [:td {:style {:text-align "left" :padding "4px 12px"}} right]])
+
+(defn- combat-card
+  "Render a combat card with header, 3-col symmetric table, and optional footer.
+
+  Left col: your unit count + inline red loss. Right col: opponent's loss delta.
+  :stations-mine? true when you are the defender (you have stations).
+  :plunder-label customises the footer label (outgoing vs incoming framing)."
+  [{:keys [mode opp-name won? my-counts my-losses opp-losses
+           stations-mine? resources-taken planets-transferred plunder-label]}]
+  (let [col-header {:font-size "10px" :letter-spacing "0.1em"
+                    :color "#4a6a58" :text-transform "uppercase"
+                    :font-weight "normal" :padding "6px 12px"}
+        dash       [:span {:style {:color "#4a6a58"}} "—"]
+        make-left  (fn [unit-key loss-key defender-only?]
+                     (if (and defender-only? (not stations-mine?))
+                       dash
+                       [:<>
+                        [:span {:style {:color "#9adaaa"}}
+                         (ui/format-number (get my-counts unit-key 0))]
+                        (let [loss (get my-losses loss-key 0)]
+                          (when (pos? loss)
+                            [:span {:style {:color "#f87171" :margin-left "6px"}}
+                             (str "−" (ui/format-number loss))]))]))
+        make-right (fn [loss-key defender-only?]
+                     (if (and defender-only? stations-mine?)
+                       dash
+                       (opp-loss-cell (get opp-losses loss-key 0))))
+        credits    (or (:credits resources-taken) 0)
+        food       (or (:food    resources-taken) 0)
+        fuel       (or (:fuel    resources-taken) 0)
+        ore-pt     (or (:ore planets-transferred) 0)
+        erg-pt     (or (:erg planets-transferred) 0)
+        mil-pt     (or (:mil planets-transferred) 0)
+        ;; Both sides always show: attacker gain (+N, left) and defender loss (−N, right).
+        ;; When stations-mine? the columns are swapped: your loss on left, attacker gain on right.
+        transfer-row (fn [label n]
+                       (when (pos? n)
+                         (if stations-mine?
+                           (combat-row (opp-loss-cell n) label (gain-cell n))
+                           (combat-row (gain-cell n) label (opp-loss-cell n)))))]
+    [:div {:style {:border "1px solid #253530" :border-radius "3px"
+                   :background "#161616" :overflow "hidden"}}
+     ;; Header: mode badge + opponent name on left, victory/defeat on right
+     [:div.flex.justify-between.items-center
+      {:style {:padding "8px 12px"}}
+      [:div.flex.items-center {:style {:gap "12px"}}
+       (mode-badge mode)
+       [:span.text-xl.font-bold {:style {:color "#4ade80"}} opp-name]]
+      (outcome-label won?)]
+     ;; Table
      [:div.overflow-x-auto
       [:table.w-full.text-xs.table-fixed
        [:thead
-        [:tr {:style {:border-bottom "1px solid #4ade80"}}
-         [:th.text-left.py-1  {:style (assoc th-style :width "10%")} "Item"]
-         [:th.text-right.py-1 {:style (assoc th-style :width "30%")} "Your Forces"]
-         [:th.text-right.py-1 {:style (assoc th-style :width "30%")} "Your Losses"]
-         [:th.text-right.py-1 {:style (assoc th-style :width "30%")} (str att-name " Losses")]]]
+        [:tr {:style {:background "#151f1a"
+                      :border-top "1px solid #253530"
+                      :border-bottom "1px solid #253530"}}
+         [:th {:style (assoc col-header :text-align "right")}   "◄ YOU"]
+         [:th {:style (assoc col-header :text-align "center")}  "UNIT"]
+         [:th {:style (assoc col-header :text-align "left")}    (str (str/upper-case opp-name) " ►")]]]
        [:tbody
-        (for [spec battle-unit-specs]
-          (incoming-battle-row (:label spec) dc dl al (:unit-key spec) (:loss-key spec)
-                               (:special? spec) (:separator? spec)))
-        (for [spec planet-specs]
-          (incoming-planet-row (:label spec) (get pt (:pt-key spec)) (:separator? spec)))]]]
-     ;; Stolen resources — shown when attacker wins and plundered something
-     (when (and att-wins? rc (or (pos? (:credits rc)) (pos? (:food rc)) (pos? (:fuel rc))))
-       [:p.text-xs.mt-2
-        {:style {:color "#f87171"}}
-        "Plundered from you: "
-        (clojure.string/join ", "
-          (keep identity
-            [(when (pos? (:credits rc)) (str (ui/format-number (:credits rc)) " cr"))
-             (when (pos? (:food    rc)) (str (ui/format-number (:food    rc)) " food"))
-             (when (pos? (:fuel    rc)) (str (ui/format-number (:fuel    rc)) " fuel"))]))])]))
+        ;; Military unit rows
+        (for [{:keys [label unit-key loss-key defender-only?]} battle-unit-specs]
+          (combat-row (make-left  unit-key loss-key defender-only?)
+                      label
+                      (make-right loss-key defender-only?)))
+        ;; Planet rows — only when planets changed hands
+        (transfer-row "ore planets"      ore-pt)
+        (transfer-row "energy planets"   erg-pt)
+        (transfer-row "military planets" mil-pt)
+        ;; Plunder rows — only when resources were taken
+        (transfer-row "credits" credits)
+        (transfer-row "food"    food)
+        (transfer-row "fuel"    fuel)]]]]))
 
-(defn- battle-row [label af al dl att-key loss-key special? separator-below?]
-  [:tr {:style {:border-bottom (if separator-below? "1px solid #4ade80" "1px solid #253530")
-                :background "#121a18"}}
-   [:td {:style {:padding "4px 0" :color "#9adaaa"}} label]
-   [:td {:style {:text-align "right" :padding "4px 12px" :color "#9adaaa"}} (if special? "—" (get af att-key))]
-   [:td {:style {:text-align "right" :padding "4px 12px" :color "#9adaaa"}} (if special? "—" (get al loss-key))]
-   [:td {:style {:text-align "right" :color "#9adaaa"}} (get dl loss-key)]])
-
-(defn- planet-row [label enemy-losses att-wins? separator-below?]
-  [:tr {:style {:border-bottom (if separator-below? "1px solid #4ade80" "1px solid #253530")
-                :background "#121a18"}}
-   [:td {:style {:padding "4px 0" :color "#9adaaa"}} label]
-   [:td {:style {:text-align "right" :padding "4px 12px" :color "#9adaaa"}} "—"]
-   [:td {:style {:text-align "right" :padding "4px 12px" :color "#9adaaa"}} "—"]
-   [:td {:style {:text-align "right" :color "#9adaaa"}} (if att-wins? enemy-losses "—")]])
+(defn- strike-card
+  "Render a strike result using the same 3-col table structure as combat-card.
+  :stations-mine? true when you are the defender."
+  [{:keys [opp-name stations-mine? dispatched intercepted units-destroyed defender-stations]}]
+  (let [col-header {:font-size "10px" :letter-spacing "0.1em"
+                    :color "#4a6a58" :text-transform "uppercase"
+                    :font-weight "normal" :padding "6px 12px"}
+        dash [:span {:style {:color "#4a6a58"}} "—"]
+        att-cmd [:<>
+                 [:span {:style {:color "#9adaaa"}} (ui/format-number dispatched)]
+                 (when (pos? intercepted)
+                   [:span {:style {:color "#f87171" :margin-left "6px"}}
+                    (str "−" (ui/format-number intercepted))])]
+        def-stns [:span {:style {:color "#9adaaa"}} (ui/format-number (or defender-stations 0))]
+        ud   (or units-destroyed {})
+        rows [["cmd ships"  att-cmd                              dash]
+              ["soldiers"   dash (opp-loss-cell (:soldiers   ud))]
+              ["transports" dash (opp-loss-cell (:transports ud))]
+              ["generals"   dash (opp-loss-cell (:generals   ud))]
+              ["fighters"   dash (opp-loss-cell (:fighters   ud))]
+              ["carriers"   dash (opp-loss-cell (:carriers   ud))]
+              ["admirals"   dash (opp-loss-cell (:admirals   ud))]
+              ["def stns"   dash def-stns]]]
+    [:div {:style {:border "1px solid #253530" :border-radius "3px"
+                   :background "#161616" :overflow "hidden"}}
+     [:div.flex.items-center {:style {:padding "8px 12px" :gap "12px"}}
+      (mode-badge :strike)
+      "by"
+      [:span.text-xl.font-bold {:style {:color "#4ade80"}} opp-name]]
+     [:div.overflow-x-auto
+      [:table.w-full.text-xs.table-fixed
+       [:thead
+        [:tr {:style {:background "#151f1a"
+                      :border-top "1px solid #253530"
+                      :border-bottom "1px solid #253530"}}
+         [:th {:style (assoc col-header :text-align "right")}  "◄ YOU"]
+         [:th {:style (assoc col-header :text-align "center")} "UNIT"]
+         [:th {:style (assoc col-header :text-align "left")}   (str (str/upper-case opp-name) " ►")]]]
+       [:tbody
+        (for [[label att-cell def-cell] rows]
+          (if stations-mine?
+            (combat-row def-cell label att-cell)
+            (combat-row att-cell label def-cell)))]]]]))
 
 (defn apply-outcomes
   "Advance turn/round/phase and clear stored battle and espionage results.
@@ -263,8 +328,7 @@
         turns-per-round    (:game/turns-per-round game)
         end-current-round? (>= current-turn turns-per-round)
         card-style         {:border "1px solid #253530" :border-radius "3px" :background "#161616"
-                            :padding "12px"}
-        th-style           {:color "#4ade80"}]
+                            :padding "12px"}]
     (ui/page
      {}
      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
@@ -286,7 +350,27 @@
          (when (or incoming (pos? esp-fails) (pos? incite-stab-lost) bomb-result)
            [:div.flex.flex-col.gap-2
             (for [r incoming]
-              (incoming-attack-section (clojure.core/read-string r)))
+              (let [result (clojure.core/read-string r)]
+                (if (= (:mode result) :strike)
+                  ;; --- Incoming strike ---
+                  (strike-card {:opp-name          (:attacker-name result)
+                                :stations-mine?    true
+                                :dispatched        (:cmd-ships-dispatched result)
+                                :intercepted       (:cmd-ships-lost result)
+                                :units-destroyed   (:units-destroyed result)
+                                :defender-stations (:defender-stations result)})
+                  ;; --- Incoming raid/invade ---
+                  (let [att-wins? (:attacker-wins? result)]
+                    (combat-card {:mode                (get result :mode :invade)
+                                  :opp-name            (:attacker-name result)
+                                  :won?                (not att-wins?)
+                                  :my-counts           (:defender-counts result)
+                                  :my-losses           (:defender-losses result)
+                                  :opp-losses          (:attacker-losses result)
+                                  :stations-mine?      true
+                                  :resources-taken     (:resources-captured result)
+                                  :planets-transferred (:planets-transferred result)
+                                  :plunder-label       "SEIZED FROM YOUR TREASURY"})))))
             (when (pos? esp-fails)
               [:div {:style card-style}
                [:p.font-bold {:style {:color "#4ade80"}}
@@ -313,66 +397,23 @@
                def-name (:defender-name battle-result)]
            (if (= mode :strike)
              ;; --- Strike result ---
-             (let [ud         (:units-destroyed battle-result)
-                   committed  (:cmd-ships-committed  battle-result)
-                   dispatched (:cmd-ships-dispatched battle-result)
-                   lost       (:cmd-ships-lost       battle-result)
-                   returned   (- dispatched lost)
-                   dmg-pct    (Math/round (* 100.0 (:damage-rate battle-result)))]
-               [:div {:style card-style}
-                [:h3.font-bold.mb-3 {:style {:color "#4ade80"}}
-                 (str "Strike against " def-name " launched")]
-                [:div.grid.grid-cols-2.gap-x-8.gap-y-1
-                 [:p.text-xs.font-bold.col-span-2.mb-1 {:style {:color "#4ade80"}} "Strike package"]
-                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Cmd-ships committed: " committed)]
-                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Cmd-ships dispatched: " dispatched)]
-                 [:p.text-xs {:style {:color (if (pos? lost) "#f87171" "#9adaaa")}}
-                  (str "Intercepted: " lost)]
-                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Returned safely: " returned)]
-                 [:p.text-xs.col-span-2.font-bold {:style {:color "#4ade80"}}
-                  (str dmg-pct "% of " def-name "'s military destroyed")]
-                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Soldiers:   " (:soldiers   ud))]
-                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Transports: " (:transports ud))]
-                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Generals:   " (:generals   ud))]
-                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Fighters:   " (:fighters   ud))]
-                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Carriers:   " (:carriers   ud))]
-                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Admirals:   " (:admirals   ud))]]])
+             (strike-card {:opp-name          def-name
+                           :stations-mine?    false
+                           :dispatched        (:cmd-ships-dispatched battle-result)
+                           :intercepted       (:cmd-ships-lost       battle-result)
+                           :units-destroyed   (:units-destroyed      battle-result)
+                           :defender-stations (:defender-stations    battle-result)})
              ;; --- Invade / Raid result ---
-             (let [att-wins? (:attacker-wins? battle-result)
-                   ac        (:attacker-counts battle-result)
-                   al        (:attacker-losses battle-result)
-                   dl        (:defender-losses battle-result)
-                   pt        (:planets-transferred battle-result)
-                   rc        (:resources-captured battle-result)]
-               [:div {:style card-style}
-                [:h3.font-bold.mb-3 {:style {:color "#4ade80"}}
-                 (if att-wins?
-                   (str (if (= mode :raid) "Raid victory against " "Invasion victory against ") def-name)
-                   (str (if (= mode :raid) "Raid repelled by "     "Defeated in invasion of ")  def-name))]
-                [:div.overflow-x-auto
-                 [:table.w-full.text-xs.table-fixed
-                  [:thead
-                   [:tr {:style {:border-bottom "1px solid #4ade80"}}
-                    [:th.text-left.py-1  {:style (assoc th-style :width "10%")} "Item"]
-                    [:th.text-right.py-1 {:style (assoc th-style :width "30%")} "Your Forces"]
-                    [:th.text-right.py-1 {:style (assoc th-style :width "30%")} "Your Losses"]
-                    [:th.text-right.py-1 {:style (assoc th-style :width "30%")} (str def-name " Losses")]]]
-                  [:tbody
-                   (for [spec battle-unit-specs]
-                     (battle-row (:label spec) ac al dl (:unit-key spec) (:loss-key spec)
-                                 (:special? spec) (:separator? spec)))
-                   (for [spec planet-specs]
-                     (planet-row (:label spec) (get pt (:pt-key spec)) att-wins? (:separator? spec)))]]]
-                ;; Plundered resources row — shown when attacker wins and captured something
-                (when (and att-wins? rc (or (pos? (:credits rc)) (pos? (:food rc)) (pos? (:fuel rc))))
-                  [:p.text-xs.mt-2
-                   {:style {:color "#9adaaa"}}
-                   "Plundered: "
-                   (clojure.string/join ", "
-                     (keep identity
-                       [(when (pos? (:credits rc)) (str (ui/format-number (:credits rc)) " cr"))
-                        (when (pos? (:food    rc)) (str (ui/format-number (:food    rc)) " food"))
-                        (when (pos? (:fuel    rc)) (str (ui/format-number (:fuel    rc)) " fuel"))]))])]))))
+             (combat-card {:mode                mode
+                           :opp-name            def-name
+                           :won?                (:attacker-wins? battle-result)
+                           :my-counts           (:attacker-counts battle-result)
+                           :my-losses           (:attacker-losses battle-result)
+                           :opp-losses          (:defender-losses battle-result)
+                           :stations-mine?      false
+                           :resources-taken     (:resources-captured battle-result)
+                           :planets-transferred (:planets-transferred battle-result)
+                           :plunder-label       "PLUNDERED FROM TREASURY"}))))
 
        ;; Espionage result section (only shown when an operation was declared)
        (when espionage-result

@@ -31,6 +31,7 @@
           ;; Combat mode multipliers
           [:game/raid-defense-multiplier   {:optional true} :double]
           [:game/raid-reward-multiplier    {:optional true} :double]
+          [:game/raid-planet-capture-rate  {:optional true} :double]
           [:game/invade-defense-multiplier {:optional true} :double]
           [:game/invade-reward-multiplier  {:optional true} :double]
 

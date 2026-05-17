@@ -296,9 +296,9 @@
       (let [result (combat/resolve-combat game strong-attacker strong-defender :invade)
             xfer   (:planets-transferred result)]
         (when-not (:attacker-wins? result)
-          (is (= 0 (:mil  xfer)))
-          (is (= 0 (:food xfer)))
-          (is (= 0 (:ore  xfer))))))))
+          (is (= 0 (:mil xfer)))
+          (is (= 0 (:erg xfer)))
+          (is (= 0 (:ore xfer))))))))
 
 (deftest test-resolve-combat-planet-transfer-does-not-exceed-total
   (testing "Total planets transferred never exceeds defender's total"
@@ -308,7 +308,7 @@
       (dotimes [_ 50]
         (let [result (combat/resolve-combat game strong-attacker strong-defender :invade)
               xfer   (:planets-transferred result)
-              xfer-total (+ (:mil xfer) (:food xfer) (:ore xfer))]
+              xfer-total (+ (:mil xfer) (:erg xfer) (:ore xfer))]
           (is (<= xfer-total total-planets)))))))
 
 (deftest test-resolve-combat-losses-are-non-negative
@@ -422,21 +422,21 @@
       ;; Raid should win far more often since the defender's station power is reduced to 10%
       (is (> wins-raid wins-invade)))))
 
-(deftest raid-caps-planet-capture-at-10-percent
-  (testing "Raid mode never captures more than reward-mult × margin × total planets"
-    ;; large-defender has 100 total planets; max possible capture = 0.75 × 0.1 × 100 = 7
+(deftest raid-caps-planet-capture-at-5-percent
+  (testing "Raid mode never captures more than planet-capture-rate × margin × total planets"
+    ;; large-defender has 100 total planets; max possible capture = floor(0.75 × 0.05 × 100) = 3
     (dotimes [_ 50]
       (let [result (combat/resolve-combat game massive-attacker large-defender :raid)
             xfer   (:planets-transferred result)
-            total  (+ (:mil xfer) (:food xfer) (:ore xfer))]
-        (is (<= total 8))))))  ; floor(0.75 * 0.1 * 100) = 7, +1 tolerance for floating point
+            total  (+ (:mil xfer) (:erg xfer) (:ore xfer))]
+        (is (<= total 4))))))  ; floor(0.75 * 0.1 * 100) = 7, +1 tolerance for floating point
 
 (deftest invade-can-capture-up-to-margin-planets
   (testing "Invade mode can capture up to 0.75 × total defender planets"
     ;; Run many times and verify at least some runs capture > 10 planets (impossible in raid).
     (let [results (repeatedly 50 #(combat/resolve-combat game massive-attacker large-defender :invade))
           max-capture (apply max (map #(let [pt (:planets-transferred %)]
-                                         (+ (:mil pt) (:food pt) (:ore pt)))
+                                         (+ (:mil pt) (:erg pt) (:ore pt)))
                                        results))]
       (is (> max-capture 10)))))
 
@@ -482,9 +482,9 @@
             (when-not (:attacker-wins? result)
               (let [pt (:planets-transferred result)
                     rc (:resources-captured result)]
-                (is (= 0 (:mil  pt)))
-                (is (= 0 (:food pt)))
-                (is (= 0 (:ore  pt)))
+                (is (= 0 (:mil pt)))
+                (is (= 0 (:erg pt)))
+                (is (= 0 (:ore pt)))
                 (is (= 0 (:credits rc)))
                 (is (= 0 (:food    rc)))
                 (is (= 0 (:fuel    rc)))))))))))

@@ -212,7 +212,7 @@
                      :admirals-lost 0 :stations-lost 1}
    :attacker-counts {:soldiers 50 :fighters 10 :cmd-ships 0 :transports 5
                      :carriers 1 :generals 1 :admirals 0}
-   :planets-transferred {:mil 0 :food 0 :ore 0}})
+   :planets-transferred {:mil 0 :erg 0 :ore 0}})
 
 (def sample-espionage-result
   {:attacker-wins? true
@@ -256,7 +256,7 @@
                            :defender-losses {:soldiers-lost 10 :fighters-lost 2 :cmd-ships-lost 0
                                              :transports-lost 0 :carriers-lost 0 :generals-lost 0
                                              :admirals-lost 0 :stations-lost 1}
-                           :planets-transferred {:mil 0 :food 0 :ore 0}}
+                           :planets-transferred {:mil 0 :erg 0 :ore 0}}
           player-with-attacks (assoc test-player
                                      :player/incoming-attacks [(pr-str attacker-result)]
                                      :player/incoming-espionage-fails 1)]

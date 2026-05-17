@@ -93,18 +93,18 @@
    :stations-lost   (max 0 (long (* (:stations   forces) rate)))})
 
 (defn- select-planets
-  "Randomly select n planets from the defender's pool, returning a {:mil n :food n :ore n} map of how 
+  "Randomly select n planets from the defender's pool, returning a {:mil n :erg n :ore n} map of how
   many of each type are transferred.
 
   [defender player-map, n int] -> transfer-map"
   [defender n]
   (let [pool  (shuffle (concat (repeat (:player/mil-planets defender) :mil)
-                               (repeat (:player/erg-planets defender) :food)
+                               (repeat (:player/erg-planets defender) :erg)
                                (repeat (:player/ore-planets defender) :ore)))
         taken (frequencies (take n pool))]
-    {:mil  (get taken :mil  0)
-     :food (get taken :food 0)
-     :ore  (get taken :ore  0)}))
+    {:mil (get taken :mil 0)
+     :erg (get taken :erg 0)
+     :ore (get taken :ore 0)}))
 
 (defn resolve-combat
   "Resolve a full combat engagement between attacker and defender. The `mode` parameter
@@ -120,9 +120,12 @@
         def-mult    (case mode
                       :raid   (:game/raid-defense-multiplier   game)
                       :invade (:game/invade-defense-multiplier game))
-        reward-mult (case mode
-                      :raid   (:game/raid-reward-multiplier   game)
-                      :invade (:game/invade-reward-multiplier game))
+        reward-mult  (case mode
+                       :raid   (:game/raid-reward-multiplier   game)
+                       :invade (:game/invade-reward-multiplier game))
+        planet-mult  (case mode
+                       :raid   (:game/raid-planet-capture-rate game)
+                       :invade (:game/invade-reward-multiplier game))
         def-power   (* (base-power game def-forces false) def-mult)
         att-roll    (* att-power (random-factor))
         def-roll    (* def-power (random-factor))
@@ -142,14 +145,18 @@
                               (:player/ore-planets  defender))
         ;; Use loser-rate (capped at 0.75) as the effective margin for captures, so that captures
         ;; scale with victory margin but are bounded by the same 75% cap applied to combat losses.
-        planets-count       (if att-wins? (long (* loser-rate reward-mult def-total-planets)) 0)
+        planets-count       (if att-wins? (long (* loser-rate planet-mult def-total-planets)) 0)
         ;; Randomly select planets to be transferred to the attacker.
         planets-transferred (select-planets defender planets-count)
         ;; Resources captured scale by loser-rate × reward-mult; zero on defeat.
         resources-mult     (if att-wins? (* loser-rate reward-mult) 0.0)
         credits-captured   (long (* resources-mult (:player/credits defender)))
         food-captured      (long (* resources-mult (:player/food    defender)))
-        fuel-captured      (long (* resources-mult (:player/fuel    defender)))]
+        fuel-captured      (long (* resources-mult (:player/fuel    defender)))
+        ;; The defender only exposes reward-mult of their forces to casualties (they're defending
+        ;; a fraction of their territory). The attacker commits fully against that fraction.
+        ;; For invade reward-mult=1.0 (all defender forces at risk); for raid reward-mult=0.1 (10%).
+        def-engaged (update-vals def-forces #(long (* reward-mult %)))]
     {:attacker-id     (str (:xt/id attacker))
      :attacker-name   (:player/empire-name attacker)
      :defender-id     (str (:xt/id defender))
@@ -176,8 +183,8 @@
      :defender-roll   def-roll
      :attacker-wins?  att-wins?
      :margin          margin
-     :attacker-losses (compute-losses att-forces (if att-wins? winner-rate loser-rate))
-     :defender-losses (compute-losses def-forces (if att-wins? loser-rate winner-rate))
+     :attacker-losses (compute-losses att-forces  (if att-wins? winner-rate loser-rate))
+     :defender-losses (compute-losses def-engaged (if att-wins? loser-rate winner-rate))
      :planets-transferred planets-transferred
      :resources-captured  {:credits credits-captured
                            :food    food-captured
@@ -200,14 +207,17 @@
         interception-cap     (:game/strike-interception-cap  game)
         committed            (:player/cmd-ships attacker)
         dispatched           (min max-dispatch committed)
-        damage-rate          (* dispatched damage-rate-per-ship)
         intercept-chance     (min interception-cap (* (:player/stations defender) interception-rate))
         ships-lost           (count (filter #(< % intercept-chance)
-                                            (repeatedly dispatched #(Math/random))))]
+                                            (repeatedly dispatched #(Math/random))))
+        ships-through        (- dispatched ships-lost)
+        damage-rate          (* ships-through damage-rate-per-ship)]
     {:mode                :strike
      :attacker-id         (str (:xt/id attacker))
+     :attacker-name       (:player/empire-name attacker)
      :defender-id         (str (:xt/id defender))
      :defender-name       (:player/empire-name defender)
+     :defender-stations   (:player/stations defender)
      :cmd-ships-committed committed
      :cmd-ships-dispatched dispatched
      :cmd-ships-lost      ships-lost

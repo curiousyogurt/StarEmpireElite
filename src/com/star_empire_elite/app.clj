@@ -109,6 +109,7 @@
             :game/hours-between-rounds          const/hours-between-rounds
             :game/raid-defense-multiplier       const/raid-defense-multiplier
             :game/raid-reward-multiplier        const/raid-reward-multiplier
+            :game/raid-planet-capture-rate      const/raid-planet-capture-rate
             :game/invade-defense-multiplier     const/invade-defense-multiplier
             :game/invade-reward-multiplier      const/invade-reward-multiplier
             :game/strike-damage-rate            const/strike-damage-rate
@@ -427,11 +428,11 @@
                       (let [result  (combat/resolve-combat game player defender mode)
                             al      (:attacker-losses result)
                             dl      (:defender-losses result)
-                            raw-pt  (or (:planets-transferred result) {:mil 0 :food 0 :ore 0})
-                            pt-mil  (min (:mil  raw-pt) (:player/mil-planets  defender))
-                            pt-food (min (:food raw-pt) (:player/erg-planets defender))
-                            pt-ore  (min (:ore  raw-pt) (:player/ore-planets  defender))
-                            capped  (assoc result :planets-transferred {:mil pt-mil :food pt-food :ore pt-ore})
+                            raw-pt  (or (:planets-transferred result) {:mil 0 :erg 0 :ore 0})
+                            pt-mil  (min (:mil raw-pt) (:player/mil-planets defender))
+                            pt-erg  (min (:erg raw-pt) (:player/erg-planets defender))
+                            pt-ore  (min (:ore raw-pt) (:player/ore-planets defender))
+                            capped  (assoc result :planets-transferred {:mil pt-mil :erg pt-erg :ore pt-ore})
                             rc           (or (:resources-captured capped) {:credits 0 :food 0 :fuel 0})
                             rc-credits   (:credits rc)
                             rc-food      (:food    rc)
@@ -444,7 +445,7 @@
                             att-admirals   (max 0 (- (:player/admirals   player) (:admirals-lost   al)))
                             att-cmd-ships  (max 0 (- (:player/cmd-ships  player) (:cmd-ships-lost  al)))
                             att-mil-plts   (+ (:player/mil-planets  player) pt-mil)
-                            att-food-plts  (+ (:player/erg-planets player) pt-food)
+                            att-erg-plts   (+ (:player/erg-planets player) pt-erg)
                             att-ore-plts   (+ (:player/ore-planets  player) pt-ore)
                             att-credits    (+ (:player/credits player) rc-credits)
                             att-food-res   (+ (:player/food    player) rc-food)
@@ -460,7 +461,7 @@
                             :player/admirals     att-admirals
                             :player/cmd-ships    att-cmd-ships
                             :player/mil-planets  att-mil-plts
-                            :player/erg-planets att-food-plts
+                            :player/erg-planets att-erg-plts
                             :player/ore-planets  att-ore-plts
                             :player/credits      att-credits
                             :player/food         att-food-res
@@ -475,7 +476,7 @@
                             :player/cmd-ships    (max 0 (- (:player/cmd-ships   defender) (:cmd-ships-lost  dl)))
                             :player/stations     (max 0 (- (:player/stations    defender) (:stations-lost   dl)))
                             :player/mil-planets  (max 0 (- (:player/mil-planets defender) pt-mil))
-                            :player/erg-planets  (max 0 (- (:player/erg-planets defender) pt-food))
+                            :player/erg-planets  (max 0 (- (:player/erg-planets defender) pt-erg))
                             :player/ore-planets  (max 0 (- (:player/ore-planets defender) pt-ore))
                             :player/credits      (max 0 (- (:player/credits     defender) rc-credits))
                             :player/food         (max 0 (- (:player/food        defender) rc-food))
@@ -491,7 +492,7 @@
                                                :player/admirals     att-admirals
                                                :player/cmd-ships    att-cmd-ships
                                                :player/mil-planets  att-mil-plts
-                                               :player/erg-planets  att-food-plts
+                                               :player/erg-planets  att-erg-plts
                                                :player/ore-planets  att-ore-plts
                                                :player/credits      att-credits
                                                :player/food         att-food-res

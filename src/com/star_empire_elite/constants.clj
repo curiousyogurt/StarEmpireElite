@@ -38,10 +38,11 @@
 ;;;; (rolls, margin, losses); they differ only in the defender's effective defense
 ;;;; multiplier and the cap on captured planets and resources.
 
-(def raid-defense-multiplier   0.1)  ; defender engages 10% of forces during a raid
-(def raid-reward-multiplier    0.1)  ; raid can capture at most 10% of empire/resources
-(def invade-defense-multiplier 1.0)  ; defender engages full forces during an invasion
-(def invade-reward-multiplier  1.0)  ; invade can capture up to full margin of empire/resources
+(def raid-defense-multiplier    0.1)  ; defender engages 10% of forces during a raid
+(def raid-reward-multiplier     0.1)  ; raid can capture at most 10% of resources (credits/food/fuel)
+(def raid-planet-capture-rate   0.05) ; raid captures at most 5% of planets (half the resource rate)
+(def invade-defense-multiplier  1.0)  ; defender engages full forces during an invasion
+(def invade-reward-multiplier   1.0)  ; invade can capture up to full margin of empire/resources
 
 ;;;;
 ;;;; Combat Power
@@ -83,9 +84,9 @@
 (def starting-fuel     5000)
 (def starting-galaxars 0)
 
-(def starting-mil-planets 0)
-(def starting-erg-planets 1)
-(def starting-ore-planets 1)
+(def starting-mil-planets 100)
+(def starting-erg-planets 100)
+(def starting-ore-planets 100)
 
 (def starting-population 6)    ; stored in millions
 (def starting-stability  100)  ; stored as %
@@ -147,19 +148,19 @@
 ;;;; Cost to maintain units and infrastructure per round.
 
 (def planet-upkeep-credits  2500)
-(def planet-upkeep-food     100)
+(def planet-upkeep-food     1000)
 
 (def soldier-upkeep-credits 25)
-(def soldier-upkeep-food    10)
+(def soldier-upkeep-food    20)
 
 (def fighter-upkeep-credits 100)
-(def fighter-upkeep-fuel    10)
+(def fighter-upkeep-fuel    20)
 
 (def station-upkeep-credits 100)
-(def station-upkeep-fuel    10)
+(def station-upkeep-fuel    20)
 
-(def agent-upkeep-food 10)
-(def agent-upkeep-fuel 10)
+(def agent-upkeep-food 20)
+(def agent-upkeep-fuel 20)
 
 ;;;;
 ;;;; Building Costs
@@ -177,7 +178,7 @@
 (def cmd-ship-cost   60000)
 
 (def mil-planet-cost 17000)
-(def erg-planet-cost 22000)
+(def erg-planet-cost 20000)
 (def ore-planet-cost 22000)
 
 (def agent-cost    5000)
@@ -224,8 +225,8 @@
 (def station-sell     500)
 (def cmd-ship-sell    30000)
 
-(def mil-planet-sell  1000)
-(def erg-planet-sell  5500)
+(def mil-planet-sell  9000)
+(def erg-planet-sell  10000)
 (def ore-planet-sell  11000)
 
 (def agent-sell 1000)
