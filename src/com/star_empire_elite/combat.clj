@@ -112,20 +112,17 @@
   on captured planets and resources. Returns a result map containing both sides' force
   counts, losses, rolls, captured planets, captured resources, and the combat mode.
   UUIDs stored as strings for safe pr-str round-trip.
-  Passing nil for mode defaults to :invade for backward compatibility.
-
   [game game-map, attacker player-map, defender player-map, mode keyword] -> result-map"
   [game attacker defender mode]
-  (let [mode        (or mode :invade)  ;; backward compatibility for games without combat-mode keys
-        att-forces  (effective-forces attacker)
+  (let [att-forces  (effective-forces attacker)
         def-forces  (effective-defending-forces defender)
         att-power   (base-power game att-forces true)
         def-mult    (case mode
-                      :raid   (or (:game/raid-defense-multiplier   game) const/raid-defense-multiplier)
-                      :invade (or (:game/invade-defense-multiplier game) const/invade-defense-multiplier))
+                      :raid   (:game/raid-defense-multiplier   game)
+                      :invade (:game/invade-defense-multiplier game))
         reward-mult (case mode
-                      :raid   (or (:game/raid-reward-multiplier   game) const/raid-reward-multiplier)
-                      :invade (or (:game/invade-reward-multiplier game) const/invade-reward-multiplier))
+                      :raid   (:game/raid-reward-multiplier   game)
+                      :invade (:game/invade-reward-multiplier game))
         def-power   (* (base-power game def-forces false) def-mult)
         att-roll    (* att-power (random-factor))
         def-roll    (* def-power (random-factor))
@@ -187,6 +184,45 @@
                            :fuel    fuel-captured}}))
 
 ;;;;
+;;;; Strike Resolution
+;;;;
+
+(defn resolve-strike
+  "Resolve a standoff strike: the attacker dispatches up to strike-max-dispatch cmd-ships, each
+  destroying strike-damage-rate of the defender's non-station military. Dispatched ships may be
+  intercepted independently by the defender's stations. No planet capture or resource theft.
+  UUIDs stored as strings for safe pr-str round-trip.
+  [game game-map, attacker player-map, defender player-map] -> result-map"
+  [game attacker defender]
+  (let [damage-rate-per-ship (:game/strike-damage-rate       game)
+        max-dispatch         (:game/strike-max-dispatch      game)
+        interception-rate    (:game/strike-interception-rate game)
+        interception-cap     (:game/strike-interception-cap  game)
+        committed            (:player/cmd-ships attacker)
+        dispatched           (min max-dispatch committed)
+        damage-rate          (* dispatched damage-rate-per-ship)
+        intercept-chance     (min interception-cap (* (:player/stations defender) interception-rate))
+        ships-lost           (count (filter #(< % intercept-chance)
+                                            (repeatedly dispatched #(Math/random))))]
+    {:mode                :strike
+     :attacker-id         (str (:xt/id attacker))
+     :defender-id         (str (:xt/id defender))
+     :defender-name       (:player/empire-name defender)
+     :cmd-ships-committed committed
+     :cmd-ships-dispatched dispatched
+     :cmd-ships-lost      ships-lost
+     :damage-rate         damage-rate
+     :units-destroyed     (if (zero? committed)
+                            {:soldiers 0 :transports 0 :generals 0
+                             :fighters 0 :carriers 0  :admirals 0}
+                            {:soldiers   (long (* damage-rate (:player/soldiers   defender)))
+                             :transports (long (* damage-rate (:player/transports defender)))
+                             :generals   (long (* damage-rate (:player/generals   defender)))
+                             :fighters   (long (* damage-rate (:player/fighters   defender)))
+                             :carriers   (long (* damage-rate (:player/carriers   defender)))
+                             :admirals   (long (* damage-rate (:player/admirals   defender)))})}))
+
+;;;;
 ;;;; Espionage Resolution
 ;;;;
 
@@ -194,20 +230,23 @@
   "Compute attacker/defender agent rolls and determine the winner.
   Returns {:att-roll float, :def-roll float, :att-wins? bool, :agents-captured long|nil}.
   agents-captured is non-nil only on failure; it is the number of the attacker's agents taken.
+  The optional def-mult scales only the defender's effective agent count (default 1.0).
 
-  [attacker player-map, defender player-map] -> roll-map"
-  [attacker defender]
-  (let [att-roll  (* (:player/agents attacker) (random-factor))
-        def-roll  (* (:player/agents defender)  (random-factor))
-        att-wins? (> att-roll def-roll)]
-    {:att-roll        att-roll
-     :def-roll        def-roll
-     :att-wins?       att-wins?
-     :agents-captured (when-not att-wins?
-                        (min (:player/agents attacker)
-                             (max const/espionage-defection-min
-                                  (long (* (:player/agents attacker)
-                                           const/espionage-defection-rate)))))}))
+  [attacker player-map, defender player-map] -> roll-map
+  [attacker player-map, defender player-map, def-mult float] -> roll-map"
+  ([attacker defender] (espionage-roll attacker defender 1.0))
+  ([attacker defender def-mult]
+   (let [att-roll  (* (:player/agents attacker) (random-factor))
+         def-roll  (* (:player/agents defender) def-mult (random-factor))
+         att-wins? (> att-roll def-roll)]
+     {:att-roll        att-roll
+      :def-roll        def-roll
+      :att-wins?       att-wins?
+      :agents-captured (when-not att-wins?
+                         (min (:player/agents attacker)
+                              (max const/espionage-defection-min
+                                   (long (* (:player/agents attacker)
+                                            const/espionage-defection-rate)))))})))
 
 (defn resolve-espionage
   "Resolve an espionage attempt. Agent counts are compared with ±variance random rolls. Returns a 
@@ -267,5 +306,25 @@
      :fighters-destroyed   (when att-wins? (long (* (:player/fighters   defender) const/bomb-damage-rate)))
      :carriers-destroyed   (when att-wins? (long (* (:player/carriers   defender) const/bomb-damage-rate)))
      :agents-captured      agents-captured}))
+
+(defn resolve-defect
+  "Resolve a defection operation against the target empire's agent pool.
+  Only 10% of the defender's agents defend, making this viable against agent-massing opponents.
+  On success, a fraction of the defender's agents transfer to the attacker (capped).
+  On failure, agents are captured. UUIDs stored as strings for safe pr-str round-trip.
+  [game game-map, attacker player-map, defender player-map] -> result-map"
+  [game attacker defender]
+  (let [def-mult  (:game/defect-defense-multiplier game)
+        rate      (:game/defect-transfer-rate      game)
+        cap       (:game/defect-transfer-cap       game)
+        {:keys [att-wins? agents-captured]} (espionage-roll attacker defender def-mult)]
+    {:op               "defect"
+     :attacker-id      (str (:xt/id attacker))
+     :defender-id      (str (:xt/id defender))
+     :defender-name    (:player/empire-name defender)
+     :attacker-wins?   att-wins?
+     :agents-captured  agents-captured
+     :agents-defected  (when att-wins?
+                         (min cap (long (* rate (:player/agents defender)))))}))
 
 

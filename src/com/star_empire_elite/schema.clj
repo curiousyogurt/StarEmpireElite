@@ -34,6 +34,17 @@
           [:game/invade-defense-multiplier {:optional true} :double]
           [:game/invade-reward-multiplier  {:optional true} :double]
 
+          ;; Strike operation constants
+          [:game/strike-damage-rate       {:optional true} :double]
+          [:game/strike-max-dispatch      {:optional true} :int]
+          [:game/strike-interception-rate {:optional true} :double]
+          [:game/strike-interception-cap  {:optional true} :double]
+
+          ;; Defect operation constants
+          [:game/defect-defense-multiplier {:optional true} :double]
+          [:game/defect-transfer-rate      {:optional true} :double]
+          [:game/defect-transfer-cap       {:optional true} :int]
+
           ;; Combat power constants
           [:game/soldier-power             :int]
           [:game/fighter-power             :int]
@@ -50,9 +61,6 @@
           [:game/mil-planet-fighters       :int]
           [:game/mil-planet-stations       :int]
           
-          ;; Industrial synergy constants
-          [:game/synergy-credits-per-paired :int]
-
           ;; Population tax
           [:game/population-tax-credits    :int]
 
@@ -80,7 +88,6 @@
           [:game/station-cost            :int]
           [:game/cmd-ship-cost           :int]
           [:game/agent-cost              :int]
-          [:game/advisor-cost            :int]
           [:game/mil-planet-cost         :int]
           [:game/erg-planet-cost        :int]
           [:game/ore-planet-cost         :int]
@@ -154,11 +161,6 @@
             [:player/generals              :int]
             [:player/admirals              :int]
             [:player/agents                :int]
-            [:player/advisors              :int]
-
-            ;; Hidden governance resources (not shown to player; used for expansion mechanics)
-            [:player/governance            :int]
-            [:player/strain                :int]
 
             ;; Diplomatic relationships
             [:player/allies {:optional true}   [:set :player/id]]

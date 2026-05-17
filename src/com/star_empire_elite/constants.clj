@@ -99,7 +99,6 @@
 (def starting-stations   0)
 (def starting-cmd-ships  0)
 (def starting-agents     2)
-(def starting-advisors   2)
 
 ;;;;
 ;;;; Income Generation
@@ -114,14 +113,6 @@
 (def mil-planet-soldiers 5)
 (def mil-planet-fighters 2)
 (def mil-planet-stations 1)
-
-;;;;
-;;;; Industrial Synergy
-;;;; Bonus output for paired ore/erg planets. The first min(ore, erg) planets
-;;;; on each side contribute a credit bonus, representing efficiency gains from
-;;;; coordinated industrial and energy operations.
-
-(def synergy-credits-per-paired 1000)
 
 ;;;;
 ;;;; Population Tax
@@ -190,7 +181,6 @@
 (def ore-planet-cost 22000)
 
 (def agent-cost    5000)
-(def advisor-cost  15000)
 
 ;;;;
 ;;;; Espionage
@@ -201,6 +191,23 @@
 
 (def incite-stability-damage  10)    ; stability points lost by the target on a successful incite
 (def bomb-damage-rate         0.10)  ; fraction of soldiers/transports/fighters/carriers destroyed on a successful bomb
+
+;;;;
+;;;; Strike Operation
+;;;; Standoff attack using command ships to damage the defender's military. No planet capture.
+
+(def strike-damage-rate       0.01)  ; fraction of each unit type destroyed per dispatched cmd-ship
+(def strike-max-dispatch      15)    ; max cmd-ships dispatched per strike; rest stay in reserve
+(def strike-interception-rate 0.001) ; per-station contribution to interception chance per cmd-ship
+(def strike-interception-cap  0.20)  ; maximum per-cmd-ship interception chance regardless of stations
+
+;;;;
+;;;; Defect Operation
+;;;; Targets the defender's agent pool — success flips a fraction of their agents to the attacker.
+
+(def defect-defense-multiplier 0.10) ; only 10% of defender's agents defend against defection
+(def defect-transfer-rate      0.10) ; fraction of defender's agents that defect on success
+(def defect-transfer-cap       50)   ; maximum agents transferred per successful defect
 
 ;;;;
 ;;;; Exchange Rates

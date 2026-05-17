@@ -57,7 +57,8 @@
      [:td {:style td-right}  (:player/score player)]
      [:td {:style td-border} (op-radio "spy"    player-id-str "Spy")]
      [:td {:style td-border} (op-radio "incite" player-id-str "Incite")]
-     [:td {:style {:padding "4px 12px"}} (op-radio "bomb" player-id-str "Bomb")]]))
+     [:td {:style td-border} (op-radio "bomb"   player-id-str "Bomb")]
+     [:td {:style {:padding "4px 12px"}} (op-radio "defect" player-id-str "Defect")]]))
 
 (defn apply-espionage
   "Parse the chosen operation and target, store them as pending espionage, and advance to outcomes.
@@ -68,7 +69,7 @@
     (if-let [redirect (utils/validate-phase player 5 player-id)]
       redirect
       (let [action    (get params :espionage-action)
-            match     (when (seq action) (re-matches #"(spy|incite|bomb):(.*)" action))
+            match     (when (seq action) (re-matches #"(spy|incite|bomb|defect):(.*)" action))
             op        (get match 1)
             id-str    (get match 2)
             target-id (when id-str (java.util.UUID/fromString id-str))]
@@ -122,7 +123,7 @@
           [:div
            (ui/section-label "Choose a Target")
            [:p.text-xs.mb-2 {:style {:color "#7ab88a"}}
-            "Spy reveals the target's military. Incite reduces their stability. Bomb covertly destroys units."]
+            "Spy reveals the target's military. Incite reduces their stability. Bomb covertly destroys units. Defect flips a fraction of their agents to your side."]
            [:div.overflow-x-auto
             [:table.w-full.text-sm
              {:style {:border "1px solid #253530" :border-collapse "collapse"}}
@@ -131,7 +132,7 @@
                [:th.text-left.px-3.py-1  {:style th-style} "Empire"]
                [:th.text-right.px-3.py-1 {:style th-style} "Planets"]
                [:th.text-right.px-3.py-1 {:style th-style} "Score"]
-               [:th.px-3.py-1 {:colspan 3 :style th-style} "Operations"]]]
+               [:th.px-3.py-1 {:colspan 4 :style th-style} "Operations"]]]
              [:tbody
               (for [target other-players]
                 (target-row target))]]]])

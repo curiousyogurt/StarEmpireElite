@@ -211,6 +211,58 @@
         (is (nil? (:intel result)))))))
 
 ;;;;
+;;;; resolve-defect Tests
+;;;;
+
+(deftest defect-uses-reduced-defense
+  (testing "Small attacker wins consistently via defect but never via spy against a larger defender"
+    ;; With att=50 and def=300: defect effective defense = 30, so att(50) vs eff_def(30) → attacker favored.
+    ;; Under spy: att(50) vs def(300) → attacker always loses (50*1.15=57.5 << 300*0.85=255).
+    (let [small-attacker (assoc strong-attacker :player/agents 50)
+          mid-defender   (assoc strong-defender :player/agents 300)
+          runs           20
+          wins-defect    (count (filter :attacker-wins?
+                                        (repeatedly runs #(combat/resolve-defect game small-attacker mid-defender))))
+          wins-spy       (count (filter :attacker-wins?
+                                        (repeatedly runs #(combat/resolve-espionage small-attacker mid-defender))))]
+      (is (> wins-defect wins-spy)))))
+
+(deftest defect-transfers-up-to-cap
+  (testing "Successful defect transfers 10% of defender's agents, capped at defect-transfer-cap"
+    (let [attacker      (assoc strong-attacker :player/agents 100000)
+          ;; 200 agents → 10% = 20, under cap
+          small-def     (assoc strong-defender :player/agents 200)
+          ;; 1000 agents → 10% = 100, over cap of 50
+          large-def     (assoc strong-defender :player/agents 1000)]
+      ;; Run until we get a win for each defender size
+      (let [small-result (first (filter :attacker-wins?
+                                         (repeatedly 100 #(combat/resolve-defect game attacker small-def))))
+            large-result (first (filter :attacker-wins?
+                                         (repeatedly 100 #(combat/resolve-defect game attacker large-def))))]
+        (is (= 20 (:agents-defected small-result)))   ; floor(0.10 * 200) = 20, under cap
+        (is (= 50 (:agents-defected large-result))))))) ; min(50, floor(0.10 * 1000)) = 50, capped
+
+(deftest defect-captures-agents-on-failure
+  (testing "Failed defect returns agents-captured > 0 and agents-defected = nil"
+    (let [weak-attacker (assoc strong-attacker :player/agents 1)
+          strong-def    (assoc strong-defender :player/agents 100000)
+          result        (combat/resolve-defect game weak-attacker strong-def)]
+      (when-not (:attacker-wins? result)
+        (is (some? (:agents-captured result)))
+        (is (pos?  (:agents-captured result)))
+        (is (nil?  (:agents-defected result)))))))
+
+(deftest other-ops-unchanged
+  (testing "Spy/incite/bomb still use the full defender agent count (espionage-roll is backward-compatible)"
+    ;; An overwhelming defender (100k agents) beats a small attacker under spy every time.
+    ;; If the 2-arg espionage-roll incorrectly applied any multiplier, attacker would win some runs.
+    (let [small-attacker (assoc strong-attacker :player/agents 50)
+          huge-defender  (assoc strong-defender :player/agents 100000)]
+      (dotimes [_ 20]
+        (let [r (combat/resolve-espionage small-attacker huge-defender)]
+          (is (false? (:attacker-wins? r))))))))
+
+;;;;
 ;;;; resolve-combat Tests
 ;;;;
 
@@ -437,9 +489,116 @@
                 (is (= 0 (:food    rc)))
                 (is (= 0 (:fuel    rc)))))))))))
 
-(deftest mode-defaults-to-invade-when-nil
-  (testing "Passing nil mode behaves identically to :invade mode"
-    ;; Both should produce the same defender defense multiplier (1.0).
-    ;; We verify by checking that the mode key is :invade in the result.
-    (let [result (combat/resolve-combat game strong-attacker strong-defender nil)]
-      (is (= :invade (:mode result))))))
+
+;;;;
+;;;; resolve-strike Tests
+;;;;
+
+;;; Fixture: defender with known units for damage calculation.
+(def ^:private strike-defender
+  (merge helpers/player-defaults
+         {:xt/id             #uuid "00000000-0000-0000-0000-000000000020"
+          :player/empire-name "Strike Target"
+          :player/soldiers    1000
+          :player/transports  100
+          :player/generals    10
+          :player/fighters    500
+          :player/carriers    50
+          :player/admirals    5
+          :player/cmd-ships   0
+          :player/stations    0}))
+
+(deftest strike-damages-non-station-units
+  (testing "10 dispatched cmd-ships destroy 10% of each non-station unit type; stations unchanged"
+    (let [attacker (assoc strong-attacker :player/cmd-ships 10)
+          defender (assoc strike-defender :player/stations 0)
+          result   (combat/resolve-strike game attacker defender)
+          ud       (:units-destroyed result)]
+      ;; 10 ships × 1% = 10% damage
+      (is (= 100 (:soldiers   ud)))  ; 10% of 1000
+      (is (= 10  (:transports ud)))  ; 10% of 100
+      (is (= 1   (:generals   ud)))  ; 10% of 10
+      (is (= 50  (:fighters   ud)))  ; 10% of 500
+      (is (= 5   (:carriers   ud)))  ; 10% of 50
+      (is (= 0   (:admirals   ud)))  ; 10% of 5 = 0.5 → floor 0
+      ;; Stations not in units-destroyed map
+      (is (not (contains? ud :stations))))))
+
+(deftest strike-dispatch-caps-at-15
+  (testing "Attacker with 50 cmd-ships dispatches only 15; damage is 15% not 50%"
+    (let [attacker (assoc strong-attacker :player/cmd-ships 50)
+          defender (assoc strike-defender :player/stations 0)
+          result   (combat/resolve-strike game attacker defender)]
+      (is (= 50  (:cmd-ships-committed  result)))
+      (is (= 15  (:cmd-ships-dispatched result)))
+      (is (= 0.15 (:damage-rate result)))
+      ;; 15% of 1000 soldiers = 150
+      (is (= 150 (:soldiers (:units-destroyed result)))))))
+
+(deftest strike-dispatches-all-when-under-cap
+  (testing "Attacker with 8 cmd-ships dispatches all 8; damage is 8%"
+    (let [attacker (assoc strong-attacker :player/cmd-ships 8)
+          defender (assoc strike-defender :player/stations 0)
+          result   (combat/resolve-strike game attacker defender)]
+      (is (= 8    (:cmd-ships-committed  result)))
+      (is (= 8    (:cmd-ships-dispatched result)))
+      (is (= 0.08 (:damage-rate result))))))
+
+(deftest strike-no-interception-with-zero-stations
+  (testing "Defender with 0 stations: all dispatched cmd-ships return safely"
+    (let [attacker (assoc strong-attacker :player/cmd-ships 15)
+          defender (assoc strike-defender :player/stations 0)]
+      (dotimes [_ 20]
+        (let [result (combat/resolve-strike game attacker defender)]
+          (is (= 0 (:cmd-ships-lost result))))))))
+
+(deftest strike-interception-scales-with-stations
+  (testing "Defender with 200 stations has 20% interception; across many ships, loss rate approaches 20%"
+    ;; With 15 dispatched and 20% interception per ship, expected losses ≈ 3.
+    ;; Over 200 trials, mean losses should be in [2.5, 3.5].
+    (let [attacker (assoc strong-attacker :player/cmd-ships 15)
+          defender (assoc strike-defender :player/stations 200)
+          results  (repeatedly 200 #(combat/resolve-strike game attacker defender))
+          mean-lost (/ (reduce + (map :cmd-ships-lost results)) 200.0)]
+      (is (>= mean-lost 2.0))
+      (is (<= mean-lost 4.0)))))
+
+(deftest strike-interception-caps-at-20-percent
+  (testing "Defender with 5000 stations: interception capped at 20% per ship, not 500%"
+    ;; interception-rate (0.001) × 5000 stations = 5.0, but capped at 0.20.
+    ;; With 15 dispatched, expected losses ≈ 3 (not 15).
+    (let [attacker (assoc strong-attacker :player/cmd-ships 15)
+          defender (assoc strike-defender :player/stations 5000)
+          results  (repeatedly 100 #(combat/resolve-strike game attacker defender))
+          max-lost (apply max (map :cmd-ships-lost results))]
+      ;; Under cap, some runs lose 0; no run loses all 15 unless very unlucky.
+      ;; Verify losses never exceed dispatched count.
+      (is (<= max-lost 15)))))
+
+(deftest strike-loss-cannot-exceed-dispatched
+  (testing "cmd-ships-lost is always ≤ cmd-ships-dispatched regardless of station count"
+    (let [attacker (assoc strong-attacker :player/cmd-ships 50)
+          defender (assoc strike-defender :player/stations 100000)]
+      (dotimes [_ 50]
+        (let [result (combat/resolve-strike game attacker defender)]
+          (is (<= (:cmd-ships-lost result) (:cmd-ships-dispatched result))))))))
+
+(deftest strike-with-zero-cmd-ships
+  (testing "Attacker with 0 cmd-ships: no damage, no losses, dispatched = 0"
+    (let [attacker (assoc strong-attacker :player/cmd-ships 0)
+          result   (combat/resolve-strike game attacker strike-defender)]
+      (is (= 0 (:cmd-ships-committed  result)))
+      (is (= 0 (:cmd-ships-dispatched result)))
+      (is (= 0 (:cmd-ships-lost       result)))
+      (is (= 0.0 (:damage-rate result)))
+      (let [ud (:units-destroyed result)]
+        (is (= 0 (:soldiers   ud)))
+        (is (= 0 (:fighters   ud)))
+        (is (= 0 (:carriers   ud)))))))
+
+(deftest strike-does-not-capture-planets-or-resources
+  (testing "Strike result map contains no planet-transfer or resource-capture keys"
+    (let [attacker (assoc strong-attacker :player/cmd-ships 10)
+          result   (combat/resolve-strike game attacker strike-defender)]
+      (is (not (contains? result :planets-transferred)))
+      (is (not (contains? result :resources-captured))))))

@@ -21,13 +21,14 @@
 ;;;;
 
 (defn target-row
-  "Render a single row in the targets table with Invade and Raid selectors.
-  Each row produces two radio inputs (one per mode), both sharing the same
-  group name so only one selection across the whole table can be made.
+  "Render a single row in the targets table with Invade, Raid, and Strike selectors.
+  Each row produces three radio inputs sharing the same group name so only one
+  selection across the whole table can be made.
   Composite radio values 'player-id:mode' are parsed in apply-action.
+  attacker-cmd-ships is used to disable the Strike button when the attacker has none.
 
-  [player player-map] -> hiccup"
-  [player]
+  [player player-map, attacker-cmd-ships int] -> hiccup"
+  [player attacker-cmd-ships]
   (let [total-planets (+ (:player/mil-planets player)
                          (:player/erg-planets player)
                          (:player/ore-planets player))
@@ -45,13 +46,22 @@
                                          "if(p){this.checked=false;}else{this.dataset.was='true';}")}]
                          [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
                           {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
-                          label]])]
+                          label]])
+        can-strike?   (pos? attacker-cmd-ships)
+        strike-btn    (if can-strike?
+                        (action-btn :strike "Strike")
+                        [:label
+                         [:input.sr-only {:type "radio" :name "target-action" :disabled true}]
+                         [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border
+                          {:style {:color "#3a5a48" :border-color "#253530" :cursor "not-allowed"}}
+                          "Strike"]])]
     [:tr {:style {:border-bottom "1px solid #1a2820" :background "#121a18"}}
      [:td {:style td-border} (:player/empire-name player)]
      [:td {:style td-right}  total-planets]
      [:td {:style td-right}  (:player/score player)]
      [:td {:style {:padding "4px 8px"}} (action-btn :invade "Invade")]
-     [:td {:style {:padding "4px 8px"}} (action-btn :raid   "Raid")]]))
+     [:td {:style {:padding "4px 8px"}} (action-btn :raid   "Raid")]
+     [:td {:style {:padding "4px 8px"}} strike-btn]]))
 
 ;;;;
 ;;;; Actions
@@ -149,15 +159,14 @@
                fleet-limit (conj {:label "Limit" :display fleet-limit})))
            (ui/stat-pill "Operations"
              [{:label "Cmd Ships" :value (:player/cmd-ships player)}
-              {:label "Agents"    :value (:player/agents    player)}
-              {:label "Advisors"  :value (:player/advisors player)}])])
+              {:label "Agents"    :value (:player/agents    player)}])])
         (if (empty? other-players)
           [:p.text-sm {:style {:color "#9adaaa"}}
            "There are no other empires in the galaxy to attack."]
           [:div
            (ui/section-label "Choose a Target")
            [:p.text-xs.mb-2 {:style {:color "#7ab88a"}}
-            "Select an empire to attack. Your attack will be resolved in the Outcomes phase."]
+            "Invade or Raid to fight for planets. Strike dispatches cmd-ships to damage their forces — no planet capture."]
            [:div.overflow-x-auto
             [:table.w-full.text-sm
              {:style {:border "1px solid #253530" :border-collapse "collapse"}}
@@ -166,11 +175,10 @@
                [:th.text-left.px-3.py-1  {:style th-style} "Empire"]
                [:th.text-right.px-3.py-1 {:style th-style} "Planets"]
                [:th.text-right.px-3.py-1 {:style th-style} "Score"]
-               [:th.px-3.py-1            {:style th-style} "Invade"]
-               [:th.px-3.py-1            {:style th-style} "Raid"]]]
+               [:th.px-3.py-1 {:style (assoc th-style :text-align "center") :col-span 3} "Operations"]]]
              [:tbody
               (for [target other-players]
-                (target-row target))]]]])
+                (target-row target (:player/cmd-ships player)))]]]])
         ;; Warning banner — shown by CSS when a target radio is selected
         [:div.queued-warning.items-center
          [:p.text-sm {:style {:color "#facc15"}} "\u26a0 Attack queued for Outcomes phase."]]

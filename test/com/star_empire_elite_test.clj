@@ -79,6 +79,15 @@
             :game/raid-reward-multiplier    const/raid-reward-multiplier
             :game/invade-defense-multiplier const/invade-defense-multiplier
             :game/invade-reward-multiplier  const/invade-reward-multiplier
+            ;; Strike operation constants
+            :game/strike-damage-rate        const/strike-damage-rate
+            :game/strike-max-dispatch       const/strike-max-dispatch
+            :game/strike-interception-rate  const/strike-interception-rate
+            :game/strike-interception-cap   const/strike-interception-cap
+            ;; Defect operation constants
+            :game/defect-defense-multiplier const/defect-defense-multiplier
+            :game/defect-transfer-rate      const/defect-transfer-rate
+            :game/defect-transfer-cap       const/defect-transfer-cap
             ;; All the required income generation constants
             :game/ore-planet-credits const/ore-planet-credits
             :game/erg-planet-food const/erg-planet-food
@@ -112,8 +121,6 @@
             :game/erg-planet-cost const/erg-planet-cost
             :game/ore-planet-cost const/ore-planet-cost
             :game/agent-cost const/agent-cost
-            :game/advisor-cost const/advisor-cost
-            :game/synergy-credits-per-paired const/synergy-credits-per-paired
             :game/population-tax-credits const/population-tax-credits
             ;; Stability constants
             :game/expense-stability-penalty    const/expense-stability-penalty
@@ -189,9 +196,6 @@
             :player/generals 5
             :player/admirals 3
             :player/agents 10
-            :player/advisors const/starting-advisors
-            :player/governance 0
-            :player/strain 0
             :player/last-population-growth nil}])
 
         (let [db (xt/db node)
@@ -266,8 +270,6 @@
                 :game/erg-planet-cost const/erg-planet-cost
                 :game/ore-planet-cost const/ore-planet-cost
                 :game/agent-cost const/agent-cost
-                :game/advisor-cost const/advisor-cost
-                :game/synergy-credits-per-paired const/synergy-credits-per-paired
                 :game/population-tax-credits const/population-tax-credits
                 ;; Stability constants
                 :game/expense-stability-penalty    const/expense-stability-penalty
@@ -321,9 +323,6 @@
                 :player/fighters 50
                 :player/cmd-ships 1
                 :player/agents 10
-                :player/advisors const/starting-advisors
-                :player/governance 0
-                :player/strain 0
                 :player/last-population-growth nil}])
           db (xt/db node)
           game (xt/entity db game-id)

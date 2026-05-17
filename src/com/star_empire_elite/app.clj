@@ -98,74 +98,79 @@
             now       (java.util.Date.)
             end-date  (java.util.Date. (+ (.getTime now) (* 30 24 60 60 1000)))]
         (biff/submit-tx ctx
-          [{:db/doc-type :game
-            :xt/id game-id
-            :game/name game-name
-            :game/created-at now
-            :game/scheduled-end-at end-date
-            :game/status 0
-            :game/turns-per-round const/turns-per-round
-            :game/rounds-per-day const/rounds-per-day
-            :game/hours-between-rounds const/hours-between-rounds
-            :game/raid-defense-multiplier   const/raid-defense-multiplier
-            :game/raid-reward-multiplier    const/raid-reward-multiplier
-            :game/invade-defense-multiplier const/invade-defense-multiplier
-            :game/invade-reward-multiplier  const/invade-reward-multiplier
-            :game/soldier-power  const/soldier-power
-            :game/fighter-power  const/fighter-power
-            :game/cmd-ship-power const/cmd-ship-power
-            :game/station-power  const/station-power
-            :game/general-power  const/general-power
-            :game/admiral-power  const/admiral-power
-            :game/ore-planet-credits const/ore-planet-credits
-            :game/erg-planet-food const/erg-planet-food
-            :game/erg-planet-fuel const/erg-planet-fuel
-            :game/mil-planet-soldiers const/mil-planet-soldiers
-            :game/mil-planet-fighters const/mil-planet-fighters
-            :game/mil-planet-stations const/mil-planet-stations
-            :game/synergy-credits-per-paired const/synergy-credits-per-paired
-            :game/population-tax-credits const/population-tax-credits
-            :game/planet-upkeep-credits const/planet-upkeep-credits
-            :game/planet-upkeep-food const/planet-upkeep-food
-            :game/soldier-upkeep-credits const/soldier-upkeep-credits
-            :game/soldier-upkeep-food const/soldier-upkeep-food
-            :game/fighter-upkeep-credits const/fighter-upkeep-credits
-            :game/fighter-upkeep-fuel const/fighter-upkeep-fuel
-            :game/station-upkeep-credits const/station-upkeep-credits
-            :game/station-upkeep-fuel const/station-upkeep-fuel
-            :game/agent-upkeep-food const/agent-upkeep-food
-            :game/agent-upkeep-fuel const/agent-upkeep-fuel
-            :game/population-upkeep-food const/population-upkeep-food
-            :game/population-upkeep-fuel const/population-upkeep-fuel
-            :game/soldier-cost const/soldier-cost
-            :game/transport-cost const/transport-cost
-            :game/general-cost const/general-cost
-            :game/carrier-cost const/carrier-cost
-            :game/fighter-cost const/fighter-cost
-            :game/admiral-cost const/admiral-cost
-            :game/station-cost const/station-cost
-            :game/cmd-ship-cost const/cmd-ship-cost
-            :game/agent-cost    const/agent-cost
-            :game/advisor-cost  const/advisor-cost
-            :game/mil-planet-cost const/mil-planet-cost
-            :game/erg-planet-cost const/erg-planet-cost
-            :game/ore-planet-cost const/ore-planet-cost
-            :game/soldier-sell    const/soldier-sell
-            :game/transport-sell  const/transport-sell
-            :game/general-sell    const/general-sell
-            :game/fighter-sell    const/fighter-sell
-            :game/carrier-sell    const/carrier-sell
-            :game/admiral-sell    const/admiral-sell
-            :game/station-sell    const/station-sell
-            :game/cmd-ship-sell   const/cmd-ship-sell
-            :game/agent-sell      const/agent-sell
-            :game/mil-planet-sell const/mil-planet-sell
-            :game/erg-planet-sell const/erg-planet-sell
-            :game/ore-planet-sell const/ore-planet-sell
-            :game/food-buy        const/food-buy
-            :game/food-sell       const/food-sell
-            :game/fuel-buy        const/fuel-buy
-            :game/fuel-sell       const/fuel-sell
+          [{:db/doc-type                        :game
+            :xt/id                              game-id
+            :game/name                          game-name
+            :game/created-at                    now
+            :game/scheduled-end-at              end-date
+            :game/status                        0
+            :game/turns-per-round               const/turns-per-round
+            :game/rounds-per-day                const/rounds-per-day
+            :game/hours-between-rounds          const/hours-between-rounds
+            :game/raid-defense-multiplier       const/raid-defense-multiplier
+            :game/raid-reward-multiplier        const/raid-reward-multiplier
+            :game/invade-defense-multiplier     const/invade-defense-multiplier
+            :game/invade-reward-multiplier      const/invade-reward-multiplier
+            :game/strike-damage-rate            const/strike-damage-rate
+            :game/strike-max-dispatch           const/strike-max-dispatch
+            :game/strike-interception-rate      const/strike-interception-rate
+            :game/strike-interception-cap       const/strike-interception-cap
+            :game/defect-defense-multiplier     const/defect-defense-multiplier
+            :game/defect-transfer-rate          const/defect-transfer-rate
+            :game/defect-transfer-cap           const/defect-transfer-cap
+            :game/soldier-power                 const/soldier-power
+            :game/fighter-power                 const/fighter-power
+            :game/cmd-ship-power                const/cmd-ship-power
+            :game/station-power                 const/station-power
+            :game/general-power                 const/general-power
+            :game/admiral-power                 const/admiral-power
+            :game/ore-planet-credits            const/ore-planet-credits
+            :game/erg-planet-food               const/erg-planet-food
+            :game/erg-planet-fuel               const/erg-planet-fuel
+            :game/mil-planet-soldiers           const/mil-planet-soldiers
+            :game/mil-planet-fighters           const/mil-planet-fighters
+            :game/mil-planet-stations           const/mil-planet-stations
+            :game/population-tax-credits        const/population-tax-credits
+            :game/planet-upkeep-credits         const/planet-upkeep-credits
+            :game/planet-upkeep-food            const/planet-upkeep-food
+            :game/soldier-upkeep-credits        const/soldier-upkeep-credits
+            :game/soldier-upkeep-food           const/soldier-upkeep-food
+            :game/fighter-upkeep-credits        const/fighter-upkeep-credits
+            :game/fighter-upkeep-fuel           const/fighter-upkeep-fuel
+            :game/station-upkeep-credits        const/station-upkeep-credits
+            :game/station-upkeep-fuel           const/station-upkeep-fuel
+            :game/agent-upkeep-food             const/agent-upkeep-food
+            :game/agent-upkeep-fuel             const/agent-upkeep-fuel
+            :game/population-upkeep-food        const/population-upkeep-food
+            :game/population-upkeep-fuel        const/population-upkeep-fuel
+            :game/soldier-cost                  const/soldier-cost
+            :game/transport-cost                const/transport-cost
+            :game/general-cost                  const/general-cost
+            :game/carrier-cost                  const/carrier-cost
+            :game/fighter-cost                  const/fighter-cost
+            :game/admiral-cost                  const/admiral-cost
+            :game/station-cost                  const/station-cost
+            :game/cmd-ship-cost                 const/cmd-ship-cost
+            :game/agent-cost                    const/agent-cost
+            :game/mil-planet-cost               const/mil-planet-cost
+            :game/erg-planet-cost               const/erg-planet-cost
+            :game/ore-planet-cost               const/ore-planet-cost
+            :game/soldier-sell                  const/soldier-sell
+            :game/transport-sell                const/transport-sell
+            :game/general-sell                  const/general-sell
+            :game/fighter-sell                  const/fighter-sell
+            :game/carrier-sell                  const/carrier-sell
+            :game/admiral-sell                  const/admiral-sell
+            :game/station-sell                  const/station-sell
+            :game/cmd-ship-sell                 const/cmd-ship-sell
+            :game/agent-sell                    const/agent-sell
+            :game/mil-planet-sell               const/mil-planet-sell
+            :game/erg-planet-sell               const/erg-planet-sell
+            :game/ore-planet-sell               const/ore-planet-sell
+            :game/food-buy                      const/food-buy
+            :game/food-sell                     const/food-sell
+            :game/fuel-buy                      const/fuel-buy
+            :game/fuel-sell                     const/fuel-sell
             :game/expense-stability-penalty     const/expense-stability-penalty
             :game/stability-breakaway-threshold const/stability-breakaway-threshold
             :game/stability-breakaway-cap       const/stability-breakaway-cap
@@ -273,38 +278,35 @@
       :else
       (let [player-id (java.util.UUID/randomUUID)]
         (biff/submit-tx ctx
-          [{:db/doc-type          :player
-            :xt/id                player-id
-            :player/user          uid
-            :player/game          game-id
-            :player/empire-name   empire-name
-            :player/credits       const/starting-credits
-            :player/food          const/starting-food
-            :player/fuel          const/starting-fuel
-            :player/galaxars      const/starting-galaxars
-            :player/mil-planets   const/starting-mil-planets
-            :player/erg-planets  const/starting-erg-planets
-            :player/ore-planets   const/starting-ore-planets
-            :player/population    const/starting-population
-            :player/stability     const/starting-stability
-            :player/status        0
-            :player/score         0
-            :player/current-turn  1
-            :player/current-round 1
-            :player/current-phase 1
-            :player/turns-used    0
-            :player/generals      const/starting-generals
-            :player/admirals      const/starting-admirals
-            :player/soldiers      const/starting-soldiers
-            :player/transports    const/starting-transports
-            :player/stations      const/starting-stations
-            :player/carriers      const/starting-carriers
-            :player/fighters      const/starting-fighters
+          [{:db/doc-type                    :player
+            :xt/id                          player-id
+            :player/user                    uid
+            :player/game                    game-id
+            :player/empire-name             empire-name
+            :player/credits                 const/starting-credits
+            :player/food                    const/starting-food
+            :player/fuel                    const/starting-fuel
+            :player/galaxars                const/starting-galaxars
+            :player/mil-planets             const/starting-mil-planets
+            :player/erg-planets             const/starting-erg-planets
+            :player/ore-planets             const/starting-ore-planets
+            :player/population              const/starting-population
+            :player/stability               const/starting-stability
+            :player/status                  0
+            :player/score                   0
+            :player/current-turn            1
+            :player/current-round           1
+            :player/current-phase           1
+            :player/turns-used              0
+            :player/generals                const/starting-generals
+            :player/admirals                const/starting-admirals
+            :player/soldiers                const/starting-soldiers
+            :player/transports              const/starting-transports
+            :player/stations                const/starting-stations
+            :player/carriers                const/starting-carriers
+            :player/fighters                const/starting-fighters
             :player/cmd-ships               const/starting-cmd-ships
             :player/agents                  const/starting-agents
-            :player/advisors                const/starting-advisors
-            :player/governance              0
-            :player/strain                  0
             :player/last-population-growth  nil}])
         {:status 303
          :headers {"location" (str "/app/game/" player-id)}}))))
@@ -390,7 +392,7 @@
         ;; On first load: resolve, apply ALL stat changes to both sides, store result.
         ;; On refresh (cache hit): stored result already applied — use player as-is.
         (let [pending-attack (:player/pending-attack player)
-              mode           (or (:player/pending-attack-mode player) :invade)
+              mode           (:player/pending-attack-mode player)
               stored-battle  (some-> (:player/last-battle-result player) clojure.core/read-string)
 
               [battle-result display-player]
@@ -400,79 +402,100 @@
                   (if (and stored-battle (= (:defender-id stored-battle) (str pending-attack)))
                     ;; Cache hit — changes already applied; player entity is fresh on this request
                     [stored-battle player]
-                    ;; Fresh resolve — apply everything now
-                    (let [result  (combat/resolve-combat game player defender mode)
-                          al      (:attacker-losses result)
-                          dl      (:defender-losses result)
-                          raw-pt  (or (:planets-transferred result) {:mil 0 :food 0 :ore 0})
-                          pt-mil  (min (:mil  raw-pt) (:player/mil-planets  defender))
-                          pt-food (min (:food raw-pt) (:player/erg-planets defender))
-                          pt-ore  (min (:ore  raw-pt) (:player/ore-planets  defender))
-                          capped  (assoc result :planets-transferred {:mil pt-mil :food pt-food :ore pt-ore})
-                          rc           (or (:resources-captured capped) {:credits 0 :food 0 :fuel 0})
-                          rc-credits   (:credits rc)
-                          rc-food      (:food    rc)
-                          rc-fuel      (:fuel    rc)
-                          att-soldiers   (max 0 (- (:player/soldiers   player) (:soldiers-lost   al)))
-                          att-transports (max 0 (- (:player/transports player) (:transports-lost  al)))
-                          att-generals   (max 0 (- (:player/generals   player) (:generals-lost   al)))
-                          att-fighters   (max 0 (- (:player/fighters   player) (:fighters-lost   al)))
-                          att-carriers   (max 0 (- (:player/carriers   player) (:carriers-lost   al)))
-                          att-admirals   (max 0 (- (:player/admirals   player) (:admirals-lost   al)))
-                          att-cmd-ships  (max 0 (- (:player/cmd-ships  player) (:cmd-ships-lost  al)))
-                          att-mil-plts   (+ (:player/mil-planets  player) pt-mil)
-                          att-food-plts  (+ (:player/erg-planets player) pt-food)
-                          att-ore-plts   (+ (:player/ore-planets  player) pt-ore)
-                          att-credits    (+ (:player/credits player) rc-credits)
-                          att-food-res   (+ (:player/food    player) rc-food)
-                          att-fuel-res   (+ (:player/fuel    player) rc-fuel)]
-                      (biff/submit-tx ctx
-                        [{:db/doc-type :player :db/op :update :xt/id player-id
-                          :player/last-battle-result (pr-str capped)
-                          :player/soldiers     att-soldiers
-                          :player/transports   att-transports
-                          :player/generals     att-generals
-                          :player/fighters     att-fighters
-                          :player/carriers     att-carriers
-                          :player/admirals     att-admirals
-                          :player/cmd-ships    att-cmd-ships
-                          :player/mil-planets  att-mil-plts
-                          :player/erg-planets att-food-plts
-                          :player/ore-planets  att-ore-plts
-                          :player/credits      att-credits
-                          :player/food         att-food-res
-                          :player/fuel         att-fuel-res}
-                         {:db/doc-type :player :db/op :update :xt/id (:xt/id defender)
-                          :player/soldiers     (max 0 (- (:player/soldiers   defender) (:soldiers-lost   dl)))
-                          :player/transports   (max 0 (- (:player/transports defender) (:transports-lost dl)))
-                          :player/generals     (max 0 (- (:player/generals   defender) (:generals-lost   dl)))
-                          :player/fighters     (max 0 (- (:player/fighters   defender) (:fighters-lost   dl)))
-                          :player/carriers     (max 0 (- (:player/carriers   defender) (:carriers-lost   dl)))
-                          :player/admirals     (max 0 (- (:player/admirals   defender) (:admirals-lost   dl)))
-                          :player/cmd-ships    (max 0 (- (:player/cmd-ships  defender) (:cmd-ships-lost  dl)))
-                          :player/stations     (max 0 (- (:player/stations   defender) (:stations-lost   dl)))
-                          :player/mil-planets  (max 0 (- (:player/mil-planets  defender) pt-mil))
-                          :player/erg-planets (max 0 (- (:player/erg-planets defender) pt-food))
-                          :player/ore-planets  (max 0 (- (:player/ore-planets  defender) pt-ore))
-                          :player/credits      (max 0 (- (:player/credits defender) rc-credits))
-                          :player/food         (max 0 (- (:player/food    defender) rc-food))
-                          :player/fuel         (max 0 (- (:player/fuel    defender) rc-fuel))
-                          :player/incoming-attacks
-                          (conj (or (:player/incoming-attacks defender) []) (pr-str capped))}])
-                      ;; Build locally updated player for accurate resource display this request
-                      [capped (merge player {:player/soldiers     att-soldiers
-                                             :player/transports   att-transports
-                                             :player/generals     att-generals
-                                             :player/fighters     att-fighters
-                                             :player/carriers     att-carriers
-                                             :player/admirals     att-admirals
-                                             :player/cmd-ships    att-cmd-ships
-                                             :player/mil-planets  att-mil-plts
-                                             :player/erg-planets att-food-plts
-                                             :player/ore-planets  att-ore-plts
-                                             :player/credits      att-credits
-                                             :player/food         att-food-res
-                                             :player/fuel         att-fuel-res})]))))
+                    ;; Fresh resolve — branch on mode
+                    (if (= mode :strike)
+                      ;; --- Strike branch ---
+                      (let [result     (combat/resolve-strike game player defender)
+                            ud         (:units-destroyed result)
+                            ships-lost (:cmd-ships-lost result)]
+                        (biff/submit-tx ctx
+                          [{:db/doc-type :player :db/op :update :xt/id player-id
+                            :player/last-battle-result (pr-str result)
+                            :player/cmd-ships (max 0 (- (:player/cmd-ships player) ships-lost))}
+                           {:db/doc-type :player :db/op :update :xt/id (:xt/id defender)
+                            :player/soldiers   (max 0 (- (:player/soldiers   defender) (:soldiers   ud)))
+                            :player/transports (max 0 (- (:player/transports defender) (:transports ud)))
+                            :player/generals   (max 0 (- (:player/generals   defender) (:generals   ud)))
+                            :player/fighters   (max 0 (- (:player/fighters   defender) (:fighters   ud)))
+                            :player/carriers   (max 0 (- (:player/carriers   defender) (:carriers   ud)))
+                            :player/admirals   (max 0 (- (:player/admirals   defender) (:admirals   ud)))
+                            :player/incoming-attacks
+                            (conj (or (:player/incoming-attacks defender) []) (pr-str result))}])
+                        [result (assoc player :player/cmd-ships
+                                       (max 0 (- (:player/cmd-ships player) ships-lost)))])
+                      ;; --- Invade / Raid branch ---
+                      (let [result  (combat/resolve-combat game player defender mode)
+                            al      (:attacker-losses result)
+                            dl      (:defender-losses result)
+                            raw-pt  (or (:planets-transferred result) {:mil 0 :food 0 :ore 0})
+                            pt-mil  (min (:mil  raw-pt) (:player/mil-planets  defender))
+                            pt-food (min (:food raw-pt) (:player/erg-planets defender))
+                            pt-ore  (min (:ore  raw-pt) (:player/ore-planets  defender))
+                            capped  (assoc result :planets-transferred {:mil pt-mil :food pt-food :ore pt-ore})
+                            rc           (or (:resources-captured capped) {:credits 0 :food 0 :fuel 0})
+                            rc-credits   (:credits rc)
+                            rc-food      (:food    rc)
+                            rc-fuel      (:fuel    rc)
+                            att-soldiers   (max 0 (- (:player/soldiers   player) (:soldiers-lost   al)))
+                            att-transports (max 0 (- (:player/transports player) (:transports-lost  al)))
+                            att-generals   (max 0 (- (:player/generals   player) (:generals-lost   al)))
+                            att-fighters   (max 0 (- (:player/fighters   player) (:fighters-lost   al)))
+                            att-carriers   (max 0 (- (:player/carriers   player) (:carriers-lost   al)))
+                            att-admirals   (max 0 (- (:player/admirals   player) (:admirals-lost   al)))
+                            att-cmd-ships  (max 0 (- (:player/cmd-ships  player) (:cmd-ships-lost  al)))
+                            att-mil-plts   (+ (:player/mil-planets  player) pt-mil)
+                            att-food-plts  (+ (:player/erg-planets player) pt-food)
+                            att-ore-plts   (+ (:player/ore-planets  player) pt-ore)
+                            att-credits    (+ (:player/credits player) rc-credits)
+                            att-food-res   (+ (:player/food    player) rc-food)
+                            att-fuel-res   (+ (:player/fuel    player) rc-fuel)]
+                        (biff/submit-tx ctx
+                          [{:db/doc-type :player :db/op :update :xt/id player-id
+                            :player/last-battle-result (pr-str capped)
+                            :player/soldiers     att-soldiers
+                            :player/transports   att-transports
+                            :player/generals     att-generals
+                            :player/fighters     att-fighters
+                            :player/carriers     att-carriers
+                            :player/admirals     att-admirals
+                            :player/cmd-ships    att-cmd-ships
+                            :player/mil-planets  att-mil-plts
+                            :player/erg-planets att-food-plts
+                            :player/ore-planets  att-ore-plts
+                            :player/credits      att-credits
+                            :player/food         att-food-res
+                            :player/fuel         att-fuel-res}
+                           {:db/doc-type :player :db/op :update :xt/id (:xt/id  defender)
+                            :player/soldiers     (max 0 (- (:player/soldiers    defender) (:soldiers-lost   dl)))
+                            :player/transports   (max 0 (- (:player/transports  defender) (:transports-lost dl)))
+                            :player/generals     (max 0 (- (:player/generals    defender) (:generals-lost   dl)))
+                            :player/fighters     (max 0 (- (:player/fighters    defender) (:fighters-lost   dl)))
+                            :player/carriers     (max 0 (- (:player/carriers    defender) (:carriers-lost   dl)))
+                            :player/admirals     (max 0 (- (:player/admirals    defender) (:admirals-lost   dl)))
+                            :player/cmd-ships    (max 0 (- (:player/cmd-ships   defender) (:cmd-ships-lost  dl)))
+                            :player/stations     (max 0 (- (:player/stations    defender) (:stations-lost   dl)))
+                            :player/mil-planets  (max 0 (- (:player/mil-planets defender) pt-mil))
+                            :player/erg-planets  (max 0 (- (:player/erg-planets defender) pt-food))
+                            :player/ore-planets  (max 0 (- (:player/ore-planets defender) pt-ore))
+                            :player/credits      (max 0 (- (:player/credits     defender) rc-credits))
+                            :player/food         (max 0 (- (:player/food        defender) rc-food))
+                            :player/fuel         (max 0 (- (:player/fuel        defender) rc-fuel))
+                            :player/incoming-attacks
+                            (conj (or (:player/incoming-attacks defender) []) (pr-str capped))}])
+                        ;; Build locally updated player for accurate resource display this request
+                        [capped (merge player {:player/soldiers     att-soldiers
+                                               :player/transports   att-transports
+                                               :player/generals     att-generals
+                                               :player/fighters     att-fighters
+                                               :player/carriers     att-carriers
+                                               :player/admirals     att-admirals
+                                               :player/cmd-ships    att-cmd-ships
+                                               :player/mil-planets  att-mil-plts
+                                               :player/erg-planets  att-food-plts
+                                               :player/ore-planets  att-ore-plts
+                                               :player/credits      att-credits
+                                               :player/food         att-food-res
+                                               :player/fuel         att-fuel-res})])))))
 
               ;; --- espionage ---
               pending-espionage    (:player/pending-espionage player)
@@ -489,10 +512,12 @@
                     ;; Fresh resolve
                     (let [incite?     (= pending-espionage-op "incite")
                           bomb?       (= pending-espionage-op "bomb")
+                          defect?     (= pending-espionage-op "defect")
                           result      (cond
-                                        incite? (combat/resolve-incite player target)
-                                        bomb?   (combat/resolve-bomb   player target)
-                                        :else   (combat/resolve-espionage player target))
+                                        incite?  (combat/resolve-incite  player target)
+                                        bomb?    (combat/resolve-bomb    player target)
+                                        defect?  (combat/resolve-defect  game player target)
+                                        :else    (combat/resolve-espionage player target))
                           att-wins?   (:attacker-wins? result)
                           agents-lost (or (:agents-captured result) 0)
                           stab-dmg    (or (:stability-damage result) 0)]
@@ -503,14 +528,14 @@
                             :player/agents (max 0 (- (:player/agents display-player) agents-lost))}
                            (when (pos? agents-lost)
                              {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
-                              :player/agents (+ (or (:player/agents target) 0) agents-lost)
+                              :player/agents (+ (:player/agents target) agents-lost)
                               :player/incoming-espionage-fails
                               (inc (or (:player/incoming-espionage-fails target) 0))
                               :player/incoming-espionage-agents-gained
                               (+ (or (:player/incoming-espionage-agents-gained target) 0) agents-lost)})
                            (when (and incite? att-wins? (pos? stab-dmg))
                              {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
-                              :player/stability (max 0 (- (or (:player/stability target) 100) stab-dmg))
+                              :player/stability (max 0 (- (:player/stability target) stab-dmg))
                               :player/incoming-incite-stability-lost
                               (+ (or (:player/incoming-incite-stability-lost target) 0) stab-dmg)})
                            (when (and bomb? att-wins?)
@@ -527,9 +552,17 @@
                                 (pr-str {:soldiers-destroyed   sd
                                          :transports-destroyed td
                                          :fighters-destroyed   fd
-                                         :carriers-destroyed   cd})}))]))
-                      [result (assoc display-player :player/agents
-                                     (max 0 (- (:player/agents display-player) agents-lost)))]))))
+                                         :carriers-destroyed   cd})}))
+                           (when (and defect? att-wins?)
+                             (let [n (or (:agents-defected result) 0)]
+                               {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
+                                :player/agents (max 0 (- (or (:player/agents target) 0) n))}))]))
+                      (let [agents-gained (if (and defect? att-wins?)
+                                            (or (:agents-defected result) 0)
+                                            0)]
+                        [result (assoc display-player :player/agents
+                                       (max 0 (+ (- (:player/agents display-player) agents-lost)
+                                                 agents-gained)))])))))
 
               ;; --- population growth (end of round only) ---
               end-round?  (>= (:player/current-turn display-player) (:game/turns-per-round game))

@@ -425,12 +425,11 @@
 (defn snapshot-section
   "Render the 2-row × 10-column empire snapshot grid used on the building and exchange pages.
   Row 1: Credits, Food, Fuel, Galaxars, Population, Ore Plts, Erg Plts, Mil Plts, Stability, Control.
-  Row 2: Soldiers, Transports, Generals, Fighters, Carriers, Admirals, Stations, Cmd Ships, Agents, Advisors.
+  Row 2: Soldiers, Transports, Generals, Fighters, Carriers, Admirals, Stations, Cmd Ships, Agents.
 
   [player player-map] -> hiccup"
   [player]
-  (let [control (- (get player :player/governance 0) (get player :player/strain 0))
-        row1 [["CREDITS"    (:player/credits player)      nil]
+  (let [row1 [["CREDITS"    (:player/credits player)      nil]
                ["FOOD"       (:player/food player)        nil]
                ["FUEL"       (:player/fuel player)        nil]
                ["GALAXARS"   (:player/galaxars player)    nil]
@@ -440,8 +439,7 @@
                ["ERG PLTS"   (:player/erg-planets player) nil]
                ["MIL PLTS"   (:player/mil-planets player) nil]
                ["STABILITY"  (:player/stability player)
-                #(str % "%")]
-               ["CONTROL"    control                     nil]]
+                #(str % "%")]]
         row2 [["SOLDIERS"   (:player/soldiers player)     nil]
                ["TRANSPORTS" (:player/transports player)  nil]
                ["GENERALS"   (:player/generals player)    nil]
@@ -450,11 +448,10 @@
                ["ADMIRALS"   (:player/admirals player)    nil]
                ["STATIONS"   (:player/stations player)    nil]
                ["CMD SHIPS"  (:player/cmd-ships player)   nil]
-               ["AGENTS"     (:player/agents player)      nil]
-               ["ADVISORS"   (:player/advisors player)    nil]]
+               ["AGENTS"     (:player/agents player)      nil]]
         render-row
         (fn [items]
-          [:div {:style {:display "grid" :grid-template-columns "repeat(10, 1fr)" :gap "4px"}}
+          [:div {:style {:display "grid" :grid-template-columns "repeat(9, 1fr)" :gap "4px"}}
            (for [item items]
              (if (nil? item)
                [:div]

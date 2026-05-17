@@ -309,43 +309,70 @@
 
        ;; Battle result section (only shown when an attack was declared)
        (when battle-result
-         (let [att-wins? (:attacker-wins? battle-result)
-               mode      (get battle-result :mode :invade)
-               ac        (:attacker-counts battle-result)
-               al        (:attacker-losses battle-result)
-               dl        (:defender-losses battle-result)
-               def-name  (:defender-name battle-result)
-               pt        (:planets-transferred battle-result)
-               rc        (:resources-captured battle-result)]
-           [:div {:style card-style}
-            [:h3.font-bold.mb-3 {:style {:color "#4ade80"}}
-             (if att-wins?
-               (str (if (= mode :raid) "Raid victory against " "Invasion victory against ") def-name)
-               (str (if (= mode :raid) "Raid repelled by "     "Defeated in invasion of ")  def-name))]
-            [:div.overflow-x-auto
-             [:table.w-full.text-xs.table-fixed
-              [:thead
-               [:tr {:style {:border-bottom "1px solid #4ade80"}}
-                [:th.text-left.py-1  {:style (assoc th-style :width "10%")} "Item"]
-                [:th.text-right.py-1 {:style (assoc th-style :width "30%")} "Your Forces"]
-                [:th.text-right.py-1 {:style (assoc th-style :width "30%")} "Your Losses"]
-                [:th.text-right.py-1 {:style (assoc th-style :width "30%")} (str def-name " Losses")]]]
-              [:tbody
-               (for [spec battle-unit-specs]
-                 (battle-row (:label spec) ac al dl (:unit-key spec) (:loss-key spec)
-                             (:special? spec) (:separator? spec)))
-               (for [spec planet-specs]
-                 (planet-row (:label spec) (get pt (:pt-key spec)) att-wins? (:separator? spec)))]]]
-            ;; Plundered resources row — shown when attacker wins and captured something
-            (when (and att-wins? rc (or (pos? (:credits rc)) (pos? (:food rc)) (pos? (:fuel rc))))
-              [:p.text-xs.mt-2
-               {:style {:color "#9adaaa"}}
-               "Plundered: "
-               (clojure.string/join ", "
-                 (keep identity
-                   [(when (pos? (:credits rc)) (str (ui/format-number (:credits rc)) " cr"))
-                    (when (pos? (:food    rc)) (str (ui/format-number (:food    rc)) " food"))
-                    (when (pos? (:fuel    rc)) (str (ui/format-number (:fuel    rc)) " fuel"))]))])]))
+         (let [mode     (get battle-result :mode :invade)
+               def-name (:defender-name battle-result)]
+           (if (= mode :strike)
+             ;; --- Strike result ---
+             (let [ud         (:units-destroyed battle-result)
+                   committed  (:cmd-ships-committed  battle-result)
+                   dispatched (:cmd-ships-dispatched battle-result)
+                   lost       (:cmd-ships-lost       battle-result)
+                   returned   (- dispatched lost)
+                   dmg-pct    (Math/round (* 100.0 (:damage-rate battle-result)))]
+               [:div {:style card-style}
+                [:h3.font-bold.mb-3 {:style {:color "#4ade80"}}
+                 (str "Strike against " def-name " launched")]
+                [:div.grid.grid-cols-2.gap-x-8.gap-y-1
+                 [:p.text-xs.font-bold.col-span-2.mb-1 {:style {:color "#4ade80"}} "Strike package"]
+                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Cmd-ships committed: " committed)]
+                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Cmd-ships dispatched: " dispatched)]
+                 [:p.text-xs {:style {:color (if (pos? lost) "#f87171" "#9adaaa")}}
+                  (str "Intercepted: " lost)]
+                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Returned safely: " returned)]
+                 [:p.text-xs.col-span-2.font-bold {:style {:color "#4ade80"}}
+                  (str dmg-pct "% of " def-name "'s military destroyed")]
+                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Soldiers:   " (:soldiers   ud))]
+                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Transports: " (:transports ud))]
+                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Generals:   " (:generals   ud))]
+                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Fighters:   " (:fighters   ud))]
+                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Carriers:   " (:carriers   ud))]
+                 [:p.text-xs {:style {:color "#9adaaa"}} (str "Admirals:   " (:admirals   ud))]]])
+             ;; --- Invade / Raid result ---
+             (let [att-wins? (:attacker-wins? battle-result)
+                   ac        (:attacker-counts battle-result)
+                   al        (:attacker-losses battle-result)
+                   dl        (:defender-losses battle-result)
+                   pt        (:planets-transferred battle-result)
+                   rc        (:resources-captured battle-result)]
+               [:div {:style card-style}
+                [:h3.font-bold.mb-3 {:style {:color "#4ade80"}}
+                 (if att-wins?
+                   (str (if (= mode :raid) "Raid victory against " "Invasion victory against ") def-name)
+                   (str (if (= mode :raid) "Raid repelled by "     "Defeated in invasion of ")  def-name))]
+                [:div.overflow-x-auto
+                 [:table.w-full.text-xs.table-fixed
+                  [:thead
+                   [:tr {:style {:border-bottom "1px solid #4ade80"}}
+                    [:th.text-left.py-1  {:style (assoc th-style :width "10%")} "Item"]
+                    [:th.text-right.py-1 {:style (assoc th-style :width "30%")} "Your Forces"]
+                    [:th.text-right.py-1 {:style (assoc th-style :width "30%")} "Your Losses"]
+                    [:th.text-right.py-1 {:style (assoc th-style :width "30%")} (str def-name " Losses")]]]
+                  [:tbody
+                   (for [spec battle-unit-specs]
+                     (battle-row (:label spec) ac al dl (:unit-key spec) (:loss-key spec)
+                                 (:special? spec) (:separator? spec)))
+                   (for [spec planet-specs]
+                     (planet-row (:label spec) (get pt (:pt-key spec)) att-wins? (:separator? spec)))]]]
+                ;; Plundered resources row — shown when attacker wins and captured something
+                (when (and att-wins? rc (or (pos? (:credits rc)) (pos? (:food rc)) (pos? (:fuel rc))))
+                  [:p.text-xs.mt-2
+                   {:style {:color "#9adaaa"}}
+                   "Plundered: "
+                   (clojure.string/join ", "
+                     (keep identity
+                       [(when (pos? (:credits rc)) (str (ui/format-number (:credits rc)) " cr"))
+                        (when (pos? (:food    rc)) (str (ui/format-number (:food    rc)) " food"))
+                        (when (pos? (:fuel    rc)) (str (ui/format-number (:fuel    rc)) " fuel"))]))])]))))
 
        ;; Espionage result section (only shown when an operation was declared)
        (when espionage-result
@@ -360,6 +387,7 @@
                (and won? (= op "spy"))    (str "Spy operation against " (:defender-name espionage-result) " succeeded")
                (and won? (= op "incite")) (str "Incite operation against " (:defender-name espionage-result) " succeeded")
                (and won? (= op "bomb"))   (str "Bombing raid against " (:defender-name espionage-result) " succeeded")
+               (and won? (= op "defect")) (str "Defection operation against " (:defender-name espionage-result) " succeeded")
                :else                      (str "Operation against " (:defender-name espionage-result) " failed — agents captured"))]
             (cond
               (and won? (= op "spy"))
@@ -389,6 +417,11 @@
                [:p.text-xs {:style {:color "#9adaaa"}} (str "Transports: " (or (:transports-destroyed espionage-result) 0))]
                [:p.text-xs {:style {:color "#9adaaa"}} (str "Fighters:   " (or (:fighters-destroyed   espionage-result) 0))]
                [:p.text-xs {:style {:color "#9adaaa"}} (str "Carriers:   " (or (:carriers-destroyed   espionage-result) 0))]]
+
+              (and won? (= op "defect"))
+              [:p.text-xs {:style {:color "#9adaaa"}}
+               (str (or (:agents-defected espionage-result) 0)
+                    " agent(s) defected from " (:defender-name espionage-result) " to your service.")]
 
               :else
               [:p.text-xs {:style {:color "#9adaaa"}}

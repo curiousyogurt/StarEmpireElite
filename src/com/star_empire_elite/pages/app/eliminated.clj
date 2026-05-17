@@ -74,9 +74,6 @@
               :player/generals               const/starting-generals
               :player/admirals               const/starting-admirals
               :player/agents                 const/starting-agents
-              :player/advisors               const/starting-advisors
-              :player/governance             0
-              :player/strain                 0
               :player/last-population-growth nil}])
           {:status 303
            :headers {"location" (str "/app/game/" new-player-id "/income")}})))))

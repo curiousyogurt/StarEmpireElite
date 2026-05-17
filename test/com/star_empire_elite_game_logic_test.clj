@@ -40,13 +40,19 @@
                    :game/raid-reward-multiplier    const/raid-reward-multiplier
                    :game/invade-defense-multiplier const/invade-defense-multiplier
                    :game/invade-reward-multiplier  const/invade-reward-multiplier
+                   :game/strike-damage-rate        const/strike-damage-rate
+                   :game/strike-max-dispatch       const/strike-max-dispatch
+                   :game/strike-interception-rate  const/strike-interception-rate
+                   :game/strike-interception-cap   const/strike-interception-cap
+                   :game/defect-defense-multiplier const/defect-defense-multiplier
+                   :game/defect-transfer-rate      const/defect-transfer-rate
+                   :game/defect-transfer-cap       const/defect-transfer-cap
                    :game/ore-planet-credits const/ore-planet-credits
                    :game/erg-planet-food const/erg-planet-food
                    :game/erg-planet-fuel const/erg-planet-fuel
                    :game/mil-planet-soldiers const/mil-planet-soldiers
                    :game/mil-planet-fighters const/mil-planet-fighters
                    :game/mil-planet-stations const/mil-planet-stations
-                   :game/synergy-credits-per-paired const/synergy-credits-per-paired
                    :game/planet-upkeep-credits const/planet-upkeep-credits
                    :game/planet-upkeep-food const/planet-upkeep-food
                    :game/soldier-upkeep-credits const/soldier-upkeep-credits
@@ -72,7 +78,6 @@
                    :game/erg-planet-cost const/erg-planet-cost
                    :game/ore-planet-cost const/ore-planet-cost
                    :game/agent-cost const/agent-cost
-                   :game/advisor-cost const/advisor-cost
                    :game/population-tax-credits const/population-tax-credits
                    ;; Stability constants
                    :game/expense-stability-penalty    const/expense-stability-penalty
@@ -127,9 +132,6 @@
                      :player/fighters 10
                      :player/cmd-ships 1
                      :player/agents 5
-                     :player/advisors 2
-                     :player/governance 0
-                     :player/strain 0
                      :player/last-population-growth nil}]
 
     (biff/submit-tx ctx
