@@ -9,7 +9,8 @@
 ;;;;;
 
 (ns com.star-empire-elite.pages.app.action
-  (:require [com.biffweb :as biff]
+  (:require [clojure.string :as str]
+            [com.biffweb :as biff]
             [com.star-empire-elite.combat :as combat]
             [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
@@ -20,9 +21,10 @@
 ;;;;
 
 (defn target-row
-  "Render a single row in the targets table with a radio-button attack selector.
-  The radio input is visually hidden; its label renders as the attack button.
-  A small onclick handler enables deselect, since radio buttons don't natively uncheck on re-click.
+  "Render a single row in the targets table with Invade and Raid selectors.
+  Each row produces two radio inputs (one per mode), both sharing the same
+  group name so only one selection across the whole table can be made.
+  Composite radio values 'player-id:mode' are parsed in apply-action.
 
   [player player-map] -> hiccup"
   [player]
@@ -31,44 +33,49 @@
                          (:player/ore-planets player))
         player-id-str (str (:xt/id player))
         td-border     {:border-right "1px solid #253530" :padding "4px 12px" :color "#9adaaa"}
-        td-right      (assoc td-border :text-align "right")]
+        td-right      (assoc td-border :text-align "right")
+        action-btn    (fn [mode label]
+                        [:label.block.cursor-pointer
+                         [:input.peer.sr-only
+                          {:type "radio"
+                           :name "target-action"
+                           :value (str player-id-str ":" (name mode))
+                           :onclick (str "var p=this.dataset.was==='true';"
+                                         "document.querySelectorAll('[name=target-action]').forEach(function(r){r.dataset.was='false';});"
+                                         "if(p){this.checked=false;}else{this.dataset.was='true';}")}]
+                         [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
+                          {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
+                          label]])]
     [:tr {:style {:border-bottom "1px solid #1a2820" :background "#121a18"}}
      [:td {:style td-border} (:player/empire-name player)]
      [:td {:style td-right}  total-planets]
      [:td {:style td-right}  (:player/score player)]
-     [:td {:style {:padding "4px 12px"}}
-      [:label.block.cursor-pointer
-       [:input.peer.sr-only
-        {:type "radio"
-         :name "target-player-id"
-         :value player-id-str
-         :onclick (str "var p=this.dataset.was==='true';"
-                       "document.querySelectorAll('[name=target-player-id]').forEach(function(r){r.dataset.was='false';});"
-                       "if(p){this.checked=false;}else{this.dataset.was='true';}")}]
-       [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
-        {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
-        "Attack"]]]]))
+     [:td {:style {:padding "4px 8px"}} (action-btn :invade "Invade")]
+     [:td {:style {:padding "4px 8px"}} (action-btn :raid   "Raid")]]))
 
 ;;;;
 ;;;; Actions
 ;;;;
 
 (defn apply-action
-  "Store the pending attack target (nil if none chosen) and advance to espionage phase.
+  "Store the pending attack target and mode (nil if none chosen) and advance to espionage phase.
 
   [ctx ring-ctx] -> ring-response (303 redirect to espionage)"
   [{:keys [path-params params] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (if-let [redirect (utils/validate-phase player 4 player-id)]
       redirect
-      (let [target-str (:target-player-id params)
-            target-id  (when (and target-str (not (empty? target-str)))
-                         (java.util.UUID/fromString target-str))]
-        (biff/submit-tx ctx [{:db/doc-type          :player
-                              :db/op                :update
-                              :xt/id                player-id
-                              :player/current-phase 5
-                              :player/pending-attack target-id}])
+      (let [target-action (:target-action params)
+            [target-id mode-str] (when (and target-action (str/includes? target-action ":"))
+                                   (str/split target-action #":" 2))
+            target-uuid   (when target-id (parse-uuid target-id))
+            mode-kw       (when mode-str (keyword mode-str))]
+        (biff/submit-tx ctx [{:db/doc-type               :player
+                              :db/op                     :update
+                              :xt/id                     player-id
+                              :player/current-phase      5
+                              :player/pending-attack      target-uuid
+                              :player/pending-attack-mode mode-kw}])
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/espionage")}}))))
 
@@ -159,7 +166,8 @@
                [:th.text-left.px-3.py-1  {:style th-style} "Empire"]
                [:th.text-right.px-3.py-1 {:style th-style} "Planets"]
                [:th.text-right.px-3.py-1 {:style th-style} "Score"]
-               [:th.px-3.py-1            {:style th-style} "Operation"]]]
+               [:th.px-3.py-1            {:style th-style} "Invade"]
+               [:th.px-3.py-1            {:style th-style} "Raid"]]]
              [:tbody
               (for [target other-players]
                 (target-row target))]]]])
@@ -173,5 +181,5 @@
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
         (ui/action-bar-button "Cancel Attack"
           {:class   "cancel-target"
-           :onclick "document.querySelectorAll('[name=target-player-id]').forEach(function(r){r.checked=false;r.dataset.was='false';});"})
+           :onclick "document.querySelectorAll('[name=target-action]').forEach(function(r){r.checked=false;r.dataset.was='false';});"})
         (ui/submit-button true "Continue to Espionage")])])))

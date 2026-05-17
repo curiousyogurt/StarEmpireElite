@@ -145,7 +145,8 @@
         food-current      (:player/food player)
         fuel-current      (:player/fuel player)
         credits-changes   [{:label "Planets"
-                            :value (- (:ore-credits income) (:planets-credits required))
+                            :value (- (+ (:ore-credits income) (:synergy-credits income))
+                                      (:planets-credits required))
                             :suffix "cr"
                             :id "credits-pill-planets"}
                            {:label "Military"
@@ -415,8 +416,9 @@
           new-mil-planets      (+ (:player/mil-planets player) (:mil-planets quantities))
           new-total-planets    (+ new-ore-planets new-erg-planets new-mil-planets)
           new-ore-income       (* new-ore-planets (:game/ore-planet-credits game))
+          new-synergy-credits  (* (min new-ore-planets new-erg-planets) (:game/synergy-credits-per-paired game))
           new-planet-expense   (* new-total-planets (:game/planet-upkeep-credits game))
-          new-planets-value    (- new-ore-income new-planet-expense)
+          new-planets-value    (- (+ new-ore-income new-synergy-credits) new-planet-expense)
           ;; Military planet income adds to unit counts that must be maintained
           mil-income-soldiers  (* new-mil-planets (:game/mil-planet-soldiers game))
           mil-income-fighters  (* new-mil-planets (:game/mil-planet-fighters game))

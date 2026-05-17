@@ -22,10 +22,10 @@
 
   [player player-map, game game-map] -> {:ore-credits int,     :erg-food int,        :erg-fuel int,
                                          :mil-soldiers int,    :mil-fighters int,    :mil-stations int,
-                                         :tax-credits int,     :synergy-credits int, :synergy-fuel int}"
+                                         :tax-credits int,     :synergy-credits int}"
   [player game]
   ;; Keys such as :player/ore-planets are fully qualified keys in the player map.
-  ;; Synergy: the first min(ore, erg) planets on each side contribute a bonus.
+  ;; Synergy: the first min(ore, erg) planets on each side contribute a credit bonus.
   (let [ore-count (:player/ore-planets player)
         erg-count (:player/erg-planets player)
         paired    (min ore-count erg-count)]
@@ -36,8 +36,7 @@
      :mil-fighters    (* (:player/mil-planets player)    (:game/mil-planet-fighters       game))
      :mil-stations    (* (:player/mil-planets player)    (:game/mil-planet-stations       game))
      :tax-credits     (* (:player/population player)     (:game/population-tax-credits    game))
-     :synergy-credits (* paired                          (:game/synergy-credits-per-paired game))
-     :synergy-fuel    (* paired                          (:game/synergy-fuel-per-paired    game))}))
+     :synergy-credits (* paired                          (:game/synergy-credits-per-paired game))}))
 
 (defn calculate-resources-after-income
   "Calculate all player resources after applying income.
@@ -47,7 +46,7 @@
   (-> (utils/player-snapshot player)
       (update :credits  + (:ore-credits  income) (:tax-credits income) (:synergy-credits income))
       (update :food     + (:erg-food     income))
-      (update :fuel     + (:erg-fuel     income) (:synergy-fuel income))
+      (update :fuel     + (:erg-fuel     income))
       (update :soldiers + (:mil-soldiers income))
       (update :fighters + (:mil-fighters income))
       (update :stations + (:mil-stations income))))
@@ -74,7 +73,7 @@
   [income-map]
   (for [[k label suffix] [[:credits "+" "cr"] [:food "+" "food"] [:fuel "+" "fuel"]
                           [:soldiers "+" "sold"] [:fighters "+" "fgtr"] [:stations "+" "stn"]
-                          [:synergy-credits "+" "cr erg-synergy"] [:synergy-fuel "+" "fuel ore-synergy"]]
+                          [:synergy-credits "+" "cr erg-synergy"]]
         :let [v (or (k income-map) 0)]
         :when (pos? v)]
     [:span.text-xs.inline-block.rounded-sm.text-green-400
@@ -109,9 +108,8 @@
                                :synergy-credits (:synergy-credits income)}}
                  {:name "Erg"
                   :count (:player/erg-planets player)
-                  :income-map {:food        (:erg-food     income)
-                               :fuel        (:erg-fuel     income)
-                               :synergy-fuel (:synergy-fuel income)}}
+                  :income-map {:food (:erg-food income)
+                               :fuel (:erg-fuel income)}}
                  {:name "Mil"
                   :count (:player/mil-planets player)
                   :income-map {:soldiers (:mil-soldiers income)
@@ -207,10 +205,7 @@
                         (:synergy-credits income))
               :key? true}
               {:name "Food"     :before (:player/food     player) :delta (:erg-food  income) :key? true}
-              {:name "Fuel"     :before (:player/fuel     player)
-              :delta (+ (:erg-fuel     income)
-                        (:synergy-fuel income))
-              :key? true}
+              {:name "Fuel"     :before (:player/fuel     player) :delta (:erg-fuel income) :key? true}
               {:name "Soldiers" :before (:player/soldiers player) :delta (:mil-soldiers income) :key? false}
               {:name "Fighters" :before (:player/fighters player) :delta (:mil-fighters income) :key? false}
               {:name "Stations" :before (:player/stations player) :delta (:mil-stations income) :key? false}]]

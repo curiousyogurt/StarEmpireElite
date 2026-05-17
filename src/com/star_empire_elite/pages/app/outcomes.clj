@@ -148,18 +148,20 @@
 
 (defn- incoming-attack-section [result]
   (let [att-wins? (:attacker-wins? result)
+        mode      (get result :mode :invade)
         att-name  (:attacker-name result)
         dc        (:defender-counts result)
         al        (:attacker-losses result)
         dl        (:defender-losses result)
         pt        (:planets-transferred result)
+        rc        (:resources-captured result)
         th-style  {:color "#4ade80"}]
     [:div {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"
                    :padding "12px"}}
      [:h3.font-bold.mb-3 {:style {:color "#4ade80"}}
       (if att-wins?
-        (str "Attacked by " att-name " — defeat")
-        (str "Attacked by " att-name " — repelled"))]
+        (str (if (= mode :raid) "Raided by " "Attacked by ") att-name " — defeat")
+        (str (if (= mode :raid) "Raid by "   "Attacked by ") att-name " — repelled"))]
      [:div.overflow-x-auto
       [:table.w-full.text-xs.table-fixed
        [:thead
@@ -173,7 +175,17 @@
           (incoming-battle-row (:label spec) dc dl al (:unit-key spec) (:loss-key spec)
                                (:special? spec) (:separator? spec)))
         (for [spec planet-specs]
-          (incoming-planet-row (:label spec) (get pt (:pt-key spec)) (:separator? spec)))]]]]))
+          (incoming-planet-row (:label spec) (get pt (:pt-key spec)) (:separator? spec)))]]]
+     ;; Stolen resources — shown when attacker wins and plundered something
+     (when (and att-wins? rc (or (pos? (:credits rc)) (pos? (:food rc)) (pos? (:fuel rc))))
+       [:p.text-xs.mt-2
+        {:style {:color "#f87171"}}
+        "Plundered from you: "
+        (clojure.string/join ", "
+          (keep identity
+            [(when (pos? (:credits rc)) (str (ui/format-number (:credits rc)) " cr"))
+             (when (pos? (:food    rc)) (str (ui/format-number (:food    rc)) " food"))
+             (when (pos? (:fuel    rc)) (str (ui/format-number (:fuel    rc)) " fuel"))]))])]))
 
 (defn- battle-row [label af al dl att-key loss-key special? separator-below?]
   [:tr {:style {:border-bottom (if separator-below? "1px solid #4ade80" "1px solid #253530")
@@ -298,14 +310,18 @@
        ;; Battle result section (only shown when an attack was declared)
        (when battle-result
          (let [att-wins? (:attacker-wins? battle-result)
+               mode      (get battle-result :mode :invade)
                ac        (:attacker-counts battle-result)
                al        (:attacker-losses battle-result)
                dl        (:defender-losses battle-result)
                def-name  (:defender-name battle-result)
-               pt        (:planets-transferred battle-result)]
+               pt        (:planets-transferred battle-result)
+               rc        (:resources-captured battle-result)]
            [:div {:style card-style}
             [:h3.font-bold.mb-3 {:style {:color "#4ade80"}}
-             (if att-wins? (str "Victory against " def-name) (str "Defeat by " def-name))]
+             (if att-wins?
+               (str (if (= mode :raid) "Raid victory against " "Invasion victory against ") def-name)
+               (str (if (= mode :raid) "Raid repelled by "     "Defeated in invasion of ")  def-name))]
             [:div.overflow-x-auto
              [:table.w-full.text-xs.table-fixed
               [:thead
@@ -319,7 +335,17 @@
                  (battle-row (:label spec) ac al dl (:unit-key spec) (:loss-key spec)
                              (:special? spec) (:separator? spec)))
                (for [spec planet-specs]
-                 (planet-row (:label spec) (get pt (:pt-key spec)) att-wins? (:separator? spec)))]]]]))
+                 (planet-row (:label spec) (get pt (:pt-key spec)) att-wins? (:separator? spec)))]]]
+            ;; Plundered resources row — shown when attacker wins and captured something
+            (when (and att-wins? rc (or (pos? (:credits rc)) (pos? (:food rc)) (pos? (:fuel rc))))
+              [:p.text-xs.mt-2
+               {:style {:color "#9adaaa"}}
+               "Plundered: "
+               (clojure.string/join ", "
+                 (keep identity
+                   [(when (pos? (:credits rc)) (str (ui/format-number (:credits rc)) " cr"))
+                    (when (pos? (:food    rc)) (str (ui/format-number (:food    rc)) " food"))
+                    (when (pos? (:fuel    rc)) (str (ui/format-number (:fuel    rc)) " fuel"))]))])]))
 
        ;; Espionage result section (only shown when an operation was declared)
        (when espionage-result

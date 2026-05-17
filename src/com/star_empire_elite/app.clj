@@ -107,6 +107,10 @@
             :game/turns-per-round const/turns-per-round
             :game/rounds-per-day const/rounds-per-day
             :game/hours-between-rounds const/hours-between-rounds
+            :game/raid-defense-multiplier   const/raid-defense-multiplier
+            :game/raid-reward-multiplier    const/raid-reward-multiplier
+            :game/invade-defense-multiplier const/invade-defense-multiplier
+            :game/invade-reward-multiplier  const/invade-reward-multiplier
             :game/soldier-power  const/soldier-power
             :game/fighter-power  const/fighter-power
             :game/cmd-ship-power const/cmd-ship-power
@@ -120,7 +124,6 @@
             :game/mil-planet-fighters const/mil-planet-fighters
             :game/mil-planet-stations const/mil-planet-stations
             :game/synergy-credits-per-paired const/synergy-credits-per-paired
-            :game/synergy-fuel-per-paired    const/synergy-fuel-per-paired
             :game/population-tax-credits const/population-tax-credits
             :game/planet-upkeep-credits const/planet-upkeep-credits
             :game/planet-upkeep-food const/planet-upkeep-food
@@ -387,6 +390,7 @@
         ;; On first load: resolve, apply ALL stat changes to both sides, store result.
         ;; On refresh (cache hit): stored result already applied — use player as-is.
         (let [pending-attack (:player/pending-attack player)
+              mode           (or (:player/pending-attack-mode player) :invade)
               stored-battle  (some-> (:player/last-battle-result player) clojure.core/read-string)
 
               [battle-result display-player]
@@ -397,7 +401,7 @@
                     ;; Cache hit — changes already applied; player entity is fresh on this request
                     [stored-battle player]
                     ;; Fresh resolve — apply everything now
-                    (let [result  (combat/resolve-combat game player defender)
+                    (let [result  (combat/resolve-combat game player defender mode)
                           al      (:attacker-losses result)
                           dl      (:defender-losses result)
                           raw-pt  (or (:planets-transferred result) {:mil 0 :food 0 :ore 0})
@@ -405,6 +409,10 @@
                           pt-food (min (:food raw-pt) (:player/erg-planets defender))
                           pt-ore  (min (:ore  raw-pt) (:player/ore-planets  defender))
                           capped  (assoc result :planets-transferred {:mil pt-mil :food pt-food :ore pt-ore})
+                          rc           (or (:resources-captured capped) {:credits 0 :food 0 :fuel 0})
+                          rc-credits   (:credits rc)
+                          rc-food      (:food    rc)
+                          rc-fuel      (:fuel    rc)
                           att-soldiers   (max 0 (- (:player/soldiers   player) (:soldiers-lost   al)))
                           att-transports (max 0 (- (:player/transports player) (:transports-lost  al)))
                           att-generals   (max 0 (- (:player/generals   player) (:generals-lost   al)))
@@ -414,7 +422,10 @@
                           att-cmd-ships  (max 0 (- (:player/cmd-ships  player) (:cmd-ships-lost  al)))
                           att-mil-plts   (+ (:player/mil-planets  player) pt-mil)
                           att-food-plts  (+ (:player/erg-planets player) pt-food)
-                          att-ore-plts   (+ (:player/ore-planets  player) pt-ore)]
+                          att-ore-plts   (+ (:player/ore-planets  player) pt-ore)
+                          att-credits    (+ (:player/credits player) rc-credits)
+                          att-food-res   (+ (:player/food    player) rc-food)
+                          att-fuel-res   (+ (:player/fuel    player) rc-fuel)]
                       (biff/submit-tx ctx
                         [{:db/doc-type :player :db/op :update :xt/id player-id
                           :player/last-battle-result (pr-str capped)
@@ -427,7 +438,10 @@
                           :player/cmd-ships    att-cmd-ships
                           :player/mil-planets  att-mil-plts
                           :player/erg-planets att-food-plts
-                          :player/ore-planets  att-ore-plts}
+                          :player/ore-planets  att-ore-plts
+                          :player/credits      att-credits
+                          :player/food         att-food-res
+                          :player/fuel         att-fuel-res}
                          {:db/doc-type :player :db/op :update :xt/id (:xt/id defender)
                           :player/soldiers     (max 0 (- (:player/soldiers   defender) (:soldiers-lost   dl)))
                           :player/transports   (max 0 (- (:player/transports defender) (:transports-lost dl)))
@@ -440,6 +454,9 @@
                           :player/mil-planets  (max 0 (- (:player/mil-planets  defender) pt-mil))
                           :player/erg-planets (max 0 (- (:player/erg-planets defender) pt-food))
                           :player/ore-planets  (max 0 (- (:player/ore-planets  defender) pt-ore))
+                          :player/credits      (max 0 (- (:player/credits defender) rc-credits))
+                          :player/food         (max 0 (- (:player/food    defender) rc-food))
+                          :player/fuel         (max 0 (- (:player/fuel    defender) rc-fuel))
                           :player/incoming-attacks
                           (conj (or (:player/incoming-attacks defender) []) (pr-str capped))}])
                       ;; Build locally updated player for accurate resource display this request
@@ -452,7 +469,10 @@
                                              :player/cmd-ships    att-cmd-ships
                                              :player/mil-planets  att-mil-plts
                                              :player/erg-planets att-food-plts
-                                             :player/ore-planets  att-ore-plts})]))))
+                                             :player/ore-planets  att-ore-plts
+                                             :player/credits      att-credits
+                                             :player/food         att-food-res
+                                             :player/fuel         att-fuel-res})]))))
 
               ;; --- espionage ---
               pending-espionage    (:player/pending-espionage player)

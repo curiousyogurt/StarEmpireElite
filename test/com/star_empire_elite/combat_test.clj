@@ -216,32 +216,32 @@
 
 (deftest test-resolve-combat-returns-required-keys
   (testing "Result contains all expected top-level keys"
-    (let [result (combat/resolve-combat game strong-attacker strong-defender)]
+    (let [result (combat/resolve-combat game strong-attacker strong-defender :invade)]
       (doseq [k [:attacker-id :attacker-name :defender-id :defender-name
                  :attacker-counts :defender-counts
                  :attacker-forces :defender-forces
                  :attacker-roll :defender-roll :attacker-wins?
                  :margin :attacker-losses :defender-losses
-                 :planets-transferred]]
+                 :mode :planets-transferred :resources-captured]]
         (is (contains? result k) (str "Missing key: " k))))))
 
 (deftest test-resolve-combat-ids-are-strings
   (testing "UUIDs are stored as strings"
-    (let [result (combat/resolve-combat game strong-attacker strong-defender)]
+    (let [result (combat/resolve-combat game strong-attacker strong-defender :invade)]
       (is (string? (:attacker-id result)))
       (is (string? (:defender-id result))))))
 
 (deftest test-resolve-combat-margin-bounds
   (testing "Margin is always between 0.0 and 1.0"
     (dotimes [_ 50]
-      (let [result (combat/resolve-combat game strong-attacker strong-defender)]
+      (let [result (combat/resolve-combat game strong-attacker strong-defender :invade)]
         (is (>= (:margin result) 0.0))
         (is (<= (:margin result) 1.0))))))
 
 (deftest test-resolve-combat-planets-only-on-attacker-win
   (testing "Planets are only transferred when attacker wins"
     (dotimes [_ 50]
-      (let [result (combat/resolve-combat game strong-attacker strong-defender)
+      (let [result (combat/resolve-combat game strong-attacker strong-defender :invade)
             xfer   (:planets-transferred result)]
         (when-not (:attacker-wins? result)
           (is (= 0 (:mil  xfer)))
@@ -254,7 +254,7 @@
                            (:player/erg-planets strong-defender)
                            (:player/ore-planets  strong-defender))]
       (dotimes [_ 50]
-        (let [result (combat/resolve-combat game strong-attacker strong-defender)
+        (let [result (combat/resolve-combat game strong-attacker strong-defender :invade)
               xfer   (:planets-transferred result)
               xfer-total (+ (:mil xfer) (:food xfer) (:ore xfer))]
           (is (<= xfer-total total-planets)))))))
@@ -262,7 +262,7 @@
 (deftest test-resolve-combat-losses-are-non-negative
   (testing "No unit type ever has negative losses"
     (dotimes [_ 50]
-      (let [result (combat/resolve-combat game strong-attacker strong-defender)]
+      (let [result (combat/resolve-combat game strong-attacker strong-defender :invade)]
         (doseq [[_ v] (:attacker-losses result)]
           (is (>= v 0)))
         (doseq [[_ v] (:defender-losses result)]
@@ -285,13 +285,161 @@
                                    :player/generals  1
                                    :player/admirals  1})]
       (dotimes [_ 20]
-        (let [result (combat/resolve-combat game massive-attacker tiny-defender)]
+        (let [result (combat/resolve-combat game massive-attacker tiny-defender :invade)]
           (is (:attacker-wins? result)))))))
 
 (deftest test-resolve-combat-defender-counts-include-stations
   (testing "Defender counts snapshot includes stations"
-    (let [result (combat/resolve-combat game strong-attacker strong-defender)]
+    (let [result (combat/resolve-combat game strong-attacker strong-defender :invade)]
       (is (contains? (:defender-counts result) :stations))))
   (testing "Attacker counts snapshot does not include stations"
-    (let [result (combat/resolve-combat game strong-attacker strong-defender)]
+    (let [result (combat/resolve-combat game strong-attacker strong-defender :invade)]
       (is (not (contains? (:attacker-counts result) :stations))))))
+
+;;;;
+;;;; Combat Mode Tests
+;;;;
+
+;;; Fixtures for mode tests: a tiny defender and an overwhelming attacker so
+;;; we can control outcomes deterministically across runs.
+
+(def ^:private massive-attacker
+  (merge helpers/player-defaults
+         {:xt/id             #uuid "00000000-0000-0000-0000-000000000010"
+          :player/empire-name "Massive Attacker"
+          :player/soldiers    1000000
+          :player/transports  10000
+          :player/generals    1000
+          :player/fighters    1000000
+          :player/carriers    10000
+          :player/admirals    1000
+          :player/cmd-ships   500}))
+
+(def ^:private large-defender
+  (merge helpers/player-defaults
+         {:xt/id             #uuid "00000000-0000-0000-0000-000000000011"
+          :player/empire-name "Large Defender"
+          :player/soldiers    100
+          :player/transports  1
+          :player/generals    1
+          :player/fighters    100
+          :player/carriers    1
+          :player/admirals    1
+          :player/cmd-ships   0
+          :player/stations    1
+          :player/mil-planets  50
+          :player/erg-planets 30
+          :player/ore-planets  20
+          :player/credits      100000
+          :player/food         10000
+          :player/fuel         10000}))
+
+(def ^:private resourced-defender
+  (merge helpers/player-defaults
+         {:xt/id             #uuid "00000000-0000-0000-0000-000000000012"
+          :player/empire-name "Resourced Defender"
+          :player/soldiers    1
+          :player/transports  1
+          :player/generals    1
+          :player/fighters    1
+          :player/carriers    1
+          :player/admirals    1
+          :player/cmd-ships   0
+          :player/stations    0
+          :player/mil-planets  1
+          :player/erg-planets 1
+          :player/ore-planets  1
+          :player/credits      100000
+          :player/food         10000
+          :player/fuel         10000}))
+
+(deftest raid-uses-reduced-defense
+  (testing "With :raid mode, an attacker consistently beats a strong defender they would lose to in :invade"
+    ;; A moderate attacker vs a defender whose power is entirely in stations.
+    ;; Under :invade the defender's station power dominates; under :raid it's scaled to 10%.
+    ;; strong-attacker power ≈ 1640; with 3000 stations (power 5 each), invade def_power ≈ 15015
+    ;; (attacker never wins) while raid def_power ≈ 1502 (attacker frequently wins).
+    (let [station-heavy-defender (assoc large-defender
+                                        :player/stations   3000
+                                        :player/soldiers   0
+                                        :player/fighters   0)
+          wins-raid   (count (filter :attacker-wins?
+                                     (repeatedly 20 #(combat/resolve-combat game strong-attacker station-heavy-defender :raid))))
+          wins-invade (count (filter :attacker-wins?
+                                     (repeatedly 20 #(combat/resolve-combat game strong-attacker station-heavy-defender :invade))))]
+      ;; Raid should win far more often since the defender's station power is reduced to 10%
+      (is (> wins-raid wins-invade)))))
+
+(deftest raid-caps-planet-capture-at-10-percent
+  (testing "Raid mode never captures more than reward-mult × margin × total planets"
+    ;; large-defender has 100 total planets; max possible capture = 0.75 × 0.1 × 100 = 7
+    (dotimes [_ 50]
+      (let [result (combat/resolve-combat game massive-attacker large-defender :raid)
+            xfer   (:planets-transferred result)
+            total  (+ (:mil xfer) (:food xfer) (:ore xfer))]
+        (is (<= total 8))))))  ; floor(0.75 * 0.1 * 100) = 7, +1 tolerance for floating point
+
+(deftest invade-can-capture-up-to-margin-planets
+  (testing "Invade mode can capture up to 0.75 × total defender planets"
+    ;; Run many times and verify at least some runs capture > 10 planets (impossible in raid).
+    (let [results (repeatedly 50 #(combat/resolve-combat game massive-attacker large-defender :invade))
+          max-capture (apply max (map #(let [pt (:planets-transferred %)]
+                                         (+ (:mil pt) (:food pt) (:ore pt)))
+                                       results))]
+      (is (> max-capture 10)))))
+
+(deftest raid-captures-resources-proportionally
+  (testing "Raid mode :resources-captured = min(margin,0.75) × 0.1 × defender's resources (on win)"
+    ;; Use massive attacker so we always win, and resourced-defender with known resources.
+    ;; Captures use loser-rate = min(margin, 0.75), not raw margin.
+    (dotimes [_ 20]
+      (let [result (combat/resolve-combat game massive-attacker resourced-defender :raid)]
+        (when (:attacker-wins? result)
+          (let [eff-margin (min (:margin result) 0.75)
+                rc         (:resources-captured result)
+                expect-cr  (long (* eff-margin const/raid-reward-multiplier (:player/credits resourced-defender)))
+                expect-fd  (long (* eff-margin const/raid-reward-multiplier (:player/food    resourced-defender)))
+                expect-fu  (long (* eff-margin const/raid-reward-multiplier (:player/fuel    resourced-defender)))]
+            (is (= expect-cr (:credits rc)))
+            (is (= expect-fd (:food    rc)))
+            (is (= expect-fu (:fuel    rc)))))))))
+
+(deftest invade-captures-resources-proportionally
+  (testing "Invade mode :resources-captured = min(margin,0.75) × 1.0 × defender's resources (on win)"
+    (dotimes [_ 20]
+      (let [result (combat/resolve-combat game massive-attacker resourced-defender :invade)]
+        (when (:attacker-wins? result)
+          (let [eff-margin (min (:margin result) 0.75)
+                rc         (:resources-captured result)
+                expect-cr  (long (* eff-margin const/invade-reward-multiplier (:player/credits resourced-defender)))
+                expect-fd  (long (* eff-margin const/invade-reward-multiplier (:player/food    resourced-defender)))
+                expect-fu  (long (* eff-margin const/invade-reward-multiplier (:player/fuel    resourced-defender)))]
+            (is (= expect-cr (:credits rc)))
+            (is (= expect-fd (:food    rc)))
+            (is (= expect-fu (:fuel    rc)))))))))
+
+(deftest losing-attacker-captures-nothing
+  (testing "Failed attack captures zero planets and zero resources in both modes"
+    (let [weak-attacker (assoc strong-attacker
+                               :player/soldiers  1 :player/fighters  1
+                               :player/transports 1 :player/carriers  1
+                               :player/cmd-ships  0)]
+      (doseq [mode [:raid :invade]]
+        (dotimes [_ 20]
+          (let [result (combat/resolve-combat game weak-attacker large-defender mode)]
+            (when-not (:attacker-wins? result)
+              (let [pt (:planets-transferred result)
+                    rc (:resources-captured result)]
+                (is (= 0 (:mil  pt)))
+                (is (= 0 (:food pt)))
+                (is (= 0 (:ore  pt)))
+                (is (= 0 (:credits rc)))
+                (is (= 0 (:food    rc)))
+                (is (= 0 (:fuel    rc)))))))))))
+
+(deftest mode-defaults-to-invade-when-nil
+  (testing "Passing nil mode behaves identically to :invade mode"
+    ;; Both should produce the same defender defense multiplier (1.0).
+    ;; We verify by checking that the mode key is :invade in the result.
+    (let [result (combat/resolve-combat game strong-attacker strong-defender nil)]
+      (is (= :invade (:mode result))))))

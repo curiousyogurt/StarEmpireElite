@@ -34,6 +34,12 @@
    :game/rounds-per-day            4
    :game/hours-between-rounds      2
 
+   ;; Combat mode multipliers
+   :game/raid-defense-multiplier   0.1
+   :game/raid-reward-multiplier    0.1
+   :game/invade-defense-multiplier 1.0
+   :game/invade-reward-multiplier  1.0
+
    ;; Combat power constants
    :game/soldier-power             1
    :game/fighter-power             3

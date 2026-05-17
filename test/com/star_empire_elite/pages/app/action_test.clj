@@ -97,11 +97,23 @@
 
   (testing "Displays total planet count (mil + food + ore)"
     ;; test-target has 2 mil + 1 food + 3 ore = 6 total planets.
-    ;; row: [:tr {attrs} [:td empire-name] [:td total-planets] [:td score] [:td button]]
+    ;; row: [:tr {attrs} [:td empire-name] [:td total-planets] [:td score] [:td invade-btn] [:td raid-btn]]
     ;; index 0=:tr, 1=attrs-map, 2=empire-td, 3=planets-td; planets-td is [:td {attrs} 6].
     (let [result (action/target-row test-target)
           planet-td (nth result 3)]
-      (is (= 6 (last planet-td))))))
+      (is (= 6 (last planet-td)))))
+
+  (testing "Renders Invade and Raid buttons"
+    (let [result (action/target-row test-target)]
+      (is (= 7 (count result)))))  ; :tr + attrs-map + 5 tds
+
+  (testing "Radio values contain composite player-id:mode format"
+    (let [result   (action/target-row test-target)
+          hiccup   (tree-seq coll? seq result)
+          values   (filter #(and (map? %) (:value %)) hiccup)
+          val-strs (map :value values)]
+      (is (some #(= % (str test-target-id ":invade")) val-strs))
+      (is (some #(= % (str test-target-id ":raid"))   val-strs)))))
 
 ;;;;
 ;;;; action-page Tests
@@ -144,13 +156,13 @@
           (is (= 303 (:status result)))
           (is (= (str "/app/game/" test-player-id) (get-in result [:headers "location"]))))))))
 
-(deftest test-apply-action-with-target
-  (testing "Records pending-attack as target UUID and advances to phase 5"
+(deftest test-apply-action-with-invade-target
+  (testing "Records pending-attack as target UUID, mode :invade, and advances to phase 5"
     (let [tx-atom (atom nil)]
       (with-redefs [xt/entity      (helpers/fake-entity [test-player])
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
         (let [result (action/apply-action {:path-params {:player-id (str test-player-id)}
-                                           :params {:target-player-id (str test-target-id)}
+                                           :params {:target-action (str test-target-id ":invade")}
                                            :biff/db nil})
               tx     (first @tx-atom)]
           ;; Redirect to espionage
@@ -160,12 +172,25 @@
           (is (= :player       (:db/doc-type tx)))
           (is (= :update        (:db/op tx)))
           (is (= test-player-id (:xt/id tx)))
-          ;; Advances phase and records target
-          (is (= 5 (:player/current-phase tx)))
-          (is (= test-target-id (:player/pending-attack tx))))))))
+          ;; Advances phase and records target + mode
+          (is (= 5              (:player/current-phase      tx)))
+          (is (= test-target-id (:player/pending-attack     tx)))
+          (is (= :invade        (:player/pending-attack-mode tx))))))))
+
+(deftest test-apply-action-with-raid-target
+  (testing "Records pending-attack as target UUID, mode :raid, and advances to phase 5"
+    (let [tx-atom (atom nil)]
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player])
+                    biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
+        (action/apply-action {:path-params {:player-id (str test-player-id)}
+                               :params {:target-action (str test-target-id ":raid")}
+                               :biff/db nil})
+        (let [tx (first @tx-atom)]
+          (is (= test-target-id (:player/pending-attack      tx)))
+          (is (= :raid          (:player/pending-attack-mode  tx))))))))
 
 (deftest test-apply-action-without-target
-  (testing "Records nil pending-attack when no target is selected and advances to phase 5"
+  (testing "Records nil pending-attack and nil mode when no target is selected and advances to phase 5"
     ;; Players can choose not to attack. The pending-attack must be explicitly set to nil
     ;; so that a previous round's pending-attack is not carried forward.
     (let [tx-atom (atom nil)]
@@ -175,16 +200,19 @@
                                :params {} :biff/db nil})
         (let [tx (first @tx-atom)]
           (is (= 5 (:player/current-phase tx)))
-          (is (nil? (:player/pending-attack tx))))))))
+          (is (nil? (:player/pending-attack      tx)))
+          (is (nil? (:player/pending-attack-mode tx))))))))
 
 (deftest test-apply-action-empty-target-string
-  (testing "Treats an empty target-player-id string as no target (nil pending-attack)"
+  (testing "Treats an empty target-action value as no target (nil pending-attack and nil mode)"
     (let [tx-atom (atom nil)]
       (with-redefs [xt/entity      (helpers/fake-entity [test-player])
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
         (action/apply-action {:path-params {:player-id (str test-player-id)}
-                               :params {:target-player-id ""} :biff/db nil})
-        (is (nil? (:player/pending-attack (first @tx-atom))))))))
+                               :params {:target-action ""} :biff/db nil})
+        (let [tx (first @tx-atom)]
+          (is (nil? (:player/pending-attack      tx)))
+          (is (nil? (:player/pending-attack-mode tx))))))))
 
 ;;;;
 ;;;; Action Page Readiness Pills Tests

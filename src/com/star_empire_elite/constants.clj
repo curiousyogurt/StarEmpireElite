@@ -32,6 +32,18 @@
 (def hours-between-rounds 2)
 
 ;;;;
+;;;; Combat Modes
+;;;; Raid is a limited engagement that targets a fraction of the defender's empire.
+;;;; Invade is a full-scale assault. Both share the underlying combat resolution
+;;;; (rolls, margin, losses); they differ only in the defender's effective defense
+;;;; multiplier and the cap on captured planets and resources.
+
+(def raid-defense-multiplier   0.1)  ; defender engages 10% of forces during a raid
+(def raid-reward-multiplier    0.1)  ; raid can capture at most 10% of empire/resources
+(def invade-defense-multiplier 1.0)  ; defender engages full forces during an invasion
+(def invade-reward-multiplier  1.0)  ; invade can capture up to full margin of empire/resources
+
+;;;;
 ;;;; Combat Power
 ;;;; Power contribution of each unit type per unit.
 
@@ -106,11 +118,10 @@
 ;;;;
 ;;;; Industrial Synergy
 ;;;; Bonus output for paired ore/erg planets. The first min(ore, erg) planets
-;;;; on each side contribute a Treasury credit and fuel bonus, representing
-;;;; efficiency gains from coordinated industrial and energy operations.
+;;;; on each side contribute a credit bonus, representing efficiency gains from
+;;;; coordinated industrial and energy operations.
 
 (def synergy-credits-per-paired 1000)
-(def synergy-fuel-per-paired     200)
 
 ;;;;
 ;;;; Population Tax

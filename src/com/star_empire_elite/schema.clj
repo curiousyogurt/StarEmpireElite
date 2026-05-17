@@ -28,6 +28,12 @@
           [:game/stability-recovery-amount      :int]
           [:game/stability-recovery-floor       :int]
 
+          ;; Combat mode multipliers
+          [:game/raid-defense-multiplier   {:optional true} :double]
+          [:game/raid-reward-multiplier    {:optional true} :double]
+          [:game/invade-defense-multiplier {:optional true} :double]
+          [:game/invade-reward-multiplier  {:optional true} :double]
+
           ;; Combat power constants
           [:game/soldier-power             :int]
           [:game/fighter-power             :int]
@@ -46,7 +52,6 @@
           
           ;; Industrial synergy constants
           [:game/synergy-credits-per-paired :int]
-          [:game/synergy-fuel-per-paired    :int]
 
           ;; Population tax
           [:game/population-tax-credits    :int]
@@ -169,7 +174,8 @@
             [:player/last-stability-recovery        {:optional true} [:maybe :string]]
 
             ;; Combat
-            [:player/pending-attack {:optional true} [:maybe :player/id]]
+            [:player/pending-attack      {:optional true} [:maybe :player/id]]
+            [:player/pending-attack-mode {:optional true} [:maybe :keyword]]
 
             ;; Espionage
             [:player/pending-espionage    {:optional true} [:maybe :player/id]]

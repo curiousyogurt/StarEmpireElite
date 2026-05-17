@@ -36,6 +36,10 @@
                    :game/station-power const/station-power
                    :game/general-power const/general-power
                    :game/admiral-power const/admiral-power
+                   :game/raid-defense-multiplier   const/raid-defense-multiplier
+                   :game/raid-reward-multiplier    const/raid-reward-multiplier
+                   :game/invade-defense-multiplier const/invade-defense-multiplier
+                   :game/invade-reward-multiplier  const/invade-reward-multiplier
                    :game/ore-planet-credits const/ore-planet-credits
                    :game/erg-planet-food const/erg-planet-food
                    :game/erg-planet-fuel const/erg-planet-fuel
@@ -43,7 +47,6 @@
                    :game/mil-planet-fighters const/mil-planet-fighters
                    :game/mil-planet-stations const/mil-planet-stations
                    :game/synergy-credits-per-paired const/synergy-credits-per-paired
-                   :game/synergy-fuel-per-paired    const/synergy-fuel-per-paired
                    :game/planet-upkeep-credits const/planet-upkeep-credits
                    :game/planet-upkeep-food const/planet-upkeep-food
                    :game/soldier-upkeep-credits const/soldier-upkeep-credits

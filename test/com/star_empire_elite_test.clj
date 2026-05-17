@@ -74,6 +74,11 @@
             :game/station-power const/station-power
             :game/general-power const/general-power
             :game/admiral-power const/admiral-power
+            ;; Combat mode multipliers
+            :game/raid-defense-multiplier   const/raid-defense-multiplier
+            :game/raid-reward-multiplier    const/raid-reward-multiplier
+            :game/invade-defense-multiplier const/invade-defense-multiplier
+            :game/invade-reward-multiplier  const/invade-reward-multiplier
             ;; All the required income generation constants
             :game/ore-planet-credits const/ore-planet-credits
             :game/erg-planet-food const/erg-planet-food
@@ -109,7 +114,6 @@
             :game/agent-cost const/agent-cost
             :game/advisor-cost const/advisor-cost
             :game/synergy-credits-per-paired const/synergy-credits-per-paired
-            :game/synergy-fuel-per-paired    const/synergy-fuel-per-paired
             :game/population-tax-credits const/population-tax-credits
             ;; Stability constants
             :game/expense-stability-penalty    const/expense-stability-penalty
@@ -224,6 +228,11 @@
                 :game/station-power const/station-power
                 :game/general-power const/general-power
                 :game/admiral-power const/admiral-power
+                ;; Combat mode multipliers
+                :game/raid-defense-multiplier   const/raid-defense-multiplier
+                :game/raid-reward-multiplier    const/raid-reward-multiplier
+                :game/invade-defense-multiplier const/invade-defense-multiplier
+                :game/invade-reward-multiplier  const/invade-reward-multiplier
                 ;; Income generation constants
                 :game/ore-planet-credits const/ore-planet-credits
                 :game/erg-planet-food const/erg-planet-food
@@ -259,7 +268,6 @@
                 :game/agent-cost const/agent-cost
                 :game/advisor-cost const/advisor-cost
                 :game/synergy-credits-per-paired const/synergy-credits-per-paired
-                :game/synergy-fuel-per-paired    const/synergy-fuel-per-paired
                 :game/population-tax-credits const/population-tax-credits
                 ;; Stability constants
                 :game/expense-stability-penalty    const/expense-stability-penalty

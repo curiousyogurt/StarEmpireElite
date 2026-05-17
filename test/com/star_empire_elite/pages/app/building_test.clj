@@ -37,7 +37,6 @@
    :game/mil-planet-fighters     0
    :game/mil-planet-stations     0
    :game/synergy-credits-per-paired 0
-   :game/synergy-fuel-per-paired    0
    :game/population-tax-credits  0
    ;; Upkeep constants needed by projections-section
    :game/planet-upkeep-credits  0
