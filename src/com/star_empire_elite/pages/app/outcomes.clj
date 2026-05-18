@@ -126,9 +126,15 @@
    {:label "def stns"   :unit-key :stations   :loss-key :stations-lost   :defender-only? true}])
 
 (defn- mode-badge [mode]
-  [:span {:style {:border "1px solid #4ade80" :padding "2px 7px"
-                  :font-size "11px" :letter-spacing "0.12em" :color "#4ade80"}}
-   (case mode :raid "RAID" :strike "STRIKE" "INVASION")])
+  (let [[text color] (case mode
+                       :raid   ["RAID"         "#4ade80"]
+                       :strike ["STRIKE"       "#4ade80"]
+                       :bomb   ["BOMBING"      "#facc15"]
+                       :growth ["GROWTH"       "#4ade80"]
+                               ["INVASION"     "#4ade80"])]
+    [:span {:style {:border (str "1px solid " color) :padding "2px 7px"
+                    :font-size "11px" :letter-spacing "0.12em" :color color}}
+     text]))
 
 (defn- outcome-label [won?]
   [:span {:style {:font-size "12px" :letter-spacing "0.1em"
@@ -237,7 +243,6 @@
                  (when (pos? intercepted)
                    [:span {:style {:color "#f87171" :margin-left "6px"}}
                     (str "−" (ui/format-number intercepted))])]
-        def-stns [:span {:style {:color "#9adaaa"}} (ui/format-number (or defender-stations 0))]
         ud   (or units-destroyed {})
         rows [["cmd ships"  att-cmd                              dash]
               ["soldiers"   dash (opp-loss-cell (:soldiers   ud))]
@@ -246,12 +251,11 @@
               ["fighters"   dash (opp-loss-cell (:fighters   ud))]
               ["carriers"   dash (opp-loss-cell (:carriers   ud))]
               ["admirals"   dash (opp-loss-cell (:admirals   ud))]
-              ["def stns"   dash def-stns]]]
+              ["def stns"   dash           (opp-loss-cell (:stations ud))]]]
     [:div {:style {:border "1px solid #253530" :border-radius "3px"
                    :background "#161616" :overflow "hidden"}}
      [:div.flex.items-center {:style {:padding "8px 12px" :gap "12px"}}
       (mode-badge :strike)
-      "by"
       [:span.text-xl.font-bold {:style {:color "#4ade80"}} opp-name]]
      [:div.overflow-x-auto
       [:table.w-full.text-xs.table-fixed
@@ -267,6 +271,96 @@
           (if stations-mine?
             (combat-row def-cell label att-cell)
             (combat-row att-cell label def-cell)))]]]]))
+
+(defn- spy-badge [op won?]
+  (let [[text color] (if (not won?)
+                       ["FAILED"  "#f87171"]
+                       (case op
+                         "spy"    ["SPY"     "#facc15"]
+                         "incite" ["INCITE"  "#facc15"]
+                         "defect" ["DEFECT"  "#facc15"]
+                                  ["COVERT"  "#facc15"]))]
+    [:span {:style {:border (str "1px solid " color) :padding "2px 7px"
+                    :font-size "11px" :letter-spacing "0.12em" :color color}}
+     text]))
+
+(defn- spy-card
+  [{:keys [opp-name won? op spy lost stab agents-defected]}]
+  [:div {:style {:border "1px solid #253530" :border-radius "3px"
+                 :background "#161616" :overflow "hidden"}}
+   [:div.flex.items-center {:style {:padding "8px 12px" :gap "12px"}}
+    (spy-badge op won?)
+    [:span.text-xl.font-bold {:style {:color "#4ade80"}} opp-name]]
+   [:div {:style {:padding "6px 12px" :border-top "1px solid #1a2820"}}
+    (cond
+      (and won? (= op "spy"))
+      (let [units [["Soldiers"   (:soldiers   spy)]
+                   ["Transports" (:transports spy)]
+                   ["Generals"   (:generals   spy)]
+                   ["Fighters"   (:fighters   spy)]
+                   ["Carriers"   (:carriers   spy)]
+                   ["Admirals"   (:admirals   spy)]
+                   ["Stations"   (:stations   spy)]
+                   ["Cmd Ships"  (:cmd-ships  spy)]
+                   ["Agents"     (:agents     spy)]]]
+        [:div.grid.grid-cols-3 {:style {:gap "2px 16px"}}
+         (for [[label val] units]
+           [:div.flex.justify-between.items-center
+            [:span {:style {:color "#7ab88a" :font-size "12px"}} label]
+            [:span {:style {:color "#9adaaa"}} (ui/format-number (or val 0))]])])
+
+      (and won? (= op "incite"))
+      [:p.text-xs {:style {:color "#9adaaa"}}
+       (str "Your agents successfully stirred unrest. "
+            opp-name "'s stability was reduced by " stab ".")]
+
+      (and won? (= op "defect"))
+      [:p.text-xs {:style {:color "#9adaaa"}}
+       (str (or agents-defected 0)
+            " agent(s) defected from " opp-name " to your service.")]
+
+      :else
+      [:p.text-xs {:style {:color "#9adaaa"}}
+       (str "Your agents were unable to complete their mission. "
+            lost " agent(s) were captured by " opp-name ".")])]])
+
+(defn- bomb-card
+  "Render a bombing raid result card."
+  [{:keys [opp-name won? soldiers transports fighters carriers]}]
+  (let [units [["Soldiers"   (or soldiers   0)]
+               ["Transports" (or transports 0)]
+               ["Fighters"   (or fighters   0)]
+               ["Carriers"   (or carriers   0)]]]
+    [:div {:style {:border "1px solid #253530" :border-radius "3px"
+                   :background "#161616" :overflow "hidden"}}
+     [:div.flex.items-center {:style {:padding "8px 12px" :gap "12px"}}
+      (mode-badge :bomb)
+      [:span.text-xl.font-bold {:style {:color "#4ade80"}}
+       (str opp-name " (" (if won? "succeeded" "failed") ")")]]
+     (when won?
+       [:div.grid.grid-cols-4 {:style {:padding "6px 12px" :border-top "1px solid #1a2820"}}
+        (for [[label val] units]
+          [:div.flex.justify-between.items-center {:style {:padding-right "16px"}}
+           [:span {:style {:color "#7ab88a" :font-size "12px"}} label]
+           [:span {:style {:color "#9adaaa"}} (ui/format-number val)]])])]))
+
+(defn- growth-card [{:keys [pop-growth population]}]
+  [:div {:style {:border "1px solid #253530" :border-radius "3px"
+                 :background "#161616" :overflow "hidden"}}
+   [:div.flex.items-center {:style {:padding "8px 12px" :gap "12px"}}
+    (mode-badge :growth)
+    (if (pos? pop-growth)
+      [:span {:style {:color "#9adaaa" :font-size "14px"}}
+       "Population grew by "
+       [:span {:style {:color "#4ade80"}} (str "+" pop-growth "M")]
+       [:span {:style {:color "#4a6a58"}} " · "]
+       "total "
+       [:span {:style {:color "#4ade80"}} (str population "M")]]
+      [:span {:style {:color "#9adaaa" :font-size "14px"}}
+       "Population held steady this round"
+       [:span {:style {:color "#4a6a58"}} " · "]
+       "total "
+       [:span {:style {:color "#4ade80"}} (str population "M")]])]])
 
 (defn apply-outcomes
   "Advance turn/round/phase and clear stored battle and espionage results.
@@ -383,13 +477,12 @@
                 (str "Enemy agents successfully incited unrest in your empire. Stability reduced by "
                      incite-stab-lost ".")]])
             (when bomb-result
-              [:div {:style card-style}
-               [:p.font-bold.mb-2 {:style {:color "#facc15"}} "Enemy bombing raid struck your empire:"]
-               [:div.grid.grid-cols-2.gap-x-8.gap-y-1
-                [:p.text-xs {:style {:color "#9adaaa"}} (str "Soldiers lost:   " (:soldiers-destroyed   bomb-result))]
-                [:p.text-xs {:style {:color "#9adaaa"}} (str "Transports lost: " (:transports-destroyed bomb-result))]
-                [:p.text-xs {:style {:color "#9adaaa"}} (str "Fighters lost:   " (:fighters-destroyed   bomb-result))]
-                [:p.text-xs {:style {:color "#9adaaa"}} (str "Carriers lost:   " (:carriers-destroyed   bomb-result))]]])]))
+              (bomb-card {:opp-name   (:attacker-name        bomb-result)
+                          :won?       true
+                          :soldiers   (:soldiers-destroyed   bomb-result)
+                          :transports (:transports-destroyed bomb-result)
+                          :fighters   (:fighters-destroyed   bomb-result)
+                          :carriers   (:carriers-destroyed   bomb-result)}))]))
 
        ;; Battle result section (only shown when an attack was declared)
        (when battle-result
@@ -422,52 +515,20 @@
                intel (:intel espionage-result)
                lost  (or (:agents-captured espionage-result) 0)
                stab  (:stability-damage espionage-result)]
-           [:div {:style card-style}
-            [:h3.font-bold.mb-2 {:style {:color "#4ade80"}}
-             (cond
-               (and won? (= op "spy"))    (str "Spy operation against " (:defender-name espionage-result) " succeeded")
-               (and won? (= op "incite")) (str "Incite operation against " (:defender-name espionage-result) " succeeded")
-               (and won? (= op "bomb"))   (str "Bombing raid against " (:defender-name espionage-result) " succeeded")
-               (and won? (= op "defect")) (str "Defection operation against " (:defender-name espionage-result) " succeeded")
-               :else                      (str "Operation against " (:defender-name espionage-result) " failed — agents captured"))]
-            (cond
-              (and won? (= op "spy"))
-              [:div.grid.grid-cols-2.gap-x-8.gap-y-1
-               [:p.text-xs.font-bold.col-span-2.mb-1 {:style {:color "#4ade80"}}
-                (str (:defender-name espionage-result) "'s military")]
-               [:p.text-xs {:style {:color "#9adaaa"}} (str "Soldiers:   " (:soldiers   intel))]
-               [:p.text-xs {:style {:color "#9adaaa"}} (str "Transports: " (:transports intel))]
-               [:p.text-xs {:style {:color "#9adaaa"}} (str "Generals:   " (:generals   intel))]
-               [:p.text-xs {:style {:color "#9adaaa"}} (str "Fighters:   " (:fighters   intel))]
-               [:p.text-xs {:style {:color "#9adaaa"}} (str "Carriers:   " (:carriers   intel))]
-               [:p.text-xs {:style {:color "#9adaaa"}} (str "Admirals:   " (:admirals   intel))]
-               [:p.text-xs {:style {:color "#9adaaa"}} (str "Stations:   " (:stations   intel))]
-               [:p.text-xs {:style {:color "#9adaaa"}} (str "Cmd Ships:  " (:cmd-ships  intel))]
-               [:p.text-xs {:style {:color "#9adaaa"}} (str "Agents:     " (:agents     intel))]]
-
-              (and won? (= op "incite"))
-              [:p.text-xs {:style {:color "#9adaaa"}}
-               (str "Your agents successfully stirred unrest. "
-                    (:defender-name espionage-result) "'s stability was reduced by " stab ".")]
-
-              (and won? (= op "bomb"))
-              [:div.grid.grid-cols-2.gap-x-8.gap-y-1
-               [:p.text-xs.font-bold.col-span-2.mb-1 {:style {:color "#4ade80"}}
-                (str "Units destroyed in " (:defender-name espionage-result) ":")]
-               [:p.text-xs {:style {:color "#9adaaa"}} (str "Soldiers:   " (or (:soldiers-destroyed   espionage-result) 0))]
-               [:p.text-xs {:style {:color "#9adaaa"}} (str "Transports: " (or (:transports-destroyed espionage-result) 0))]
-               [:p.text-xs {:style {:color "#9adaaa"}} (str "Fighters:   " (or (:fighters-destroyed   espionage-result) 0))]
-               [:p.text-xs {:style {:color "#9adaaa"}} (str "Carriers:   " (or (:carriers-destroyed   espionage-result) 0))]]
-
-              (and won? (= op "defect"))
-              [:p.text-xs {:style {:color "#9adaaa"}}
-               (str (or (:agents-defected espionage-result) 0)
-                    " agent(s) defected from " (:defender-name espionage-result) " to your service.")]
-
-              :else
-              [:p.text-xs {:style {:color "#9adaaa"}}
-               (str "Your agents were unable to complete their mission. "
-                    lost " agent(s) were captured by " (:defender-name espionage-result) ".")])]))
+           (if (= op "bomb")
+             (bomb-card {:opp-name   (:defender-name espionage-result)
+                         :won?       won?
+                         :soldiers   (:soldiers-destroyed   espionage-result)
+                         :transports (:transports-destroyed espionage-result)
+                         :fighters   (:fighters-destroyed   espionage-result)
+                         :carriers   (:carriers-destroyed   espionage-result)})
+             (spy-card {:opp-name        (:defender-name espionage-result)
+                        :won?            won?
+                        :op              op
+                        :spy             intel
+                        :lost            lost
+                        :stab            stab
+                        :agents-defected (:agents-defected espionage-result)}))))
 
        ;; Stability section — only shown when at least one stability event occurred
        (let [has-penalty?   (and (some? expense-penalty) (pos? expense-penalty))
@@ -503,10 +564,8 @@
 
        ;; Population growth section (only shown at end of round)
        (when (some? pop-growth)
-         [:div {:style card-style}
-          (if (pos? pop-growth)
-            [:p.font-bold {:style {:color "#4ade80"}} (str "Population grew by " pop-growth " million this round.")]
-            [:p.font-bold {:style {:color "#9adaaa"}} "Population held steady this round."])])
+         (growth-card {:pop-growth pop-growth
+                       :population (:player/population player)}))
 
        (ui/snapshot-section player)]
 

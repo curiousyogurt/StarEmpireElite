@@ -420,6 +420,7 @@
                             :player/fighters   (max 0 (- (:player/fighters   defender) (:fighters   ud)))
                             :player/carriers   (max 0 (- (:player/carriers   defender) (:carriers   ud)))
                             :player/admirals   (max 0 (- (:player/admirals   defender) (:admirals   ud)))
+                            :player/stations   (max 0 (- (:player/stations   defender) (:stations   ud)))
                             :player/incoming-attacks
                             (conj (or (:player/incoming-attacks defender) []) (pr-str result))}])
                         [result (assoc player :player/cmd-ships
@@ -550,7 +551,8 @@
                                 :player/fighters   (max 0 (- (:player/fighters   target) fd))
                                 :player/carriers   (max 0 (- (:player/carriers   target) cd))
                                 :player/incoming-bomb-result
-                                (pr-str {:soldiers-destroyed   sd
+                                (pr-str {:attacker-name        (:player/empire-name player)
+                                         :soldiers-destroyed   sd
                                          :transports-destroyed td
                                          :fighters-destroyed   fd
                                          :carriers-destroyed   cd})}))

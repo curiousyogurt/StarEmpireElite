@@ -224,13 +224,14 @@
      :damage-rate         damage-rate
      :units-destroyed     (if (zero? committed)
                             {:soldiers 0 :transports 0 :generals 0
-                             :fighters 0 :carriers 0  :admirals 0}
+                             :fighters 0 :carriers 0  :admirals 0 :stations 0}
                             {:soldiers   (long (* damage-rate (:player/soldiers   defender)))
                              :transports (long (* damage-rate (:player/transports defender)))
                              :generals   (long (* damage-rate (:player/generals   defender)))
                              :fighters   (long (* damage-rate (:player/fighters   defender)))
                              :carriers   (long (* damage-rate (:player/carriers   defender)))
-                             :admirals   (long (* damage-rate (:player/admirals   defender)))})}))
+                             :admirals   (long (* damage-rate (:player/admirals   defender)))
+                             :stations   (long (* damage-rate (:player/stations   defender)))})}))
 
 ;;;;
 ;;;; Espionage Resolution

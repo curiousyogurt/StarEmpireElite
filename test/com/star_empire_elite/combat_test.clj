@@ -521,8 +521,8 @@
       (is (= 50  (:fighters   ud)))  ; 10% of 500
       (is (= 5   (:carriers   ud)))  ; 10% of 50
       (is (= 0   (:admirals   ud)))  ; 10% of 5 = 0.5 → floor 0
-      ;; Stations not in units-destroyed map
-      (is (not (contains? ud :stations))))))
+      ;; Stations take damage too
+      (is (= 0   (:stations  ud))))))  ; 10% of 5 = 0.5 → floor 0
 
 (deftest strike-dispatch-caps-at-15
   (testing "Attacker with 50 cmd-ships dispatches only 15; damage is 15% not 50%"
