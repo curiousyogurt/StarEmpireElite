@@ -2,12 +2,11 @@
 ;;;;; Outcomes Phase - Turn Results and Advancement
 ;;;;;
 ;;;;; The outcomes page is the final phase of each turn. It displays the results of any combat and
-;;;;; espionage operations that were resolved when the page was first loaded (in outcomes-handler in
-;;;;; app.clj), along with population growth at the end of a round. All stat changes — casualties,
-;;;;; captured planets, population — are applied on the GET request and cached in the player entity
-;;;;; so that a page refresh shows the same result without recomputing. The POST (apply-outcomes)
-;;;;; only handles turn advancement and cleanup: incrementing turn/round counters, clearing pending
-;;;;; state, and recording the score.
+;;;;; espionage operations resolved by resolution/resolve-turn!, along with population growth,
+;;;;; stability events, and elimination. All stat changes are applied on the GET request and cached
+;;;;; in the player entity so that a page refresh shows the same result without recomputing.
+;;;;; The POST (apply-outcomes) only handles turn advancement and cleanup: incrementing turn/round
+;;;;; counters, clearing pending state, and recording the score.
 ;;;;;
 
 (ns com.star-empire-elite.pages.app.outcomes
@@ -18,7 +17,7 @@
             [com.star-empire-elite.utils :as utils]))
 
 ;;;;
-;;;; Calculations
+;;;; Score
 ;;;;
 
 (defn- calculate-score
@@ -36,78 +35,6 @@
      (* (:player/generals     player) 50)
      (* (:player/admirals     player) 100)
      (quot (max 0 (:player/credits player)) 1000)))
-
-(defn- distribute-breakaway-planets
-  "Distribute n planet losses proportionally across ore/erg/mil counts.
-  Uses largest-remainder method so the total always equals n exactly.
-
-  [ore int, erg int, mil int, n int] -> {:ore int, :erg int, :mil int}"
-  [ore erg mil n]
-  (let [total (+ ore erg mil)]
-    (if (zero? total)
-      {:ore 0 :erg 0 :mil 0}
-      (let [ore-frac (* n (/ (double ore) total))
-            erg-frac (* n (/ (double erg) total))
-            mil-frac (* n (/ (double mil) total))
-            ore-base (long ore-frac)
-            erg-base (long erg-frac)
-            mil-base (long mil-frac)
-            remainder (- n ore-base erg-base mil-base)
-            ;; Distribute remainder to types with largest fractional parts
-            by-frac  (sort-by second >
-                       [[:ore (- ore-frac ore-base)]
-                        [:erg (- erg-frac erg-base)]
-                        [:mil (- mil-frac mil-base)]])
-            extras   (set (map first (take remainder by-frac)))]
-        {:ore (min ore (+ ore-base (if (extras :ore) 1 0)))
-         :erg (min erg (+ erg-base (if (extras :erg) 1 0)))
-         :mil (min mil (+ mil-base (if (extras :mil) 1 0)))}))))
-
-(defn calculate-stability-breakaway
-  "Roll for a stability breakaway event. Returns a result map whether or not
-  a breakaway occurs; :triggered? indicates whether planets were lost.
-
-  [player player-map, game game-map] -> result-map"
-  [player game]
-  (let [stability  (:player/stability player)
-        threshold  (:game/stability-breakaway-threshold game)
-        cap        (/ (:game/stability-breakaway-cap game) 100.0)
-        roll       (inc (rand-int 100))
-        triggered? (> roll (+ stability threshold))]
-    (if-not triggered?
-      {:roll roll :stability stability :triggered? false}
-      (let [ore   (:player/ore-planets player)
-            erg   (:player/erg-planets player)
-            mil   (:player/mil-planets player)
-            total (+ ore erg mil)
-            fraction     (min cap (/ (double (- roll stability threshold)) 100.0))
-            planets-lost (max 1 (long (Math/ceil (* fraction total))))
-            lost         (distribute-breakaway-planets ore erg mil planets-lost)]
-        {:roll        roll
-         :stability   stability
-         :triggered?  true
-         :ore-lost    (:ore lost)
-         :erg-lost    (:erg lost)
-         :mil-lost    (:mil lost)
-         :total-lost  planets-lost}))))
-
-(defn calculate-stability-recovery
-  "Roll for a stability recovery event. Only call when expenses were fully paid
-  and stability is below 100. Triggers if roll < max(stability, 50), so higher
-  stability means a greater chance of recovery, with a 50% floor.
-
-  [player player-map, game game-map] -> result-map"
-  [player game]
-  (let [stability  (:player/stability player)
-        amount     (:game/stability-recovery-amount game)
-        floor      (:game/stability-recovery-floor game)
-        roll       (inc (rand-int 100))
-        target     (max stability floor)
-        triggered? (< roll target)]
-    {:roll       roll
-     :stability  stability
-     :triggered? triggered?
-     :amount     (when triggered? (min amount (- 100 stability)))}))
 
 ;;;;
 ;;;; UI Components

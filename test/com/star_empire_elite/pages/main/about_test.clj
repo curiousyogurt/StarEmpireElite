@@ -85,9 +85,8 @@
         (is (clojure.string/includes? result "/about/design") (str "Missing /about/design on tab " tab))))))
 
 (deftest test-about-page-nav-links-present
-  (testing "All tab pages include signup, signin, and home navigation links"
+  (testing "All tab pages include combined sign-in/sign-up and home navigation links"
     (doseq [tab [:about :essay :design]]
       (let [result (pr-str (about/about-page tab))]
         (is (clojure.string/includes? result "/signup") (str "Missing /signup on tab " tab))
-        (is (clojure.string/includes? result "/signin") (str "Missing /signin on tab " tab))
         (is (clojure.string/includes? result "\"Home\"") (str "Missing Home link on tab " tab))))))

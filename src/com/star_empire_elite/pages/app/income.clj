@@ -29,10 +29,10 @@
     {:ore-credits  (* ore-count                    (:game/ore-planet-credits     game))
      :erg-food     (* erg-count                    (:game/erg-planet-food        game))
      :erg-fuel     (* erg-count                    (:game/erg-planet-fuel        game))
-     :mil-soldiers (* (:player/mil-planets player) (:game/mil-planet-soldiers   game))
-     :mil-fighters (* (:player/mil-planets player) (:game/mil-planet-fighters   game))
-     :mil-stations (* (:player/mil-planets player) (:game/mil-planet-stations   game))
-     :tax-credits  (* (:player/population player)  (:game/population-tax-credits game))}))
+     :mil-soldiers (* (:player/mil-planets player) (:game/mil-planet-soldiers    game))
+     :mil-fighters (* (:player/mil-planets player) (:game/mil-planet-fighters    game))
+     :mil-stations (* (:player/mil-planets player) (:game/mil-planet-stations    game))
+     :tax-credits  (* (:player/population  player) (:game/population-tax-credits game))}))
 
 (defn calculate-resources-after-income
   "Calculate all player resources after applying income.

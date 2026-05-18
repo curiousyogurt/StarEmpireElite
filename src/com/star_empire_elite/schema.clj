@@ -163,11 +163,6 @@
             [:player/admirals              :int]
             [:player/agents                :int]
 
-            ;; Diplomatic relationships
-            [:player/allies {:optional true}   [:set :player/id]]
-            [:player/treaties {:optional true} [:set :player/id]]
-            [:player/messages {:optional true} [:vector :message/id]]
-
             ;; Expense stability penalty
             [:player/expense-stability-penalty      {:optional true} [:maybe :int]]
             [:player/last-expense-stability-penalty {:optional true} [:maybe :int]]
@@ -191,15 +186,7 @@
             [:player/incoming-incite-stability-lost    {:optional true} [:maybe :int]]
             [:player/incoming-bomb-result              {:optional true} [:maybe :string]]]
 
-   :message/id :uuid
-   :message [:map {:closed true}
-             [:xt/id              :message/id]
-             [:message/game       :game/id]
-             [:message/from       :player/id]
-             [:message/to         :player/id]
-             [:message/text       :string]
-             [:message/sent-at    inst?]
-             [:message/is-anonymous :boolean]]})
+   })
 
 (def module
   {:schema schema})
