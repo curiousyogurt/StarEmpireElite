@@ -7,32 +7,34 @@
 ;;;;; combat, espionage, population growth, stability events, and elimination inline on first load.
 ;;;;;
 ;;;;; To add a new page <p>:
-;;;;;  - Import the <p> module at the top require with :as alias
+;;;;;  - Import the <p> module into the ns with the :as alias
 ;;;;;    - This corresponds to a <p>.clj file in the pages/app directory
 ;;;;;  - Create a handler function <p>-handler using with-player-and-game
 ;;;;;  - Add a route in the module map
 ;;;;;
 
 (ns com.star-empire-elite.app
-  (:require [rum.core :as rum]
-            [com.biffweb :as biff :refer [q]]
-            [com.star-empire-elite.middleware :as mid]
-            [com.star-empire-elite.pages.app.dashboard :as dashboard]
-            [com.star-empire-elite.pages.app.game :as game]
-            [com.star-empire-elite.pages.app.income :as income]
-            [com.star-empire-elite.pages.app.expenses :as expenses]
-            [com.star-empire-elite.pages.app.exchange :as exchange]
-            [com.star-empire-elite.pages.app.building :as building]
-            [com.star-empire-elite.pages.app.action :as action]
-            [com.star-empire-elite.pages.app.espionage :as espionage]
-            [com.star-empire-elite.pages.app.outcomes :as outcomes]
+  (:require [rum.core                                   :as rum]
+            [com.biffweb                                :as biff :refer [q]]
+            [com.star-empire-elite.middleware           :as mid]
+            ;; Game pages
+            [com.star-empire-elite.pages.app.dashboard  :as dashboard]
+            [com.star-empire-elite.pages.app.game       :as game]
+            [com.star-empire-elite.pages.app.income     :as income]
+            [com.star-empire-elite.pages.app.expenses   :as expenses]
+            [com.star-empire-elite.pages.app.exchange   :as exchange]
+            [com.star-empire-elite.pages.app.building   :as building]
+            [com.star-empire-elite.pages.app.action     :as action]
+            [com.star-empire-elite.pages.app.espionage  :as espionage]
+            [com.star-empire-elite.pages.app.outcomes   :as outcomes]
             [com.star-empire-elite.pages.app.eliminated :as eliminated]
-            [com.star-empire-elite.combat :as combat]
-            [com.star-empire-elite.constants :as const]
-            [com.star-empire-elite.ui :as ui]
-            [com.star-empire-elite.utils :as utils]
-            [com.star-empire-elite.log :as gamelog]
-            [xtdb.api :as xt]))
+            ;; Game functions
+            [com.star-empire-elite.combat               :as combat]
+            [com.star-empire-elite.constants            :as const]
+            [com.star-empire-elite.ui                   :as ui]
+            [com.star-empire-elite.utils                :as utils]
+            [com.star-empire-elite.log                  :as gamelog]
+            [xtdb.api                                   :as xt]))
 
 ;;;;
 ;;;; Dashboard
@@ -59,30 +61,30 @@
     (if-not (const/admin-emails (:user/email user))
       {:status 303 :headers {"location" "/app"}}
       (ui/page
-       {}
-       [:div.text-base.w-full.max-w-2xl.mx-auto.overflow-hidden.relative
-        {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
-                 :border-radius "4px" :color "#4ade80"
-                 :font-family "'Courier New', monospace"}}
-        (ui/scanline-overlay)
-        [:div.flex.items-center
-         {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
-         [:div {:style {:font-size "18px" :font-weight "bold" :color "#4ade80"
-                        :letter-spacing "0.05em"}} "CREATE GAME"]]
-        [:div {:style {:padding "14px"}}
-         (biff/form
-          {:action "/app/create-game"
-           :method "post"}
-          [:div {:style {:margin-bottom "14px"}}
-           (ui/section-label "Galaxy Name")
-           [:input.w-full
-            {:type "text" :name "game-name" :required true :maxlength 100 :autofocus true
-             :style {:background "#0e1810" :border "1px solid #1e6e44" :color "#4ade80"
-                     :padding "6px 8px" :font-family "'Courier New', monospace"
-                     :font-size "14px" :border-radius "2px" :outline "none" :width "100%"}}]]
-          [:div.flex.gap-3
-           (ui/action-bar-link "/app" "Cancel")
-           (ui/submit-button true "Create")])]]))))
+        {}
+        [:div.text-base.w-full.max-w-2xl.mx-auto.overflow-hidden.relative
+         {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
+                  :border-radius "4px" :color "#4ade80"
+                  :font-family "'Courier New', monospace"}}
+         (ui/scanline-overlay)
+         [:div.flex.items-center
+          {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
+          [:div {:style {:font-size "18px" :font-weight "bold" :color "#4ade80"
+                         :letter-spacing "0.05em"}} "CREATE GAME"]]
+         [:div {:style {:padding "14px"}}
+          (biff/form
+            {:action "/app/create-game"
+             :method "post"}
+            [:div {:style {:margin-bottom "14px"}}
+             (ui/section-label "Galaxy Name")
+             [:input.w-full
+              {:type "text" :name "game-name" :required true :maxlength 100 :autofocus true
+               :style {:background "#0e1810" :border "1px solid #1e6e44" :color "#4ade80"
+                       :padding "6px 8px" :font-family "'Courier New', monospace"
+                       :font-size "14px" :border-radius "2px" :outline "none" :width "100%"}}]]
+            [:div.flex.gap-3
+             (ui/action-bar-link "/app" "Cancel")
+             (ui/submit-button true "Create")])]]))))
 
 (defn create-game
   "Create a new game entity with all constants baked in. Admin only.
@@ -97,7 +99,9 @@
             game-name (clojure.string/trim (or (:game-name params) ""))
             now       (java.util.Date.)
             end-date  (java.util.Date. (+ (.getTime now) (* 30 24 60 60 1000)))]
-        (biff/submit-tx ctx
+        (biff/submit-txctx
+          ctx
+          ;; Set up game and establish gameplay constants
           [{:db/doc-type                        :game
             :xt/id                              game-id
             :game/name                          game-name
@@ -193,21 +197,17 @@
             players  (q db '{:find [player]
                              :in [game-id]
                              :where [[player :player/game game-id]]}
-                         game-id)
+                        game-id)
             messages (q db '{:find [msg]
                              :in [game-id]
                              :where [[msg :message/game game-id]]}
-                         game-id)]
+                        game-id)]
         (biff/submit-tx ctx
-          (concat
-            (for [[player-id] players] {:db/op :delete :xt/id player-id})
-            (for [[msg-id]    messages] {:db/op :delete :xt/id msg-id})
-            [{:db/op :delete :xt/id game-id}]))
+                        (concat
+                          (for [[player-id] players] {:db/op :delete :xt/id player-id})
+                          (for [[msg-id]    messages] {:db/op :delete :xt/id msg-id})
+                          [{:db/op :delete :xt/id game-id}]))
         {:status 303 :headers {"location" "/app"}}))))
-
-;;;;
-;;;; Join Game
-;;;;
 
 (defn join-game-page
   "Show the empire name prompt for joining a game.
@@ -220,34 +220,34 @@
     (if (nil? game)
       {:status 404 :body "Game not found"}
       (ui/page
-       {}
-       [:div.text-base.w-full.max-w-2xl.mx-auto.overflow-hidden.relative
-        {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
-                 :border-radius "4px" :color "#4ade80"
-                 :font-family "'Courier New', monospace"}}
-        (ui/scanline-overlay)
-        [:div.flex.items-center
-         {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
-         [:div
-          [:div {:style {:font-size "18px" :font-weight "bold" :color "#4ade80"
-                         :letter-spacing "0.05em"}} "JOIN GAME"]
-          [:div.text-sm.mt-px {:style {:color "#9adaaa"}} (:game/name game)]]]
-        [:div {:style {:padding "14px"}}
-         (when error
-           [:div {:style {:color "#f87171" :font-size "13px" :margin-bottom "10px"}} error])
-         (biff/form
-          {:action (str "/app/join-game/" game-id)
-           :method "post"}
-          [:div {:style {:margin-bottom "14px"}}
-           (ui/section-label "Empire Name")
-           [:input.w-full
-            {:type "text" :name "empire-name" :required true :maxlength 50 :autofocus true
-             :style {:background "#0e1810" :border "1px solid #1e6e44" :color "#4ade80"
-                     :padding "6px 8px" :font-family "'Courier New', monospace"
-                     :font-size "14px" :border-radius "2px" :outline "none" :width "100%"}}]]
-          [:div.flex.gap-3
-           (ui/action-bar-link "/app" "Cancel")
-           (ui/submit-button true "Join")])]]))))
+        {}
+        [:div.text-base.w-full.max-w-2xl.mx-auto.overflow-hidden.relative
+         {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
+                  :border-radius "4px" :color "#4ade80"
+                  :font-family "'Courier New', monospace"}}
+         (ui/scanline-overlay)
+         [:div.flex.items-center
+          {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
+          [:div
+           [:div {:style {:font-size "18px" :font-weight "bold" :color "#4ade80"
+                          :letter-spacing "0.05em"}} "JOIN GAME"]
+           [:div.text-sm.mt-px {:style {:color "#9adaaa"}} (:game/name game)]]]
+         [:div {:style {:padding "14px"}}
+          (when error
+            [:div {:style {:color "#f87171" :font-size "13px" :margin-bottom "10px"}} error])
+          (biff/form
+            {:action (str "/app/join-game/" game-id)
+             :method "post"}
+            [:div {:style {:margin-bottom "14px"}}
+             (ui/section-label "Empire Name")
+             [:input.w-full
+              {:type "text" :name "empire-name" :required true :maxlength 50 :autofocus true
+               :style {:background "#0e1810" :border "1px solid #1e6e44" :color "#4ade80"
+                       :padding "6px 8px" :font-family "'Courier New', monospace"
+                       :font-size "14px" :border-radius "2px" :outline "none" :width "100%"}}]]
+            [:div.flex.gap-3
+             (ui/action-bar-link "/app" "Cancel")
+             (ui/submit-button true "Join")])]]))))
 
 (defn join-game
   "Create a player entity in the chosen game after validating empire name uniqueness.
@@ -266,7 +266,7 @@
       {:status 303
        :headers {"location" (str "/app/join-game/" game-id "?error=Empire+name+cannot+be+blank")}}
 
-      ;; check if another user already has this empire name in any game
+      ;; Check if another user already has this empire name in any game
       (seq (q db '{:find [player]
                    :in [empire-name uid]
                    :where [[player :player/empire-name empire-name]
@@ -277,38 +277,39 @@
        :headers {"location" (str "/app/join-game/" game-id "?error=That+empire+name+is+already+taken")}}
 
       :else
+      ;; Set up new player in the game, pulling from game constants
       (let [player-id (java.util.UUID/randomUUID)]
         (biff/submit-tx ctx
-          [{:db/doc-type                    :player
-            :xt/id                          player-id
-            :player/user                    uid
-            :player/game                    game-id
-            :player/empire-name             empire-name
-            :player/credits                 const/starting-credits
-            :player/food                    const/starting-food
-            :player/fuel                    const/starting-fuel
-            :player/galaxars                const/starting-galaxars
-            :player/mil-planets             const/starting-mil-planets
-            :player/erg-planets             const/starting-erg-planets
-            :player/ore-planets             const/starting-ore-planets
-            :player/population              const/starting-population
-            :player/stability               const/starting-stability
-            :player/status                  0
-            :player/score                   0
-            :player/current-turn            1
-            :player/current-round           1
-            :player/current-phase           1
-            :player/turns-used              0
-            :player/generals                const/starting-generals
-            :player/admirals                const/starting-admirals
-            :player/soldiers                const/starting-soldiers
-            :player/transports              const/starting-transports
-            :player/stations                const/starting-stations
-            :player/carriers                const/starting-carriers
-            :player/fighters                const/starting-fighters
-            :player/cmd-ships               const/starting-cmd-ships
-            :player/agents                  const/starting-agents
-            :player/last-population-growth  nil}])
+                        [{:db/doc-type                   :player
+                          :xt/id                         player-id
+                          :player/user                   uid
+                          :player/game                   game-id
+                          :player/empire-name            empire-name
+                          :player/credits                const/starting-credits
+                          :player/food                   const/starting-food
+                          :player/fuel                   const/starting-fuel
+                          :player/galaxars               const/starting-galaxars
+                          :player/mil-planets            const/starting-mil-planets
+                          :player/erg-planets            const/starting-erg-planets
+                          :player/ore-planets            const/starting-ore-planets
+                          :player/population             const/starting-population
+                          :player/stability              const/starting-stability
+                          :player/status                 0
+                          :player/score                  0
+                          :player/current-turn           1
+                          :player/current-round          1
+                          :player/current-phase          1
+                          :player/turns-used             0
+                          :player/generals               const/starting-generals
+                          :player/admirals               const/starting-admirals
+                          :player/soldiers               const/starting-soldiers
+                          :player/transports             const/starting-transports
+                          :player/stations               const/starting-stations
+                          :player/carriers               const/starting-carriers
+                          :player/fighters               const/starting-fighters
+                          :player/cmd-ships              const/starting-cmd-ships
+                          :player/agents                 const/starting-agents
+                          :player/last-population-growth nil}])
         {:status 303
          :headers {"location" (str "/app/game/" player-id)}}))))
 
@@ -330,22 +331,27 @@
   [{:keys [player game remaining-ms]}]
   (let [day-exhausted? (utils/day-exhausted? player game)]
     (ui/page
-     {}
-     [:div.text-green-400.font-mono
-      [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
-      [:div.border.border-yellow-400.p-6.mb-6.bg-yellow-400.bg-opacity-5
-       [:h2.text-xl.font-bold.mb-4.text-yellow-400 (if day-exhausted? "ALL ROUNDS COMPLETE" "ROUND COOLDOWN")]
-       [:p.mb-4 (if day-exhausted?
-                  "You have played all rounds for today. Rounds reset at midnight UTC."
-                  "Your empire needs time to consolidate before the next round.")]
-       [:p.text-2xl.font-bold.text-yellow-400.mb-2
-        (utils/format-cooldown-duration remaining-ms)]
-       [:p.text-sm (if day-exhausted? "Time remaining until midnight UTC" "Time remaining before next round")]
-       (when-not day-exhausted?
-         [:p.text-xs.mt-2 (str "Minimum " (:game/hours-between-rounds game) " hours between rounds.")])]
-      [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
-       {:href (str "/app/game/" (:xt/id player))} "Back to Overview"]])))
+      {}
+      [:div.text-green-400.font-mono
+       [:h1.text-3xl.font-bold.mb-6 (:player/empire-name player)]
+       [:div.border.border-yellow-400.p-6.mb-6.bg-yellow-400.bg-opacity-5
+        [:h2.text-xl.font-bold.mb-4.text-yellow-400 (if day-exhausted? "ALL ROUNDS COMPLETE" "ROUND COOLDOWN")]
+        [:p.mb-4 (if day-exhausted?
+                   "You have played all rounds for today. Rounds reset at midnight UTC."
+                   "Your empire needs time to consolidate before the next round.")]
+        [:p.text-2xl.font-bold.text-yellow-400.mb-2
+         (utils/format-cooldown-duration remaining-ms)]
+        [:p.text-sm (if day-exhausted? "Time remaining until midnight UTC" "Time remaining before next round")]
+        (when-not day-exhausted?
+          [:p.text-xs.mt-2 (str "Minimum " (:game/hours-between-rounds game) " hours between rounds.")])]
+       [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
+        {:href (str "/app/game/" (:xt/id player))} "Back to Overview"]])))
 
+;;;;
+;;;; All the handlers are similar:
+;;;;  - validate whether player is in the correct phase (nil if yes)
+;;;;  - determine whether player is in cooldown (nil if no)
+;;;;  - render income-page (because or returns the first non-false/nil value)
 (defn income-handler [ctx]
   (utils/with-player-and-game [player game player-id] ctx
     (or (utils/validate-phase player 1 player-id)
@@ -410,19 +416,19 @@
                             ud         (:units-destroyed result)
                             ships-lost (:cmd-ships-lost result)]
                         (biff/submit-tx ctx
-                          [{:db/doc-type :player :db/op :update :xt/id player-id
-                            :player/last-battle-result (pr-str result)
-                            :player/cmd-ships (max 0 (- (:player/cmd-ships player) ships-lost))}
-                           {:db/doc-type :player :db/op :update :xt/id (:xt/id defender)
-                            :player/soldiers   (max 0 (- (:player/soldiers   defender) (:soldiers   ud)))
-                            :player/transports (max 0 (- (:player/transports defender) (:transports ud)))
-                            :player/generals   (max 0 (- (:player/generals   defender) (:generals   ud)))
-                            :player/fighters   (max 0 (- (:player/fighters   defender) (:fighters   ud)))
-                            :player/carriers   (max 0 (- (:player/carriers   defender) (:carriers   ud)))
-                            :player/admirals   (max 0 (- (:player/admirals   defender) (:admirals   ud)))
-                            :player/stations   (max 0 (- (:player/stations   defender) (:stations   ud)))
-                            :player/incoming-attacks
-                            (conj (or (:player/incoming-attacks defender) []) (pr-str result))}])
+                                        [{:db/doc-type :player :db/op :update :xt/id player-id
+                                          :player/last-battle-result (pr-str result)
+                                          :player/cmd-ships (max 0 (- (:player/cmd-ships player) ships-lost))}
+                                         {:db/doc-type :player :db/op :update :xt/id (:xt/id defender)
+                                          :player/soldiers   (max 0 (- (:player/soldiers   defender) (:soldiers   ud)))
+                                          :player/transports (max 0 (- (:player/transports defender) (:transports ud)))
+                                          :player/generals   (max 0 (- (:player/generals   defender) (:generals   ud)))
+                                          :player/fighters   (max 0 (- (:player/fighters   defender) (:fighters   ud)))
+                                          :player/carriers   (max 0 (- (:player/carriers   defender) (:carriers   ud)))
+                                          :player/admirals   (max 0 (- (:player/admirals   defender) (:admirals   ud)))
+                                          :player/stations   (max 0 (- (:player/stations   defender) (:stations   ud)))
+                                          :player/incoming-attacks
+                                          (conj (or (:player/incoming-attacks defender) []) (pr-str result))}])
                         [result (assoc player :player/cmd-ships
                                        (max 0 (- (:player/cmd-ships player) ships-lost)))])
                       ;; --- Invade / Raid branch ---
@@ -452,38 +458,38 @@
                             att-food-res   (+ (:player/food    player) rc-food)
                             att-fuel-res   (+ (:player/fuel    player) rc-fuel)]
                         (biff/submit-tx ctx
-                          [{:db/doc-type :player :db/op :update :xt/id player-id
-                            :player/last-battle-result (pr-str capped)
-                            :player/soldiers     att-soldiers
-                            :player/transports   att-transports
-                            :player/generals     att-generals
-                            :player/fighters     att-fighters
-                            :player/carriers     att-carriers
-                            :player/admirals     att-admirals
-                            :player/cmd-ships    att-cmd-ships
-                            :player/mil-planets  att-mil-plts
-                            :player/erg-planets att-erg-plts
-                            :player/ore-planets  att-ore-plts
-                            :player/credits      att-credits
-                            :player/food         att-food-res
-                            :player/fuel         att-fuel-res}
-                           {:db/doc-type :player :db/op :update :xt/id (:xt/id  defender)
-                            :player/soldiers     (max 0 (- (:player/soldiers    defender) (:soldiers-lost   dl)))
-                            :player/transports   (max 0 (- (:player/transports  defender) (:transports-lost dl)))
-                            :player/generals     (max 0 (- (:player/generals    defender) (:generals-lost   dl)))
-                            :player/fighters     (max 0 (- (:player/fighters    defender) (:fighters-lost   dl)))
-                            :player/carriers     (max 0 (- (:player/carriers    defender) (:carriers-lost   dl)))
-                            :player/admirals     (max 0 (- (:player/admirals    defender) (:admirals-lost   dl)))
-                            :player/cmd-ships    (max 0 (- (:player/cmd-ships   defender) (:cmd-ships-lost  dl)))
-                            :player/stations     (max 0 (- (:player/stations    defender) (:stations-lost   dl)))
-                            :player/mil-planets  (max 0 (- (:player/mil-planets defender) pt-mil))
-                            :player/erg-planets  (max 0 (- (:player/erg-planets defender) pt-erg))
-                            :player/ore-planets  (max 0 (- (:player/ore-planets defender) pt-ore))
-                            :player/credits      (max 0 (- (:player/credits     defender) rc-credits))
-                            :player/food         (max 0 (- (:player/food        defender) rc-food))
-                            :player/fuel         (max 0 (- (:player/fuel        defender) rc-fuel))
-                            :player/incoming-attacks
-                            (conj (or (:player/incoming-attacks defender) []) (pr-str capped))}])
+                                        [{:db/doc-type :player :db/op :update :xt/id player-id
+                                          :player/last-battle-result (pr-str capped)
+                                          :player/soldiers     att-soldiers
+                                          :player/transports   att-transports
+                                          :player/generals     att-generals
+                                          :player/fighters     att-fighters
+                                          :player/carriers     att-carriers
+                                          :player/admirals     att-admirals
+                                          :player/cmd-ships    att-cmd-ships
+                                          :player/mil-planets  att-mil-plts
+                                          :player/erg-planets att-erg-plts
+                                          :player/ore-planets  att-ore-plts
+                                          :player/credits      att-credits
+                                          :player/food         att-food-res
+                                          :player/fuel         att-fuel-res}
+                                         {:db/doc-type :player :db/op :update :xt/id (:xt/id  defender)
+                                          :player/soldiers     (max 0 (- (:player/soldiers    defender) (:soldiers-lost   dl)))
+                                          :player/transports   (max 0 (- (:player/transports  defender) (:transports-lost dl)))
+                                          :player/generals     (max 0 (- (:player/generals    defender) (:generals-lost   dl)))
+                                          :player/fighters     (max 0 (- (:player/fighters    defender) (:fighters-lost   dl)))
+                                          :player/carriers     (max 0 (- (:player/carriers    defender) (:carriers-lost   dl)))
+                                          :player/admirals     (max 0 (- (:player/admirals    defender) (:admirals-lost   dl)))
+                                          :player/cmd-ships    (max 0 (- (:player/cmd-ships   defender) (:cmd-ships-lost  dl)))
+                                          :player/stations     (max 0 (- (:player/stations    defender) (:stations-lost   dl)))
+                                          :player/mil-planets  (max 0 (- (:player/mil-planets defender) pt-mil))
+                                          :player/erg-planets  (max 0 (- (:player/erg-planets defender) pt-erg))
+                                          :player/ore-planets  (max 0 (- (:player/ore-planets defender) pt-ore))
+                                          :player/credits      (max 0 (- (:player/credits     defender) rc-credits))
+                                          :player/food         (max 0 (- (:player/food        defender) rc-food))
+                                          :player/fuel         (max 0 (- (:player/fuel        defender) rc-fuel))
+                                          :player/incoming-attacks
+                                          (conj (or (:player/incoming-attacks defender) []) (pr-str capped))}])
                         ;; Build locally updated player for accurate resource display this request
                         [capped (merge player {:player/soldiers     att-soldiers
                                                :player/transports   att-transports
@@ -524,42 +530,42 @@
                           agents-lost (or (:agents-captured result) 0)
                           stab-dmg    (or (:stability-damage result) 0)]
                       (biff/submit-tx ctx
-                        (remove nil?
-                          [{:db/doc-type :player :db/op :update :xt/id player-id
-                            :player/last-espionage-result (pr-str result)
-                            :player/agents (max 0 (- (:player/agents display-player) agents-lost))}
-                           (when (pos? agents-lost)
-                             {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
-                              :player/agents (+ (:player/agents target) agents-lost)
-                              :player/incoming-espionage-fails
-                              (inc (or (:player/incoming-espionage-fails target) 0))
-                              :player/incoming-espionage-agents-gained
-                              (+ (or (:player/incoming-espionage-agents-gained target) 0) agents-lost)})
-                           (when (and incite? att-wins? (pos? stab-dmg))
-                             {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
-                              :player/stability (max 0 (- (:player/stability target) stab-dmg))
-                              :player/incoming-incite-stability-lost
-                              (+ (or (:player/incoming-incite-stability-lost target) 0) stab-dmg)})
-                           (when (and bomb? att-wins?)
-                             (let [sd (or (:soldiers-destroyed   result) 0)
-                                   td (or (:transports-destroyed result) 0)
-                                   fd (or (:fighters-destroyed   result) 0)
-                                   cd (or (:carriers-destroyed   result) 0)]
-                               {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
-                                :player/soldiers   (max 0 (- (:player/soldiers   target) sd))
-                                :player/transports (max 0 (- (:player/transports target) td))
-                                :player/fighters   (max 0 (- (:player/fighters   target) fd))
-                                :player/carriers   (max 0 (- (:player/carriers   target) cd))
-                                :player/incoming-bomb-result
-                                (pr-str {:attacker-name        (:player/empire-name player)
-                                         :soldiers-destroyed   sd
-                                         :transports-destroyed td
-                                         :fighters-destroyed   fd
-                                         :carriers-destroyed   cd})}))
-                           (when (and defect? att-wins?)
-                             (let [n (or (:agents-defected result) 0)]
-                               {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
-                                :player/agents (max 0 (- (or (:player/agents target) 0) n))}))]))
+                                      (remove nil?
+                                              [{:db/doc-type :player :db/op :update :xt/id player-id
+                                                :player/last-espionage-result (pr-str result)
+                                                :player/agents (max 0 (- (:player/agents display-player) agents-lost))}
+                                               (when (pos? agents-lost)
+                                                 {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
+                                                  :player/agents (+ (:player/agents target) agents-lost)
+                                                  :player/incoming-espionage-fails
+                                                  (inc (or (:player/incoming-espionage-fails target) 0))
+                                                  :player/incoming-espionage-agents-gained
+                                                  (+ (or (:player/incoming-espionage-agents-gained target) 0) agents-lost)})
+                                               (when (and incite? att-wins? (pos? stab-dmg))
+                                                 {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
+                                                  :player/stability (max 0 (- (:player/stability target) stab-dmg))
+                                                  :player/incoming-incite-stability-lost
+                                                  (+ (or (:player/incoming-incite-stability-lost target) 0) stab-dmg)})
+                                               (when (and bomb? att-wins?)
+                                                 (let [sd (or (:soldiers-destroyed   result) 0)
+                                                       td (or (:transports-destroyed result) 0)
+                                                       fd (or (:fighters-destroyed   result) 0)
+                                                       cd (or (:carriers-destroyed   result) 0)]
+                                                   {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
+                                                    :player/soldiers   (max 0 (- (:player/soldiers   target) sd))
+                                                    :player/transports (max 0 (- (:player/transports target) td))
+                                                    :player/fighters   (max 0 (- (:player/fighters   target) fd))
+                                                    :player/carriers   (max 0 (- (:player/carriers   target) cd))
+                                                    :player/incoming-bomb-result
+                                                    (pr-str {:attacker-name        (:player/empire-name player)
+                                                             :soldiers-destroyed   sd
+                                                             :transports-destroyed td
+                                                             :fighters-destroyed   fd
+                                                             :carriers-destroyed   cd})}))
+                                               (when (and defect? att-wins?)
+                                                 (let [n (or (:agents-defected result) 0)]
+                                                   {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
+                                                    :player/agents (max 0 (- (or (:player/agents target) 0) n))}))]))
                       (let [agents-gained (if (and defect? att-wins?)
                                             (or (:agents-defected result) 0)
                                             0)]
@@ -573,27 +579,27 @@
                 (if (some? cached)
                   [cached display-player]
                   (let [pop      (:player/population display-player)
-                          planets  (+ (:player/ore-planets  display-player)
-                                      (:player/erg-planets display-player)
-                                      (:player/mil-planets  display-player))
-                          capacity (* planets const/pop-capacity-per-planet)
-                          raw      (+ (* pop const/pop-growth-rate)
-                                      (* planets const/pop-growth-per-planet))
-                          crowding (if (zero? capacity) 0.0
-                                     (max 0.0 (- 1.0 (/ pop capacity))))
-                          rnd         (+ const/pop-random-min
-                                         (* (rand) (- const/pop-random-max const/pop-random-min)))
-                          raw-growth  (* raw crowding rnd)
-                          growth-int  (long raw-growth)
-                          growth-frac (- raw-growth growth-int)
-                          growth      (max 0 (+ growth-int (if (< (rand) growth-frac) 1 0)))]
-                      (biff/submit-tx ctx
-                        [{:db/doc-type :player :db/op :update :xt/id player-id
-                          :player/population             (+ pop growth)
-                          :player/last-population-growth growth}])
-                      [growth (-> display-player
-                                  (assoc :player/population             (+ pop growth))
-                                  (assoc :player/last-population-growth growth))])))
+                        planets  (+ (:player/ore-planets  display-player)
+                                    (:player/erg-planets display-player)
+                                    (:player/mil-planets  display-player))
+                        capacity (* planets const/pop-capacity-per-planet)
+                        raw      (+ (* pop const/pop-growth-rate)
+                                    (* planets const/pop-growth-per-planet))
+                        crowding (if (zero? capacity) 0.0
+                                   (max 0.0 (- 1.0 (/ pop capacity))))
+                        rnd         (+ const/pop-random-min
+                                       (* (rand) (- const/pop-random-max const/pop-random-min)))
+                        raw-growth  (* raw crowding rnd)
+                        growth-int  (long raw-growth)
+                        growth-frac (- raw-growth growth-int)
+                        growth      (max 0 (+ growth-int (if (< (rand) growth-frac) 1 0)))]
+                    (biff/submit-tx ctx
+                                    [{:db/doc-type :player :db/op :update :xt/id player-id
+                                      :player/population             (+ pop growth)
+                                      :player/last-population-growth growth}])
+                    [growth (-> display-player
+                                (assoc :player/population             (+ pop growth))
+                                (assoc :player/last-population-growth growth))])))
 
               ;; --- expense stability penalty ---
               pending-penalty (:player/expense-stability-penalty final-player)
@@ -613,12 +619,12 @@
                 :else
                 (let [new-stability (max 0 (- (:player/stability final-player) pending-penalty))]
                   (biff/submit-tx ctx
-                    [{:db/doc-type                            :player
-                      :db/op                                  :update
-                      :xt/id                                  player-id
-                      :player/stability                       new-stability
-                      :player/last-expense-stability-penalty  pending-penalty
-                      :player/expense-stability-penalty       nil}])
+                                  [{:db/doc-type                            :player
+                                    :db/op                                  :update
+                                    :xt/id                                  player-id
+                                    :player/stability                       new-stability
+                                    :player/last-expense-stability-penalty  pending-penalty
+                                    :player/expense-stability-penalty       nil}])
                   [pending-penalty (-> final-player
                                        (assoc :player/stability new-stability)
                                        (assoc :player/last-expense-stability-penalty pending-penalty))]))
@@ -636,22 +642,22 @@
                   (if-not (:triggered? result)
                     (do
                       (biff/submit-tx ctx
-                        [{:db/doc-type                    :player
-                          :db/op                          :update
-                          :xt/id                          player-id
-                          :player/last-stability-breakaway (pr-str result)}])
+                                      [{:db/doc-type                    :player
+                                        :db/op                          :update
+                                        :xt/id                          player-id
+                                        :player/last-stability-breakaway (pr-str result)}])
                       [result final-player-2])
                     (let [ore-after (- (:player/ore-planets final-player-2) (:ore-lost result))
                           erg-after (- (:player/erg-planets final-player-2) (:erg-lost result))
                           mil-after (- (:player/mil-planets final-player-2) (:mil-lost result))]
                       (biff/submit-tx ctx
-                        [{:db/doc-type                     :player
-                          :db/op                           :update
-                          :xt/id                           player-id
-                          :player/ore-planets              ore-after
-                          :player/erg-planets              erg-after
-                          :player/mil-planets              mil-after
-                          :player/last-stability-breakaway (pr-str result)}])
+                                      [{:db/doc-type                     :player
+                                        :db/op                           :update
+                                        :xt/id                           player-id
+                                        :player/ore-planets              ore-after
+                                        :player/erg-planets              erg-after
+                                        :player/mil-planets              mil-after
+                                        :player/last-stability-breakaway (pr-str result)}])
                       [result (-> final-player-2
                                   (assoc :player/ore-planets ore-after)
                                   (assoc :player/erg-planets erg-after)
@@ -683,41 +689,41 @@
                   (if-not (:triggered? result)
                     (do
                       (biff/submit-tx ctx
-                        [{:db/doc-type                    :player
-                          :db/op                          :update
-                          :xt/id                          player-id
-                          :player/last-stability-recovery (pr-str result)}])
+                                      [{:db/doc-type                    :player
+                                        :db/op                          :update
+                                        :xt/id                          player-id
+                                        :player/last-stability-recovery (pr-str result)}])
                       [result final-player-3])
                     (let [new-stability (min 100 (+ (:player/stability final-player-3) (:amount result)))]
                       (biff/submit-tx ctx
-                        [{:db/doc-type                    :player
-                          :db/op                          :update
-                          :xt/id                          player-id
-                          :player/stability               new-stability
-                          :player/last-stability-recovery (pr-str result)}])
+                                      [{:db/doc-type                    :player
+                                        :db/op                          :update
+                                        :xt/id                          player-id
+                                        :player/stability               new-stability
+                                        :player/last-stability-recovery (pr-str result)}])
                       [result (assoc final-player-3 :player/stability new-stability)]))))]
 
-          ;; --- elimination check ---
-          (let [total-planets (+ (:player/ore-planets final-player-4)
-                                 (:player/erg-planets final-player-4)
-                                 (:player/mil-planets final-player-4))
-                eliminated?   (zero? total-planets)]
-            (when (and eliminated?
-                       (not= (:player/status final-player-4) const/player-status-eliminated))
-              (biff/submit-tx ctx
-                [{:db/doc-type   :player
-                  :db/op         :update
-                  :xt/id         player-id
-                  :player/status const/player-status-eliminated}]))
-            (outcomes/outcomes-page {:player           final-player-4
-                                     :game             game
-                                     :battle-result    battle-result
-                                     :espionage-result espionage-result
-                                     :pop-growth       pop-growth
-                                     :expense-penalty  expense-penalty
-                                     :breakaway-result breakaway-result
-                                     :recovery-result  recovery-result
-                                     :eliminated?      eliminated?}))))))
+;; --- elimination check ---
+(let [total-planets (+ (:player/ore-planets final-player-4)
+                       (:player/erg-planets final-player-4)
+                       (:player/mil-planets final-player-4))
+      eliminated?   (zero? total-planets)]
+  (when (and eliminated?
+             (not= (:player/status final-player-4) const/player-status-eliminated))
+    (biff/submit-tx ctx
+                    [{:db/doc-type   :player
+                      :db/op         :update
+                      :xt/id         player-id
+                      :player/status const/player-status-eliminated}]))
+  (outcomes/outcomes-page {:player           final-player-4
+                           :game             game
+                           :battle-result    battle-result
+                           :espionage-result espionage-result
+                           :pop-growth       pop-growth
+                           :expense-penalty  expense-penalty
+                           :breakaway-result breakaway-result
+                           :recovery-result  recovery-result
+                           :eliminated?      eliminated?}))))))
 
 ;;;;
 ;;;; Alerts
@@ -744,31 +750,34 @@
 ;;;; Routes
 ;;;;
 
+;;; A map of all the routes
 (def module
-  {:routes ["/app" {:middleware [mid/wrap-signed-in gamelog/wrap-game-action-log]}
-            ["" {:get app}]
-            ["/create-game"                        {:get create-game-page :post create-game}]
-            ["/delete-game/:game-id"               {:post delete-game}]
-            ["/join-game/:game-id"                 {:get join-game-page :post join-game}]
-            ["/game/:player-id"                    {:get game/game-view}]
-            ["/game/:player-id/income"             {:get income-handler}]
-            ["/game/:player-id/apply-income"       {:post income/apply-income}]
-            ["/game/:player-id/expenses"           {:get expenses-handler}]
-            ["/game/:player-id/apply-expenses"     {:post expenses/apply-expenses}]
-            ["/game/:player-id/calculate-expenses" {:post expenses/calculate-expenses}]
-            ["/game/:player-id/exchange"           {:get exchange-handler}]
-            ["/game/:player-id/apply-exchange"     {:post exchange/apply-exchange}]
-            ["/game/:player-id/calculate-exchange" {:post exchange/calculate-exchange}]
-            ["/game/:player-id/building"           {:get building-handler}]
-            ["/game/:player-id/apply-building"     {:post building/apply-building}]
-            ["/game/:player-id/calculate-building" {:post building/calculate-building}]
-            ["/game/:player-id/action"             {:get action-handler}]
-            ["/game/:player-id/apply-action"       {:post action/apply-action}]
-            ["/game/:player-id/espionage"          {:get espionage-handler}]
-            ["/game/:player-id/apply-espionage"    {:post espionage/apply-espionage}]
-            ["/game/:player-id/outcomes"           {:get outcomes-handler}]
-            ["/game/:player-id/apply-outcomes"     {:post outcomes/apply-outcomes}]
-            ["/game/:player-id/eliminated"         {:get eliminated/eliminated-page}]
-            ["/game/:player-id/rejoin"             {:post eliminated/rejoin}]
-            ["/game/:player-id/alerts"             {:get alerts-handler}]
-            ]})
+  {:routes
+   ;; Base path (/app) and middleware injector
+   ["/app" {:middleware [mid/wrap-signed-in gamelog/wrap-game-action-log]}
+    ;; Path parameters, http method, function to call
+    [""                                    {:get app}]
+    ["/create-game"                        {:get  create-game-page :post create-game}]
+    ["/delete-game/:game-id"               {:post delete-game}]
+    ["/join-game/:game-id"                 {:get  join-game-page :post join-game}]
+    ["/game/:player-id"                    {:get  game/game-view}]
+    ["/game/:player-id/income"             {:get  income-handler}]
+    ["/game/:player-id/apply-income"       {:post income/apply-income}]
+    ["/game/:player-id/expenses"           {:get  expenses-handler}]
+    ["/game/:player-id/apply-expenses"     {:post expenses/apply-expenses}]
+    ["/game/:player-id/calculate-expenses" {:post expenses/calculate-expenses}]
+    ["/game/:player-id/exchange"           {:get  exchange-handler}]
+    ["/game/:player-id/apply-exchange"     {:post exchange/apply-exchange}]
+    ["/game/:player-id/calculate-exchange" {:post exchange/calculate-exchange}]
+    ["/game/:player-id/building"           {:get  building-handler}]
+    ["/game/:player-id/apply-building"     {:post building/apply-building}]
+    ["/game/:player-id/calculate-building" {:post building/calculate-building}]
+    ["/game/:player-id/action"             {:get  action-handler}]
+    ["/game/:player-id/apply-action"       {:post action/apply-action}]
+    ["/game/:player-id/espionage"          {:get  espionage-handler}]
+    ["/game/:player-id/apply-espionage"    {:post espionage/apply-espionage}]
+    ["/game/:player-id/outcomes"           {:get  outcomes-handler}]
+    ["/game/:player-id/apply-outcomes"     {:post outcomes/apply-outcomes}]
+    ["/game/:player-id/eliminated"         {:get  eliminated/eliminated-page}]
+    ["/game/:player-id/rejoin"             {:post eliminated/rejoin}]
+    ["/game/:player-id/alerts"             {:get  alerts-handler}]]})
