@@ -20,7 +20,7 @@
 (defn calculate-income
   "Calculate income from all sources using game constants.
 
-  [player player-map, game game-map] -> {:ore-credits int, :erg-food int,     :erg-fuel int,
+  [player player-map, game game-map] -> {:ore-credits int,  :erg-food int,     :erg-fuel int,
                                          :mil-soldiers int, :mil-fighters int, :mil-stations int,
                                          :tax-credits int}"
   [player game]
