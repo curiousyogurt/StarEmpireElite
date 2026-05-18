@@ -279,15 +279,15 @@
     (if (pos? pop-growth)
       [:span {:style {:color "#9adaaa" :font-size "14px"}}
        "Population grew by "
-       [:span {:style {:color "#4ade80"}} (str "+" pop-growth "M")]
+       [:span {:style {:color "#4ade80"}} (str "+" (ui/format-population pop-growth))]
        [:span {:style {:color "#4a6a58"}} " · "]
        "total "
-       [:span {:style {:color "#4ade80"}} (str population "M")]]
+       [:span {:style {:color "#4ade80"}} (ui/format-population population)]]
       [:span {:style {:color "#9adaaa" :font-size "14px"}}
        "Population held steady this round"
        [:span {:style {:color "#4a6a58"}} " · "]
        "total "
-       [:span {:style {:color "#4ade80"}} (str population "M")]])]])
+       [:span {:style {:color "#4ade80"}} (ui/format-population population)]])]])
 
 (defn apply-outcomes
   "Advance turn/round/phase and clear stored battle and espionage results.

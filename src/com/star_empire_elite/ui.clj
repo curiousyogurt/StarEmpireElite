@@ -77,6 +77,16 @@
   [n]
   (when n (first (format-number-core n))))
 
+(defn format-population
+  "Format a population value stored in millions for display.
+  Multiplies by 1,000,000 before abbreviating so that 6 → '6M', 1500 → '1.5B', etc.
+  Trailing '.0' before the suffix letter is stripped (e.g. '6.0M' → '6M').
+
+  [n number] -> string"
+  [n]
+  (when n
+    (str/replace (format-number-str (* n 1000000)) #"\.0([A-Za-z])" "$1")))
+
 (defn format-scale-tick-str
   "Format a number for compact scale ticks. Abbreviates at 1K+.
 
@@ -434,7 +444,7 @@
   [player player-map, opts? map] -> hiccup"
   [player & [{:keys [rank show-ground? show-fleet? show-ops?]
               :or   {show-ground? true show-fleet? true show-ops? true}}]]
-  (let [pop-str   (str/replace (format-number-str (* (:player/population player) 1000000)) #"\.0([A-Za-z])" "$1")
+  (let [pop-str   (format-population (:player/population player))
         turn      (:player/current-turn  player)
         round     (:player/current-round player)
 
@@ -590,7 +600,7 @@
    {:label "Food"       :key :food       :player-key :player/food}
    {:label "Fuel"       :key :fuel       :player-key :player/fuel}
    {:label "Galaxars"   :key :galaxars   :player-key :player/galaxars}
-   {:label "Population" :key :population :player-key :player/population :display-fn #(format-number (* % 1000000))}
+   {:label "Population" :key :population :player-key :player/population :display-fn format-population}
    {:label "Stability"  :key :stability  :player-key :player/stability  :display-fn #(str % "%")}
    {:label "Ore Plts"   :key :ore-planets :player-key :player/ore-planets}
    {:label "Erg Plts"   :key :erg-planets :player-key :player/erg-planets}

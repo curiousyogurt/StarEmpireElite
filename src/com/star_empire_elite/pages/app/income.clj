@@ -36,6 +36,8 @@
 
 (defn calculate-resources-after-income
   "Calculate all player resources after applying income.
+  Uses utils/player-snapshot which returns a flat map with un-namespaced keys
+  ({:credits n :food n :fuel n ...}), so we update :credits rather than :player/credits.
 
   [player player-map, income income-map] -> {:credits int, :food int, ...}"
   [player income]
@@ -48,32 +50,23 @@
       (update :stations + (:mil-stations income))))
 
 ;;;;
-;;;; SVG Indicator Bar
-;;;;
-
-(defn- resource-bar
-  "Render an SVG arrow indicator bar showing resource gain.
-
-  [before int, after int, filter-id str] -> hiccup"
-  [before after filter-id]
-  (ui/svg-indicator-bar :gain before after filter-id))
-
-;;;;
 ;;;; UI Components
 ;;;;
 
 (defn- source-pills
   "Render income pills for a source card: one pill per non-zero resource.
+  The for comprehension uses :let to compute the value and :when to skip zeros,
+  so only resources that actually increased this turn are shown.
 
   [income-map {:credits? int, :food? int, ...}] -> seq of hiccup"
   [income-map]
-  (for [[k label suffix] [[:credits "+" "cr"] [:food "+" "food"] [:fuel "+" "fuel"]
-                          [:soldiers "+" "sold"] [:fighters "+" "fgtr"] [:stations "+" "stn"]]
+  (for [[k suffix] [[:credits "cr"] [:food "food"] [:fuel "fuel"]
+                    [:soldiers "sold"] [:fighters "fgtr"] [:stations "stn"]]
         :let [v (or (k income-map) 0)]
         :when (pos? v)]
     [:span.text-xs.inline-block.rounded-sm.text-green-400
      {:key k :style {:padding "1px 5px" :background "#1a3a28"}}
-     label (ui/format-number v) " " suffix]))
+     "+" (ui/format-number v) " " suffix]))
 
 (defn- source-card
   "Render one income source card with name, count, and resource pills.
@@ -94,9 +87,7 @@
 
   [player player-map, income income-map] -> hiccup"
   [player income]
-  (let [pop-count (-> (format "%.1f" (double (:player/population player)))
-                      (str/replace #"\.0$" "")
-                      (str "M"))
+  (let [pop-count (ui/format-population (:player/population player))
         sources [{:name "Ore"
                   :count (:player/ore-planets player)
                   :income-map {:credits (:ore-credits income)}}
@@ -156,7 +147,7 @@
      [:div.income-row-desktop
       {:class (str "hidden md:grid " row-class)
        :style row-style}
-      name-cell (resource-bar before after filter-id) before-cell delta-cell after-cell]]))
+      name-cell (ui/svg-indicator-bar :gain before after filter-id) before-cell delta-cell after-cell]]))
 
 (defn- resource-table-header
   "Render the column-label row for the resource table.
