@@ -121,8 +121,8 @@
 
 (def population-tax-credits  2000)  ; credits per million population per round
 
-(def population-upkeep-food  250)
-(def population-upkeep-fuel  10)
+(def population-upkeep-food  1000)
+(def population-upkeep-fuel  1000)
 
 ;;;;
 ;;;; Stability
@@ -147,8 +147,8 @@
 ;;;; Upkeep / Expenses
 ;;;; Cost to maintain units and infrastructure per round.
 
-(def planet-upkeep-credits  2500)
-(def planet-upkeep-food     1000)
+(def planet-upkeep-credits  1000)
+(def planet-upkeep-food     300)
 
 (def soldier-upkeep-credits 25)
 (def soldier-upkeep-food    20)

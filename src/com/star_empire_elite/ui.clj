@@ -423,59 +423,70 @@
    label])
 
 (defn snapshot-section
-  "Render the 2-row × 10-column empire snapshot grid used on the building and exchange pages.
-  Row 1: Credits, Food, Fuel, Galaxars, Population, Ore Plts, Erg Plts, Mil Plts, Stability, Control.
-  Row 2: Soldiers, Transports, Generals, Fighters, Carriers, Admirals, Stations, Cmd Ships, Agents.
+  "Render the empire status tile. Accepts an optional rank integer for the header.
 
-  [player player-map] -> hiccup"
-  [player]
-  (let [row1 [["CREDITS"    (:player/credits player)      nil]
-               ["FOOD"       (:player/food player)        nil]
-               ["FUEL"       (:player/fuel player)        nil]
-               ["GALAXARS"   (:player/galaxars player)    nil]
-               ["POPULATION" (:player/population player)
-                #(str (str/replace (format "%.1f" (double %)) #"\.0$" "") "M")]
-               ["ORE PLTS"   (:player/ore-planets player) nil]
-               ["ERG PLTS"   (:player/erg-planets player) nil]
-               ["MIL PLTS"   (:player/mil-planets player) nil]
-               ["STABILITY"  (:player/stability player)
-                #(str % "%")]]
-        row2 [["SOLDIERS"   (:player/soldiers player)     nil]
-               ["TRANSPORTS" (:player/transports player)  nil]
-               ["GENERALS"   (:player/generals player)    nil]
-               ["FIGHTERS"   (:player/fighters player)    nil]
-               ["CARRIERS"   (:player/carriers player)    nil]
-               ["ADMIRALS"   (:player/admirals player)    nil]
-               ["STATIONS"   (:player/stations player)    nil]
-               ["CMD SHIPS"  (:player/cmd-ships player)   nil]
-               ["AGENTS"     (:player/agents player)      nil]]
-        render-row
-        (fn [items]
-          [:div {:style {:display "grid" :grid-template-columns "repeat(9, 1fr)" :gap "4px"}}
-           (for [item items]
-             (if (nil? item)
-               [:div]
-               (let [[label v display-fn] item]
-                 [:div {:key label}
-                  [:div {:style {:color "#4a6a58" :letter-spacing "0.04em" :font-size "9px"
-                                 :text-transform "uppercase" :overflow "hidden"
-                                 :text-overflow "ellipsis" :white-space "nowrap"}}
-                   label]
-                  [:div.font-bold {:style {:color "#9adaaa" :font-size "13px"}}
-                   (if display-fn (display-fn v) (format-number v))]])))])]
-    [:div
-     {:style {:background "#0a120d" :border "1px solid #1e3a2a"
-              :border-radius "3px" :padding "7px 10px" :overflow-x "auto"}}
-     [:div.flex.justify-between.items-center.mb-2
-      [:span.text-xs.uppercase
-       {:style {:letter-spacing "0.15em" :color "#4ade80"}}
-       "Empire Status"]
-      [:span.text-xs
-       {:style {:color "#7ab88a" :letter-spacing "0.1em"}}
-       ""]]
-     [:div.flex.flex-col {:style {:gap "6px" :min-width "500px"}}
-      (render-row row1)
-      (render-row row2)]]))
+  [player player-map, rank? int] -> hiccup"
+  [player & [rank]]
+  (let [pop-str   (str/replace (format-number-str (* (:player/population player) 1000000)) #"\.0([A-Za-z])" "$1")
+        turn      (:player/current-turn  player)
+        round     (:player/current-round player)
+
+        col-label {:color "#629171" :font-size "9px" :letter-spacing "0.1em"
+                   :text-transform "uppercase" :margin-bottom "6px"}
+        col-value {:color "#4ade80" :font-size "22px" :font-weight "bold" :line-height "1"}
+
+        big-stats [["CREDITS"     (format-number (:player/credits     player))]
+                   ["ORE PLANETS" (format-number (:player/ore-planets player))]
+                   ["ERG PLANETS" (format-number (:player/erg-planets player))]
+                   ["MIL PLANETS" (format-number (:player/mil-planets player))]]
+
+        row-label {:color "#629171" :font-size "10px" :letter-spacing "0.1em"
+                   :text-transform "uppercase" :width "100px" :flex-shrink "0"}
+        muted     {:color "#7ab88a" :font-size "12px"}
+        bright    {:color "#4ade80" :font-weight "bold" :font-size "12px"}
+
+        stat      (fn [label v]
+                    [:<>
+                     [:span {:style muted} (str label " ")]
+                     [:span {:style bright} v]])
+
+        row       (fn [section-label & stats]
+                    [:div.flex.items-center
+                     {:style {:padding "2px 14px" :gap "20px"}}
+                     [:span {:style row-label} (str "› " section-label)]
+                     [:div.flex.items-center {:style {:gap "20px" :flex-wrap "wrap"}} stats]])]
+
+    [:div {:style {:border "1px solid #253530" :border-radius "3px"
+                   :background "#161616" :overflow "hidden"}}
+     ;; Big 4 stat columns
+     [:div {:style {:display "grid" :grid-template-columns "repeat(4, 1fr)"
+                    :border-bottom "1px solid #253530"}}
+      (for [[label value] big-stats]
+        [:div {:style {:padding "6px 14px 8px" :border-right "1px solid #1a2820"}}
+         [:div {:style col-label} label]
+         [:div {:style col-value} value]])]
+     ;; Grouped rows
+     [:div
+      (row "EMPIRE"
+           (stat "population" pop-str)
+           (stat "stability"  (str (:player/stability player) "%"))
+           (stat "food"       (format-number (:player/food player)))
+           (stat "fuel"       (format-number (:player/fuel player))))
+      (row "GROUND"
+           (stat "soldiers"   (format-number (:player/soldiers   player)))
+           (stat "generals"   (format-number (:player/generals   player)))
+           (stat "transports" (format-number (:player/transports player))))
+      (row "FLEET"
+           (stat "fighters"   (format-number (:player/fighters   player)))
+           (stat "carriers"   (format-number (:player/carriers   player)))
+           (stat "admirals"   (format-number (:player/admirals   player)))
+           (stat "stations"   (format-number (:player/stations   player))))
+      [:div.flex.items-center
+       {:style {:padding "2px 14px" :gap "20px"}}
+       [:span {:style row-label} "› OPERATIONS"]
+       [:div.flex.items-center {:style {:gap "20px"}}
+        (stat "cmd ships" (format-number (:player/cmd-ships player)))
+        (stat "agents"    (format-number (:player/agents    player)))]]]]))
 
 (defn projection-pill
   "Render one projection pill card with a title, right-aligned total, and breakdown rows.

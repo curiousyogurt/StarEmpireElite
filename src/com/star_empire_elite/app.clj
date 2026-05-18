@@ -567,15 +567,12 @@
                                        (max 0 (+ (- (:player/agents display-player) agents-lost)
                                                  agents-gained)))])))))
 
-              ;; --- population growth (end of round only) ---
-              end-round?  (>= (:player/current-turn display-player) (:game/turns-per-round game))
+              ;; --- population growth (every turn) ---
               [pop-growth final-player]
-              (if-not end-round?
-                [nil display-player]
-                (let [cached (:player/last-population-growth display-player)]
-                  (if (some? cached)
-                    [cached display-player]
-                    (let [pop      (:player/population display-player)
+              (let [cached (:player/last-population-growth display-player)]
+                (if (some? cached)
+                  [cached display-player]
+                  (let [pop      (:player/population display-player)
                           planets  (+ (:player/ore-planets  display-player)
                                       (:player/erg-planets display-player)
                                       (:player/mil-planets  display-player))
@@ -596,7 +593,7 @@
                           :player/last-population-growth growth}])
                       [growth (-> display-player
                                   (assoc :player/population             (+ pop growth))
-                                  (assoc :player/last-population-growth growth))]))))
+                                  (assoc :player/last-population-growth growth))])))
 
               ;; --- expense stability penalty ---
               pending-penalty (:player/expense-stability-penalty final-player)
