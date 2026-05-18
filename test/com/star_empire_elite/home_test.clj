@@ -57,10 +57,10 @@
     (let [result (pr-str (home/home-page (ctx-with-params {:error "invalid-email"})))]
       (is (clojure.string/includes? result "Bennington")))))
 
-(deftest test-home-page-has-signin-link
-  (testing "home-page includes a link to /signin for existing users"
+(deftest test-home-page-has-unified-title
+  (testing "home-page shows unified Sign In / Sign Up title"
     (let [result (pr-str (home/home-page (bare-ctx)))]
-      (is (clojure.string/includes? result "/signin")))))
+      (is (clojure.string/includes? result "SIGN IN / SIGN UP")))))
 
 ;;
 ;; link-sent
@@ -133,10 +133,10 @@
     (let [result (pr-str (home/signin-page (ctx-with-params {:error "not-signed-in"})))]
       (is (clojure.string/includes? result "signed in")))))
 
-(deftest test-signin-page-has-signup-link
-  (testing "signin-page includes a link to /signup for new users"
+(deftest test-signin-page-has-unified-title
+  (testing "signin-page shows unified Sign In / Sign Up title"
     (let [result (pr-str (home/signin-page (bare-ctx)))]
-      (is (clojure.string/includes? result "/signup")))))
+      (is (clojure.string/includes? result "SIGN IN / SIGN UP")))))
 
 ;;
 ;; enter-code-page

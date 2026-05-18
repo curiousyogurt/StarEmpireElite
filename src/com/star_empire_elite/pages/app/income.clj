@@ -265,6 +265,7 @@
        {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
                 :border-radius "4px" :color "#4ade80"
                 :font-family "'Courier New', monospace"}}
+
        ;; Scanline overlay
        (ui/scanline-overlay)
 

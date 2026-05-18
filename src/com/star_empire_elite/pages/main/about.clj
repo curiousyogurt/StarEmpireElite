@@ -301,8 +301,7 @@
       ;; Navigation links
       [:div {:style {:border-top "1px solid #1a3020" :padding-top "12px" :margin-top "8px"}}
        [:div.flex.gap-3
-        (nav-link "/signup" "Sign Up")
-        (nav-link "/signin" "Sign In")
+        (nav-link "/signup" "Sign In / Sign Up")
         (nav-link "/" "Home" {:hx-boost "true"})]]]]))
 
 ;;;;

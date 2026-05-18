@@ -75,8 +75,7 @@
        [:div {:style {:font-size "13px" :font-weight "bold" :color "#4ade80"
                       :letter-spacing "0.1em" :margin-bottom "10px"}} "GET STARTED"]]
       [:div.flex.justify-center.gap-3.mb-6
-       (nav-link "/signup" "Sign Up")
-       (nav-link "/signin" "Sign In")
+       (nav-link "/signup" "Sign In / Sign Up")
        (nav-link "/about" "About" {:hx-boost "true"})]
 
       ;; Footer attribution

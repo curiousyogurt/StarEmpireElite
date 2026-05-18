@@ -289,25 +289,25 @@
   (assoc test-player :player/fighters 5000 :player/carriers 10 :player/admirals 1))
 
 (deftest test-action-page-ground-transport-limit
-  (testing "Shows 'Trans' when transports cap deployable soldiers"
+  (testing "Shows 'Transports' when transports cap deployable soldiers"
     (with-redefs [biff/q (fn [_ _ & _] [])]
       (is (hiccup-contains-str?
            (action/action-page {:player transport-limited-player :game test-game :db nil})
-           "Trans")))))
+           "Transports")))))
 
 (deftest test-action-page-ground-general-limit
-  (testing "Shows 'Gen' when generals cap deployable soldiers"
+  (testing "Shows 'Generals' when generals cap deployable soldiers"
     (with-redefs [biff/q (fn [_ _ & _] [])]
       (is (hiccup-contains-str?
            (action/action-page {:player general-limited-player :game test-game :db nil})
-           "Gen")))))
+           "Generals")))))
 
 (deftest test-action-page-ground-both-limit
-  (testing "Shows 'Trans/Gen' when both transports and generals cap deployable soldiers"
+  (testing "Shows 'Transports/Generals' when both transports and generals cap deployable soldiers"
     (with-redefs [biff/q (fn [_ _ & _] [])]
       (is (hiccup-contains-str?
            (action/action-page {:player both-ground-limited-player :game test-game :db nil})
-           "Trans/Gen")))))
+           "Transports/Generals")))))
 
 (deftest test-action-page-ground-no-limit
   (testing "Shows no limit row when soldiers are not capped"
@@ -318,25 +318,25 @@
         (is (not (hiccup-contains-str? result "Gen")))))))
 
 (deftest test-action-page-fleet-carrier-limit
-  (testing "Shows 'Carr' when carriers cap deployable fighters"
+  (testing "Shows 'Carriers' when carriers cap deployable fighters"
     (with-redefs [biff/q (fn [_ _ & _] [])]
       (is (hiccup-contains-str?
            (action/action-page {:player carrier-limited-player :game test-game :db nil})
-           "Carr")))))
+           "Carriers")))))
 
 (deftest test-action-page-fleet-admiral-limit
-  (testing "Shows 'Adm' when admirals cap deployable fighters"
+  (testing "Shows 'Admirals' when admirals cap deployable fighters"
     (with-redefs [biff/q (fn [_ _ & _] [])]
       (is (hiccup-contains-str?
            (action/action-page {:player admiral-limited-player :game test-game :db nil})
-           "Adm")))))
+           "Admirals")))))
 
 (deftest test-action-page-fleet-both-limit
-  (testing "Shows 'Carr/Adm' when both carriers and admirals cap deployable fighters"
+  (testing "Shows 'Carriers/Admirals' when both carriers and admirals cap deployable fighters"
     (with-redefs [biff/q (fn [_ _ & _] [])]
       (is (hiccup-contains-str?
            (action/action-page {:player both-fleet-limited-player :game test-game :db nil})
-           "Carr/Adm")))))
+           "Carriers/Admirals")))))
 
 (deftest test-action-page-fleet-no-limit
   (testing "Shows no fleet limit row when fighters are not capped"

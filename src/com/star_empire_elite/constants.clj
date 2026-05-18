@@ -79,27 +79,27 @@
 ;;;; Starting Empire Defaults
 ;;;; Resources and units a new player begins with.
 
-(def starting-credits  70000)
-(def starting-food     5000)
-(def starting-fuel     5000)
-(def starting-galaxars 0)
+(def starting-credits     70000)
+(def starting-food        50000)
+(def starting-fuel        50000)
+(def starting-galaxars    0)
 
-(def starting-mil-planets 100)
-(def starting-erg-planets 100)
-(def starting-ore-planets 100)
+(def starting-mil-planets 0)
+(def starting-erg-planets 1)
+(def starting-ore-planets 1)
 
-(def starting-population 6)    ; stored in millions
-(def starting-stability  100)  ; stored as %
+(def starting-population  6)    ; stored in millions
+(def starting-stability   100)  ; stored as %
 
-(def starting-soldiers   100)
-(def starting-transports 1)
-(def starting-generals   1)
-(def starting-fighters   0)
-(def starting-carriers   1)
-(def starting-admirals   1)
-(def starting-stations   0)
-(def starting-cmd-ships  0)
-(def starting-agents     2)
+(def starting-soldiers    100)
+(def starting-transports  1)
+(def starting-generals    1)
+(def starting-fighters    1)
+(def starting-carriers    1)
+(def starting-admirals    1)
+(def starting-stations    1)
+(def starting-cmd-ships   1)
+(def starting-agents      2)
 
 ;;;;
 ;;;; Income Generation

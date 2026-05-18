@@ -110,7 +110,7 @@
        ;; Body
        [:div.flex.flex-col.gap-2
         {:style {:padding "10px 14px"}}
-        (ui/snapshot-section player)
+        (ui/snapshot-section player {:show-ground? false :show-fleet? false})
         (cond
           (zero? (:player/agents player))
           [:p.text-sm {:style {:color "#facc15"}}

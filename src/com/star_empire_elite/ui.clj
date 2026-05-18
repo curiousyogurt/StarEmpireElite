@@ -423,10 +423,17 @@
    label])
 
 (defn snapshot-section
-  "Render the empire status tile. Accepts an optional rank integer for the header.
+  "Render the empire status tile.
 
-  [player player-map, rank? int] -> hiccup"
-  [player & [rank]]
+  opts map keys (all optional, default true):
+    :rank         — integer rank to display in header
+    :show-ground? — show the GROUND row
+    :show-fleet?  — show the FLEET row
+    :show-ops?    — show the OPERATIONS row
+
+  [player player-map, opts? map] -> hiccup"
+  [player & [{:keys [rank show-ground? show-fleet? show-ops?]
+              :or   {show-ground? true show-fleet? true show-ops? true}}]]
   (let [pop-str   (str/replace (format-number-str (* (:player/population player) 1000000)) #"\.0([A-Za-z])" "$1")
         turn      (:player/current-turn  player)
         round     (:player/current-round player)
@@ -472,21 +479,24 @@
            (stat "stability"  (str (:player/stability player) "%"))
            (stat "food"       (format-number (:player/food player)))
            (stat "fuel"       (format-number (:player/fuel player))))
-      (row "GROUND"
-           (stat "soldiers"   (format-number (:player/soldiers   player)))
-           (stat "generals"   (format-number (:player/generals   player)))
-           (stat "transports" (format-number (:player/transports player))))
-      (row "FLEET"
-           (stat "fighters"   (format-number (:player/fighters   player)))
-           (stat "carriers"   (format-number (:player/carriers   player)))
-           (stat "admirals"   (format-number (:player/admirals   player)))
-           (stat "stations"   (format-number (:player/stations   player))))
-      [:div.flex.items-center
-       {:style {:padding "2px 14px" :gap "20px"}}
-       [:span {:style row-label} "› OPERATIONS"]
-       [:div.flex.items-center {:style {:gap "20px"}}
-        (stat "cmd ships" (format-number (:player/cmd-ships player)))
-        (stat "agents"    (format-number (:player/agents    player)))]]]]))
+      (when show-ground?
+        (row "GROUND"
+             (stat "soldiers"   (format-number (:player/soldiers   player)))
+             (stat "generals"   (format-number (:player/generals   player)))
+             (stat "transports" (format-number (:player/transports player)))))
+      (when show-fleet?
+        (row "FLEET"
+             (stat "fighters"   (format-number (:player/fighters   player)))
+             (stat "carriers"   (format-number (:player/carriers   player)))
+             (stat "admirals"   (format-number (:player/admirals   player)))
+             (stat "stations"   (format-number (:player/stations   player)))))
+      (when show-ops?
+        [:div.flex.items-center
+         {:style {:padding "2px 14px" :gap "20px"}}
+         [:span {:style row-label} "› OPERATIONS"]
+         [:div.flex.items-center {:style {:gap "20px"}}
+          (stat "cmd ships" (format-number (:player/cmd-ships player)))
+          (stat "agents"    (format-number (:player/agents    player)))]])]]))
 
 (defn projection-pill
   "Render one projection pill card with a title, right-aligned total, and breakdown rows.

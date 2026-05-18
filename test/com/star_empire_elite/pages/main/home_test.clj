@@ -21,15 +21,10 @@
     (let [result (pr-str (home/home {}))]
       (is (clojure.string/includes? result "STAR EMPIRE ELITE")))))
 
-(deftest test-home-contains-sign-up-link
-  (testing "A link to /signup is present on the home page"
+(deftest test-home-contains-sign-in-up-link
+  (testing "A combined sign-in/sign-up link to /signup is present on the home page"
     (let [result (pr-str (home/home {}))]
       (is (clojure.string/includes? result "/signup")))))
-
-(deftest test-home-contains-sign-in-link
-  (testing "A link to /signin is present on the home page"
-    (let [result (pr-str (home/home {}))]
-      (is (clojure.string/includes? result "/signin")))))
 
 (deftest test-home-contains-about-link
   (testing "A link to /about is present on the home page"

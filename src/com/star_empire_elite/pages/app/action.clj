@@ -117,7 +117,7 @@
        ;; Body
        [:div.flex.flex-col.gap-2
         {:style {:padding "10px 14px"}}
-        (ui/snapshot-section player)
+        (ui/snapshot-section player {:show-ground? false :show-fleet? false :show-ops? false})
         ;; Army / Fleet readiness pills
         (let [ef              (combat/effective-forces player)
               soldiers-avail  (:soldiers ef)
@@ -131,15 +131,15 @@
               army-limit      (when (< soldiers-avail soldiers-total)
                                 (cond
                                   (and (= soldiers-avail trans-cap)
-                                       (= soldiers-avail gen-cap)) "Trans/Gen"
-                                  (= soldiers-avail trans-cap)     "Trans"
-                                  :else                            "Gen"))
+                                       (= soldiers-avail gen-cap)) "Transports/Generals"
+                                  (= soldiers-avail trans-cap)     "Transports"
+                                  :else                            "Generals"))
               fleet-limit     (when (< fighters-avail fighters-total)
                                 (cond
                                   (and (= fighters-avail carrier-cap)
-                                       (= fighters-avail admiral-cap)) "Carr/Adm"
-                                  (= fighters-avail carrier-cap)       "Carr"
-                                  :else                                "Adm"))]
+                                       (= fighters-avail admiral-cap)) "Carriers/Admirals"
+                                  (= fighters-avail carrier-cap)       "Carriers"
+                                  :else                                "Admirals"))]
           [:div {:class "grid grid-cols-1 md:grid-cols-3 gap-1.5"}
            (ui/stat-pill "Ground"
              (cond-> [{:label "Soldiers"   :value soldiers-total}

@@ -71,7 +71,7 @@
   (ui/page
    (assoc ctx ::ui/recaptcha true)
    (auth-card
-    "SIGN UP"
+    "SIGN IN / SIGN UP"
     (biff/form
      {:action "/auth/send-code"
       :id     "signup"
@@ -102,13 +102,10 @@
       (merge {:type "submit" :style submit-style}
              (when site-key
                {:data-sitekey site-key :data-callback "submitSignup"}))
-      "Send Sign-Up Code"])
+      "Send Code"])
 
     [:div {:style {:border-top "1px solid #1a3020" :margin-top "20px" :padding-top "16px"}}
-     [:p {:style {:font-size "13px" :color "#9adaaa" :margin-bottom "10px" :text-align "center"}}
-      "Already have an account?"]
-     [:div.flex.justify-center.gap-3
-      [:a {:href "/signin" :style link-style} "Sign In"]
+     [:div.flex.justify-center
       [:a {:href "/" :hx-boost "true" :style link-style} "Home"]]]
 
     [:div {:style {:margin-top "16px" :font-size "11px" :color "#4a6a58"}}
@@ -163,7 +160,7 @@
   (ui/page
    (assoc ctx ::ui/recaptcha true)
    (auth-card
-    "SIGN IN"
+    "SIGN IN / SIGN UP"
     (biff/form
      {:action "/auth/send-code"
       :id     "signin"
@@ -196,13 +193,10 @@
       (merge {:type "submit" :style submit-style}
              (when site-key
                {:data-sitekey site-key :data-callback "submitSignin"}))
-      "Send Sign-In Code"])
+      "Send Code"])
 
     [:div {:style {:border-top "1px solid #1a3020" :margin-top "20px" :padding-top "16px"}}
-     [:p {:style {:font-size "13px" :color "#9adaaa" :margin-bottom "10px" :text-align "center"}}
-      "Don't have an account yet?"]
-     [:div.flex.justify-center.gap-3
-      [:a {:href "/signup" :style link-style} "Sign Up"]
+     [:div.flex.justify-center
       [:a {:href "/" :hx-boost "true" :style link-style} "Home"]]]
 
     [:div {:style {:margin-top "16px" :font-size "11px" :color "#4a6a58"}}
