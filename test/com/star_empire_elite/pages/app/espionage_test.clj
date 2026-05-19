@@ -69,12 +69,12 @@
   (testing "Returns a hiccup table row"
     (let [result (espionage/target-row test-target)]
       (is (vector? result))
-      (is (= :tr (first result)))))
+      (is (clojure.string/starts-with? (name (first result)) "tr"))))
 
   (testing "Displays correct total planet count"
-    ;; row: [:tr {attrs} [:td empire-name] [:td total-planets] [:td score] [:td op] [:td op] [:td op]]
-    ;; index 0=:tr, 1=attrs-map, 2=empire-td, 3=planets-td; planets-td is [:td {attrs} 6].
-    (let [planet-td (nth (espionage/target-row test-target) 3)]
+    ;; row: [:tr.classes [:td empire-name] [:td total-planets] [:td score] [:td op] ...]
+    ;; index 0=:tr, 1=empire-td, 2=planets-td; planets-td is [:td {attrs} 6].
+    (let [planet-td (nth (espionage/target-row test-target) 2)]
       (is (= 6 (last planet-td))))))
 
 ;;;;

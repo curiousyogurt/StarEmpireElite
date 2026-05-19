@@ -135,7 +135,7 @@
         :let [v (or (k expense-map) 0)]
         :when (pos? v)]
     [:span.text-xs.inline-block.rounded-sm.text-green-400
-     {:key k :style {:padding "1px 5px" :background "#1a3a28"}}
+     {:key k :class "py-px px-[5px] bg-game-green-deep"}
      "-" (ui/format-number v) " " suffix]))
 
 (defn- expense-summary-card
@@ -143,13 +143,12 @@
 
   [{:keys [name count expense-map]}] -> hiccup"
   [{:keys [name count expense-map]}]
-  [:div.flex.flex-col.gap-1
-   {:style {:border "1px solid #253530" :border-radius "3px"
-            :padding "6px 8px" :background "#1e1e1e"}}
+  [:div.flex.flex-col.gap-1.rounded-game.bg-game-card
+   {:class "border border-game-border py-1.5 px-2"}
    [:div.flex.justify-between.items-baseline
     [:span.text-base.font-bold.text-green-400 name]
     (when count
-      [:span.text-xs {:style {:color "#7ab88a"}} (str "x" count)])]
+      [:span.text-xs.text-game-green-muted (str "x" count)])]
    [:div {:class "flex flex-col gap-0.5"}
     (expense-pills expense-map)]])
 
@@ -206,19 +205,17 @@
    player-id uuid, hx-include str] -> hiccup"
   [name before payment filter-id field-name player-id hx-include]
   (let [after        (- before payment)
-        row-class    "items-center gap-2 py-1 px-3"
-        row-style    {:border-bottom "1px solid #1a2820" :background "#121a18"}
+        row-class    "items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"
         name-cell    [:div.text-base.font-bold.text-green-400 name]
-        before-cell  [:div.text-base.text-right
-                      {:style {:color "#7ab88a"}}
+        before-cell  [:div.text-base.text-right.text-game-green-muted
                       (ui/format-number before)]
-        after-style   (fn [v] {:color (if (neg? v) "#f87171" "#4ade80") :font-weight "bold"})
+        after-cls     (fn [v] (str "font-bold " (if (neg? v) "text-red-400" "text-green-400")))
         slug          (str/lower-case name)
         after-cell-m  [:div.text-base.text-right
-                       [:span {:id (str "after-" slug "-m") :style (after-style after)}
+                       [:span {:id (str "after-" slug "-m") :class (after-cls after)}
                         (ui/format-number after)]]
         after-cell-d  [:div.text-base.text-right
-                       [:span {:id (str "after-" slug "-d") :style (after-style after)}
+                       [:span {:id (str "after-" slug "-d") :class (after-cls after)}
                         (ui/format-number after)]]
         ;; Mobile row uses display-only input (no name, no HTMX) to avoid duplicate
         ;; field submission — both rows are always in the DOM, only CSS hides one.
@@ -241,14 +238,14 @@
                                           :prefix      "-"})]]
     [:<>
      [:div.expense-row-mobile
-      {:class (str "md:hidden " row-class) :style row-style}
+      {:class (str "md:hidden " row-class)}
       name-cell
       before-cell
       change-cell-m
       after-cell-m]
 
      [:div.expense-row-desktop
-      {:class (str "hidden md:grid " row-class) :style row-style}
+      {:class (str "hidden md:grid " row-class)}
       name-cell
       [:div {:id (str "bar-" slug)} (deduction-bar before payment filter-id)]
       before-cell
@@ -296,8 +293,7 @@
           affordable?     (can-afford-expenses? resources-after)
           oob-span        (fn [id v]
                             [:span {:id id :hx-swap-oob "true"
-                                    :style {:color (if (neg? v) "#f87171" "#4ade80")
-                                            :font-weight "bold"}}
+                                    :class (str "font-bold " (if (neg? v) "text-red-400" "text-green-400"))}
                              (ui/format-number v)])
           oob-bar         (fn [id before payment filter-id]
                             [:div {:id id :hx-swap-oob "true"}
@@ -322,7 +318,7 @@
           {:hx-swap-oob "true"}
           (when (not affordable?)
             [:p.text-yellow-400.text-sm
-             {:style {:letter-spacing "0.03em"}}
+             {:class "tracking-[0.03em]"}
              "⚠ Insufficient resources to pay expenses."])]
          ;; OOB: submit button
          (ui/submit-button affordable? "Continue to Building" {:hx-swap-oob "true"})]))))
@@ -350,9 +346,7 @@
       {}
       ;; Terminal shell
       [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
-       {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
-                :border-radius "4px" :color "#4ade80"
-                :font-family "'Courier New', monospace"}}
+       {:class "bg-game-bg text-green-400 font-mono border-[1.5px] border-game-green-border rounded"}
 
        ;; Scanline overlay
        (ui/scanline-overlay)
@@ -363,18 +357,18 @@
        ;; Form wraps body + action bar so submit button works
        (biff/form
          {:action (str "/app/game/" player-id "/apply-expenses") :method "post"
-          :style  {:margin 0}}
+          :class  "m-0"}
 
          ;; Body
          [:div.flex.flex-col.gap-2
-          {:style {:padding "10px 14px"}}
+          {:class "py-2.5 px-3.5"}
 
           ;; Expense summary: totals by category (Planets, Military, Population, Total)
           (expense-summary-grid player required required-totals)
 
           ;; Resource table: Credits, Food, Fuel with deduction bars and inputs
-          [:div.overflow-hidden
-           {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
+          [:div.overflow-hidden.rounded-game.bg-game-surface
+           {:class "border border-game-border"}
            (ui/deduction-table-header)
            (expense-resource-row "Credits" (:player/credits player) (:credits required-totals)
                                  "glow-credits" "credits-pay" player-id hx-include)
@@ -384,7 +378,7 @@
                                  "glow-fuel"    "fuel-pay"    player-id hx-include)]
 
           ;; HTMX swap-target placeholder (invisible; OOB updates go to the after-column spans)
-          [:div#resources-after {:style {:display "none"}}]
+          [:div#resources-after.hidden]
 
           ;; Warning message — populated by HTMX when player can't afford expenses
           [:div#expense-warning.flex.items-center]
@@ -393,7 +387,7 @@
 
          ;; Action bar
          [:div.flex.gap-2
-          {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
+          {:class "py-2 px-3.5 border-t border-game-border"}
           (ui/action-bar-link (str "/app/game/" player-id) "Pause")
           (ui/action-bar-link (str "/app/game/" player-id "/exchange") "Go to Exchange")
           (ui/submit-button affordable? "Continue to Building")])])))

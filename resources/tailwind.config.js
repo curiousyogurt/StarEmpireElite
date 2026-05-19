@@ -22,6 +22,12 @@ module.exports = {
         // Green text shades (complement to green-400 = #4ade80)
         'game-green-muted':  '#7ab88a',  // secondary text, labels
         'game-green-soft':   '#9adaaa',  // tertiary text, subtitles
+        'game-green-mid':    '#629171',  // snapshot column labels
+        'game-green-dim':    '#4a6a58',  // inactive/disabled text, separators
+        'game-green-dark':   '#3a5040',  // affordability-false state
+      },
+      borderRadius: {
+        'game': '3px',  // standard card border-radius
       },
     },
   },

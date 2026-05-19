@@ -211,18 +211,16 @@
   [name before after filter-id]
   (let [delta      (- after before)
         slug       (str/lower-case name)
-        row-class  "items-center gap-2 py-1 px-3"
-        row-style  {:border-bottom "1px solid #1a2820" :background "#121a18"}
+        row-class  "items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"
         name-cell  [:div.text-base.font-bold.text-green-400 name]
-        before-cell [:div.text-base.text-right
-                     {:style {:color "#7ab88a"}}
+        before-cell [:div.text-base.text-right.text-game-green-muted
                      (ui/format-number before)]
         change-cell (fn [id]
                       [:div.text-base.justify-self-center.whitespace-nowrap
-                       {:style {:letter-spacing "0.03em"
-                                :color (cond (zero? delta) "#7ab88a"
-                                             (pos? delta)  "#4ade80"
-                                             :else         "#f87171")}}
+                       {:class (str "tracking-[0.03em] "
+                                    (cond (zero? delta) "text-game-green-muted"
+                                          (pos? delta)  "text-green-400"
+                                          :else         "text-red-400"))}
                        [:span {:id id}
                         (if (zero? delta)
                           "-"
@@ -231,19 +229,18 @@
         after-cell  (fn [id]
                       [:div.text-base.text-right
                        [:span {:id id
-                               :style {:color (if (neg? after) "#f87171" "#4ade80")
-                                       :font-weight "bold"}}
+                               :class (str "font-bold " (if (neg? after) "text-red-400" "text-green-400"))}
                         (ui/format-number after)]])]
     [:<>
      ;; Mobile: 4-col grid, no bar
      [:div.expense-row-mobile
-      {:class (str "md:hidden " row-class) :style row-style}
+      {:class (str "md:hidden " row-class)}
       name-cell before-cell
       (change-cell (str "change-exchange-" slug "-m"))
       (after-cell  (str "after-exchange-"  slug "-m"))]
      ;; Desktop: 5-col grid, with bar
      [:div.expense-row-desktop
-      {:class (str "hidden md:grid " row-class) :style row-style}
+      {:class (str "hidden md:grid " row-class)}
       name-cell
       [:div {:id (str "bar-exchange-" slug)} (exchange-resource-bar before after filter-id)]
       before-cell
@@ -255,8 +252,8 @@
 
   [player player-map, resources-after {:credits int, :food int, :fuel int}] -> hiccup"
   [player resources-after]
-  [:div.overflow-hidden
-   {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
+  [:div.overflow-hidden.rounded-game.bg-game-surface
+   {:class "border border-game-border"}
    (ui/deduction-table-header)
    (exchange-bar-row "Credits" (:player/credits player) (:credits resources-after) "glow-ex-credits")
    (exchange-bar-row "Food"    (:player/food    player) (:food    resources-after) "glow-ex-food")
@@ -307,17 +304,16 @@
 
   [action-label str] -> hiccup"
   [action-label]
-  (let [header-style {:background "#151f1a" :border-bottom "1px solid #253530"}
-        col-style    {:letter-spacing "0.08em" :color "#4ade80"}
-        item-style   (assoc col-style :letter-spacing "0.1em")
-        label        (fn [text style extra-class]
-                       [:span.text-xs.uppercase {:class extra-class :style style} text])
-        r            (fn [text] (label text col-style "text-right justify-self-end"))
-        c            (fn [text] (label text col-style "text-center justify-self-center"))]
+  (let [header-cls "bg-game-header border-b border-game-border"
+        col-cls    "tracking-[0.08em] text-green-400"
+        item-cls   "tracking-widest text-green-400"
+        label      (fn [text cls extra-class]
+                     [:span.text-xs.uppercase {:class (str cls (when extra-class (str " " extra-class)))} text])
+        r          (fn [text] (label text col-cls "text-right justify-self-end"))
+        c          (fn [text] (label text col-cls "text-center justify-self-center"))]
     [:div.building-purchase-grid
-     {:class "building-purchase-grid gap-2 py-1 px-3 items-center"
-      :style header-style}
-     (label "Item" item-style nil)
+     {:class (str "building-purchase-grid gap-2 py-1 px-3 items-center " header-cls)}
+     (label "Item" item-cls nil)
      (r "Rate")
      (r "Max")
      (c action-label)
@@ -336,24 +332,12 @@
   (let [credit-value (* price-per-unit current-quantity)
         credit-id    (str "credit-" field-key)
         max-qty-id   (str "max-qty-" field-key)
-        row-style    {:border-bottom "1px solid #1a2820" :background "#121a18"}
         has-max?     (pos? max-quantity)
         fill-onclick (fn [v]
                        (str "var i=document.querySelector('[name=\"" field-key "\"]');"
                             "if(i){i.value='" (long v) "';"
                             "i.dispatchEvent(new Event('input',{bubbles:true}));}"))
-        btn-style    {:position "absolute"
-                      :top "50%"
-                      :transform "translateY(-50%)"
-                      :border "1px solid #2d6644"
-                      :background "#0e1f16"
-                      :color "#7ab88a"
-                      :font-family "'Courier New', monospace"
-                      :font-size "11px"
-                      :padding "1px 4px"
-                      :border-radius "2px"
-                      :cursor "pointer"
-                      :white-space "nowrap"}
+        btn-cls      "absolute top-1/2 -translate-y-1/2 border border-game-green-border bg-game-green-done text-game-green-muted font-mono text-[11px] py-px px-1 rounded-sm cursor-pointer whitespace-nowrap"
         input-node   (ui/numeric-input field-key current-quantity player-id "/calculate-exchange" hx-include
                                         {:input-class "text-xs lg:text-sm text-right min-w-0"
                                          :input-style {:color "#7ab88a"
@@ -361,8 +345,7 @@
                                                        :padding-top "1px"
                                                        :padding-bottom "1px"}})]
     [:div.building-purchase-grid
-     {:class "building-purchase-grid items-center gap-2 py-1 px-3"
-      :style row-style}
+     {:class "building-purchase-grid items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"}
 
      ;; Item name: abbreviated on mobile, full on desktop
      [:div.text-base.font-bold.text-green-400
@@ -370,13 +353,12 @@
       [:span.hidden.lg:inline item-name]]
 
      ;; Rate per unit
-     [:div.text-base.text-right
-      {:style {:color "#7ab88a"}}
+     [:div.text-base.text-right.text-game-green-muted
       (ui/format-number price-per-unit)]
 
      ;; Max available/affordable
      [:div.text-base.text-right
-      {:style {:color (if has-max? "#9adaaa" "#3a5040")}}
+      {:class (if has-max? "text-game-green-soft" "text-game-green-dark")}
       [:span {:id max-qty-id}
        (ui/format-number (if (neg? max-quantity) 0 max-quantity))]]
 
@@ -384,8 +366,7 @@
      ;; The input box itself is always centered in the same 120px slot.
      ;; The optional Ex button hangs off the right side, so rows with and without
      ;; Ex buttons keep their text fields aligned.
-     [:div.flex.items-center.justify-center
-      {:style {:min-width "0"}}
+     [:div.flex.items-center.justify-center.min-w-0
 
       [:div
        {:style {:position "relative"
@@ -398,18 +379,18 @@
        (when (some? ex-value)
          [:button
           {:type "button" :title ex-tooltip :onclick (fill-onclick ex-value)
-           :style (assoc btn-style :left "calc(100% + 4px)")}
+           :class btn-cls :style {:left "calc(100% + 4px)"}}
           "ex"])
 
        (when (some? sf-value)
          [:button
           {:type "button" :title sf-tooltip :onclick (fill-onclick sf-value)
-           :style (assoc btn-style :left "calc(100% + 4px)")}
+           :class btn-cls :style {:left "calc(100% + 4px)"}}
           "sf"])]]
 
      ;; Credits value
      [:div.text-base.text-right
-      {:style {:color (if (pos? credit-value) "#4ade80" "#3a5040")}}
+      {:class (if (pos? credit-value) "text-green-400" "text-game-green-dark")}
       [:span {:id credit-id}
        (if (pos? credit-value)
          [:<> "+" (ui/format-number credit-value)]
@@ -489,14 +470,14 @@
                :let [qty (get quantities (:qty-key spec))
                      v   (* qty (get rates (:rate-key spec)))]]
            [:span {:id (str "credit-" (:field spec)) :hx-swap-oob "true"
-                   :style {:color (if (pos? v) "#4ade80" "#3a5040")}}
+                   :class (if (pos? v) "text-green-400" "text-game-green-dark")}
             (if (pos? v) [:<> "+" (ui/format-number v)] "—")])
 
          ;; OOB: maximum quantities for buy rows
          (for [spec buy-row-specs
                :let [max-qty (get max-buy-quantities (:max-key spec))]]
            [:span {:id (str "max-qty-" (:field spec)) :hx-swap-oob "true"
-                   :style {:color (if (pos? max-qty) "#9adaaa" "#3a5040")}}
+                   :class (if (pos? max-qty) "text-game-green-soft" "text-game-green-dark")}
             (ui/format-number max-qty)])
 
          ;; OOB: pill Required rows (adjusted for proposed unit/planet sales)
@@ -511,13 +492,13 @@
 
          ;; OOB: pill totals
          [:span#projection-credits-total
-          {:hx-swap-oob "true" :style {:color (if (neg? cr-total) "#f87171" "#7ab88a")}}
+          {:hx-swap-oob "true" :class (if (neg? cr-total) "text-red-400" "text-game-green-muted")}
           (if (neg? cr-total) "-" "+") (ui/format-number (Math/abs (long cr-total)))]
          [:span#projection-food-total
-          {:hx-swap-oob "true" :style {:color (if (neg? food-total) "#f87171" "#7ab88a")}}
+          {:hx-swap-oob "true" :class (if (neg? food-total) "text-red-400" "text-game-green-muted")}
           (if (neg? food-total) "-" "+") (ui/format-number (Math/abs (long food-total)))]
          [:span#projection-fuel-total
-          {:hx-swap-oob "true" :style {:color (if (neg? fuel-total) "#f87171" "#7ab88a")}}
+          {:hx-swap-oob "true" :class (if (neg? fuel-total) "text-red-400" "text-game-green-muted")}
           (if (neg? fuel-total) "-" "+") (ui/format-number (Math/abs (long fuel-total)))]
 
          ;; OOB: exchange summary bar table — bars, change spans, after spans
@@ -535,15 +516,14 @@
                               (exchange-resource-bar before after filter-id)])
                oob-after   (fn [id v]
                              [:span {:id id :hx-swap-oob "true"
-                                     :style {:color (if (neg? v) "#f87171" "#4ade80")
-                                             :font-weight "bold"}}
+                                     :class (str "font-bold " (if (neg? v) "text-red-400" "text-green-400"))}
                               (ui/format-number v)])
                oob-change  (fn [id delta]
                              [:span {:id id :hx-swap-oob "true"
-                                     :style {:letter-spacing "0.03em"
-                                             :color (cond (zero? delta) "#7ab88a"
-                                                          (pos? delta)  "#4ade80"
-                                                          :else         "#f87171")}}
+                                     :class (str "tracking-[0.03em] "
+                                                  (cond (zero? delta) "text-game-green-muted"
+                                                        (pos? delta)  "text-green-400"
+                                                        :else         "text-red-400"))}
                               (if (zero? delta)
                                 "-"
                                 [:<> (if (pos? delta) "+" "−")
@@ -574,13 +554,13 @@
                   buying?  (or (:invalid-food-purchase? invalid) (:invalid-fuel-purchase? invalid))]
               (cond
                 (and selling? buying?)
-                [:p.text-yellow-400.text-sm {:style {:letter-spacing "0.03em"}}
+                [:p.text-yellow-400.text-sm {:class "tracking-[0.03em]"}
                  "⚠ Cannot sell more than you have or buy more than you can afford."]
                 selling?
-                [:p.text-yellow-400.text-sm {:style {:letter-spacing "0.03em"}}
+                [:p.text-yellow-400.text-sm {:class "tracking-[0.03em]"}
                  "⚠ Cannot sell more than you have."]
                 buying?
-                [:p.text-yellow-400.text-sm {:style {:letter-spacing "0.03em"}}
+                [:p.text-yellow-400.text-sm {:class "tracking-[0.03em]"}
                  "⚠ Cannot buy more than you can afford."])))]
 
          ;; OOB: submit button
@@ -604,10 +584,8 @@
         req-totals         (expenses-calc/calculate-required-expense-totals required)]
     (ui/page
       {}
-      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
-       {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
-                :border-radius "4px" :color "#4ade80"
-                :font-family "'Courier New', monospace"}}
+      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.text-green-400.font-mono
+       {:class "border-[1.5px] border-game-green-border rounded"}
 
        ;; Scanline overlay
        (ui/scanline-overlay)
@@ -618,11 +596,10 @@
        ;; Form wraps body + action bar
        (biff/form
          {:action (str "/app/game/" player-id "/apply-exchange") :method "post"
-          :style  {:margin 0}}
+          :class  "m-0"}
 
          ;; Body
-         [:div.flex.flex-col.gap-2
-          {:style {:padding "10px 14px"}}
+         [:div.flex.flex-col.gap-2.py-2.5.px-3.5
 
           ;; 1. Snapshot
           (ui/snapshot-section player)
@@ -633,8 +610,8 @@
           ;; 3. Sell Assets table
           [:div
            (ui/section-label "Sell Assets")
-           [:div.overflow-hidden
-            {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
+           [:div.overflow-hidden.rounded-game.bg-game-surface
+            {:class "border border-game-border"}
             (exchange-table-header "Sell")
             (for [spec sell-asset-row-specs]
               (exchange-row (:label spec) (:abbrev spec) (:field spec)
@@ -644,8 +621,8 @@
           ;; 4. Sell Resources table
           [:div
            (ui/section-label "Sell Resources")
-           [:div.overflow-hidden
-            {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
+           [:div.overflow-hidden.rounded-game.bg-game-surface
+            {:class "border border-game-border"}
             (exchange-table-header "Sell")
             (for [spec sell-resource-row-specs
                   :let [ex-val (max 0 (- (get player (:player-key spec))
@@ -658,8 +635,8 @@
           ;; 5. Buy table
           [:div
            (ui/section-label "Buy Resources")
-           [:div.overflow-hidden
-            {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
+           [:div.overflow-hidden.rounded-game.bg-game-surface
+            {:class "border border-game-border"}
             (exchange-table-header "Buy")
             (for [spec buy-row-specs
                   :let [sf-val (max 0 (- (get req-totals (:resource-key spec) 0)
@@ -677,7 +654,7 @@
                                        :fuel    (:player/fuel    player)})]
 
           ;; HTMX swap target (hidden)
-          [:div#resources-after {:style {:display "none"}}]
+          [:div#resources-after.hidden]
 
           ;; Warning message area
           [:div#exchange-warning.flex.items-center]
@@ -685,7 +662,6 @@
           (ui/incoming-alert player)]
 
          ;; Action bar
-         [:div.flex.gap-2
-          {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
+         [:div.flex.gap-2.py-2.px-3.5.border-t.border-game-border
           (ui/action-bar-link (str "/app/game/" player-id "/expenses") "Cancel Exchange")
           (ui/submit-button false "Make Exchange")])])))

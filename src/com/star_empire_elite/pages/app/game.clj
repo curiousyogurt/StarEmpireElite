@@ -59,31 +59,30 @@
 
   [{:keys [players]}] -> hiccup"
   [{:keys [players]}]
-  (let [th-style  {:color "#4ade80" :font-size "11px" :letter-spacing "0.08em"
-                   :text-transform "uppercase"}
-        td-border {:border-right "1px solid #253530" :padding "4px 12px" :color "#9adaaa"}
-        td-right  (assoc td-border :text-align "right")]
+  (let [th-cls       "text-green-400 text-[11px] tracking-[0.08em] uppercase"
+        td-cls       "border-r border-game-border py-1 px-3 text-game-green-soft"
+        td-right-cls "border-r border-game-border py-1 px-3 text-game-green-soft text-right"]
     [:div.mt-2
      (ui/section-label "Players")
      [:div.overflow-x-auto
       [:table.w-full.text-sm
-       {:style {:border "1px solid #253530" :border-collapse "collapse"}}
+       {:class "border border-game-border border-collapse"}
        [:thead
-        [:tr {:style {:background "#151f1a" :border-bottom "1px solid #253530"}}
-         [:th.text-left.px-3.py-1  {:style th-style} "Rank"]
-         [:th.text-left.px-3.py-1  {:style th-style} "Empire"]
-         [:th.text-right.px-3.py-1 {:style th-style} "Planets"]
-         [:th.text-right.px-3.py-1 {:style th-style} "Score"]]]
+        [:tr.bg-game-header.border-b.border-game-border
+         [:th.text-left.px-3.py-1  {:class th-cls} "Rank"]
+         [:th.text-left.px-3.py-1  {:class th-cls} "Empire"]
+         [:th.text-right.px-3.py-1 {:class th-cls} "Planets"]
+         [:th.text-right.px-3.py-1 {:class th-cls} "Score"]]]
        [:tbody
         (for [player players]
-          [:tr {:style {:border-bottom "1px solid #1a2820" :background "#121a18"}}
-           [:td {:style td-border} (:rank player)]
-           [:td {:style td-border} (:player/empire-name player)]
-           [:td {:style td-right}
+          [:tr.bg-game-row.border-b.border-game-divider
+           [:td {:class td-cls} (:rank player)]
+           [:td {:class td-cls} (:player/empire-name player)]
+           [:td {:class td-right-cls}
             (ui/format-number (+ (:player/mil-planets player)
                                  (:player/erg-planets player)
                                  (:player/ore-planets player)))]
-           [:td {:style td-right} (ui/format-number (:player/score player))]])]]]]))
+           [:td {:class td-right-cls} (ui/format-number (:player/score player))]])]]]]))
 
 ;;;;
 ;;;; Page
@@ -104,23 +103,19 @@
       (ui/page
        {}
        [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
-        {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
-                 :border-radius "4px" :color "#4ade80"
-                 :font-family "'Courier New', monospace"}}
+        {:class "border-[1.5px] border-game-green-border rounded bg-game-bg text-green-400 font-mono"}
         (ui/scanline-overlay)
         (ui/phase-topbar player game "GAME OVERVIEW")
         [:div.flex.flex-col.gap-2
-         {:style {:padding "10px 14px"}}
+         {:class "py-2.5 px-3.5"}
          (ui/snapshot-section player)
          (players-table {:players players})]
         ;; Play button or cooldown message depending on round availability
         [:div.flex.gap-2
-         {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
+         {:class "py-2 px-3.5 border-t border-game-border"}
          (ui/action-bar-link "/app" "Back to Games")
          (if cooldown-ms
-           [:div {:style {:padding "5px 14px" :border "1px solid #b45309"
-                          :color "#facc15" :border-radius "2px" :font-size "14px"
-                          :font-family "'Courier New', monospace" :letter-spacing "0.05em"}}
+           [:div {:class "py-[5px] px-3.5 border border-yellow-700 text-yellow-400 rounded-sm text-sm font-mono tracking-wider"}
             (if (utils/day-exhausted? player game)
               (str "Rounds reset in " (utils/format-cooldown-duration cooldown-ms))
               (str "Next round opens in " (utils/format-cooldown-duration cooldown-ms)))]

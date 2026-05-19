@@ -93,19 +93,19 @@
   (testing "Returns a hiccup table row vector"
     (let [result (action/target-row test-target 1)]
       (is (vector? result))
-      (is (= :tr (first result)))))
+      (is (clojure.string/starts-with? (name (first result)) "tr"))))
 
   (testing "Displays total planet count (mil + food + ore)"
     ;; test-target has 2 mil + 1 food + 3 ore = 6 total planets.
-    ;; row: [:tr {attrs} [:td empire-name] [:td total-planets] [:td score] [:td invade] [:td raid] [:td strike]]
-    ;; index 0=:tr, 1=attrs-map, 2=empire-td, 3=planets-td; planets-td is [:td {attrs} 6].
+    ;; row: [:tr.classes [:td empire-name] [:td total-planets] [:td score] [:td invade] [:td raid] [:td strike]]
+    ;; index 0=:tr, 1=empire-td, 2=planets-td; planets-td is [:td {attrs} 6].
     (let [result (action/target-row test-target 1)
-          planet-td (nth result 3)]
+          planet-td (nth result 2)]
       (is (= 6 (last planet-td)))))
 
   (testing "Renders Invade, Raid, and Strike buttons"
     (let [result (action/target-row test-target 1)]
-      (is (= 8 (count result)))))  ; :tr + attrs-map + 6 tds
+      (is (= 7 (count result)))))  ; :tr + 6 tds (no separate attrs map)
 
   (testing "Radio values contain composite player-id:mode format"
     (let [result   (action/target-row test-target 1)

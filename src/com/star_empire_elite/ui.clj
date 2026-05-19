@@ -191,7 +191,7 @@
      [:div.text-xs.text-gray-400.relative.mb-2
       {:style {:height "1em"}}
       [:span.absolute.left-0 "0"]
-      [:span.absolute {:style {:left "50%" :transform "translateX(-50%)"}} (fmt-tick (* 0.5 scale-max))]
+      [:span {:class "absolute left-1/2 -translate-x-1/2"} (fmt-tick (* 0.5 scale-max))]
       [:span.absolute.right-0 (fmt-tick scale-max)]]]))
 
 ;;;;
@@ -230,15 +230,14 @@
                  done?   (< phase current-phase)]]
        [:div.flex.items-center.gap-1 {:key phase}
         [:div.text-xs.flex.items-center.justify-center.rounded-full
-         {:style (merge {:width "22px" :height "22px"
-                         :border "1.5px solid #1e6e44"}
+         {:class (str "w-[22px] h-[22px] border-[1.5px] "
                         (cond
-                          active? {:border-color "#4ade80" :color "#4ade80" :background "#1a3a28"}
-                          done?   {:border-color "#1e6e44" :background "#162a1e" :color "#4ade80"}
-                          :else   {:color "#7ab88a"}))}
+                          active? "border-green-400 text-green-400 bg-game-green-deep"
+                          done?   "border-game-green-border bg-game-green-done text-green-400"
+                          :else   "border-game-green-border text-game-green-muted"))}
          (if done? "✓" label)]
         (when (< phase 6)
-          [:span.text-xs {:style {:color "#7ab88a"}} "›"])])]))
+          [:span.text-xs.text-game-green-muted "›"])])]))
 
 (defn phase-header
   "Render the full phase header: phase name on the left, progress indicator on the right.
@@ -279,13 +278,13 @@
   [player game phase-label]
   (let [{:keys [turn round]} (utils/display-turn-round player game)]
     [:div.flex.items-center.justify-between
-     {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
+     {:class "bg-game-surface border-b border-game-green-border py-[7px] px-3.5"}
      [:div
       [:div.text-3xl.font-bold.text-green-400
-       {:style {:letter-spacing "0.05em"}}
+       {:class "tracking-wider"}
        (:player/empire-name player)]
       [:div.text-sm.mt-px
-       {:style {:color "#9adaaa"}}
+       {:class "text-game-green-soft"}
        (str phase-label " · Turn " turn "/" (:game/turns-per-round game)
             " · Round " round "/" (:game/rounds-per-day game))]]
      (phase-stepper (:player/current-phase player))]))
@@ -334,8 +333,7 @@
     [:.flex-grow]
     [:div.min-h-screen.flex.flex-col.items-center.justify-center.mx-auto.text-green-400.font-mono.p-4.rounded-lg.bg-black.bg-opacity-10
      (merge
-       {:class "m-2 w-full sm:m-4 md:m-10 md:w-11/12"
-        :style {:border "1px solid #1e6e44"}}
+       {:class "m-2 w-full sm:m-4 md:m-10 md:w-11/12 border border-game-green-border"}
        (when (bound? #'csrf/*anti-forgery-token*)
          {:hx-headers (cheshire/generate-string
                         {:x-csrf-token csrf/*anti-forgery-token*})}))
@@ -370,15 +368,13 @@
   ([affordable? bool, label str, extra-attrs map]) -> hiccup"
   ([affordable? label] (submit-button affordable? label {}))
   ([affordable? label extra-attrs]
-   [:button#submit-button.tracking-wider.rounded-sm
-    (merge {:type "submit"
+   [:button#submit-button.font-mono.text-sm.tracking-wider.rounded-sm
+    (merge {:type     "submit"
             :disabled (not affordable?)
-            :style (merge {:padding "5px 14px" :font-family "'Courier New', monospace"
-                           :font-size "14px" :letter-spacing "0.05em" :border-radius "2px"}
-                          (if affordable?
-                            {:border "1px solid #4ade80" :background "#1a3a28" :color "#4ade80"}
-                            {:border "1px solid #253530" :background "transparent"
-                             :color "#7ab88a" :opacity "0.5" :cursor "not-allowed"}))}
+            :class    (str "py-[5px] px-3.5 "
+                           (if affordable?
+                             "border border-green-400 bg-game-green-deep text-green-400"
+                             "border border-game-border bg-transparent text-game-green-muted opacity-50 cursor-not-allowed"))}
            extra-attrs)
     label]))
 
@@ -388,7 +384,7 @@
   [text str] -> hiccup"
   [text]
   [:div.text-xs.uppercase.mb-1
-   {:style {:letter-spacing "0.12em" :color "#7ab88a"}}
+   {:class "tracking-[0.12em] text-game-green-muted"}
    text])
 
 (defn action-bar-link
@@ -396,12 +392,8 @@
 
   [href str, label str] -> hiccup"
   [href label]
-  [:a
-   {:href  href
-    :style {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
-            :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
-            :font-family "'Courier New', monospace" :font-size "14px"
-            :text-decoration "none" :display "inline-block"}}
+  [:a.inline-block.no-underline.text-game-green-soft.font-mono.text-sm.rounded-sm.tracking-wider.border.border-game-green-border.bg-transparent
+   {:href href :class "py-[5px] px-3.5"}
    label])
 
 (defn action-bar-primary-link
@@ -409,12 +401,8 @@
 
   [href str, label str] -> hiccup"
   [href label]
-  [:a
-   {:href  href
-    :style {:padding "5px 14px" :border "1px solid #4ade80" :background "#1a3a28"
-            :color "#4ade80" :border-radius "2px" :letter-spacing "0.05em"
-            :font-family "'Courier New', monospace" :font-size "14px"
-            :text-decoration "none" :display "inline-block"}}
+  [:a.inline-block.no-underline.text-green-400.font-mono.text-sm.rounded-sm.tracking-wider.border.border-green-400.bg-game-green-deep
+   {:href href :class "py-[5px] px-3.5"}
    label])
 
 (defn action-bar-button
@@ -425,10 +413,7 @@
   [label extra-attrs]
   [:button
    (merge {:type  "button"
-           :style {:padding "5px 14px" :border "1px solid #1e6e44" :background "transparent"
-                   :color "#9adaaa" :border-radius "2px" :letter-spacing "0.05em"
-                   :font-family "'Courier New', monospace" :font-size "14px"
-                   :cursor "pointer"}}
+           :class "inline-block text-game-green-soft font-mono text-sm rounded-sm tracking-wider border border-game-green-border bg-transparent cursor-pointer py-[5px] px-3.5"}
           extra-attrs)
    label])
 
@@ -448,40 +433,36 @@
         turn      (:player/current-turn  player)
         round     (:player/current-round player)
 
-        col-label {:color "#629171" :font-size "9px" :letter-spacing "0.1em"
-                   :text-transform "uppercase" :margin-bottom "6px"}
-        col-value {:color "#4ade80" :font-size "22px" :font-weight "bold" :line-height "1"}
+        col-label-cls "text-game-green-mid text-[9px] tracking-widest uppercase mb-1.5"
+        col-value-cls "text-green-400 text-[22px] font-bold leading-none"
 
         big-stats [["CREDITS"     (format-number (:player/credits     player))]
                    ["ORE PLANETS" (format-number (:player/ore-planets player))]
                    ["ERG PLANETS" (format-number (:player/erg-planets player))]
                    ["MIL PLANETS" (format-number (:player/mil-planets player))]]
 
-        row-label {:color "#629171" :font-size "10px" :letter-spacing "0.1em"
-                   :text-transform "uppercase" :width "100px" :flex-shrink "0"}
-        muted     {:color "#7ab88a" :font-size "12px"}
-        bright    {:color "#4ade80" :font-weight "bold" :font-size "12px"}
+        row-label-cls "text-game-green-mid text-[10px] tracking-widest uppercase w-[100px] shrink-0"
+        muted-cls     "text-game-green-muted text-xs"
+        bright-cls    "text-green-400 font-bold text-xs"
 
         stat      (fn [label v]
                     [:<>
-                     [:span {:style muted} (str label " ")]
-                     [:span {:style bright} v]])
+                     [:span {:class muted-cls} (str label " ")]
+                     [:span {:class bright-cls} v]])
 
         row       (fn [section-label & stats]
-                    [:div.flex.items-center
-                     {:style {:padding "2px 14px" :gap "20px"}}
-                     [:span {:style row-label} (str "› " section-label)]
-                     [:div.flex.items-center {:style {:gap "20px" :flex-wrap "wrap"}} stats]])]
+                    [:div.flex.items-center.py-0.5.px-3.5.gap-5
+                     [:span {:class row-label-cls} (str "› " section-label)]
+                     [:div.flex.items-center.flex-wrap.gap-5 stats]])]
 
-    [:div {:style {:border "1px solid #253530" :border-radius "3px"
-                   :background "#161616" :overflow "hidden"}}
+    [:div.rounded-game.bg-game-surface.overflow-hidden
+     {:class "border border-game-border"}
      ;; Big 4 stat columns
-     [:div {:style {:display "grid" :grid-template-columns "repeat(4, 1fr)"
-                    :border-bottom "1px solid #253530"}}
+     [:div.grid.grid-cols-4.border-b.border-game-border
       (for [[label value] big-stats]
-        [:div {:style {:padding "6px 14px 8px" :border-right "1px solid #1a2820"}}
-         [:div {:style col-label} label]
-         [:div {:style col-value} value]])]
+        [:div.pt-1.5.pb-2.px-3.5.border-r.border-game-divider
+         [:div {:class col-label-cls} label]
+         [:div {:class col-value-cls} value]])]
      ;; Grouped rows
      [:div
       (row "EMPIRE"
@@ -501,10 +482,9 @@
              (stat "admirals"   (format-number (:player/admirals   player)))
              (stat "stations"   (format-number (:player/stations   player)))))
       (when show-ops?
-        [:div.flex.items-center
-         {:style {:padding "2px 14px" :gap "20px"}}
-         [:span {:style row-label} "› OPERATIONS"]
-         [:div.flex.items-center {:style {:gap "20px"}}
+        [:div.flex.items-center.py-0.5.px-3.5.gap-5
+         [:span {:class row-label-cls} "› OPERATIONS"]
+         [:div.flex.items-center.gap-5
           (stat "cmd ships" (format-number (:player/cmd-ships player)))
           (stat "agents"    (format-number (:player/agents    player)))]])]]))
 
@@ -517,13 +497,12 @@
 
   [title str, total number, rows [{:keys [label value suffix id]}], opts map] -> hiccup"
   [title total rows & [{:keys [total-id signed?]}]]
-  [:div.flex.flex-col.gap-1
-   {:style {:border "1px solid #253530" :border-radius "3px"
-            :padding "6px 8px" :background "#1e1e1e"}}
+  [:div.flex.flex-col.gap-1.rounded-game.bg-game-card
+   {:class "border border-game-border py-1.5 px-2"}
    [:div.flex.justify-between.items-baseline
     [:span.text-base.font-bold.text-green-400 title]
     [:span.text-xs
-     (cond-> {:style {:color (if (and signed? (neg? total)) "#f87171" "#7ab88a")}}
+     (cond-> {:class (if (and signed? (neg? total)) "text-red-400" "text-game-green-muted")}
        total-id (assoc :id total-id))
      (if signed?
        (list (if (neg? total) "-" "+") (format-number (Math/abs (long total))))
@@ -531,7 +510,7 @@
    [:div {:class "flex flex-col gap-0.5"}
     (for [{:keys [label value suffix id]} rows]
       [:span.text-xs.inline-block.rounded-sm.text-green-400
-       (cond-> {:style {:padding "1px 5px" :background "#1a3a28"}}
+       (cond-> {:class "py-px px-[5px] bg-game-green-deep"}
          id (assoc :id id))
        label " "
        (if (neg? value) "-" "+")
@@ -545,16 +524,16 @@
 
   [title str, rows [{:keys [label value display highlight? warn?]}]] -> hiccup"
   [title rows]
-  [:div.flex.flex-col.gap-1
-   {:style {:border "1px solid #253530" :border-radius "3px"
-            :padding "6px 8px" :background "#1e1e1e"}}
+  [:div.flex.flex-col.gap-1.rounded-game.bg-game-card
+   {:class "border border-game-border py-1.5 px-2"}
    [:span.text-base.font-bold.text-green-400 title]
    [:div {:class "flex flex-col gap-0.5"}
     (for [{:keys [label value display highlight? warn?]} rows]
-      [:div.flex.justify-between.items-baseline
-       {:style {:padding "1px 5px" :background "#1a3a28" :border-radius "2px"}}
-       [:span.text-xs {:style {:color "#7ab88a"}} label]
-       [:span.text-xs.font-bold {:style {:color (cond warn? "#facc15" highlight? "#4ade80" :else "#9adaaa")}}
+      [:div.flex.justify-between.items-baseline.rounded-sm.bg-game-green-deep.py-px
+       {:class "px-[5px]"}
+       [:span.text-xs.text-game-green-muted label]
+       [:span.text-xs.font-bold
+        {:class (cond warn? "text-yellow-400" highlight? "text-green-400" :else "text-game-green-soft")}
         (or display (format-number value))]])]])
 
 (defn deduction-table-header
@@ -563,19 +542,18 @@
 
   [] -> hiccup"
   []
-  (let [header-style {:background "#151f1a" :border-bottom "1px solid #253530"}
-        header-class "gap-4 py-1 px-2 items-center"
-        col-style    {:letter-spacing "0.08em" :color "#4ade80"}
-        item-style   (assoc col-style :letter-spacing "0.1em")
-        label        (fn [text style extra-class]
-                       [:span.text-xs.uppercase {:class extra-class :style style} text])
-        r            (fn [text] (label text col-style "text-right justify-self-end"))
-        c            (fn [text] (label text col-style "text-center justify-self-center"))]
+  (let [header-class "gap-4 py-1 px-2 items-center bg-game-header border-b border-game-border"
+        col-cls      "tracking-[0.08em] text-green-400"
+        item-cls     "tracking-widest text-green-400"
+        label        (fn [text cls extra-class]
+                       [:span.text-xs.uppercase {:class (str cls (when extra-class (str " " extra-class)))} text])
+        r            (fn [text] (label text col-cls "text-right justify-self-end"))
+        c            (fn [text] (label text col-cls "text-center justify-self-center"))]
     [:<>
-     [:div.expense-row-mobile {:class (str "md:hidden " header-class) :style header-style}
-      (label "Item" item-style nil) (r "Before") (c "Change") (r "After")]
-     [:div.expense-row-desktop {:class (str "hidden md:grid " header-class) :style header-style}
-      (label "Item" item-style nil) [:span] (r "Before") (c "Change") (r "After")]]))
+     [:div.expense-row-mobile {:class (str "md:hidden " header-class)}
+      (label "Item" item-cls nil) (r "Before") (c "Change") (r "After")]
+     [:div.expense-row-desktop {:class (str "hidden md:grid " header-class)}
+      (label "Item" item-cls nil) [:span] (r "Before") (c "Change") (r "After")]]))
 
 (defn oob-pill
   "Render a signed OOB pill span for HTMX out-of-band updates.
@@ -584,7 +562,7 @@
   [id str, label str, value number, suffix str] -> hiccup"
   [id label value suffix]
   [:span.text-xs.inline-block.rounded-sm.text-green-400
-   {:id id :hx-swap-oob "true" :style {:padding "1px 5px" :background "#1a3a28"}}
+   {:id id :hx-swap-oob "true" :class "py-px px-[5px] bg-game-green-deep"}
    label " "
    (if (neg? value) "-" "+")
    (format-number (Math/abs (long value)))
@@ -693,8 +671,7 @@
   [name value player-id hx-post-path hx-include & [{:keys [display-only? mirror-of input-class input-style sync-key prefix]}]]
   [:div.relative
    (when prefix
-     [:span {:class "absolute top-1/2 -translate-y-1/2 pointer-events-none select-none"
-             :style {:left "6px" :color "#7ab88a" :font-size "inherit"}}
+     [:span {:class "absolute top-1/2 -translate-y-1/2 pointer-events-none select-none text-game-green-muted text-inherit left-[6px]"}
       prefix])
    [:input
     (cond->

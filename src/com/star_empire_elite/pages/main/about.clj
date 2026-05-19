@@ -8,33 +8,25 @@
 
 (defn- section [title & body]
   [:<>
-   [:h2 {:style {:font-size "16px" :font-weight "bold" :margin-bottom "8px" :color "#4ade80"
-                 :letter-spacing "0.04em"}}
+   [:h2.font-bold.text-green-400 {:class "text-[16px] mb-2 tracking-[0.04em]"}
     title]
-   [:p {:style {:font-size "13px" :color "#9adaaa" :margin-bottom "20px" :text-align "left"
-                :line-height "1.7" :max-width "48rem"}}
+   [:p.text-left.text-game-green-soft {:class "text-[13px] mb-5 leading-[1.7] max-w-[48rem]"}
     body]])
 
 (defn- nav-link [href label & [attrs]]
   [:a (merge {:href  href
-              :style {:padding "5px 16px" :border "1px solid #1e6e44" :background "transparent"
-                      :color "#9adaaa" :border-radius "2px" :font-family "'Courier New', monospace"
-                      :font-size "13px" :letter-spacing "0.04em" :text-decoration "none"}}
+              :class "no-underline text-game-green-soft font-mono rounded-sm border border-game-green-border bg-transparent tracking-[0.04em] py-[5px] px-4 inline-block text-[13px]"}
              attrs)
    label])
 
 (defn- tab-button
   "Renders a tab button. active? controls filled vs. outline style."
   [href label active?]
-  [:a {:href      href
-       :hx-boost  "true"
-       :style     (if active?
-                    {:padding "4px 14px" :border "1px solid #4ade80" :background "#1a3a28"
-                     :color "#4ade80" :border-radius "2px" :font-size "13px"
-                     :font-weight "bold" :letter-spacing "0.04em" :text-decoration "none"}
-                    {:padding "4px 14px" :border "1px solid #1e6e44" :background "transparent"
-                     :color "#9adaaa" :border-radius "2px" :font-size "13px"
-                     :letter-spacing "0.04em" :text-decoration "none"})}
+  [:a {:href     href
+       :hx-boost "true"
+       :class    (if active?
+                   "py-1 px-3.5 border border-green-400 bg-game-green-deep text-green-400 rounded-sm text-[13px] font-bold tracking-[0.04em] no-underline"
+                   "py-1 px-3.5 border border-game-green-border bg-transparent text-game-green-soft rounded-sm text-[13px] tracking-[0.04em] no-underline")}
    label])
 
 ;;;; Content sections
@@ -77,11 +69,10 @@
 
 (defn essay-content []
   (let [p (fn [& body]
-             [:p {:style {:font-size "13px" :margin-bottom "20px" :max-width "48rem"
-                          :text-align "left" :line-height "1.7" :color "#9adaaa"}}
+             [:p.text-left.text-game-green-soft {:class "text-[13px] mb-5 leading-[1.7] max-w-[48rem]"}
               body])]
     [:<>
-     [:h2 {:style {:font-size "18px" :font-weight "bold" :margin-bottom "20px" :color "#4ade80"}}
+     [:h2.font-bold.text-green-400 {:class "text-lg mb-5"}
       "From " [:em "The Sumerian Game"] " to " [:em "Star Empire Elite"]]
 
      (p "When people talk about the history of strategy games, they usually begin in the wrong place. "
@@ -274,17 +265,15 @@
   (ui/page
     {}
     [:div.text-base.w-full.max-w-3xl.mx-auto.overflow-hidden.relative
-     {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
-              :border-radius "4px" :color "#4ade80"
-              :font-family "'Courier New', monospace"}}
+     {:class "border-[1.5px] border-game-green-border rounded bg-game-bg text-green-400 font-mono"}
      (ui/scanline-overlay)
 
      ;; Page header
-     [:div {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
-      [:div {:style {:font-size "22px" :font-weight "bold" :color "#4ade80"
-                     :letter-spacing "0.05em"}} "ABOUT"]]
+     [:div.bg-game-surface.border-b.border-game-green-border
+      {:class "py-[7px] px-3.5"}
+      [:div.font-bold.text-green-400 {:class "text-[22px] tracking-wider"} "ABOUT"]]
 
-     [:div {:style {:padding "16px 20px"}}
+     [:div {:class "py-4 px-5"}
 
       ;; Tab bar
       [:div.flex.gap-2.mb-6
@@ -299,7 +288,7 @@
         :design (design-content))
 
       ;; Navigation links
-      [:div {:style {:border-top "1px solid #1a3020" :padding-top "12px" :margin-top "8px"}}
+      [:div.border-t.border-game-green-border {:class "pt-3 mt-2"}
        [:div.flex.gap-3
         (nav-link "/signup" "Sign In / Sign Up")
         (nav-link "/" "Home" {:hx-boost "true"})]]]]))

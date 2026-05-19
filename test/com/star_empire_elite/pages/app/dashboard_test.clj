@@ -152,7 +152,7 @@
                                         :game   minimal-game
                                         :admin? false})]
       (is (vector? result))
-      (is (= :div.relative (first result))))))
+      (is (clojure.string/starts-with? (name (first result)) "div.relative")))))
 
 (deftest test-game-card-contains-empire-name
   (testing "The empire name appears in the rendered hiccup"
@@ -203,7 +203,7 @@
                                                   :player-count 3
                                                   :admin?       false})]
       (is (vector? result))
-      (is (= :div (first result))))))
+      (is (clojure.string/starts-with? (name (first result)) "div")))))
 
 (deftest test-available-game-card-shows-game-name
   (testing "The game name appears in the rendered card"

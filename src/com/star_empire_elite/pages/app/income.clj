@@ -42,6 +42,8 @@
   [player player-map, income income-map] -> {:credits int, :food int, ...}"
   [player income]
   (-> (utils/player-snapshot player)
+      ;; Update reads the value of :credits, applies the + transformation,
+      ;; and writes the result back to a new map using a new key.
       (update :credits  + (:ore-credits  income) (:tax-credits income))
       (update :food     + (:erg-food     income))
       (update :fuel     + (:erg-fuel     income))
@@ -60,12 +62,12 @@
 
   [income-map {:credits? int, :food? int, ...}] -> seq of hiccup"
   [income-map]
-  (for [[k suffix] [[:credits "cr"] [:food "food"] [:fuel "fuel"]
-                    [:soldiers "sold"] [:fighters "fgtr"] [:stations "stn"]]
+  (for [[k suffix] [[:credits "cred"] [:food "food"] [:fuel "fuel"]
+                    [:soldiers "sold"] [:fighters "fgtr"] [:stations "defs"]]
         :let [v (or (k income-map) 0)]
         :when (pos? v)]
     [:span.text-xs.inline-block.rounded-sm.text-green-400
-     {:key k :style {:padding "1px 5px" :background "#1a3a28"}}
+     {:key k :class "py-px px-[5px] bg-game-green-deep"}
      "+" (ui/format-number v) " " suffix]))
 
 (defn- source-card
@@ -73,12 +75,11 @@
 
   [{:keys [name count income-map]}] -> hiccup"
   [{:keys [name count income-map]}]
-  [:div.flex.flex-col.gap-1
-   {:style {:border "1px solid #253530" :border-radius "3px"
-            :padding "6px 8px" :background "#1e1e1e"}}
+  [:div.flex.flex-col.gap-1.rounded-game.bg-game-card
+   {:class "border border-game-border py-1.5 px-2"}
    [:div.flex.justify-between.items-baseline
     [:span.text-base.font-bold.text-green-400 name]
-    [:span.text-xs {:style {:color "#7ab88a"}} (str "x" count)]]
+    [:span.text-xs.text-game-green-muted (str "x" count)]]
    [:div {:class "flex flex-col gap-0.5"}
     (source-pills income-map)]])
 
@@ -108,47 +109,6 @@
       (for [src sources]
         (source-card src))]]))
 
-(defn- resource-row
-  "Render one resource row in two variants: mobile (no bar) and desktop (with bar).
-
-  [name str, before int, delta int, key? bool, filter-id str] -> hiccup"
-  [name before delta key? filter-id]
-  (let [after       (+ before delta)
-        row-class   "items-center gap-2 py-1 px-3"
-        row-style   (merge {:border-bottom "1px solid #1a2820"}
-                           (when key? {:background "#121a18"}))
-        name-cell   [:div.text-base
-                     {:class (when key? "font-bold")
-                      :style (if key? {:color "#4ade80"} {:color "#7ab88a"})}
-                     name]
-        before-cell [:div.text-base.text-right
-                     {:style {:color "#7ab88a"}}
-                     (ui/format-number before)]
-        delta-cell  [:div.text-base.text-right.whitespace-nowrap
-                     {:style (merge {:letter-spacing "0.03em"}
-                                    (cond
-                                      (zero? delta) {:color "#7ab88a"}
-                                      key?          {:color "#4ade80" :font-weight "bold"
-                                                     :text-shadow "0 0 8px rgba(74,222,128,0.6)"}
-                                      :else         {:color "#4ade80"}))}
-                     (if (zero? delta) "-" [:<> "+" (ui/format-number delta)])]
-        after-cell  [:div.text-base.text-right
-                     {:style (if key?
-                               {:color "#4ade80" :font-weight "bold"}
-                               {:color "#9adaaa"})}
-                     (ui/format-number after)]]
-    [:<>
-     ;; Mobile: 4-col grid, no bar
-     [:div.income-row-mobile
-      {:class (str "md:hidden " row-class)
-       :style row-style}
-      name-cell before-cell delta-cell after-cell]
-     ;; Desktop: 5-col grid, with bar
-     [:div.income-row-desktop
-      {:class (str "hidden md:grid " row-class)
-       :style row-style}
-      name-cell (ui/svg-indicator-bar :gain before after filter-id) before-cell delta-cell after-cell]]))
-
 (defn- resource-table-header
   "Render the column-label row for the resource table.
   Emits two variants: a 4-column mobile row (no bar column) and a 5-column
@@ -156,28 +116,62 @@
 
   [] -> hiccup"
   []
-  (let [header-style {:background "#151f1a" :border-bottom "1px solid #253530"}
-        header-class "gap-2 py-1 px-3 items-center"
-        col-style    {:letter-spacing "0.08em" :color "#4ade80"}
-        item-style   (assoc col-style :letter-spacing "0.1em")
-        col-label    (fn [text style extra-class]
-                       [:span.text-xs.uppercase {:class extra-class :style style} text])
+  (let [header-class "gap-2 py-1 px-3 items-center bg-game-header border-b border-game-border"
+        col-cls      "tracking-[0.08em] text-green-400"
+        item-cls     "tracking-widest text-green-400"
+        col-label    (fn [text cls extra-class]
+                       [:span.text-xs.uppercase {:class (str cls (when extra-class (str " " extra-class)))} text])
         value-label  (fn [text]
-                       (col-label text col-style "text-right justify-self-end"))]
+                       (col-label text col-cls "text-right justify-self-end"))]
     [:<>
      [:div.income-row-mobile
-      {:class (str "md:hidden " header-class) :style header-style}
-      (col-label "Item" item-style nil)
+      {:class (str "md:hidden " header-class)}
+      (col-label "Item" item-cls nil)
       (value-label "before")
       (value-label "change")
       (value-label "after")]
      [:div.income-row-desktop
-      {:class (str "hidden md:grid " header-class) :style header-style}
-      (col-label "Item" item-style nil)
+      {:class (str "hidden md:grid " header-class)}
+      (col-label "Item" item-cls nil)
       [:span]
       (value-label "before")
       (value-label "change")
       (value-label "after")]]))
+
+(defn- resource-row
+  "Render one resource row in two variants: mobile (no bar) and desktop (with bar).
+
+  [name str, before int, delta int, key? bool, filter-id str] -> hiccup"
+  [name before delta key? filter-id]
+  (let [after       (+ before delta)
+        row-class   (str "items-center gap-2 py-1 px-3 border-b border-game-divider"
+                         (when key? " bg-game-row"))
+        name-cell   [:div.text-base
+                     {:class (if key? "font-bold text-green-400" "text-game-green-muted")}
+                     name]
+        before-cell [:div.text-base.text-right.text-game-green-muted
+                     (ui/format-number before)]
+        delta-cell  [:div.text-base.text-right.whitespace-nowrap
+                     {:class (str "tracking-[0.03em] "
+                                  (cond
+                                    (zero? delta) "text-game-green-muted"
+                                    key?          "text-green-400 font-bold"
+                                    :else         "text-green-400"))
+                      :style (when (and key? (not (zero? delta)))
+                               {:text-shadow "0 0 8px rgba(74,222,128,0.6)"})}
+                     (if (zero? delta) "-" [:<> "+" (ui/format-number delta)])]
+        after-cell  [:div.text-base.text-right
+                     {:class (if key? "text-green-400 font-bold" "text-game-green-soft")}
+                     (ui/format-number after)]]
+    [:<>
+     ;; Mobile: 4-col grid, no bar
+     [:div.income-row-mobile
+      {:class (str "md:hidden " row-class)}
+      name-cell before-cell delta-cell after-cell]
+     ;; Desktop: 5-col grid, with bar
+     [:div.income-row-desktop
+      {:class (str "hidden md:grid " row-class)}
+      name-cell (ui/svg-indicator-bar :gain before after filter-id) before-cell delta-cell after-cell]]))
 
 (defn- resource-table
   "Render the Resource Changes table with before/delta/after columns and SVG bars.
@@ -192,8 +186,8 @@
               {:name "Soldiers" :before (:player/soldiers player) :delta (:mil-soldiers income) :key? false}
               {:name "Fighters" :before (:player/fighters player) :delta (:mil-fighters income) :key? false}
               {:name "Stations" :before (:player/stations player) :delta (:mil-stations income) :key? false}]]
-    [:div.overflow-hidden
-     {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
+    [:div.overflow-hidden.rounded-game.bg-game-surface
+     {:class "border border-game-border"}
      (resource-table-header)
      (for [{:keys [name before delta key?]} rows]
        (resource-row name before delta key? (str "glow-" (str/lower-case name))))]))
@@ -222,18 +216,19 @@
             day-reset?     (and (> (:player/current-round player) 1)
                                 last-completed
                                 (not (utils/same-calendar-day? last-completed)))]
-        (biff/submit-tx ctx
-                        [(cond-> {:db/doc-type          :player
-                                  :db/op                :update
-                                  :xt/id                player-id
-                                  :player/credits       (:credits after)
-                                  :player/food          (:food after)
-                                  :player/fuel          (:fuel after)
-                                  :player/soldiers      (:soldiers after)
-                                  :player/fighters      (:fighters after)
-                                  :player/stations      (:stations after)
-                                  :player/current-phase 2}
-                           day-reset? (assoc :player/current-round 1))])
+        (biff/submit-tx 
+          ctx
+          [(cond-> {:db/doc-type          :player
+                    :db/op                :update
+                    :xt/id                player-id
+                    :player/credits       (:credits after)
+                    :player/food          (:food after)
+                    :player/fuel          (:fuel after)
+                    :player/soldiers      (:soldiers after)
+                    :player/fighters      (:fighters after)
+                    :player/stations      (:stations after)
+                    :player/current-phase 2}
+             day-reset? (assoc :player/current-round 1))])
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/expenses")}}))))
 
@@ -252,10 +247,8 @@
     (ui/page
       {}
       ;; Terminal shell: text-base sets the base font size for all descendants
-      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
-       {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
-                :border-radius "4px" :color "#4ade80"
-                :font-family "'Courier New', monospace"}}
+      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.rounded.text-green-400.font-mono
+       {:class "border-[1.5px] border-game-green-border"}
 
        ;; Scanline overlay
        (ui/scanline-overlay)
@@ -264,18 +257,16 @@
        (ui/phase-topbar player game "INCOME PHASE")
 
        ;; Body
-       [:div.flex.flex-col.gap-2
-        {:style {:padding "10px 14px"}}
+       [:div.flex.flex-col.gap-2.py-2.5.px-3.5
         (source-grid player income)
         (resource-table player income)
         (ui/incoming-alert player)]
 
        ;; Action bar
-       [:div.flex.gap-2
-        {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
+       [:div.flex.gap-2.py-2.px-3.5.border-t.border-game-border
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
         (biff/form
           {:action (str "/app/game/" player-id "/apply-income") :method "post"
-           :style  {:margin 0}}
+           :class  "m-0"}
           (ui/submit-button true "Continue to Expenses"))]])))
 

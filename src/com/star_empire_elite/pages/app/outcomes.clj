@@ -64,25 +64,22 @@
      text]))
 
 (defn- outcome-label [won?]
-  [:span {:style {:font-size "12px" :letter-spacing "0.1em"
-                  :color (if won? "#4ade80" "#f87171")}}
+  [:span {:class (str "text-xs tracking-widest " (if won? "text-green-400" "text-red-400"))}
    (if won? "▲ VICTORY ▲" "▼ DEFEAT ▼")])
 
 (defn- gain-cell [n]
-  [:span {:style {:color "#4ade80"}} (str "+" (ui/format-number n))])
+  [:span.text-green-400 (str "+" (ui/format-number n))])
 
 (defn- opp-loss-cell [n]
   (if (pos? (or n 0))
-    [:span {:style {:color "#f87171"}} (str "−" (ui/format-number n))]
-    [:span {:style {:color "#4a6a58"}} "0"]))
+    [:span.text-red-400 (str "−" (ui/format-number n))]
+    [:span.text-game-green-dim "0"]))
 
 (defn- combat-row [left center right]
-  [:tr {:style {:border-bottom "1px solid #1a2820" :background "#121a18"}}
-   [:td {:style {:text-align "right" :padding "4px 12px"
-                 :border-right "1px solid #1a2820"}} left]
-   [:td {:style {:text-align "center" :padding "4px 8px"
-                 :border-right "1px solid #1a2820" :color "#7ab88a"}} center]
-   [:td {:style {:text-align "left" :padding "4px 12px"}} right]])
+  [:tr.bg-game-row.border-b.border-game-divider
+   [:td.text-right.py-1.px-3.border-r.border-game-divider left]
+   [:td.text-center.py-1.px-2.border-r.border-game-divider.text-game-green-muted center]
+   [:td.text-left.py-1.px-3 right]])
 
 (defn- combat-card
   "Render a combat card with header, 3-col symmetric table, and optional footer.
@@ -92,20 +89,18 @@
   :plunder-label customises the footer label (outgoing vs incoming framing)."
   [{:keys [mode opp-name won? my-counts my-losses opp-losses
            stations-mine? resources-taken planets-transferred plunder-label]}]
-  (let [col-header {:font-size "10px" :letter-spacing "0.1em"
-                    :color "#4a6a58" :text-transform "uppercase"
-                    :font-weight "normal" :padding "6px 12px"}
-        dash       [:span {:style {:color "#4a6a58"}} "—"]
-        make-left  (fn [unit-key loss-key defender-only?]
-                     (if (and defender-only? (not stations-mine?))
-                       dash
-                       [:<>
-                        [:span {:style {:color "#9adaaa"}}
-                         (ui/format-number (get my-counts unit-key 0))]
-                        (let [loss (get my-losses loss-key 0)]
-                          (when (pos? loss)
-                            [:span {:style {:color "#f87171" :margin-left "6px"}}
-                             (str "−" (ui/format-number loss))]))]))
+  (let [col-header-cls "text-[10px] tracking-widest text-game-green-dim uppercase font-normal py-1.5 px-3"
+        dash           [:span.text-game-green-dim "—"]
+        make-left      (fn [unit-key loss-key defender-only?]
+                         (if (and defender-only? (not stations-mine?))
+                           dash
+                           [:<>
+                            [:span.text-game-green-soft
+                             (ui/format-number (get my-counts unit-key 0))]
+                            (let [loss (get my-losses loss-key 0)]
+                              (when (pos? loss)
+                                [:span.text-red-400.ml-1.5
+                                 (str "−" (ui/format-number loss))]))]))
         make-right (fn [loss-key defender-only?]
                      (if (and defender-only? stations-mine?)
                        dash
@@ -123,25 +118,22 @@
                          (if stations-mine?
                            (combat-row (opp-loss-cell n) label (gain-cell n))
                            (combat-row (gain-cell n) label (opp-loss-cell n)))))]
-    [:div {:style {:border "1px solid #253530" :border-radius "3px"
-                   :background "#161616" :overflow "hidden"}}
+    [:div.rounded-game.bg-game-surface.overflow-hidden
+     {:class "border border-game-border"}
      ;; Header: mode badge + opponent name on left, victory/defeat on right
-     [:div.flex.justify-between.items-center
-      {:style {:padding "8px 12px"}}
-      [:div.flex.items-center {:style {:gap "12px"}}
+     [:div.flex.justify-between.items-center.py-2.px-3
+      [:div.flex.items-center.gap-3
        (mode-badge mode)
-       [:span.text-xl.font-bold {:style {:color "#4ade80"}} opp-name]]
+       [:span.text-xl.font-bold.text-green-400 opp-name]]
       (outcome-label won?)]
      ;; Table
      [:div.overflow-x-auto
       [:table.w-full.text-xs.table-fixed
        [:thead
-        [:tr {:style {:background "#151f1a"
-                      :border-top "1px solid #253530"
-                      :border-bottom "1px solid #253530"}}
-         [:th {:style (assoc col-header :text-align "right")}   "◄ YOU"]
-         [:th {:style (assoc col-header :text-align "center")}  "UNIT"]
-         [:th {:style (assoc col-header :text-align "left")}    (str (str/upper-case opp-name) " ►")]]]
+        [:tr.bg-game-header.border-t.border-game-border.border-b.border-game-border
+         [:th {:class (str col-header-cls " text-right")}   "◄ YOU"]
+         [:th {:class (str col-header-cls " text-center")}  "UNIT"]
+         [:th {:class (str col-header-cls " text-left")}    (str (str/upper-case opp-name) " ►")]]]
        [:tbody
         ;; Military unit rows
         (for [{:keys [label unit-key loss-key defender-only?]} battle-unit-specs]
@@ -161,14 +153,12 @@
   "Render a strike result using the same 3-col table structure as combat-card.
   :stations-mine? true when you are the defender."
   [{:keys [opp-name stations-mine? dispatched intercepted units-destroyed defender-stations]}]
-  (let [col-header {:font-size "10px" :letter-spacing "0.1em"
-                    :color "#4a6a58" :text-transform "uppercase"
-                    :font-weight "normal" :padding "6px 12px"}
-        dash [:span {:style {:color "#4a6a58"}} "—"]
+  (let [col-header-cls "text-[10px] tracking-widest text-game-green-dim uppercase font-normal py-1.5 px-3"
+        dash [:span.text-game-green-dim "—"]
         att-cmd [:<>
-                 [:span {:style {:color "#9adaaa"}} (ui/format-number dispatched)]
+                 [:span.text-game-green-soft (ui/format-number dispatched)]
                  (when (pos? intercepted)
-                   [:span {:style {:color "#f87171" :margin-left "6px"}}
+                   [:span.text-red-400.ml-1.5
                     (str "−" (ui/format-number intercepted))])]
         ud   (or units-destroyed {})
         rows [["cmd ships"  att-cmd                              dash]
@@ -179,20 +169,18 @@
               ["carriers"   dash (opp-loss-cell (:carriers   ud))]
               ["admirals"   dash (opp-loss-cell (:admirals   ud))]
               ["def stns"   dash           (opp-loss-cell (:stations ud))]]]
-    [:div {:style {:border "1px solid #253530" :border-radius "3px"
-                   :background "#161616" :overflow "hidden"}}
-     [:div.flex.items-center {:style {:padding "8px 12px" :gap "12px"}}
+    [:div.rounded-game.bg-game-surface.overflow-hidden
+     {:class "border border-game-border"}
+     [:div.flex.items-center.py-2.px-3.gap-3
       (mode-badge :strike)
-      [:span.text-xl.font-bold {:style {:color "#4ade80"}} opp-name]]
+      [:span.text-xl.font-bold.text-green-400 opp-name]]
      [:div.overflow-x-auto
       [:table.w-full.text-xs.table-fixed
        [:thead
-        [:tr {:style {:background "#151f1a"
-                      :border-top "1px solid #253530"
-                      :border-bottom "1px solid #253530"}}
-         [:th {:style (assoc col-header :text-align "right")}  "◄ YOU"]
-         [:th {:style (assoc col-header :text-align "center")} "UNIT"]
-         [:th {:style (assoc col-header :text-align "left")}   (str (str/upper-case opp-name) " ►")]]]
+        [:tr.bg-game-header.border-t.border-game-border.border-b.border-game-border
+         [:th {:class (str col-header-cls " text-right")}  "◄ YOU"]
+         [:th {:class (str col-header-cls " text-center")} "UNIT"]
+         [:th {:class (str col-header-cls " text-left")}   (str (str/upper-case opp-name) " ►")]]]
        [:tbody
         (for [[label att-cell def-cell] rows]
           (if stations-mine?
@@ -213,12 +201,12 @@
 
 (defn- spy-card
   [{:keys [opp-name won? op spy lost stab agents-defected]}]
-  [:div {:style {:border "1px solid #253530" :border-radius "3px"
-                 :background "#161616" :overflow "hidden"}}
-   [:div.flex.items-center {:style {:padding "8px 12px" :gap "12px"}}
+  [:div.rounded-game.bg-game-surface.overflow-hidden
+   {:class "border border-game-border"}
+   [:div.flex.items-center.py-2.px-3.gap-3
     (spy-badge op won?)
-    [:span.text-xl.font-bold {:style {:color "#4ade80"}} opp-name]]
-   [:div {:style {:padding "6px 12px" :border-top "1px solid #1a2820"}}
+    [:span.text-xl.font-bold.text-green-400 opp-name]]
+   [:div.py-1.5.px-3.border-t.border-game-divider
     (cond
       (and won? (= op "spy"))
       (let [units [["Soldiers"   (:soldiers   spy)]
@@ -230,24 +218,24 @@
                    ["Stations"   (:stations   spy)]
                    ["Cmd Ships"  (:cmd-ships  spy)]
                    ["Agents"     (:agents     spy)]]]
-        [:div.grid.grid-cols-3 {:style {:gap "2px 16px"}}
+        [:div.grid.grid-cols-3.gap-x-4.gap-y-0.5
          (for [[label val] units]
            [:div.flex.justify-between.items-center
-            [:span {:style {:color "#7ab88a" :font-size "12px"}} label]
-            [:span {:style {:color "#9adaaa"}} (ui/format-number (or val 0))]])])
+            [:span.text-game-green-muted.text-xs label]
+            [:span.text-game-green-soft (ui/format-number (or val 0))]])])
 
       (and won? (= op "incite"))
-      [:p.text-xs {:style {:color "#9adaaa"}}
+      [:p.text-xs.text-game-green-soft
        (str "Your agents successfully stirred unrest. "
             opp-name "'s stability was reduced by " stab ".")]
 
       (and won? (= op "defect"))
-      [:p.text-xs {:style {:color "#9adaaa"}}
+      [:p.text-xs.text-game-green-soft
        (str (or agents-defected 0)
             " agent(s) defected from " opp-name " to your service.")]
 
       :else
-      [:p.text-xs {:style {:color "#9adaaa"}}
+      [:p.text-xs.text-game-green-soft
        (str "Your agents were unable to complete their mission. "
             lost " agent(s) were captured by " opp-name ".")])]])
 
@@ -258,36 +246,36 @@
                ["Transports" (or transports 0)]
                ["Fighters"   (or fighters   0)]
                ["Carriers"   (or carriers   0)]]]
-    [:div {:style {:border "1px solid #253530" :border-radius "3px"
-                   :background "#161616" :overflow "hidden"}}
-     [:div.flex.items-center {:style {:padding "8px 12px" :gap "12px"}}
+    [:div.rounded-game.bg-game-surface.overflow-hidden
+     {:class "border border-game-border"}
+     [:div.flex.items-center.py-2.px-3.gap-3
       (mode-badge :bomb)
-      [:span.text-xl.font-bold {:style {:color "#4ade80"}}
+      [:span.text-xl.font-bold.text-green-400
        (str opp-name " (" (if won? "succeeded" "failed") ")")]]
      (when won?
-       [:div.grid.grid-cols-4 {:style {:padding "6px 12px" :border-top "1px solid #1a2820"}}
+       [:div.grid.grid-cols-4.py-1.5.px-3.border-t.border-game-divider
         (for [[label val] units]
-          [:div.flex.justify-between.items-center {:style {:padding-right "16px"}}
-           [:span {:style {:color "#7ab88a" :font-size "12px"}} label]
-           [:span {:style {:color "#9adaaa"}} (ui/format-number val)]])])]))
+          [:div.flex.justify-between.items-center.pr-4
+           [:span.text-game-green-muted.text-xs label]
+           [:span.text-game-green-soft (ui/format-number val)]])])]))
 
 (defn- growth-card [{:keys [pop-growth population]}]
-  [:div {:style {:border "1px solid #253530" :border-radius "3px"
-                 :background "#161616" :overflow "hidden"}}
-   [:div.flex.items-center {:style {:padding "8px 12px" :gap "12px"}}
+  [:div.rounded-game.bg-game-surface.overflow-hidden
+   {:class "border border-game-border"}
+   [:div.flex.items-center.py-2.px-3.gap-3
     (mode-badge :growth)
     (if (pos? pop-growth)
-      [:span {:style {:color "#9adaaa" :font-size "14px"}}
+      [:span.text-game-green-soft.text-sm
        "Population grew by "
-       [:span {:style {:color "#4ade80"}} (str "+" (ui/format-population pop-growth))]
-       [:span {:style {:color "#4a6a58"}} " · "]
+       [:span.text-green-400 (str "+" (ui/format-population pop-growth))]
+       [:span.text-game-green-dim " · "]
        "total "
-       [:span {:style {:color "#4ade80"}} (ui/format-population population)]]
-      [:span {:style {:color "#9adaaa" :font-size "14px"}}
+       [:span.text-green-400 (ui/format-population population)]]
+      [:span.text-game-green-soft.text-sm
        "Population held steady this round"
-       [:span {:style {:color "#4a6a58"}} " · "]
+       [:span.text-game-green-dim " · "]
        "total "
-       [:span {:style {:color "#4ade80"}} (ui/format-population population)]])]])
+       [:span.text-green-400 (ui/format-population population)]])]])
 
 (defn apply-outcomes
   "Advance turn/round/phase and clear stored battle and espionage results.
@@ -348,19 +336,15 @@
   (let [current-turn       (:player/current-turn player)
         turns-per-round    (:game/turns-per-round game)
         end-current-round? (>= current-turn turns-per-round)
-        card-style         {:border "1px solid #253530" :border-radius "3px" :background "#161616"
-                            :padding "12px"}]
+        card-cls           "rounded-game bg-game-surface border border-game-border p-3"]
     (ui/page
      {}
      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
-      {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
-               :border-radius "4px" :color "#4ade80"
-               :font-family "'Courier New', monospace"}}
+      {:class "bg-game-bg rounded text-green-400 font-mono border-[1.5px] border-game-green-border"}
       (ui/scanline-overlay)
       (ui/phase-topbar player game "OUTCOMES PHASE")
       ;; Body
-      [:div.flex.flex-col.gap-2
-       {:style {:padding "10px 14px"}}
+      [:div.flex.flex-col.gap-2.py-2.5.px-3.5
 
        ;; Incoming attacks section (attacks received from other players this turn)
        (let [incoming         (seq (:player/incoming-attacks player))
@@ -393,14 +377,14 @@
                                   :planets-transferred (:planets-transferred result)
                                   :plunder-label       "SEIZED FROM YOUR TREASURY"})))))
             (when (pos? esp-fails)
-              [:div {:style card-style}
-               [:p.font-bold {:style {:color "#4ade80"}}
+              [:div {:class card-cls}
+               [:p.font-bold.text-green-400
                 (str esp-fails " covert operation(s) against your empire were discovered and neutralized.")
                 (when (pos? esp-agents)
                   (str " " esp-agents " captured agent(s) joined your forces."))]])
             (when (pos? incite-stab-lost)
-              [:div {:style card-style}
-               [:p.font-bold {:style {:color "#facc15"}}
+              [:div {:class card-cls}
+               [:p.font-bold.text-yellow-400
                 (str "Enemy agents successfully incited unrest in your empire. Stability reduced by "
                      incite-stab-lost ".")]])
             (when bomb-result
@@ -462,10 +446,10 @@
              has-breakaway? (and (some? breakaway-result) (:triggered? breakaway-result))
              has-recovery?  (and (some? recovery-result) (:triggered? recovery-result))]
          (when (or has-penalty? has-breakaway? has-recovery?)
-           [:div {:style card-style}
-            [:h3.font-bold.mb-3 {:style {:color "#4ade80"}} "Stability"]
+           [:div {:class card-cls}
+            [:h3.font-bold.mb-3.text-green-400 "Stability"]
             (when has-penalty?
-              [:p.text-xs.mb-2 {:style {:color "#facc15"}}
+              [:p.text-xs.mb-2.text-yellow-400
                (str "Empire stability decreases due to unpaid expenses: −" expense-penalty "%")])
             (when has-breakaway?
               (let [lost-str (clojure.string/join ", "
@@ -476,17 +460,17 @@
                                     (str (:erg-lost breakaway-result) " energy planet(s)"))
                                   (when (pos? (:mil-lost breakaway-result))
                                     (str (:mil-lost breakaway-result) " military planet(s)"))]))]
-                [:p.text-xs.mb-2 {:style {:color "#f87171"}}
+                [:p.text-xs.mb-2.text-red-400
                  (str "Empire instability prompts revolution. Lost: " lost-str)]))
             (when has-recovery?
-              [:p.text-xs {:style {:color "#4ade80"}}
+              [:p.text-xs.text-green-400
                (str "Empire stability increases due to paid expenses: +" (:amount recovery-result) "%")])]))
 
        ;; Elimination notice (only shown when player has 0 planets)
        (when eliminated?
-         [:div {:style (assoc card-style :border "1px solid #f87171")}
-          [:h3.font-bold.mb-2 {:style {:color "#f87171"}} "Empire Eliminated"]
-          [:p.text-xs {:style {:color "#f87171"}}
+         [:div {:class "rounded-game bg-game-surface border border-red-400 p-3"}
+          [:h3.font-bold.mb-2.text-red-400 "Empire Eliminated"]
+          [:p.text-xs.text-red-400
            "Your empire has no planets remaining. You have been eliminated."]])
 
        ;; Population growth section (only shown at end of round)
@@ -497,10 +481,9 @@
        (ui/snapshot-section player)]
 
       ;; Action bar
-      [:div.flex.gap-2
-       {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
+      [:div.flex.gap-2.py-2.px-3.5.border-t.border-game-border
        (ui/action-bar-link (str "/app/game/" (:xt/id player)) "Pause")
        (biff/form
         {:action (str "/app/game/" (:xt/id player) "/apply-outcomes") :method "post"
-         :style  {:margin 0}}
+         :class  "m-0"}
         (ui/submit-button true (if end-current-round? "End the Current Round" "Continue to Next Turn")))]])))

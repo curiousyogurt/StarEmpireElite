@@ -33,8 +33,8 @@
                          (:player/erg-planets player)
                          (:player/ore-planets player))
         player-id-str (str (:xt/id player))
-        td-border     {:border-right "1px solid #253530" :padding "4px 12px" :color "#9adaaa"}
-        td-right      (assoc td-border :text-align "right")
+        td-cls        "border-r border-game-border py-1 px-3 text-game-green-soft"
+        td-right-cls  "border-r border-game-border py-1 px-3 text-game-green-soft text-right"
         action-btn    (fn [mode label]
                         [:label.block.cursor-pointer
                          [:input.peer.sr-only
@@ -52,16 +52,15 @@
                         (action-btn :strike "Strike")
                         [:label
                          [:input.sr-only {:type "radio" :name "target-action" :disabled true}]
-                         [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border
-                          {:style {:color "#3a5a48" :border-color "#253530" :cursor "not-allowed"}}
+                         [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.text-game-green-dim.border-game-border.cursor-not-allowed
                           "Strike"]])]
-    [:tr {:style {:border-bottom "1px solid #1a2820" :background "#121a18"}}
-     [:td {:style td-border} (:player/empire-name player)]
-     [:td {:style td-right}  total-planets]
-     [:td {:style td-right}  (:player/score player)]
-     [:td {:style {:padding "4px 8px"}} (action-btn :invade "Invade")]
-     [:td {:style {:padding "4px 8px"}} (action-btn :raid   "Raid")]
-     [:td {:style {:padding "4px 8px"}} strike-btn]]))
+    [:tr.bg-game-row.border-b.border-game-divider
+     [:td {:class td-cls} (:player/empire-name player)]
+     [:td {:class td-right-cls}  total-planets]
+     [:td {:class td-right-cls}  (:player/score player)]
+     [:td.py-1.px-2 (action-btn :invade "Invade")]
+     [:td.py-1.px-2 (action-btn :raid   "Raid")]
+     [:td.py-1.px-2 strike-btn]]))
 
 ;;;;
 ;;;; Actions
@@ -100,23 +99,20 @@
   [{:keys [player game db]}]
   (let [player-id     (:xt/id player)
         other-players (utils/get-other-players db (:player/game player) player-id)
-        th-style      {:color "#4ade80" :font-size "11px" :letter-spacing "0.08em"
-                       :text-transform "uppercase"}]
+        th-cls        "text-green-400 text-[11px] tracking-[0.08em] uppercase"]
     (ui/page
      {}
      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
-      {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
-               :border-radius "4px" :color "#4ade80"
-               :font-family "'Courier New', monospace"}}
+      {:class "border-[1.5px] border-game-green-border rounded bg-game-bg text-green-400 font-mono"}
       (ui/scanline-overlay)
       (ui/phase-topbar player game "ACTION PHASE")
       (biff/form
        {:action (str "/app/game/" player-id "/apply-action")
         :method "post"
-        :style  {:margin 0}}
+        :class  "m-0"}
        ;; Body
        [:div.flex.flex-col.gap-2
-        {:style {:padding "10px 14px"}}
+        {:class "py-2.5 px-3.5"}
         (ui/snapshot-section player {:show-ground? false :show-fleet? false :show-ops? false})
         ;; Army / Fleet readiness pills
         (let [ef              (combat/effective-forces player)
@@ -161,31 +157,31 @@
              [{:label "Cmd Ships" :value (:player/cmd-ships player)}
               {:label "Agents"    :value (:player/agents    player)}])])
         (if (empty? other-players)
-          [:p.text-sm {:style {:color "#9adaaa"}}
+          [:p.text-sm.text-game-green-soft
            "There are no other empires in the galaxy to attack."]
           [:div
            (ui/section-label "Choose a Target")
-           [:p.text-xs.mb-2 {:style {:color "#7ab88a"}}
+           [:p.text-xs.mb-2.text-game-green-muted
             "Invade or Raid to fight for planets. Strike dispatches cmd-ships to damage their forces — no planet capture."]
            [:div.overflow-x-auto
             [:table.w-full.text-sm
-             {:style {:border "1px solid #253530" :border-collapse "collapse"}}
+             {:class "border border-game-border border-collapse"}
              [:thead
-              [:tr {:style {:background "#151f1a" :border-bottom "1px solid #253530"}}
-               [:th.text-left.px-3.py-1  {:style th-style} "Empire"]
-               [:th.text-right.px-3.py-1 {:style th-style} "Planets"]
-               [:th.text-right.px-3.py-1 {:style th-style} "Score"]
-               [:th.px-3.py-1 {:style (assoc th-style :text-align "center") :col-span 3} "Operations"]]]
+              [:tr.bg-game-header.border-b.border-game-border
+               [:th.text-left.px-3.py-1  {:class th-cls} "Empire"]
+               [:th.text-right.px-3.py-1 {:class th-cls} "Planets"]
+               [:th.text-right.px-3.py-1 {:class th-cls} "Score"]
+               [:th.px-3.py-1.text-center {:class th-cls :col-span 3} "Operations"]]]
              [:tbody
               (for [target other-players]
                 (target-row target (:player/cmd-ships player)))]]]])
         ;; Warning banner — shown by CSS when a target radio is selected
         [:div.queued-warning.items-center
-         [:p.text-sm {:style {:color "#facc15"}} "\u26a0 Attack queued for Outcomes phase."]]
+         [:p.text-sm.text-yellow-400 "\u26a0 Attack queued for Outcomes phase."]]
         (ui/incoming-alert player)]
        ;; Action bar
        [:div.flex.gap-2
-        {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
+        {:class "py-2 px-3.5 border-t border-game-border"}
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
         (ui/action-bar-button "Cancel Attack"
           {:class   "cancel-target"

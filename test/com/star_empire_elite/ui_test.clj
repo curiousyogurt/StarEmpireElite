@@ -165,7 +165,8 @@
 (deftest test-action-bar-link
   (testing "Returns an anchor hiccup element with the correct href and label"
     (let [[tag attrs label] (ui/action-bar-link "/app/game/123" "Pause")]
-      (is (= :a tag))
+      (is (keyword? tag))
+      (is (clojure.string/starts-with? (name tag) "a"))
       (is (= "/app/game/123" (:href attrs)))
       (is (= "Pause" label)))))
 
@@ -190,7 +191,7 @@
                                      [{:label "Planets" :value 200 :suffix "cr"}
                                       {:label "Taxes"   :value 100 :suffix "cr"}])]
       (is (vector? result))
-      (is (= :div.flex.flex-col.gap-1 (first result))))))
+      (is (clojure.string/starts-with? (name (first result)) "div")))))
 
 (deftest test-projection-pill-signed-positive
   (testing "Signed? true and a positive total produces a hiccup vector"
@@ -199,8 +200,8 @@
       ;; header row is the 3rd element (index 2) — [:keyword attrs ...children...]
       (let [header-row (nth result 2)
             total-span (last header-row)]
-        ;; Color for a positive signed value is not red
-        (is (not= "#f87171" (get-in total-span [1 :style :color])))))))
+        ;; Class for a positive signed value is not red
+        (is (not= "text-red-400" (get-in total-span [1 :class])))))))
 
 (deftest test-projection-pill-signed-negative
   (testing "Signed? true renders the total span in red when value is negative"
@@ -209,8 +210,8 @@
           header-row (nth result 2)
           total-span (last header-row)]
       (is (vector? total-span))
-      ;; Color should be red for a negative signed total
-      (is (= "#f87171" (get-in total-span [1 :style :color]))))))
+      ;; Class should be red for a negative signed total
+      (is (= "text-red-400" (get-in total-span [1 :class]))))))
 
 (deftest test-projection-pill-total-id
   (testing "total-id option assigns an :id to the total span"
@@ -341,7 +342,7 @@
   (testing "Returns a hiccup div for a player with all required fields"
     (let [result (ui/snapshot-section sample-player)]
       (is (vector? result))
-      (is (= :div (first result))))))
+      (is (clojure.string/starts-with? (name (first result)) "div")))))
 
 (deftest test-snapshot-section-population-formatting
   (testing "Renders without error for various population values (double formatting)"
@@ -355,11 +356,11 @@
 ;;;; color variants (:highlight?, :warn?, both), and the :display string override.
 ;;;;
 ;;;; Structure:
-;;;;   result[0]       = :div.flex.flex-col.gap-1
+;;;;   result[0]       = :div.flex.flex-col.gap-1.rounded-game.bg-game-card
 ;;;;   result[2]       = [:span ... title]
 ;;;;   result[3]       = [:div {:class ...} (for-lazy-seq-of-rows ...)]
 ;;;;   result[3][2]    = lazy seq of row hiccup
-;;;;   first row[3]    = [:span.text-xs.font-bold {:style {:color <value-color>}} value]
+;;;;   first row[3]    = [:span.text-xs.font-bold {:class <tailwind-color-class>} value]
 ;;;;
 
 (defn- stat-pill-first-row
@@ -371,27 +372,27 @@
   (testing "Returns a hiccup div with the correct root tag"
     (let [result (ui/stat-pill "Ground" [{:label "Soldiers" :value 100}])]
       (is (vector? result))
-      (is (= :div.flex.flex-col.gap-1 (first result))))))
+      (is (clojure.string/starts-with? (name (first result)) "div")))))
 
 (deftest test-stat-pill-default-color
-  (testing "Plain row (no :highlight? or :warn?) renders value in the dim color"
+  (testing "Plain row (no :highlight? or :warn?) renders value in the soft color class"
     (let [row (stat-pill-first-row (ui/stat-pill "T" [{:label "L" :value 5}]))]
-      (is (= "#9adaaa" (get-in row [3 1 :style :color]))))))
+      (is (= "text-game-green-soft" (get-in row [3 1 :class]))))))
 
 (deftest test-stat-pill-highlight-color
-  (testing ":highlight? true renders the value in bright green"
+  (testing ":highlight? true renders the value in bright green class"
     (let [row (stat-pill-first-row (ui/stat-pill "T" [{:label "L" :value 5 :highlight? true}]))]
-      (is (= "#4ade80" (get-in row [3 1 :style :color]))))))
+      (is (= "text-green-400" (get-in row [3 1 :class]))))))
 
 (deftest test-stat-pill-warn-color
-  (testing ":warn? true renders the value in yellow"
+  (testing ":warn? true renders the value in yellow class"
     (let [row (stat-pill-first-row (ui/stat-pill "T" [{:label "L" :value 5 :warn? true}]))]
-      (is (= "#facc15" (get-in row [3 1 :style :color]))))))
+      (is (= "text-yellow-400" (get-in row [3 1 :class]))))))
 
 (deftest test-stat-pill-warn-overrides-highlight
   (testing ":warn? takes priority over :highlight? when both are set"
     (let [row (stat-pill-first-row (ui/stat-pill "T" [{:label "L" :value 5 :warn? true :highlight? true}]))]
-      (is (= "#facc15" (get-in row [3 1 :style :color]))))))
+      (is (= "text-yellow-400" (get-in row [3 1 :class]))))))
 
 (deftest test-stat-pill-display-override
   (testing ":display renders a custom string instead of format-number"

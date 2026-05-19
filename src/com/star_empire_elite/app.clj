@@ -171,25 +171,20 @@
       (ui/page
         {}
         [:div.text-base.w-full.max-w-2xl.mx-auto.overflow-hidden.relative
-         {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
-                  :border-radius "4px" :color "#4ade80"
-                  :font-family "'Courier New', monospace"}}
+         {:class "bg-game-bg text-green-400 font-mono border-[1.5px] border-game-green-border rounded"}
          (ui/scanline-overlay)
          [:div.flex.items-center
-          {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
-          [:div {:style {:font-size "18px" :font-weight "bold" :color "#4ade80"
-                         :letter-spacing "0.05em"}} "CREATE GAME"]]
-         [:div {:style {:padding "14px"}}
+          {:class "bg-game-surface border-b border-game-green-border py-[7px] px-3.5"}
+          [:div.text-lg.font-bold.text-green-400 {:class "tracking-wider"} "CREATE GAME"]]
+         [:div.p-3.5
           (biff/form
             {:action "/app/create-game"
              :method "post"}
-            [:div {:style {:margin-bottom "14px"}}
+            [:div.mb-3.5
              (ui/section-label "Galaxy Name")
              [:input.w-full
               {:type "text" :name "game-name" :required true :maxlength 100 :autofocus true
-               :style {:background "#0e1810" :border "1px solid #1e6e44" :color "#4ade80"
-                       :padding "6px 8px" :font-family "'Courier New', monospace"
-                       :font-size "14px" :border-radius "2px" :outline "none" :width "100%"}}]]
+               :class "bg-game-green-done border border-game-green-border text-green-400 py-1.5 px-2 font-mono text-sm rounded-sm outline-none w-full"}]]
             [:div.flex.gap-3
              (ui/action-bar-link "/app" "Cancel")
              (ui/submit-button true "Create")])]]))))
@@ -251,29 +246,24 @@
       (ui/page
         {}
         [:div.text-base.w-full.max-w-2xl.mx-auto.overflow-hidden.relative
-         {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
-                  :border-radius "4px" :color "#4ade80"
-                  :font-family "'Courier New', monospace"}}
+         {:class "bg-game-bg text-green-400 font-mono border-[1.5px] border-game-green-border rounded"}
          (ui/scanline-overlay)
          [:div.flex.items-center
-          {:style {:background "#161616" :border-bottom "1px solid #1e6e44" :padding "7px 14px"}}
+          {:class "bg-game-surface border-b border-game-green-border py-[7px] px-3.5"}
           [:div
-           [:div {:style {:font-size "18px" :font-weight "bold" :color "#4ade80"
-                          :letter-spacing "0.05em"}} "JOIN GAME"]
-           [:div.text-sm.mt-px {:style {:color "#9adaaa"}} (:game/name game)]]]
-         [:div {:style {:padding "14px"}}
+           [:div.text-lg.font-bold.text-green-400 {:class "tracking-wider"} "JOIN GAME"]
+           [:div.text-sm.mt-px.text-game-green-soft (:game/name game)]]]
+         [:div.p-3.5
           (when error
-            [:div {:style {:color "#f87171" :font-size "13px" :margin-bottom "10px"}} error])
+            [:div.text-red-400 {:class "text-[13px] mb-[10px]"} error])
           (biff/form
             {:action (str "/app/join-game/" game-id)
              :method "post"}
-            [:div {:style {:margin-bottom "14px"}}
+            [:div.mb-3.5
              (ui/section-label "Empire Name")
              [:input.w-full
               {:type "text" :name "empire-name" :required true :maxlength 50 :autofocus true
-               :style {:background "#0e1810" :border "1px solid #1e6e44" :color "#4ade80"
-                       :padding "6px 8px" :font-family "'Courier New', monospace"
-                       :font-size "14px" :border-radius "2px" :outline "none" :width "100%"}}]]
+               :class "bg-game-green-done border border-game-green-border text-green-400 py-1.5 px-2 font-mono text-sm rounded-sm outline-none w-full"}]]
             [:div.flex.gap-3
              (ui/action-bar-link "/app" "Cancel")
              (ui/submit-button true "Join")])]]))))

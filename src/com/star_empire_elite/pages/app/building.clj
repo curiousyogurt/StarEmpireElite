@@ -202,17 +202,16 @@
 
   [] -> hiccup"
   []
-  (let [header-style {:background "#151f1a" :border-bottom "1px solid #253530"}
-        col-style    {:letter-spacing "0.08em" :color "#4ade80"}
-        item-style   (assoc col-style :letter-spacing "0.1em")
-        label        (fn [text style extra-class]
-                       [:span.text-xs.uppercase {:class extra-class :style style} text])
-        r            (fn [text] (label text col-style "text-right justify-self-end"))
-        c            (fn [text] (label text col-style "text-center justify-self-center"))]
+  (let [header-cls "bg-game-header border-b border-game-border"
+        col-cls    "tracking-[0.08em] text-green-400"
+        item-cls   "tracking-widest text-green-400"
+        label      (fn [text cls extra-class]
+                     [:span.text-xs.uppercase {:class (str cls (when extra-class (str " " extra-class)))} text])
+        r          (fn [text] (label text col-cls "text-right justify-self-end"))
+        c          (fn [text] (label text col-cls "text-center justify-self-center"))]
     [:div.building-purchase-grid
-     {:class "building-purchase-grid gap-2 py-1 px-3 items-center"
-      :style header-style}
-     (label "Item" item-style nil)
+     {:class (str "building-purchase-grid gap-2 py-1 px-3 items-center " header-cls)}
+     (label "Item" item-cls nil)
      (r "Each")
      (r "Max")
      (c "Build")
@@ -227,11 +226,9 @@
         item-cost     (* cost-per-unit purchase-qty)
         cost-id       (str "cost-" (name (:qty-key spec)))
         max-qty-id    (str "max-qty-" (name (:qty-key spec)))
-        row-style     {:border-bottom "1px solid #1a2820" :background "#121a18"}
         can-afford?   (not (neg? max-qty))]
     [:div.building-purchase-grid
-     {:class "building-purchase-grid items-center gap-2 py-1 px-3"
-      :style row-style}
+     {:class "building-purchase-grid items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"}
 
      ;; Item name: abbreviated on mobile, full on desktop
      [:div.text-base.font-bold.text-green-400
@@ -239,28 +236,24 @@
       [:span.hidden.lg:inline (:label spec)]]
 
      ;; Each (cost per unit)
-     [:div.text-base.text-right
-      {:style {:color "#7ab88a"}}
+     [:div.text-base.text-right.text-game-green-muted
       (ui/format-number cost-per-unit)]
 
      ;; Max affordable
      [:div.text-base.text-right
-      {:style {:color (if can-afford? "#9adaaa" "#3a5040")}}
+      {:class (if can-afford? "text-game-green-soft" "text-game-green-dark")}
       [:span {:id max-qty-id
               :data-value (str (if (neg? max-qty) 0 max-qty))}
        (ui/format-number (if (neg? max-qty) 0 max-qty))]]
 
      ;; Build input + max button
-     [:div.flex.items-center.justify-center
-      {:style {:min-width "0"}}
+     [:div.flex.items-center.justify-center.min-w-0
 
       [:div.flex.items-center.gap-1
-       {:style {:min-width "0"
-                :transform "translateX(16px)"}}
+       {:style {:min-width "0" :transform "translateX(16px)"}}
 
        [:div
-        {:style {:width "min(120px, 100%)"
-                 :min-width "0"}}
+        {:style {:width "min(120px, 100%)" :min-width "0"}}
         (ui/numeric-input (name (:qty-key spec)) purchase-qty player-id
                           "/calculate-building" building-hx-include
                           {:input-class "text-xs lg:text-sm text-right min-w-0"
@@ -269,17 +262,8 @@
                                          :padding-top "1px"
                                          :padding-bottom "1px"}})]
 
-       [:button.text-xs
+       [:button.text-xs.shrink-0.border.border-game-green-border.bg-transparent.text-game-green-muted.py-px.px-1.rounded-sm.cursor-pointer.whitespace-nowrap
         {:type "button"
-         :style {:flex "0 0 auto"
-                 :border "1px solid #2d6644"
-                 :background "transparent"
-                 :color "#7ab88a"
-                 :padding "1px 4px"
-                 :border-radius "2px"
-                 :cursor "pointer"
-                 :font-family "inherit"
-                 :white-space "nowrap"}
          :onclick (str "var s=document.getElementById('" max-qty-id "');"
                        "var i=document.querySelector('[name=\"" (name (:qty-key spec)) "\"]');"
                        "if(s&&i){i.value=s.dataset.value||'0';"
@@ -288,7 +272,7 @@
 
      ;; Line cost
      [:div.text-base.text-right
-      {:style {:color (if (pos? item-cost) "#4ade80" "#3a5040")}}
+      {:class (if (pos? item-cost) "text-green-400" "text-game-green-dark")}
       [:span {:id cost-id}
        (if (pos? item-cost)
          (ui/format-number item-cost)
@@ -300,8 +284,8 @@
   [player player-map, game game-map, quantities purchase-quantities, max-quantities map] -> hiccup"
   [player game quantities max-quantities]
   (let [player-id (:xt/id player)]
-    [:div.overflow-hidden
-     {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
+    [:div.overflow-hidden.rounded-game.bg-game-surface
+     {:class "border border-game-border"}
      (build-table-header)
      (for [spec purchase-row-specs
            :let [qty-key      (:qty-key spec)
@@ -317,33 +301,30 @@
   [player cost]
   (let [before      (:player/credits player)
         after       (- before cost)
-        row-class   "items-center gap-2 py-1 px-3"
-        row-style   {:border-bottom "1px solid #1a2820" :background "#121a18"}
-        after-style (fn [v] {:color (if (neg? v) "#f87171" "#4ade80") :font-weight "bold"})
+        row-class    "items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"
+        after-cls    (fn [v] (str "font-bold " (if (neg? v) "text-red-400" "text-green-400")))
         cost-display (if (pos? cost) [:<> "-" (ui/format-number cost)] "—")]
     [:<>
      ;; Mobile row
      [:div.expense-row-mobile
-      {:class (str "md:hidden " row-class) :style row-style}
+      {:class (str "md:hidden " row-class)}
       [:div.text-base.font-bold.text-green-400 "Credits"]
-      [:div.text-base.text-right {:style {:color "#7ab88a"}} (ui/format-number before)]
-      [:div.justify-self-center.text-base.whitespace-nowrap
-       {:style {:color "#f87171"}}
+      [:div.text-base.text-right.text-game-green-muted (ui/format-number before)]
+      [:div.justify-self-center.text-base.whitespace-nowrap.text-red-400
        [:span#build-cost-display-m cost-display]]
       [:div.text-base.text-right
-       [:span#after-credits-m {:style (after-style after)} (ui/format-number after)]]]
+       [:span#after-credits-m {:class (after-cls after)} (ui/format-number after)]]]
 
      ;; Desktop row
      [:div.expense-row-desktop
-      {:class (str "hidden md:grid " row-class) :style row-style}
+      {:class (str "hidden md:grid " row-class)}
       [:div.text-base.font-bold.text-green-400 "Credits"]
       [:div {:id "bar-build-credits"} (deduction-bar before cost "glow-build-credits")]
-      [:div.text-base.text-right {:style {:color "#7ab88a"}} (ui/format-number before)]
-      [:div.justify-self-center.text-base.whitespace-nowrap
-       {:style {:color "#f87171"}}
+      [:div.text-base.text-right.text-game-green-muted (ui/format-number before)]
+      [:div.justify-self-center.text-base.whitespace-nowrap.text-red-400
        [:span#build-cost-display-d cost-display]]
       [:div.text-base.text-right
-       [:span#after-credits-d {:style (after-style after)} (ui/format-number after)]]]]))
+       [:span#after-credits-d {:class (after-cls after)} (ui/format-number after)]]]]))
 
 ;;;;
 ;;;; Actions
@@ -399,7 +380,7 @@
           max-quantities  (calculate-max-quantities player quantities game)
           total           (:total-cost cost-info)
           credits-after   (:credits resources-after)
-          after-style     {:color (if (neg? credits-after) "#f87171" "#4ade80") :font-weight "bold"}
+          after-cls       (str "font-bold " (if (neg? credits-after) "text-red-400" "text-green-400"))
           cost-display    (if (pos? total) [:<> "-" (ui/format-number total)] "—")
           item-costs      (into {} (for [spec purchase-row-specs]
                                      [(:qty-key spec) (* (get quantities (:qty-key spec))
@@ -456,51 +437,50 @@
          ;; OOB: credits pill "Military" row — updates as soldier/fighter/station purchases change
          (ui/oob-pill "credits-pill-military" "Military" new-military-value "cr")
          ;; OOB: credits pill total — sum of all rows (current + planets + military + taxes)
-         [:span#projection-credits-total {:hx-swap-oob "true" :style {:color "#7ab88a"}}
+         [:span#projection-credits-total {:hx-swap-oob "true" :class "text-game-green-muted"}
           (ui/format-number proj-total)]
          ;; OOB: food pill "Planets" row — updates as erg/ore/mil planet purchases change
          (ui/oob-pill "food-pill-planets" "Planets" new-planets-food "food")
          ;; OOB: food pill "Military" row — updates as soldier/agent purchases change
          (ui/oob-pill "food-pill-military" "Military" new-military-food "food")
          ;; OOB: food pill total
-         [:span#projection-food-total {:hx-swap-oob "true" :style {:color "#7ab88a"}}
+         [:span#projection-food-total {:hx-swap-oob "true" :class "text-game-green-muted"}
           (ui/format-number food-proj-total)]
          ;; OOB: fuel pill "Planets" row — updates as erg planet purchases change
          (ui/oob-pill "fuel-pill-planets" "Planets" new-erg-fuel-income "fuel")
          ;; OOB: fuel pill "Military" row — updates as fighter/station/agent purchases change
          (ui/oob-pill "fuel-pill-military" "Military" new-military-fuel "fuel")
          ;; OOB: fuel pill total
-         [:span#projection-fuel-total {:hx-swap-oob "true" :style {:color "#7ab88a"}}
+         [:span#projection-fuel-total {:hx-swap-oob "true" :class "text-game-green-muted"}
           (ui/format-number fuel-proj-total)]
          ;; OOB: after-credits spans (mobile + desktop)
-         [:span#after-credits-m {:hx-swap-oob "true" :style after-style} (ui/format-number credits-after)]
-         [:span#after-credits-d {:hx-swap-oob "true" :style after-style} (ui/format-number credits-after)]
+         [:span#after-credits-m {:hx-swap-oob "true" :class after-cls} (ui/format-number credits-after)]
+         [:span#after-credits-d {:hx-swap-oob "true" :class after-cls} (ui/format-number credits-after)]
          ;; OOB: deduction bar (desktop)
          [:div#bar-build-credits {:hx-swap-oob "true"} (deduction-bar (:player/credits player) total "glow-build-credits")]
          ;; OOB: cost change display (mobile + desktop)
-         [:span#build-cost-display-m {:hx-swap-oob "true" :style {:color "#4ade80"}} cost-display]
-         [:span#build-cost-display-d {:hx-swap-oob "true" :style {:color "#4ade80"}} cost-display]
+         [:span#build-cost-display-m {:hx-swap-oob "true" :class "text-green-400"} cost-display]
+         [:span#build-cost-display-d {:hx-swap-oob "true" :class "text-green-400"} cost-display]
          ;; OOB: max quantities per item
          (for [[item-key max-qty] max-quantities]
            [:span {:id (str "max-qty-" (name item-key))
                    :hx-swap-oob "true"
                    :key (str "max-" item-key)
                    :data-value (str (if (neg? max-qty) 0 max-qty))
-                   :style {:color (if (or (zero? max-qty) (neg? max-qty)) "#3a5040" "#9adaaa")}}
+                   :class (if (or (zero? max-qty) (neg? max-qty)) "text-game-green-dark" "text-game-green-soft")}
             (ui/format-number (if (neg? max-qty) 0 max-qty))])
          ;; OOB: item line costs
          (for [[item-key cost] item-costs]
            [:span {:id (str "cost-" (name item-key))
                    :hx-swap-oob "true"
                    :key item-key
-                   :style {:color (if (pos? cost) "#4ade80" "#3a5040")}}
+                   :class (if (pos? cost) "text-green-400" "text-game-green-dark")}
             (if (pos? cost) (ui/format-number cost) "—")])
          ;; OOB: insufficient-credits warning
          [:div#building-warning.flex.items-center
           {:hx-swap-oob "true"}
           (when (not affordable?)
-            [:p.text-yellow-400.text-sm
-             {:style {:letter-spacing "0.03em"}}
+            [:p.text-yellow-400.text-sm {:class "tracking-[0.03em]"}
              "⚠ Insufficient credits for purchases."])]
          ;; OOB: submit button
          (ui/submit-button affordable? "Continue to Action" {:hx-swap-oob "true"})]))))
@@ -519,10 +499,8 @@
         max-quantities  (calculate-max-quantities player zero-quantities game)]
     (ui/page
       {}
-      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
-       {:style {:background "#0e0e0e" :border "1.5px solid #1e6e44"
-                :border-radius "4px" :color "#4ade80"
-                :font-family "'Courier New', monospace"}}
+      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.text-green-400.font-mono
+       {:class "border-[1.5px] border-game-green-border rounded"}
 
        ;; Scanline overlay
        (ui/scanline-overlay)
@@ -533,11 +511,10 @@
        ;; Form wraps body + action bar so the submit button works
        (biff/form
          {:action (str "/app/game/" player-id "/apply-building") :method "post"
-          :style  {:margin 0}}
+          :class  "m-0"}
 
          ;; Body
-         [:div.flex.flex-col.gap-2
-          {:style {:padding "10px 14px"}}
+         [:div.flex.flex-col.gap-2.py-2.5.px-3.5
 
           ;; 1. Snapshot — full empire state at T-0
           (ui/snapshot-section player)
@@ -553,13 +530,13 @@
           ;; 4. Credit impact — deduction bar showing before/change/after for credits
           [:div
            (ui/section-label "Credit Impact")
-           [:div.overflow-hidden
-            {:style {:border "1px solid #253530" :border-radius "3px" :background "#161616"}}
+           [:div.overflow-hidden.rounded-game.bg-game-surface
+            {:class "border border-game-border"}
             (ui/deduction-table-header)
             (build-credits-row player 0)]]
 
           ;; Hidden HTMX swap-target placeholder
-          [:div#resources-after {:style {:display "none"}}]
+          [:div#resources-after.hidden]
 
           ;; Warning message area — populated by HTMX if player can't afford purchases
           [:div#building-warning.flex.items-center]
@@ -567,7 +544,6 @@
           (ui/incoming-alert player)]
 
          ;; Action bar
-         [:div.flex.gap-2
-          {:style {:padding "8px 14px" :border-top "1px solid #253530"}}
+         [:div.flex.gap-2.py-2.px-3.5.border-t.border-game-border
           (ui/action-bar-link (str "/app/game/" player-id) "Pause")
           (ui/submit-button true "Continue to Action")])])))

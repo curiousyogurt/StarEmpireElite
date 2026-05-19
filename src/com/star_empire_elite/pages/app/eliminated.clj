@@ -93,44 +93,35 @@
       (ui/page
        {}
        [:div.text-base.w-full.max-w-lg.mx-auto.overflow-hidden.relative
-        {:style {:background "#0e0e0e" :border "1.5px solid #7f1d1d"
-                 :border-radius "4px" :color "#4ade80"
-                 :font-family "'Courier New', monospace"}}
+        {:class "border-[1.5px] border-red-900 rounded bg-game-bg text-green-400 font-mono"}
         (ui/scanline-overlay)
 
         ;; Header
-        [:div {:style {:background "#1a0808" :border-bottom "1px solid #7f1d1d" :padding "7px 14px"}}
-         [:div {:style {:font-size "18px" :font-weight "bold" :color "#f87171"
-                        :letter-spacing "0.05em"}}
+        [:div.border-b {:class "bg-[#1a0808] border-red-900 py-[7px] px-3.5"}
+         [:div.font-bold.text-red-400 {:class "text-lg tracking-wider"}
           "EMPIRE ELIMINATED"]]
 
         ;; Body
-        [:div {:style {:padding "16px 14px"}}
-         [:p.text-sm.mb-6 {:style {:color "#9adaaa"}}
+        [:div {:class "py-4 px-3.5"}
+         [:p.text-sm.mb-6.text-game-green-soft
           (str "The " (:player/empire-name player) " has fallen. "
                "You may rejoin as a new empire, or return to your games.")]
          (when error
-           [:p.text-xs.mb-4 {:style {:color "#f87171"}}
+           [:p.text-xs.mb-4.text-red-400
             (java.net.URLDecoder/decode error "UTF-8")])
          (biff/form
           {:action (str "/app/game/" player-id "/rejoin")
            :method "post"
-           :style  {:margin 0}}
+           :class  "m-0"}
           [:div.mb-4
-           [:label.block.mb-1
-            {:style {:font-size "11px" :text-transform "uppercase"
-                     :letter-spacing "0.1em" :color "#7ab88a"}}
+           [:label.block.mb-1 {:class "text-[11px] uppercase tracking-widest text-game-green-muted"}
             "New Empire Name"]
            [:input
             {:type "text" :name "empire-name" :required true :maxlength 100 :autofocus true
-             :style {:width "100%" :background "#0a0a0a" :border "1px solid #1e6e44"
-                     :color "#4ade80" :padding "6px 10px" :font-family "'Courier New', monospace"
-                     :border-radius "2px" :font-size "14px" :box-sizing "border-box"}}]]
+             :class "w-full bg-game-bg border border-game-green-border text-green-400 py-1.5 px-[10px] font-mono rounded-sm text-sm box-border outline-none"}]]
           [:div.flex.gap-2.mt-2
            [:button
             {:type "submit"
-             :style {:padding "6px 20px" :border "1px solid #4ade80" :background "#1a3a28"
-                     :color "#4ade80" :border-radius "2px" :font-family "'Courier New', monospace"
-                     :cursor "pointer" :font-size "14px" :letter-spacing "0.05em"}}
+             :class "py-1.5 px-5 border border-green-400 bg-game-green-deep text-green-400 rounded-sm font-mono cursor-pointer text-sm tracking-wider"}
             "Rejoin Game"]
            (ui/action-bar-link "/app" "Back to Games")])]]))))
