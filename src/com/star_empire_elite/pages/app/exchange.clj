@@ -15,7 +15,7 @@
             [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]
-            [com.star-empire-elite.pages.app.expenses :as expenses-calc]))
+            [com.star-empire-elite.pages.app.expenses :as expenses]))
 
 ;;;;
 ;;;; Calculations
@@ -189,10 +189,6 @@
                  (* (:stations-sold  quantities) (:game/station-upkeep-fuel     game))
                  (* (:agents-sold    quantities) (:game/agent-upkeep-fuel       game)))}))
 
-;;;;
-;;;; SVG Indicator Bar
-;;;;
-
 (defn- exchange-resource-bar
   "Render a bidirectional SVG indicator bar for exchange resources.
   Points right when after >= before (gain), left when after < before (loss).
@@ -269,8 +265,8 @@
 
   [player player-map, game game-map] -> hiccup"
   [player game]
-  (let [required      (expenses-calc/calculate-required-expenses player game)
-        req-totals    (expenses-calc/calculate-required-expense-totals required)
+  (let [required      (expenses/calculate-required-expenses player game)
+        req-totals    (expenses/calculate-required-expense-totals required)
         cr-current    (:player/credits player)
         cr-required   (:credits req-totals)
         cr-total      (- cr-current cr-required)
@@ -299,25 +295,6 @@
          {:label "Exchange" :value 0                  :suffix "fuel" :id "fuel-pill-exchange"}]
         {:total-id "projection-fuel-total" :signed? true})]]))
 
-(defn- exchange-table-header
-  "Render the column-label row for a sell or buy table.
-
-  [action-label str] -> hiccup"
-  [action-label]
-  (let [header-cls "bg-game-header border-b border-game-border"
-        col-cls    "tracking-[0.08em] text-green-400"
-        item-cls   "tracking-widest text-green-400"
-        label      (fn [text cls extra-class]
-                     [:span.text-xs.uppercase {:class (str cls (when extra-class (str " " extra-class)))} text])
-        r          (fn [text] (label text col-cls "text-right justify-self-end"))
-        c          (fn [text] (label text col-cls "text-center justify-self-center"))]
-    [:div.building-purchase-grid
-     {:class (str "building-purchase-grid gap-2 py-1 px-3 items-center " header-cls)}
-     (label "Item" item-cls nil)
-     (r "Rate")
-     (r "Max")
-     (c action-label)
-     (r "Credits")]))
 
 (defn exchange-row
   "Render one exchange row (sell or buy) with building-page styling.
@@ -326,7 +303,9 @@
    current-quantity int, max-quantity int, player-id uuid, hx-include str,
    opts (optional map):
      :ex-value   — when provided, adds an 'Ex' button that fills the input with this amount
-     :ex-tooltip — tooltip text for the 'Ex' button] -> hiccup"
+     :ex-tooltip — tooltip text for the 'Ex' button
+     :sf-value   — when provided, adds an 'Sf' button that fills the input with this amount
+     :sf-tooltip — tooltip text for the 'Sf' button] -> hiccup"
   [item-name item-name-mobile field-key price-per-unit current-quantity max-quantity player-id hx-include
    & [{:keys [ex-value ex-tooltip sf-value sf-tooltip]}]]
   (let [credit-value (* price-per-unit current-quantity)
@@ -345,7 +324,7 @@
                                                        :padding-top "1px"
                                                        :padding-bottom "1px"}})]
     [:div.building-purchase-grid
-     {:class "building-purchase-grid items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"}
+     {:class "items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"}
 
      ;; Item name: abbreviated on mobile, full on desktop
      [:div.text-base.font-bold.text-green-400
@@ -449,8 +428,8 @@
           max-buy-quantities (calculate-max-buy-quantities player
                                (assoc quantities :food-bought 0 :fuel-bought 0) rates)
           ;; Pill exchange values
-          required           (expenses-calc/calculate-required-expenses player game)
-          req-totals         (expenses-calc/calculate-required-expense-totals required)
+          required           (expenses/calculate-required-expenses player game)
+          req-totals         (expenses/calculate-required-expense-totals required)
           expense-reduction  (calculate-required-expense-reduction quantities game)
           exchange-credits   (:total-credits credit-changes)
           exchange-food      (- (:food-bought quantities) (:food-sold quantities))
@@ -580,12 +559,12 @@
         zero-quantities    (into {} (for [spec (concat sell-row-specs buy-row-specs)]
                                       [(:qty-key spec) 0]))
         max-buy-quantities (calculate-max-buy-quantities player zero-quantities rates)
-        required           (expenses-calc/calculate-required-expenses player game)
-        req-totals         (expenses-calc/calculate-required-expense-totals required)]
+        required           (expenses/calculate-required-expenses player game)
+        req-totals         (expenses/calculate-required-expense-totals required)]
     (ui/page
       {}
-      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.text-green-400.font-mono
-       {:class "border-[1.5px] border-game-green-border rounded"}
+      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.rounded.text-green-400.font-mono
+       {:class "border-[1.5px] border-game-green-border"}
 
        ;; Scanline overlay
        (ui/scanline-overlay)
@@ -599,7 +578,8 @@
           :class  "m-0"}
 
          ;; Body
-         [:div.flex.flex-col.gap-2.py-2.5.px-3.5
+         [:div.flex.flex-col.gap-2
+          {:class "py-2.5 px-3.5"}
 
           ;; 1. Snapshot
           (ui/snapshot-section player)
@@ -612,7 +592,7 @@
            (ui/section-label "Sell Assets")
            [:div.overflow-hidden.rounded-game.bg-game-surface
             {:class "border border-game-border"}
-            (exchange-table-header "Sell")
+            (ui/purchase-table-header "Rate" "Sell" "Credits")
             (for [spec sell-asset-row-specs]
               (exchange-row (:label spec) (:abbrev spec) (:field spec)
                             (get rates (:rate-key spec)) 0
@@ -623,7 +603,7 @@
            (ui/section-label "Sell Resources")
            [:div.overflow-hidden.rounded-game.bg-game-surface
             {:class "border border-game-border"}
-            (exchange-table-header "Sell")
+            (ui/purchase-table-header "Rate" "Sell" "Credits")
             (for [spec sell-resource-row-specs
                   :let [ex-val (max 0 (- (get player (:player-key spec))
                                          (get req-totals (:resource-key spec) 0)))]]
@@ -637,7 +617,7 @@
            (ui/section-label "Buy Resources")
            [:div.overflow-hidden.rounded-game.bg-game-surface
             {:class "border border-game-border"}
-            (exchange-table-header "Buy")
+            (ui/purchase-table-header "Rate" "Buy" "Credits")
             (for [spec buy-row-specs
                   :let [sf-val (max 0 (- (get req-totals (:resource-key spec) 0)
                                          (get player (:player-key spec))))]]
@@ -646,7 +626,7 @@
                             (get max-buy-quantities (:max-key spec)) player-id exchange-hx-include
                             {:sf-value sf-val :sf-tooltip (:sf-tooltip spec)}))]]
 
-          ;; 5. Exchange summary bar table
+          ;; 6. Exchange summary bar table
           [:div
            (ui/section-label "Exchange Summary")
            (exchange-bar-table player {:credits (:player/credits player)
@@ -662,6 +642,7 @@
           (ui/incoming-alert player)]
 
          ;; Action bar
-         [:div.flex.gap-2.py-2.px-3.5.border-t.border-game-border
+         [:div.flex.gap-2
+          {:class "py-2 px-3.5 border-t border-game-border"}
           (ui/action-bar-link (str "/app/game/" player-id "/expenses") "Cancel Exchange")
           (ui/submit-button false "Make Exchange")])])))

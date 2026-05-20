@@ -55,33 +55,17 @@
 ;;;; UI Components
 ;;;;
 
-(defn- source-pills
-  "Render income pills for a source card: one pill per non-zero resource.
-  The for comprehension uses :let to compute the value and :when to skip zeros,
-  so only resources that actually increased this turn are shown.
-
-  [income-map {:credits? int, :food? int, ...}] -> seq of hiccup"
-  [income-map]
-  (for [[k suffix] [[:credits "cred"] [:food "food"] [:fuel "fuel"]
-                    [:soldiers "sold"] [:fighters "fgtr"] [:stations "defs"]]
-        :let [v (or (k income-map) 0)]
-        :when (pos? v)]
-    [:span.text-xs.inline-block.rounded-sm.text-green-400
-     {:key k :class "py-px px-[5px] bg-game-green-deep"}
-     "+" (ui/format-number v) " " suffix]))
+(def ^:private income-resources
+  [[:credits "cred"] [:food "food"] [:fuel "fuel"]
+   [:soldiers "sold"] [:fighters "fgtr"] [:stations "defs"]])
 
 (defn- source-card
   "Render one income source card with name, count, and resource pills.
 
   [{:keys [name count income-map]}] -> hiccup"
   [{:keys [name count income-map]}]
-  [:div.flex.flex-col.gap-1.rounded-game.bg-game-card
-   {:class "border border-game-border py-1.5 px-2"}
-   [:div.flex.justify-between.items-baseline
-    [:span.text-base.font-bold.text-green-400 name]
-    [:span.text-xs.text-game-green-muted (str "x" count)]]
-   [:div {:class "flex flex-col gap-0.5"}
-    (source-pills income-map)]])
+  (ui/phase-summary-card {:name name :count count}
+                         (ui/resource-pills "+" income-resources income-map)))
 
 (defn- source-grid
   "Render the 4-column income sources grid (Ore, Erg, Mil, Taxes).
@@ -257,13 +241,15 @@
        (ui/phase-topbar player game "INCOME PHASE")
 
        ;; Body
-       [:div.flex.flex-col.gap-2.py-2.5.px-3.5
+       [:div.flex.flex-col.gap-2
+        {:class "py-2.5 px-3.5"}
         (source-grid player income)
         (resource-table player income)
         (ui/incoming-alert player)]
 
        ;; Action bar
-       [:div.flex.gap-2.py-2.px-3.5.border-t.border-game-border
+       [:div.flex.gap-2
+        {:class "py-2 px-3.5 border-t border-game-border"}
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
         (biff/form
           {:action (str "/app/game/" player-id "/apply-income") :method "post"

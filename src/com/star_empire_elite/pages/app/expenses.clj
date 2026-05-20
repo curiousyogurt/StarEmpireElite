@@ -52,17 +52,17 @@
 
   [required required-map] -> {:credits int, :food int, :fuel int}"
   [required]
-  {:credits (+ (:planets-credits required) (:soldiers-credits required)
+  {:credits (+ (:planets-credits required)  (:soldiers-credits required)
                (:fighters-credits required) (:stations-credits required))
-   :food    (+ (:planets-food required) (:soldiers-food required)
-               (:agents-food required)   (:population-food required))
-   :fuel    (+ (:fighters-fuel required) (:stations-fuel required)
-               (:agents-fuel required)   (:population-fuel required))})
+   :food    (+ (:planets-food required)     (:soldiers-food required)
+               (:agents-food required)      (:population-food required))
+   :fuel    (+ (:fighters-fuel required)    (:stations-fuel required)
+               (:agents-fuel required)      (:population-fuel required))})
 
 (defn calculate-resources-after-expenses
   "Calculate player resources after deducting total expense payments.
 
-  [player payments {:credits-pay int, :food-pay int, :fuel-pay int}] -> {:credits int, ...}"
+  [player payments] -> {:credits int, :food int, :fuel int}"
   [player payments]
   (-> (utils/player-snapshot player)
       (update :credits - (:credits-pay payments))
@@ -82,9 +82,9 @@
                [:food    :food-pay]
                [:fuel    :fuel-pay]]
         total-fraction (reduce + (for [[req-key pay-key] pairs
-                                       :let [req      (get required-totals req-key 0)
-                                             paid     (get payments pay-key 0)
-                                             shortfall (max 0 (- req paid))]]
+                                       :let [req        (get required-totals req-key 0)
+                                             paid       (get payments pay-key 0)
+                                             shortfall  (max 0 (- req paid))]]
                                    (double (/ shortfall (max 1 req)))))]
     (long (* total-fraction (:game/expense-stability-penalty game)))))
 
@@ -108,52 +108,22 @@
    :fuel-pay    (utils/parse-numeric-input (:fuel-pay    params))})
 
 ;;;;
-;;;; SVG Indicator Bar
-;;;;
-
-;;;;
-;;;; SVG Indicator Bar
-;;;;
-
-(defn- deduction-bar
-  "Render an SVG indicator bar showing a left-pointing resource deduction arrow.
-
-  [before int, payment int, filter-id str] -> hiccup"
-  [before payment filter-id]
-  (ui/svg-indicator-bar :loss before payment filter-id))
-
-;;;;
 ;;;; UI Components
 ;;;;
 
-(defn- expense-pills
-  "Render expense pills for a summary card: one pill per non-zero cost.
+(def ^:private expense-resources
+  [[:credits "cred"] [:food "food"] [:fuel "fuel"]])
 
-  [expense-map {:credits? int, :food? int, :fuel? int}] -> seq of hiccup"
-  [expense-map]
-  (for [[k suffix] [[:credits "cr"] [:food "food"] [:fuel "fuel"]]
-        :let [v (or (k expense-map) 0)]
-        :when (pos? v)]
-    [:span.text-xs.inline-block.rounded-sm.text-green-400
-     {:key k :class "py-px px-[5px] bg-game-green-deep"}
-     "-" (ui/format-number v) " " suffix]))
-
-(defn- expense-summary-card
+(defn- summary-card
   "Render one expense summary card with category name, optional asset count, and cost pills.
 
   [{:keys [name count expense-map]}] -> hiccup"
   [{:keys [name count expense-map]}]
-  [:div.flex.flex-col.gap-1.rounded-game.bg-game-card
-   {:class "border border-game-border py-1.5 px-2"}
-   [:div.flex.justify-between.items-baseline
-    [:span.text-base.font-bold.text-green-400 name]
-    (when count
-      [:span.text-xs.text-game-green-muted (str "x" count)])]
-   [:div {:class "flex flex-col gap-0.5"}
-    (expense-pills expense-map)]])
+  (ui/phase-summary-card {:name name :count count}
+                         (ui/resource-pills "-" expense-resources expense-map)))
 
-(defn- expense-summary-grid
-  "Render the 4-column expense summary grid: Planets, Military, Population, Total.
+(defn- summary-grid
+  "Render the 4-column expense summary grid: Planets, Military, Population, Totals.
   Shows total costs per category as pills, mirroring income's source-grid.
 
   [player player-map, required required-expenses-map, required-totals map] -> hiccup"
@@ -165,9 +135,7 @@
                         (:player/fighters player)
                         (:player/stations player)
                         (:player/agents   player))
-        pop-count    (-> (format "%.1f" (double (:player/population player)))
-                         (str/replace #"\.0$" "")
-                         (str "M"))
+        pop-count    (ui/format-population (:player/population player))
         cards [{:name "Planets"
                 :count planet-count
                 :expense-map {:credits (:planets-credits required)
@@ -194,9 +162,9 @@
      (ui/section-label "Expenses")
      [:div {:class "grid grid-cols-2 md:grid-cols-4 gap-1.5"}
       (for [card cards]
-        (expense-summary-card card))]]))
+        (summary-card card))]]))
 
-(defn- expense-resource-row
+(defn- resource-row
   "Render one resource row in two variants: mobile (no bar) and desktop (with bar).
   The bar shows a left-pointing deduction arrow from before to after.
   The after-cell contains an id'd span for HTMX OOB updates.
@@ -247,7 +215,7 @@
      [:div.expense-row-desktop
       {:class (str "hidden md:grid " row-class)}
       name-cell
-      [:div {:id (str "bar-" slug)} (deduction-bar before payment filter-id)]
+      [:div {:id (str "bar-" slug)} (ui/svg-indicator-bar :loss before payment filter-id)]
       before-cell
       change-cell-d
       after-cell-d]]))
@@ -297,7 +265,7 @@
                              (ui/format-number v)])
           oob-bar         (fn [id before payment filter-id]
                             [:div {:id id :hx-swap-oob "true"}
-                             (deduction-bar before payment filter-id)])]
+                             (ui/svg-indicator-bar :loss before payment filter-id)])]
       (biff/render
         [:div
          ;; Renew the HTMX swap-target placeholder for the next request
@@ -345,8 +313,8 @@
     (ui/page
       {}
       ;; Terminal shell
-      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
-       {:class "bg-game-bg text-green-400 font-mono border-[1.5px] border-game-green-border rounded"}
+      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.rounded.text-green-400.font-mono
+       {:class "border-[1.5px] border-game-green-border"}
 
        ;; Scanline overlay
        (ui/scanline-overlay)
@@ -364,18 +332,18 @@
           {:class "py-2.5 px-3.5"}
 
           ;; Expense summary: totals by category (Planets, Military, Population, Total)
-          (expense-summary-grid player required required-totals)
+          (summary-grid player required required-totals)
 
           ;; Resource table: Credits, Food, Fuel with deduction bars and inputs
           [:div.overflow-hidden.rounded-game.bg-game-surface
            {:class "border border-game-border"}
            (ui/deduction-table-header)
-           (expense-resource-row "Credits" (:player/credits player) (:credits required-totals)
-                                 "glow-credits" "credits-pay" player-id hx-include)
-           (expense-resource-row "Food"    (:player/food    player) (:food    required-totals)
-                                 "glow-food"    "food-pay"    player-id hx-include)
-           (expense-resource-row "Fuel"    (:player/fuel    player) (:fuel    required-totals)
-                                 "glow-fuel"    "fuel-pay"    player-id hx-include)]
+           (resource-row "Credits" (:player/credits player) (:credits required-totals)
+                         "glow-credits" "credits-pay" player-id hx-include)
+           (resource-row "Food"    (:player/food    player) (:food    required-totals)
+                         "glow-food"    "food-pay"    player-id hx-include)
+           (resource-row "Fuel"    (:player/fuel    player) (:fuel    required-totals)
+                         "glow-fuel"    "fuel-pay"    player-id hx-include)]
 
           ;; HTMX swap-target placeholder (invisible; OOB updates go to the after-column spans)
           [:div#resources-after.hidden]

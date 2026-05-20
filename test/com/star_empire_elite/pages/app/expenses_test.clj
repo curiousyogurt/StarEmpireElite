@@ -167,7 +167,7 @@
 (deftest test-calculate-expenses-hiccup-render
   (testing "calculate-expenses returns hiccup and handles negative result markup"
     (let [params {"planets-pay" "123"}]
-      (with-redefs [utils/load-player-and-game 
+      (with-redefs [utils/load-player-and-game
                     (fn [db player-id-str]
                       {:player test-player
                        :game test-game

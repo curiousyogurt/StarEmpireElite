@@ -3,10 +3,10 @@
 ;;;;;
 ;;;;; The building phase is the third phase of each turn, where players spend credits to purchase
 ;;;;; military units, support units, and planets. Unlike expenses (which cost multiple resources),
-;;;;; building only costs credits.
+;;;;; building only costs credits; though projections need to track other classes of resources.
 ;;;;;
 ;;;;; This phase uses htmx for dynamic validation, showing players in real-time whether they can
-;;;;; afford their selected purchases before submitting.
+;;;;; afford their selected purchases before submitting, as well as making projections.
 ;;;;;
 
 (ns com.star-empire-elite.pages.app.building
@@ -14,8 +14,8 @@
             [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]
-            [com.star-empire-elite.pages.app.income :as income-calc]
-            [com.star-empire-elite.pages.app.expenses :as expenses-calc]))
+            [com.star-empire-elite.pages.app.income :as income]
+            [com.star-empire-elite.pages.app.expenses :as expenses]))
 
 ;;;;
 ;;;; Calculations
@@ -37,8 +37,8 @@
 
 (def building-hx-include
   (str/join ","
-    (for [spec purchase-row-specs]
-      (str "[name='" (name (:qty-key spec)) "']"))))
+            (for [spec purchase-row-specs]
+              (str "[name='" (name (:qty-key spec)) "']"))))
 
 (defn parse-purchase-quantities
   "Parse all purchase quantity inputs from request params.
@@ -104,28 +104,17 @@
   (let [credits (:player/credits player)]
     (into {}
           (for [spec purchase-row-specs
-                :let [qty-key       (:qty-key spec)
-                      cost-per-unit (get game (:cost-key spec))
-                      other-cost    (reduce
-                                      +
-                                      (for [other-spec purchase-row-specs
-                                            :when (not= (:qty-key other-spec) qty-key)]
-                                        (* (get quantities (:qty-key other-spec) 0)
-                                           (get game (:cost-key other-spec)))))
+                :let [qty-key            (:qty-key spec)
+                      cost-per-unit      (get game (:cost-key spec))
+                      other-cost         (reduce
+                                           +
+                                           (for [other-spec purchase-row-specs
+                                                 :when (not= (:qty-key other-spec) qty-key)]
+                                             (* (get quantities (:qty-key other-spec) 0)
+                                                (get game (:cost-key other-spec)))))
                       remaining-for-this (- credits other-cost)
                       max-qty            (quot remaining-for-this cost-per-unit)]]
             [qty-key max-qty]))))
-
-;;;;
-;;;; SVG Deduction Bar
-;;;;
-
-(defn- deduction-bar
-  "Render an SVG indicator bar showing a left-pointing resource deduction arrow.
-
-  [before int, payment int, filter-id str] -> hiccup"
-  [before payment filter-id]
-  (ui/svg-indicator-bar :loss before payment filter-id))
 
 ;;;;
 ;;;; UI Components
@@ -137,58 +126,49 @@
 
   [player player-map, game game-map] -> hiccup"
   [player game]
-  (let [income            (income-calc/calculate-income player game)
-        required          (expenses-calc/calculate-required-expenses player game)
+  (let [income-data        (income/calculate-income player game)
+        required          (expenses/calculate-required-expenses player game)
         credits-current   (:player/credits player)
         food-current      (:player/food player)
         fuel-current      (:player/fuel player)
         credits-changes   [{:label "Planets"
-                            :value (- (:ore-credits income) (:planets-credits required))
-                            :suffix "cr"
+                            :value (- (:ore-credits income-data) (:planets-credits required))
                             :id "credits-pill-planets"}
                            {:label "Military"
                             :value (- (+ (:soldiers-credits required)
                                          (:fighters-credits required)
                                          (:stations-credits required)))
-                            :suffix "cr"
                             :id "credits-pill-military"}
                            {:label "Taxes"
-                            :value (:tax-credits income)
-                            :suffix "cr"}]
+                            :value (:tax-credits income-data)}]
         food-changes      [{:label "Planets"
-                            :value (:erg-food income)
-                            :suffix "food"
+                            :value (:erg-food income-data)
                             :id "food-pill-planets"}
                            {:label "Military"
                             :value (- (+ (:soldiers-food required) (:agents-food required)))
-                            :suffix "food"
                             :id "food-pill-military"}
                            {:label "Population"
-                            :value (- (:population-food required))
-                            :suffix "food"}]
+                            :value (- (:population-food required))}]
         fuel-changes      [{:label "Planets"
-                            :value (:erg-fuel income)
-                            :suffix "fuel"
+                            :value (:erg-fuel income-data)
                             :id "fuel-pill-planets"}
                            {:label "Military"
                             :value (- (+ (:fighters-fuel required)
                                          (:stations-fuel required)
                                          (:agents-fuel required)))
-                            :suffix "fuel"
                             :id "fuel-pill-military"}
                            {:label "Population"
-                            :value (- (:population-fuel required))
-                            :suffix "fuel"}]
+                            :value (- (:population-fuel required))}]
         sum-changes       (fn [rows] (reduce + (map :value rows)))
         credits-total     (+ credits-current (sum-changes credits-changes))
         food-total        (+ food-current (sum-changes food-changes))
         fuel-total        (+ fuel-current (sum-changes fuel-changes))
-        credits-rows      (concat [{:label "Current" :value credits-current :suffix "cr"
+        credits-rows      (concat [{:label "Current" :value credits-current
                                     :id "credits-pill-current"}]
                                   credits-changes)
-        food-rows         (concat [{:label "Current" :value food-current :suffix "food"}]
+        food-rows         (concat [{:label "Current" :value food-current}]
                                   food-changes)
-        fuel-rows         (concat [{:label "Current" :value fuel-current :suffix "fuel"}]
+        fuel-rows         (concat [{:label "Current" :value fuel-current}]
                                   fuel-changes)]
     [:div
      (ui/section-label "Resource Projections for Next Turn")
@@ -196,26 +176,6 @@
       (ui/projection-pill "Credits" credits-total credits-rows {:total-id "projection-credits-total"})
       (ui/projection-pill "Food"    food-total    food-rows {:total-id "projection-food-total"})
       (ui/projection-pill "Fuel"    fuel-total    fuel-rows {:total-id "projection-fuel-total"})]]))
-
-(defn- build-table-header
-  "Render the column-label row for the build orders table.
-
-  [] -> hiccup"
-  []
-  (let [header-cls "bg-game-header border-b border-game-border"
-        col-cls    "tracking-[0.08em] text-green-400"
-        item-cls   "tracking-widest text-green-400"
-        label      (fn [text cls extra-class]
-                     [:span.text-xs.uppercase {:class (str cls (when extra-class (str " " extra-class)))} text])
-        r          (fn [text] (label text col-cls "text-right justify-self-end"))
-        c          (fn [text] (label text col-cls "text-center justify-self-center"))]
-    [:div.building-purchase-grid
-     {:class (str "building-purchase-grid gap-2 py-1 px-3 items-center " header-cls)}
-     (label "Item" item-cls nil)
-     (r "Each")
-     (r "Max")
-     (c "Build")
-     (r "Cost")]))
 
 (defn- build-purchase-row
   "Render one purchase row with item name, unit cost, max affordable, build input, and line cost.
@@ -228,7 +188,7 @@
         max-qty-id    (str "max-qty-" (name (:qty-key spec)))
         can-afford?   (not (neg? max-qty))]
     [:div.building-purchase-grid
-     {:class "building-purchase-grid items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"}
+     {:class "items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"}
 
      ;; Item name: abbreviated on mobile, full on desktop
      [:div.text-base.font-bold.text-green-400
@@ -249,11 +209,10 @@
      ;; Build input + max button
      [:div.flex.items-center.justify-center.min-w-0
 
-      [:div.flex.items-center.gap-1
-       {:style {:min-width "0" :transform "translateX(16px)"}}
+      [:div.flex.items-center.gap-1.translate-x-4.min-w-0
 
-       [:div
-        {:style {:width "min(120px, 100%)" :min-width "0"}}
+       [:div.min-w-0
+        {:style {:width "min(120px, 100%)"}}
         (ui/numeric-input (name (:qty-key spec)) purchase-qty player-id
                           "/calculate-building" building-hx-include
                           {:input-class "text-xs lg:text-sm text-right min-w-0"
@@ -286,7 +245,7 @@
   (let [player-id (:xt/id player)]
     [:div.overflow-hidden.rounded-game.bg-game-surface
      {:class "border border-game-border"}
-     (build-table-header)
+     (ui/purchase-table-header "Each" "Build" "Cost")
      (for [spec purchase-row-specs
            :let [qty-key      (:qty-key spec)
                  purchase-qty (get quantities qty-key 0)
@@ -294,7 +253,7 @@
        (build-purchase-row spec purchase-qty max-qty game player-id))]))
 
 (defn- build-credits-row
-  "Render the credits row in the post-building expense summary.
+  "Render the credits row in the Credit Impact section.
   Shows a deduction bar (desktop) and OOB-updatable spans for cost and after-credits.
 
   [player player-map, cost int] -> hiccup"
@@ -319,7 +278,7 @@
      [:div.expense-row-desktop
       {:class (str "hidden md:grid " row-class)}
       [:div.text-base.font-bold.text-green-400 "Credits"]
-      [:div {:id "bar-build-credits"} (deduction-bar before cost "glow-build-credits")]
+      [:div {:id "bar-build-credits"} (ui/svg-indicator-bar :loss before cost "glow-build-credits")]
       [:div.text-base.text-right.text-game-green-muted (ui/format-number before)]
       [:div.justify-self-center.text-base.whitespace-nowrap.text-red-400
        [:span#build-cost-display-d cost-display]]
@@ -386,8 +345,8 @@
                                      [(:qty-key spec) (* (get quantities (:qty-key spec))
                                                          (get game (:cost-key spec)))]))
           ;; Credits projection: Planets row reflects proposed ore planet purchases
-          income              (income-calc/calculate-income player game)
-          required            (expenses-calc/calculate-required-expenses player game)
+          income-data          (income/calculate-income player game)
+          required             (expenses/calculate-required-expenses player game)
           new-ore-planets      (+ (:player/ore-planets player) (:ore-planets quantities))
           new-erg-planets      (+ (:player/erg-planets player) (:erg-planets quantities))
           new-mil-planets      (+ (:player/mil-planets player) (:mil-planets quantities))
@@ -407,7 +366,7 @@
                                      (* proj-stations (:game/station-upkeep-credits game))))
           proj-total           (+ credits-after new-planets-value
                                   new-military-value
-                                  (:tax-credits income))
+                                  (:tax-credits income-data))
           ;; Food projection: Planets and Military rows update dynamically
           new-erg-food-income  (* new-erg-planets (:game/erg-planet-food game))
           new-planet-food-exp  (* new-total-planets (:game/planet-upkeep-food game))
@@ -431,25 +390,25 @@
          ;; Renew HTMX swap-target placeholder for the next request
          [:div#resources-after]
          ;; OOB: credits pill "Current" row — decreases as build cost rises
-         (ui/oob-pill "credits-pill-current" "Current" credits-after "cr")
+         (ui/oob-pill "credits-pill-current" "Current" credits-after nil)
          ;; OOB: credits pill "Planets" row — updates as ore/erg/mil planet purchases change
-         (ui/oob-pill "credits-pill-planets" "Planets" new-planets-value "cr")
+         (ui/oob-pill "credits-pill-planets" "Planets" new-planets-value nil)
          ;; OOB: credits pill "Military" row — updates as soldier/fighter/station purchases change
-         (ui/oob-pill "credits-pill-military" "Military" new-military-value "cr")
+         (ui/oob-pill "credits-pill-military" "Military" new-military-value nil)
          ;; OOB: credits pill total — sum of all rows (current + planets + military + taxes)
          [:span#projection-credits-total {:hx-swap-oob "true" :class "text-game-green-muted"}
           (ui/format-number proj-total)]
          ;; OOB: food pill "Planets" row — updates as erg/ore/mil planet purchases change
-         (ui/oob-pill "food-pill-planets" "Planets" new-planets-food "food")
+         (ui/oob-pill "food-pill-planets" "Planets" new-planets-food nil)
          ;; OOB: food pill "Military" row — updates as soldier/agent purchases change
-         (ui/oob-pill "food-pill-military" "Military" new-military-food "food")
+         (ui/oob-pill "food-pill-military" "Military" new-military-food nil)
          ;; OOB: food pill total
          [:span#projection-food-total {:hx-swap-oob "true" :class "text-game-green-muted"}
           (ui/format-number food-proj-total)]
          ;; OOB: fuel pill "Planets" row — updates as erg planet purchases change
-         (ui/oob-pill "fuel-pill-planets" "Planets" new-erg-fuel-income "fuel")
+         (ui/oob-pill "fuel-pill-planets" "Planets" new-erg-fuel-income nil)
          ;; OOB: fuel pill "Military" row — updates as fighter/station/agent purchases change
-         (ui/oob-pill "fuel-pill-military" "Military" new-military-fuel "fuel")
+         (ui/oob-pill "fuel-pill-military" "Military" new-military-fuel nil)
          ;; OOB: fuel pill total
          [:span#projection-fuel-total {:hx-swap-oob "true" :class "text-game-green-muted"}
           (ui/format-number fuel-proj-total)]
@@ -457,7 +416,7 @@
          [:span#after-credits-m {:hx-swap-oob "true" :class after-cls} (ui/format-number credits-after)]
          [:span#after-credits-d {:hx-swap-oob "true" :class after-cls} (ui/format-number credits-after)]
          ;; OOB: deduction bar (desktop)
-         [:div#bar-build-credits {:hx-swap-oob "true"} (deduction-bar (:player/credits player) total "glow-build-credits")]
+         [:div#bar-build-credits {:hx-swap-oob "true"} (ui/svg-indicator-bar :loss (:player/credits player) total "glow-build-credits")]
          ;; OOB: cost change display (mobile + desktop)
          [:span#build-cost-display-m {:hx-swap-oob "true" :class "text-green-400"} cost-display]
          [:span#build-cost-display-d {:hx-swap-oob "true" :class "text-green-400"} cost-display]
@@ -499,8 +458,8 @@
         max-quantities  (calculate-max-quantities player zero-quantities game)]
     (ui/page
       {}
-      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.text-green-400.font-mono
-       {:class "border-[1.5px] border-game-green-border rounded"}
+      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.rounded.text-green-400.font-mono
+       {:class "border-[1.5px] border-game-green-border"}
 
        ;; Scanline overlay
        (ui/scanline-overlay)
@@ -514,7 +473,8 @@
           :class  "m-0"}
 
          ;; Body
-         [:div.flex.flex-col.gap-2.py-2.5.px-3.5
+         [:div.flex.flex-col.gap-2
+          {:class "py-2.5 px-3.5"}
 
           ;; 1. Snapshot — full empire state at T-0
           (ui/snapshot-section player)
@@ -544,6 +504,7 @@
           (ui/incoming-alert player)]
 
          ;; Action bar
-         [:div.flex.gap-2.py-2.px-3.5.border-t.border-game-border
+         [:div.flex.gap-2
+          {:class "py-2 px-3.5 border-t border-game-border"}
           (ui/action-bar-link (str "/app/game/" player-id) "Pause")
           (ui/submit-button true "Continue to Action")])])))

@@ -387,6 +387,34 @@
    {:class "tracking-[0.12em] text-game-green-muted"}
    text])
 
+(defn resource-pills
+  "Render resource pills for a phase summary card: one pill per non-zero value in value-map.
+  sign is prepended to each value (e.g. \"+\" for income, \"-\" for expenses).
+  resources is a vector of [key suffix] pairs defining which resources to check and their labels.
+
+  [sign str, resources [[key suffix]], value-map map] -> seq of hiccup"
+  [sign resources value-map]
+  (for [[k suffix] resources
+        :let [v (or (k value-map) 0)]
+        :when (pos? v)]
+    [:span.text-xs.inline-block.rounded-sm.text-green-400
+     {:key k :class "py-px px-[5px] bg-game-green-deep"}
+     sign (format-number v) " " suffix]))
+
+(defn phase-summary-card
+  "Render a phase summary card: name header with optional count, and pills content below.
+  pills is pre-rendered content, typically from resource-pills.
+
+  [{:keys [name count]} map, pills hiccup] -> hiccup"
+  [{:keys [name count]} pills]
+  [:div.flex.flex-col.gap-1.rounded-game.bg-game-card
+   {:class "border border-game-border py-1.5 px-2"}
+   [:div.flex.justify-between.items-baseline
+    [:span.text-base.font-bold.text-green-400 name]
+    (when count [:span.text-xs.text-game-green-muted (str "x" count)])]
+   [:div {:class "flex flex-col gap-0.5"}
+    pills]])
+
 (defn action-bar-link
   "Render a navigation anchor styled to match the terminal-shell action bar (secondary style).
 
@@ -515,7 +543,7 @@
        label " "
        (if (neg? value) "-" "+")
        (format-number (Math/abs (long value)))
-       " " suffix])]])
+       (when suffix (list " " suffix))])]])
 
 (defn stat-pill
   "Render a pill showing a set of plain label/value statistics.
@@ -555,6 +583,27 @@
      [:div.expense-row-desktop {:class (str "hidden md:grid " header-class)}
       (label "Item" item-cls nil) [:span] (r "Before") (c "Change") (r "After")]]))
 
+(defn purchase-table-header
+  "Render the column-label row for exchange and building purchase/sell tables.
+  Uses the building-purchase-grid CSS class for a 5-column layout.
+
+  [price-label str, action-label str, total-label str] -> hiccup"
+  [price-label action-label total-label]
+  (let [header-cls "bg-game-header border-b border-game-border"
+        col-cls    "tracking-[0.08em] text-green-400"
+        item-cls   "tracking-widest text-green-400"
+        label      (fn [text cls extra-class]
+                     [:span.text-xs.uppercase {:class (str cls (when extra-class (str " " extra-class)))} text])
+        r          (fn [text] (label text col-cls "text-right justify-self-end"))
+        c          (fn [text] (label text col-cls "text-center justify-self-center"))]
+    [:div.building-purchase-grid
+     {:class (str "gap-2 py-1 px-3 items-center " header-cls)}
+     (label "Item" item-cls nil)
+     (r price-label)
+     (r "Max")
+     (c action-label)
+     (r total-label)]))
+
 (defn oob-pill
   "Render a signed OOB pill span for HTMX out-of-band updates.
   Prefixes value with + or - sign and appends suffix.
@@ -566,7 +615,7 @@
    label " "
    (if (neg? value) "-" "+")
    (format-number (Math/abs (long value)))
-   " " suffix])
+   (when suffix (list " " suffix))])
 
 ;;;;
 ;;;; Resource Display
