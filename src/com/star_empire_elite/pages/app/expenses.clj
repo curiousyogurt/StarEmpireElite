@@ -111,58 +111,31 @@
 ;;;; UI Components
 ;;;;
 
-(def ^:private expense-resources
-  [[:credits "cred"] [:food "food"] [:fuel "fuel"]])
+(defn build-expense-projections-data
+  "Compute the projections data structure for snapshot-section's :projections opt.
+  Shows required expense breakdown for Credits, Food, and Fuel.
+  All rows and totals are negative, showing what is owed per category.
 
-(defn- summary-card
-  "Render one expense summary card with category name, optional asset count, and cost pills.
-
-  [{:keys [name count expense-map]}] -> hiccup"
-  [{:keys [name count expense-map]}]
-  (ui/phase-summary-card {:name name :count count}
-                         (ui/resource-pills "-" expense-resources expense-map)))
-
-(defn- summary-grid
-  "Render the 4-column expense summary grid: Planets, Military, Population, Totals.
-  Shows total costs per category as pills, mirroring income's source-grid.
-
-  [player player-map, required required-expenses-map, required-totals map] -> hiccup"
-  [player required required-totals]
-  (let [planet-count (+ (:player/ore-planets player)
-                        (:player/erg-planets player)
-                        (:player/mil-planets player))
-        mil-count    (+ (:player/soldiers player)
-                        (:player/fighters player)
-                        (:player/stations player)
-                        (:player/agents   player))
-        pop-count    (ui/format-population (:player/population player))
-        cards [{:name "Planets"
-                :count planet-count
-                :expense-map {:credits (:planets-credits required)
-                              :food    (:planets-food required)}}
-               {:name "Military"
-                :count mil-count
-                :expense-map {:credits (+ (:soldiers-credits required)
-                                          (:fighters-credits required)
-                                          (:stations-credits required))
-                              :food    (+ (:soldiers-food required)
-                                          (:agents-food required))
-                              :fuel    (+ (:fighters-fuel required)
-                                          (:stations-fuel required)
-                                          (:agents-fuel required))}}
-               {:name "Population"
-                :count pop-count
-                :expense-map {:food (:population-food required)
-                              :fuel (:population-fuel required)}}
-               {:name "Totals"
-                :expense-map {:credits (:credits required-totals)
-                              :food    (:food    required-totals)
-                              :fuel    (:fuel    required-totals)}}]]
-    [:div
-     (ui/section-label "Expenses")
-     [:div {:class "grid grid-cols-2 md:grid-cols-4 gap-1.5"}
-      (for [card cards]
-        (summary-card card))]]))
+  [player player-map, required required-expenses-map, required-totals map] -> projection-cards"
+  [required required-totals]
+  [{:name "Credits"
+    :total (- (:credits required-totals))
+    :rows [{:label "Planets"  :value (- (:planets-credits required))}
+           {:label "Military" :value (- (+ (:soldiers-credits required)
+                                            (:fighters-credits required)
+                                            (:stations-credits required)))}]}
+   {:name "Food"
+    :total (- (:food required-totals))
+    :rows [{:label "Planets"    :value (- (:planets-food required))}
+           {:label "Military"   :value (- (+ (:soldiers-food required)
+                                              (:agents-food required)))}
+           {:label "Population" :value (- (:population-food required))}]}
+   {:name "Fuel"
+    :total (- (:fuel required-totals))
+    :rows [{:label "Military"   :value (- (+ (:fighters-fuel required)
+                                              (:stations-fuel required)
+                                              (:agents-fuel required)))}
+           {:label "Population" :value (- (:population-fuel required))}]}])
 
 (defn- resource-row
   "Render one resource row in two variants: mobile (no bar) and desktop (with bar).
@@ -300,16 +273,17 @@
 
   [{:keys [player game]}] -> hiccup"
   [{:keys [player game]}]
-  (let [required        (calculate-required-expenses player game)
-        required-totals (calculate-required-expense-totals required)
-        player-id       (:xt/id player)
+  (let [required         (calculate-required-expenses player game)
+        required-totals  (calculate-required-expense-totals required)
+        player-id        (:xt/id player)
+        projections-data (build-expense-projections-data required required-totals)
         ;; Compute initial affordable state using default payments (= required totals)
-        initial-after   (calculate-resources-after-expenses player {:credits-pay (:credits required-totals)
-                                                                    :food-pay    (:food    required-totals)
-                                                                    :fuel-pay    (:fuel    required-totals)})
-        affordable?     (can-afford-expenses? initial-after)
+        initial-after    (calculate-resources-after-expenses player {:credits-pay (:credits required-totals)
+                                                                     :food-pay    (:food    required-totals)
+                                                                     :fuel-pay    (:fuel    required-totals)})
+        affordable?      (can-afford-expenses? initial-after)
         ;; hx-include covers all three payment inputs so every change re-evaluates all resources
-        hx-include      "[name='credits-pay'],[name='food-pay'],[name='fuel-pay']"]
+        hx-include       "[name='credits-pay'],[name='food-pay'],[name='fuel-pay']"]
     (ui/page
       {}
       ;; Terminal shell
@@ -331,8 +305,8 @@
          [:div.flex.flex-col.gap-2
           {:class "py-2.5 px-3.5"}
 
-          ;; Expense summary: totals by category (Planets, Military, Population, Total)
-          (summary-grid player required required-totals)
+          ;; Snapshot with expense breakdown folded in as projections
+          (ui/snapshot-section player {:projections projections-data})
 
           ;; Resource table: Credits, Food, Fuel with deduction bars and inputs
           [:div.overflow-hidden.rounded-game.bg-game-surface

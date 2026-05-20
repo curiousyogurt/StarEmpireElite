@@ -97,13 +97,34 @@
 
   [{:keys [player game db]}] -> hiccup"
   [{:keys [player game db]}]
-  (let [player-id     (:xt/id player)
-        other-players (utils/get-other-players db (:player/game player) player-id)
-        th-cls        "text-green-400 text-[11px] tracking-[0.08em] uppercase"]
+  (let [player-id      (:xt/id player)
+        other-players  (utils/get-other-players db (:player/game player) player-id)
+        th-cls         "text-green-400 text-[11px] tracking-[0.08em] uppercase"
+        ef             (combat/effective-forces player)
+        soldiers-avail (:soldiers ef)
+        fighters-avail (:fighters ef)
+        soldiers-total (get player :player/soldiers 0)
+        fighters-total (get player :player/fighters 0)
+        trans-cap      (* (get player :player/transports 0) const/soldiers-per-transport)
+        gen-cap        (* (get player :player/generals   0) const/soldiers-per-general)
+        carrier-cap    (* (get player :player/carriers   0) const/fighters-per-carrier)
+        admiral-cap    (* (get player :player/admirals   0) const/fighters-per-admiral)
+        army-limit     (when (< soldiers-avail soldiers-total)
+                         (cond
+                           (and (= soldiers-avail trans-cap)
+                                (= soldiers-avail gen-cap)) "Transports/Generals"
+                           (= soldiers-avail trans-cap)     "Transports"
+                           :else                            "Generals"))
+        fleet-limit    (when (< fighters-avail fighters-total)
+                         (cond
+                           (and (= fighters-avail carrier-cap)
+                                (= fighters-avail admiral-cap)) "Carriers/Admirals"
+                           (= fighters-avail carrier-cap)       "Carriers"
+                           :else                                "Admirals"))]
     (ui/page
      {}
-     [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
-      {:class "border-[1.5px] border-game-green-border rounded bg-game-bg text-green-400 font-mono"}
+     [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.rounded.text-green-400.font-mono
+      {:class "border-[1.5px] border-game-green-border"}
       (ui/scanline-overlay)
       (ui/phase-topbar player game "ACTION PHASE")
       (biff/form
@@ -113,49 +134,24 @@
        ;; Body
        [:div.flex.flex-col.gap-2
         {:class "py-2.5 px-3.5"}
-        (ui/snapshot-section player {:show-ground? false :show-fleet? false :show-ops? false})
-        ;; Army / Fleet readiness pills
-        (let [ef              (combat/effective-forces player)
-              soldiers-avail  (:soldiers ef)
-              fighters-avail  (:fighters ef)
-              soldiers-total  (get player :player/soldiers 0)
-              fighters-total  (get player :player/fighters 0)
-              trans-cap       (* (get player :player/transports 0) const/soldiers-per-transport)
-              gen-cap         (* (get player :player/generals   0) const/soldiers-per-general)
-              carrier-cap     (* (get player :player/carriers   0) const/fighters-per-carrier)
-              admiral-cap     (* (get player :player/admirals   0) const/fighters-per-admiral)
-              army-limit      (when (< soldiers-avail soldiers-total)
-                                (cond
-                                  (and (= soldiers-avail trans-cap)
-                                       (= soldiers-avail gen-cap)) "Transports/Generals"
-                                  (= soldiers-avail trans-cap)     "Transports"
-                                  :else                            "Generals"))
-              fleet-limit     (when (< fighters-avail fighters-total)
-                                (cond
-                                  (and (= fighters-avail carrier-cap)
-                                       (= fighters-avail admiral-cap)) "Carriers/Admirals"
-                                  (= fighters-avail carrier-cap)       "Carriers"
-                                  :else                                "Admirals"))]
-          [:div {:class "grid grid-cols-1 md:grid-cols-3 gap-1.5"}
-           (ui/stat-pill "Ground"
-             (cond-> [{:label "Soldiers"   :value soldiers-total}
-                      {:label "Transports" :value (:player/transports player)}
-                      {:label "Generals"   :value (:player/generals   player)}
-                      {:label "Deployable" :value soldiers-avail
-                       :highlight? (= soldiers-avail soldiers-total)
-                       :warn?      (< soldiers-avail soldiers-total)}]
-               army-limit (conj {:label "Limit" :display army-limit})))
-           (ui/stat-pill "Fleet"
-             (cond-> [{:label "Fighters"   :value fighters-total}
-                      {:label "Carriers"   :value (:player/carriers player)}
-                      {:label "Admirals"   :value (:player/admirals player)}
-                      {:label "Deployable" :value fighters-avail
-                       :highlight? (= fighters-avail fighters-total)
-                       :warn?      (< fighters-avail fighters-total)}]
-               fleet-limit (conj {:label "Limit" :display fleet-limit})))
-           (ui/stat-pill "Operations"
-             [{:label "Cmd Ships" :value (:player/cmd-ships player)}
-              {:label "Agents"    :value (:player/agents    player)}])])
+        (ui/snapshot-section player
+          {:extra
+           [:div {:class "grid grid-cols-1 md:grid-cols-3 gap-1.5"}
+            (ui/stat-pill "Ground"
+              (cond-> [{:label "Soldiers"   :value soldiers-total}
+                       {:label "Deployable" :value soldiers-avail
+                        :highlight? (= soldiers-avail soldiers-total)
+                        :warn?      (< soldiers-avail soldiers-total)}]
+                army-limit (conj {:label "Limited by" :display army-limit})))
+            (ui/stat-pill "Fleet"
+              (cond-> [{:label "Fighters"   :value fighters-total}
+                       {:label "Deployable" :value fighters-avail
+                        :highlight? (= fighters-avail fighters-total)
+                        :warn?      (< fighters-avail fighters-total)}]
+                fleet-limit (conj {:label "Limited by" :display fleet-limit})))
+            (ui/stat-pill "Operations"
+              [{:label "Cmd ships" :value (:player/cmd-ships player)}
+               {:label "Agents"    :value (:player/agents    player)}])]})
         (if (empty? other-players)
           [:p.text-sm.text-game-green-soft
            "There are no other empires in the galaxy to attack."]

@@ -259,41 +259,28 @@
 ;;;; UI Components
 ;;;;
 
-(defn- projections-section
-  "Render the three expense-coverage pills: Credits, Food, Fuel.
-  Shows current holdings, expense requirements, and exchange impact.
+(defn build-exchange-projections-data
+  "Compute the projections data structure for snapshot-section's :projections opt.
+  Shows current holdings, required expenses, and exchange impact for Credits, Food, and Fuel.
+  Required rows are negative; Exchange rows start at 0 and are updated via HTMX OOB.
 
-  [player player-map, game game-map] -> hiccup"
-  [player game]
-  (let [required      (expenses/calculate-required-expenses player game)
-        req-totals    (expenses/calculate-required-expense-totals required)
-        cr-current    (:player/credits player)
-        cr-required   (:credits req-totals)
-        cr-total      (- cr-current cr-required)
-        food-current  (:player/food player)
-        food-required (:food req-totals)
-        food-total    (- food-current food-required)
-        fuel-current  (:player/fuel player)
-        fuel-required (:fuel req-totals)
-        fuel-total    (- fuel-current fuel-required)]
-    [:div
-     (ui/section-label "Expense Coverage")
-     [:div {:class "grid grid-cols-1 md:grid-cols-3 gap-1.5"}
-      (ui/projection-pill "Credits" cr-total
-        [{:label "Current"  :value cr-current      :suffix "cr"}
-         {:label "Required" :value (- cr-required) :suffix "cr"   :id "credits-pill-required"}
-         {:label "Exchange" :value 0               :suffix "cr"   :id "credits-pill-exchange"}]
-        {:total-id "projection-credits-total" :signed? true})
-      (ui/projection-pill "Food" food-total
-        [{:label "Current"  :value food-current      :suffix "food"}
-         {:label "Required" :value (- food-required) :suffix "food" :id "food-pill-required"}
-         {:label "Exchange" :value 0                  :suffix "food" :id "food-pill-exchange"}]
-        {:total-id "projection-food-total" :signed? true})
-      (ui/projection-pill "Fuel" fuel-total
-        [{:label "Current"  :value fuel-current      :suffix "fuel"}
-         {:label "Required" :value (- fuel-required) :suffix "fuel" :id "fuel-pill-required"}
-         {:label "Exchange" :value 0                  :suffix "fuel" :id "fuel-pill-exchange"}]
-        {:total-id "projection-fuel-total" :signed? true})]]))
+  [player player-map, req-totals {:credits int, :food int, :fuel int}] -> projection-cards"
+  [player req-totals]
+  (let [cr-current   (:player/credits player)
+        food-current (:player/food    player)
+        fuel-current (:player/fuel    player)]
+    [{:name "Credits" :total (- cr-current   (:credits req-totals)) :total-id "projection-credits-total"
+      :rows [{:label "Current"  :value cr-current}
+             {:label "Required" :value (- (:credits req-totals)) :id "credits-pill-required"}
+             {:label "Exchange" :value 0                         :id "credits-pill-exchange"}]}
+     {:name "Food"    :total (- food-current (:food    req-totals)) :total-id "projection-food-total"
+      :rows [{:label "Current"  :value food-current}
+             {:label "Required" :value (- (:food    req-totals)) :id "food-pill-required"}
+             {:label "Exchange" :value 0                         :id "food-pill-exchange"}]}
+     {:name "Fuel"    :total (- fuel-current (:fuel    req-totals)) :total-id "projection-fuel-total"
+      :rows [{:label "Current"  :value fuel-current}
+             {:label "Required" :value (- (:fuel    req-totals)) :id "fuel-pill-required"}
+             {:label "Exchange" :value 0                         :id "fuel-pill-exchange"}]}]))
 
 
 (defn exchange-row
@@ -463,25 +450,31 @@
             (ui/format-number max-qty)])
 
          ;; OOB: pill Required rows (adjusted for proposed unit/planet sales)
-         (ui/oob-pill "credits-pill-required" "Required" (- adj-cr-required)   "cr")
-         (ui/oob-pill "food-pill-required"    "Required" (- adj-food-required) "food")
-         (ui/oob-pill "fuel-pill-required"    "Required" (- adj-fuel-required) "fuel")
+         (ui/oob-proj-pill "credits-pill-required" "Required" (- adj-cr-required))
+         (ui/oob-proj-pill "food-pill-required"    "Required" (- adj-food-required))
+         (ui/oob-proj-pill "fuel-pill-required"    "Required" (- adj-fuel-required))
 
          ;; OOB: pill Exchange rows
-         (ui/oob-pill "credits-pill-exchange" "Exchange" exchange-credits "cr")
-         (ui/oob-pill "food-pill-exchange"    "Exchange" exchange-food    "food")
-         (ui/oob-pill "fuel-pill-exchange"    "Exchange" exchange-fuel    "fuel")
+         (ui/oob-proj-pill "credits-pill-exchange" "Exchange" exchange-credits)
+         (ui/oob-proj-pill "food-pill-exchange"    "Exchange" exchange-food)
+         (ui/oob-proj-pill "fuel-pill-exchange"    "Exchange" exchange-fuel)
 
-         ;; OOB: pill totals
-         [:span#projection-credits-total
-          {:hx-swap-oob "true" :class (if (neg? cr-total) "text-red-400" "text-game-green-muted")}
-          (if (neg? cr-total) "-" "+") (ui/format-number (Math/abs (long cr-total)))]
-         [:span#projection-food-total
-          {:hx-swap-oob "true" :class (if (neg? food-total) "text-red-400" "text-game-green-muted")}
-          (if (neg? food-total) "-" "+") (ui/format-number (Math/abs (long food-total)))]
-         [:span#projection-fuel-total
-          {:hx-swap-oob "true" :class (if (neg? fuel-total) "text-red-400" "text-game-green-muted")}
-          (if (neg? fuel-total) "-" "+") (ui/format-number (Math/abs (long fuel-total)))]
+         ;; OOB: projection card totals
+         [:span.font-bold
+          {:id "projection-credits-total" :hx-swap-oob "true"
+           :class (str "text-[14px] " (if (neg? cr-total) "text-red-400" "text-green-400"))
+           :style {:text-shadow "0 0 10px rgba(61,220,132,0.25)"}}
+          (ui/format-number cr-total)]
+         [:span.font-bold
+          {:id "projection-food-total" :hx-swap-oob "true"
+           :class (str "text-[14px] " (if (neg? food-total) "text-red-400" "text-green-400"))
+           :style {:text-shadow "0 0 10px rgba(61,220,132,0.25)"}}
+          (ui/format-number food-total)]
+         [:span.font-bold
+          {:id "projection-fuel-total" :hx-swap-oob "true"
+           :class (str "text-[14px] " (if (neg? fuel-total) "text-red-400" "text-green-400"))
+           :style {:text-shadow "0 0 10px rgba(61,220,132,0.25)"}}
+          (ui/format-number fuel-total)]
 
          ;; OOB: exchange summary bar table — bars, change spans, after spans
          (let [cr-before   (:player/credits player)
@@ -563,7 +556,8 @@
                                       [(:qty-key spec) 0]))
         max-buy-quantities (calculate-max-buy-quantities player zero-quantities rates)
         required           (expenses/calculate-required-expenses player game)
-        req-totals         (expenses/calculate-required-expense-totals required)]
+        req-totals         (expenses/calculate-required-expense-totals required)
+        projections-data   (build-exchange-projections-data player req-totals)]
     (ui/page
       {}
       [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.rounded.text-green-400.font-mono
@@ -584,13 +578,10 @@
          [:div.flex.flex-col.gap-2
           {:class "py-2.5 px-3.5"}
 
-          ;; 1. Snapshot
-          (ui/snapshot-section player)
+          ;; 1. Snapshot with expense coverage projections folded in
+          (ui/snapshot-section player {:projections projections-data})
 
-          ;; 2. Expense coverage pills
-          (projections-section player game)
-
-          ;; 3. Sell Assets table
+          ;; 2. Sell Assets table
           [:div
            (ui/section-label "Sell Assets")
            [:div.overflow-hidden.rounded-game.bg-game-surface
@@ -601,7 +592,7 @@
                             (get rates (:rate-key spec)) 0
                             (get player (:player-key spec)) player-id exchange-hx-include))]]
 
-          ;; 4. Sell Resources table
+          ;; 3. Sell Resources table
           [:div
            (ui/section-label "Sell Resources")
            [:div.overflow-hidden.rounded-game.bg-game-surface
@@ -615,7 +606,7 @@
                             (get player (:player-key spec)) player-id exchange-hx-include
                             {:ex-value ex-val :ex-tooltip (:ex-tooltip spec)}))]]
 
-          ;; 5. Buy table
+          ;; 4. Buy table
           [:div
            (ui/section-label "Buy Resources")
            [:div.overflow-hidden.rounded-game.bg-game-surface
@@ -629,7 +620,7 @@
                             (get max-buy-quantities (:max-key spec)) player-id exchange-hx-include
                             {:sf-value sf-val :sf-tooltip (:sf-tooltip spec)}))]]
 
-          ;; 6. Exchange summary bar table
+          ;; 5. Exchange summary bar table
           [:div
            (ui/section-label "Exchange Summary")
            (exchange-bar-table player {:credits (:player/credits player)

@@ -55,43 +55,6 @@
 ;;;; UI Components
 ;;;;
 
-(def ^:private income-resources
-  [[:credits "cred"] [:food "food"] [:fuel "fuel"]
-   [:soldiers "sold"] [:fighters "fgtr"] [:stations "defs"]])
-
-(defn- source-card
-  "Render one income source card with name, count, and resource pills.
-
-  [{:keys [name count income-map]}] -> hiccup"
-  [{:keys [name count income-map]}]
-  (ui/phase-summary-card {:name name :count count}
-                         (ui/resource-pills "+" income-resources income-map)))
-
-(defn- source-grid
-  "Render the 4-column income sources grid (Ore, Erg, Mil, Taxes).
-
-  [player player-map, income income-map] -> hiccup"
-  [player income]
-  (let [pop-count (ui/format-population (:player/population player))
-        sources [{:name "Ore"
-                  :count (:player/ore-planets player)
-                  :income-map {:credits (:ore-credits income)}}
-                 {:name "Erg"
-                  :count (:player/erg-planets player)
-                  :income-map {:food (:erg-food income)
-                               :fuel (:erg-fuel income)}}
-                 {:name "Mil"
-                  :count (:player/mil-planets player)
-                  :income-map {:soldiers (:mil-soldiers income)
-                               :fighters (:mil-fighters income)
-                               :stations (:mil-stations income)}}
-                 {:name "Taxes" :count pop-count
-                  :income-map {:credits (:tax-credits income)}}]]
-    [:div
-     (ui/section-label "Sources")
-     [:div {:class "grid grid-cols-2 md:grid-cols-4 gap-1.5"}
-      (for [src sources]
-        (source-card src))]]))
 
 (defn- resource-table-header
   "Render the column-label row for the resource table.
@@ -243,7 +206,7 @@
        ;; Body
        [:div.flex.flex-col.gap-2
         {:class "py-2.5 px-3.5"}
-        (source-grid player income)
+        (ui/snapshot-section player)
         (resource-table player income)
         (ui/incoming-alert player)]
 

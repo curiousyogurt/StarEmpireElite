@@ -107,7 +107,7 @@
        ;; Body
        [:div.flex.flex-col.gap-2
         {:class "py-2.5 px-3.5"}
-        (ui/snapshot-section player {:show-ground? false :show-fleet? false})
+        (ui/snapshot-section player)
         (cond
           (zero? (:player/agents player))
           [:p.text-sm.text-yellow-400

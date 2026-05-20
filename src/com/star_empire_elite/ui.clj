@@ -496,9 +496,12 @@
                     Each card is {:name str, :total number, :total-id str (optional),
                     :rows [{:label str, :value number, :id str (optional)}]}.
                     When absent, the projections section is omitted.
+    :extra        — pre-rendered hiccup appended inside the card after the manifest/projections,
+                    wrapped in the same border-top separator style. Use for page-specific content
+                    that should live inside the tile (e.g. deployable forces on the action page).
 
   [player player-map, opts? map] -> hiccup"
-  [player & [{:keys [show-ground? show-fleet? show-ops? projections]
+  [player & [{:keys [show-ground? show-fleet? show-ops? projections extra]
               :or   {show-ground? true show-fleet? true show-ops? true}}]]
   (let [;; Manifest item: label + value; zero values render dim and non-bold
         item  (fn [label display zero?]
@@ -590,7 +593,11 @@
               (format-number total)]]
             [:div.flex.flex-col
              {:class "gap-[2px]"}
-             (map proj-pill-hiccup rows)]])]])]))
+             (map proj-pill-hiccup rows)]])]])
+     (when extra
+       [:div {:class "px-4 pt-[10px] pb-[14px] border-t border-game-border"
+              :style {:background "rgba(20,42,28,0.10)"}}
+        extra])]))
 
 (defn projection-pill
   "Render one projection pill card with a title, right-aligned total, and breakdown rows.
