@@ -481,6 +481,18 @@
           (is (= (:player/food     test-player) (:player/food     tx)))
           (is (= (:player/fuel     test-player) (:player/fuel     tx))))))))
 
+(deftest test-apply-exchange-rejects-invalid
+  (testing "Returns 400 and does not call submit-tx when exchange would overdraw resources"
+    (let [tx-called? (atom false)
+          ;; Attempt to sell more soldiers than the player has
+          params {:soldiers-sold (str (inc (:player/soldiers test-player)))}]
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player test-game])
+                    biff/submit-tx (fn [_ _] (reset! tx-called? true) :ok)]
+        (let [result (exchange/apply-exchange {:path-params {:player-id (str test-player-id)}
+                                               :params params :biff/db nil})]
+          (is (false? @tx-called?))
+          (is (= 400 (:status result))))))))
+
 ;;;;
 ;;;; UI Component Tests
 ;;;;

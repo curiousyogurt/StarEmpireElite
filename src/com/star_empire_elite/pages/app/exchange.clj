@@ -392,27 +392,30 @@
             rates          (get-exchange-rates game)
             credit-changes (calculate-exchange-credits quantities rates)
             resources-after (calculate-resources-after-exchange player quantities credit-changes)]
-        (biff/submit-tx ctx
-                        [{:db/doc-type :player
-                          :db/op :update
-                          :xt/id player-id
-                          :player/credits     (:credits resources-after)
-                          :player/soldiers    (:soldiers resources-after)
-                          :player/transports  (:transports resources-after)
-                          :player/generals    (:generals resources-after)
-                          :player/carriers    (:carriers resources-after)
-                          :player/fighters    (:fighters resources-after)
-                          :player/admirals    (:admirals resources-after)
-                          :player/stations    (:stations resources-after)
-                          :player/cmd-ships   (:cmd-ships resources-after)
-                          :player/agents      (:agents resources-after)
-                          :player/mil-planets (:mil-planets resources-after)
-                          :player/erg-planets (:erg-planets resources-after)
-                          :player/ore-planets (:ore-planets resources-after)
-                          :player/food        (:food resources-after)
-                          :player/fuel        (:fuel resources-after)}])
-        {:status 303
-         :headers {"location" (str "/app/game/" player-id "/expenses")}}))))
+        (if (not (valid-exchange? resources-after))
+          {:status 400 :body "Invalid exchange: insufficient resources"}
+          (do
+            (biff/submit-tx ctx
+                            [{:db/doc-type :player
+                              :db/op :update
+                              :xt/id player-id
+                              :player/credits     (:credits resources-after)
+                              :player/soldiers    (:soldiers resources-after)
+                              :player/transports  (:transports resources-after)
+                              :player/generals    (:generals resources-after)
+                              :player/carriers    (:carriers resources-after)
+                              :player/fighters    (:fighters resources-after)
+                              :player/admirals    (:admirals resources-after)
+                              :player/stations    (:stations resources-after)
+                              :player/cmd-ships   (:cmd-ships resources-after)
+                              :player/agents      (:agents resources-after)
+                              :player/mil-planets (:mil-planets resources-after)
+                              :player/erg-planets (:erg-planets resources-after)
+                              :player/ore-planets (:ore-planets resources-after)
+                              :player/food        (:food resources-after)
+                              :player/fuel        (:fuel resources-after)}])
+            {:status 303
+             :headers {"location" (str "/app/game/" player-id "/expenses")}}))))))
 
 (defn calculate-exchange
   "Provide HTMX out-of-band updates showing resources after exchange as user changes input values.

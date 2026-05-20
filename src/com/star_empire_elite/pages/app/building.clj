@@ -69,25 +69,15 @@
 
   [player player-map, quantities purchase-quantities, cost-info {:total-cost int}] -> {:credits int, :soldiers int, ...}"
   [player quantities cost-info]
-  (-> (utils/player-snapshot player)
-      (update :credits     - (:total-cost cost-info))
-      (update :soldiers    + (:soldiers   quantities))
-      (update :transports  + (:transports quantities))
-      (update :generals    + (:generals   quantities))
-      (update :fighters    + (:fighters   quantities))
-      (update :carriers    + (:carriers   quantities))
-      (update :admirals    + (:admirals   quantities))
-      (update :stations    + (:stations   quantities))
-      (update :cmd-ships   + (:cmd-ships  quantities))
-      (update :agents      + (:agents     quantities))
-      (update :ore-planets + (:ore-planets quantities))
-      (update :erg-planets + (:erg-planets quantities))
-      (update :mil-planets + (:mil-planets quantities))))
+  (reduce (fn [m spec]
+            (update m (:qty-key spec) + (get quantities (:qty-key spec) 0)))
+          (update (utils/player-snapshot player) :credits - (:total-cost cost-info))
+          purchase-row-specs))
 
 (defn can-afford-purchases?
   "Returns true if player has enough credits for all purchases.
 
-  [resources-after purchase-resources-map] -> boolean"
+  [resources-after snapshot-map] -> boolean"
   [resources-after]
   (>= (:credits resources-after) 0))
 

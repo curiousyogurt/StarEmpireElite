@@ -247,14 +247,19 @@
           (is (= test-player-id (:xt/id tx)))
           ;; Phase advance
           (is (= 4 (:player/current-phase tx)))
-          ;; Resources
+          ;; Resources — all 12 purchasable fields must be committed
           (is (= (:credits     expected) (:player/credits     tx)))
           (is (= (:soldiers    expected) (:player/soldiers    tx)))
           (is (= (:transports  expected) (:player/transports  tx)))
           (is (= (:generals    expected) (:player/generals    tx)))
+          (is (= (:carriers    expected) (:player/carriers    tx)))
           (is (= (:fighters    expected) (:player/fighters    tx)))
+          (is (= (:admirals    expected) (:player/admirals    tx)))
           (is (= (:stations    expected) (:player/stations    tx)))
+          (is (= (:cmd-ships   expected) (:player/cmd-ships   tx)))
           (is (= (:agents      expected) (:player/agents      tx)))
+          (is (= (:ore-planets expected) (:player/ore-planets tx)))
+          (is (= (:erg-planets expected) (:player/erg-planets tx)))
           (is (= (:mil-planets expected) (:player/mil-planets tx))))))))
 
 (deftest test-apply-building-insufficient-credits
@@ -280,6 +285,51 @@
           (is (= (:player/credits  test-player) (:player/credits  tx)))
           (is (= (:player/soldiers test-player) (:player/soldiers tx)))
           (is (= 4 (:player/current-phase tx))))))))
+
+;;;;
+;;;; calculate-building Tests
+;;;;
+;;;; calculate-building is the HTMX endpoint that provides OOB updates as the
+;;;; user changes purchase quantities. Tests focus on phase validation and that
+;;;; the handler produces renderable output under normal and edge conditions.
+;;;;
+
+(deftest test-calculate-building-any-phase-renders
+  ;; calculate-building is a read-only HTMX endpoint; phase validation is only
+  ;; enforced on the state-mutating apply-building handler.
+  (testing "Renders regardless of current phase"
+    (let [player (assoc test-player :player/current-phase 2)]
+      (with-redefs [xt/entity (helpers/fake-entity [player test-game])]
+        (let [result (building/calculate-building {:path-params {:player-id (str test-player-id)}
+                                                   :params {} :biff/db nil})]
+          (is (some? result)))))))
+
+(deftest test-calculate-building-player-not-found
+  (testing "Returns 404 when player is not in the database"
+    (with-redefs [xt/entity (fn [_ _] nil)]
+      (let [result (building/calculate-building {:path-params {:player-id (str test-player-id)}
+                                                 :params {} :biff/db nil})]
+        (is (= 404 (:status result)))))))
+
+(deftest test-calculate-building-renders
+  (testing "Returns renderable hiccup for a valid phase-3 player with no purchases"
+    (with-redefs [xt/entity (helpers/fake-entity [test-player test-game])]
+      (let [result (building/calculate-building {:path-params {:player-id (str test-player-id)}
+                                                 :params {} :biff/db nil})]
+        (is (some? result)))))
+
+  (testing "Returns renderable hiccup with purchases that do not exceed credits"
+    (with-redefs [xt/entity (helpers/fake-entity [test-player test-game])]
+      (let [result (building/calculate-building {:path-params {:player-id (str test-player-id)}
+                                                 :params {:soldiers "5" :fighters "2"} :biff/db nil})]
+        (is (some? result)))))
+
+  (testing "Returns renderable hiccup when player cannot afford purchases"
+    (let [poor-player (assoc test-player :player/credits 5)]
+      (with-redefs [xt/entity (helpers/fake-entity [poor-player test-game])]
+        (let [result (building/calculate-building {:path-params {:player-id (str test-player-id)}
+                                                   :params {:soldiers "1000"} :biff/db nil})]
+          (is (some? result)))))))
 
 ;;;;
 ;;;; UI Component Tests

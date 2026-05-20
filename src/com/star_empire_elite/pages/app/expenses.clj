@@ -50,7 +50,7 @@
   "Aggregate per-category required expenses into per-resource totals.
   These are the minimum payments needed to avoid stability penalties.
 
-  [required required-map] -> {:credits int, :food int, :fuel int}"
+  [required expenses-map] -> {:credits int, :food int, :fuel int}"
   [required]
   {:credits (+ (:planets-credits required)  (:soldiers-credits required)
                (:fighters-credits required) (:stations-credits required))

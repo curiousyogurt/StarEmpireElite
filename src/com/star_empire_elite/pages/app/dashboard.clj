@@ -97,13 +97,14 @@
   [game-id uuid] -> hiccup"
   [game-id]
   (biff/form
-   {:action  (str "/app/delete-game/" game-id)
-    :method  "post"
-    :onsubmit "return confirm('Delete this game and all its players?')"
-    :class   "m-0"}
+   {:action   (str "/app/delete-game/" game-id)
+    :method   "post"
+    :hx-boost "true"
+    :class    "m-0"}
    [:button
-    {:type "submit"
-     :class "py-px px-[10px] border border-game-green-muted bg-transparent text-game-green-soft rounded-sm font-mono cursor-pointer text-[26px]"}
+    {:type       "submit"
+     :hx-confirm "Delete this game and all its players?"
+     :class      "py-px px-[10px] border border-game-green-muted bg-transparent text-game-green-soft rounded-sm font-mono cursor-pointer text-[26px]"}
     "✕"]))
 
 (defn- bar-row
@@ -231,13 +232,14 @@
      (when admin?
        [:div.absolute.right-3.z-10 {:class "top-[10px]"}
         (biff/form
-         {:action  (str "/app/delete-game/" (:xt/id game))
-          :method  "post"
-          :onsubmit "return confirm('Delete this game and all its players?')"
-          :class   "m-0"}
+         {:action   (str "/app/delete-game/" (:xt/id game))
+          :method   "post"
+          :hx-boost "true"
+          :class    "m-0"}
          [:button
-          {:type "submit"
-           :class "px-1 border-none bg-transparent text-game-green-dim font-mono text-xl leading-none cursor-pointer"}
+          {:type       "submit"
+           :hx-confirm "Delete this game and all its players?"
+           :class      "px-1 border-none bg-transparent text-game-green-dim font-mono text-xl leading-none cursor-pointer"}
           "\u00d7"])])]))
 
 ;;;;
