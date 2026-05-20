@@ -118,20 +118,17 @@
 
   [player player-map, required required-expenses-map, required-totals map] -> projection-cards"
   [required required-totals]
-  [{:name "Credits"
-    :total (- (:credits required-totals))
+  [{:name "Credits"    :total (- (:credits required-totals))
     :rows [{:label "Planets"  :value (- (:planets-credits required))}
            {:label "Military" :value (- (+ (:soldiers-credits required)
                                             (:fighters-credits required)
                                             (:stations-credits required)))}]}
-   {:name "Food"
-    :total (- (:food required-totals))
+   {:name "Food"       :total (- (:food required-totals))
     :rows [{:label "Planets"    :value (- (:planets-food required))}
            {:label "Military"   :value (- (+ (:soldiers-food required)
                                               (:agents-food required)))}
            {:label "Population" :value (- (:population-food required))}]}
-   {:name "Fuel"
-    :total (- (:fuel required-totals))
+   {:name "Fuel"       :total (- (:fuel required-totals))
     :rows [{:label "Military"   :value (- (+ (:fighters-fuel required)
                                               (:stations-fuel required)
                                               (:agents-fuel required)))}
@@ -255,12 +252,9 @@
          (oob-bar "bar-food"    (:player/food    player) (:food-pay    payments) "glow-food")
          (oob-bar "bar-fuel"    (:player/fuel    player) (:fuel-pay    payments) "glow-fuel")
          ;; OOB: insufficient-resources warning
-         [:div#expense-warning.flex.items-center
-          {:hx-swap-oob "true"}
-          (when (not affordable?)
-            [:p.text-yellow-400.text-sm
-             {:class "tracking-[0.03em]"}
-             "⚠ Insufficient resources to pay expenses."])]
+         (ui/phase-warning-div "expense-warning"
+           (when (not affordable?) "⚠ Insufficient resources to pay expenses.")
+           {:oob? true})
          ;; OOB: submit button
          (ui/submit-button affordable? "Continue to Building" {:hx-swap-oob "true"})]))))
 
@@ -284,31 +278,13 @@
         affordable?      (can-afford-expenses? initial-after)
         ;; hx-include covers all three payment inputs so every change re-evaluates all resources
         hx-include       "[name='credits-pay'],[name='food-pay'],[name='fuel-pay']"]
-    (ui/page
-      {}
-      ;; Terminal shell
-      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.rounded.text-green-400.font-mono
-       {:class "border-[1.5px] border-game-green-border"}
-
-       ;; Scanline overlay
-       (ui/scanline-overlay)
-
-       ;; Topbar
-       (ui/phase-topbar player game "EXPENSES PHASE")
-
-       ;; Form wraps body + action bar so submit button works
-       (biff/form
-         {:action (str "/app/game/" player-id "/apply-expenses") :method "post"
-          :class  "m-0"}
-
-         ;; Body
-         [:div.flex.flex-col.gap-2
-          {:class "py-2.5 px-3.5"}
-
-          ;; Snapshot with expense breakdown folded in as projections
-          (ui/snapshot-section player {:projections projections-data})
-
-          ;; Resource table: Credits, Food, Fuel with deduction bars and inputs
+    (ui/phase-shell player game "EXPENSES PHASE"
+      (biff/form
+        {:action (str "/app/game/" player-id "/apply-expenses") :method "post"
+         :class  "m-0"}
+        (ui/phase-body player
+          (ui/snapshot-section player {:projections projections-data :projection-turn "THIS TURN"})
+          (ui/section-label "Impact")
           [:div.overflow-hidden.rounded-game.bg-game-surface
            {:class "border border-game-border"}
            (ui/deduction-table-header)
@@ -318,18 +294,9 @@
                          "glow-food"    "food-pay"    player-id hx-include)
            (resource-row "Fuel"    (:player/fuel    player) (:fuel    required-totals)
                          "glow-fuel"    "fuel-pay"    player-id hx-include)]
-
-          ;; HTMX swap-target placeholder (invisible; OOB updates go to the after-column spans)
-          [:div#resources-after.hidden]
-
-          ;; Warning message — populated by HTMX when player can't afford expenses
-          [:div#expense-warning.flex.items-center]
-
-          (ui/incoming-alert player)]
-
-         ;; Action bar
-         [:div.flex.gap-2
-          {:class "py-2 px-3.5 border-t border-game-border"}
+          [:div#resources-after.hidden])
+        (ui/phase-warning "expense-warning")
+        (ui/phase-action-bar
           (ui/action-bar-link (str "/app/game/" player-id) "Pause")
           (ui/action-bar-link (str "/app/game/" player-id "/exchange") "Go to Exchange")
-          (ui/submit-button affordable? "Continue to Building")])])))
+          (ui/submit-button affordable? "Continue to Building"))))))

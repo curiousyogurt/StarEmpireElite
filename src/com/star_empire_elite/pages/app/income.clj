@@ -191,31 +191,15 @@
   [{:keys [player game]}]
   (let [player-id (:xt/id player)
         income    (calculate-income player game)]
-    (ui/page
-      {}
-      ;; Terminal shell: text-base sets the base font size for all descendants
-      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.rounded.text-green-400.font-mono
-       {:class "border-[1.5px] border-game-green-border"}
-
-       ;; Scanline overlay
-       (ui/scanline-overlay)
-
-       ;; Topbar
-       (ui/phase-topbar player game "INCOME PHASE")
-
-       ;; Body
-       [:div.flex.flex-col.gap-2
-        {:class "py-2.5 px-3.5"}
+    (ui/phase-shell player game "INCOME PHASE"
+      (ui/phase-body player
         (ui/snapshot-section player)
-        (resource-table player income)
-        (ui/incoming-alert player)]
-
-       ;; Action bar
-       [:div.flex.gap-2
-        {:class "py-2 px-3.5 border-t border-game-border"}
+        (ui/section-label "Impact")
+        (resource-table player income))
+      (ui/phase-action-bar
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
         (biff/form
           {:action (str "/app/game/" player-id "/apply-income") :method "post"
            :class  "m-0"}
-          (ui/submit-button true "Continue to Expenses"))]])))
+          (ui/submit-button true "Continue to Expenses"))))))
 

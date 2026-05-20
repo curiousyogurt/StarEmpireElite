@@ -1,6 +1,14 @@
 (ns com.star-empire-elite.ui-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.string :as str]
+            [clojure.test :refer :all]
             [com.star-empire-elite.ui :as ui]))
+
+;; Private sub-function access via var reference
+(def ^:private manifest-item        #'ui/snapshot-manifest-item)
+(def ^:private manifest-row         #'ui/snapshot-manifest-row)
+(def ^:private hero                  #'ui/snapshot-hero)
+(def ^:private manifest              #'ui/snapshot-manifest)
+(def ^:private projections-section   #'ui/snapshot-projections)
 
 ;;;;
 ;;;; format-number Tests
@@ -295,7 +303,7 @@
       (is (= 2 (count children))))))
 
 ;;;;
-;;;; resource-display-grid Tests
+;;;; snapshot-section Tests
 ;;;;
 
 (def ^:private sample-player
@@ -305,38 +313,6 @@
    :player/soldiers    100  :player/transports  5  :player/generals     2
    :player/fighters    20   :player/carriers    1  :player/admirals     0
    :player/stations    10   :player/cmd-ships   0  :player/agents       5})
-
-(deftest test-resource-display-grid-renders
-  (testing "Returns a hiccup div for a standard player entity"
-    (let [result (ui/resource-display-grid sample-player "Test Resources")]
-      (is (vector? result))
-      (is (= :div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5 (first result))))))
-
-(deftest test-resource-display-grid-plain-keys
-  (testing "Also accepts a plain resource map using :credits, :food, :fuel, etc."
-    (let [plain {:credits 999 :food 400 :fuel 200 :galaxars 10
-                 :population 5 :stability 70
-                 :ore-planets 2 :erg-planets 1 :mil-planets 3
-                 :soldiers 50 :transports 2 :generals 1
-                 :fighters 8  :carriers 0  :admirals 0
-                 :stations 3  :cmd-ships 0 :agents 4}
-          result (ui/resource-display-grid plain "Plain Keys")]
-      (is (vector? result)))))
-
-(deftest test-resource-display-grid-highlight-negative
-  (testing "Renders without error when highlight-negative? is true and values are negative"
-    (let [negative {:player/credits -100 :player/food -50 :player/fuel -200
-                    :player/galaxars 0  :player/population  1 :player/stability  0
-                    :player/ore-planets 0 :player/erg-planets 0 :player/mil-planets 0
-                    :player/soldiers 0 :player/transports 0 :player/generals 0
-                    :player/fighters 0 :player/carriers 0 :player/admirals 0
-                    :player/stations 0 :player/cmd-ships 0 :player/agents 0}
-          result   (ui/resource-display-grid negative "After Expenses" true)]
-      (is (vector? result)))))
-
-;;;;
-;;;; snapshot-section Tests
-;;;;
 
 (deftest test-snapshot-section-renders
   (testing "Returns a hiccup div for a player with all required fields"
@@ -348,6 +324,122 @@
   (testing "Renders without error for various population values (double formatting)"
     (doseq [pop [0 1 6 100 1000]]
       (is (vector? (ui/snapshot-section (assoc sample-player :player/population pop)))))))
+
+(deftest test-snapshot-section-no-projections
+  (testing "Projections section is absent when :projections opt is not passed"
+    (let [result (str (ui/snapshot-section sample-player))]
+      (is (not (str/includes? result "PROJECTIONS"))))))
+
+(deftest test-snapshot-section-with-projections
+  (testing "Projections section appears when :projections opt is passed"
+    (let [result (str (ui/snapshot-section sample-player
+                        {:projections [{:name "Credits" :total 500 :rows []}]}))]
+      (is (str/includes? result "PROJECTIONS")))))
+
+(deftest test-snapshot-section-projection-turn-default
+  (testing "Default projection-turn is NEXT TURN"
+    (let [result (str (ui/snapshot-section sample-player
+                        {:projections [{:name "Credits" :total 0 :rows []}]}))]
+      (is (str/includes? result "NEXT TURN")))))
+
+(deftest test-snapshot-section-projection-turn-this
+  (testing "THIS TURN label is used when :projection-turn is passed"
+    (let [result (str (ui/snapshot-section sample-player
+                        {:projections     [{:name "Credits" :total 0 :rows []}]
+                         :projection-turn "THIS TURN"}))]
+      (is (str/includes? result "THIS TURN")))))
+
+
+;;;;
+;;;; snapshot-manifest-item Tests
+;;;;
+
+(deftest test-manifest-item-nonzero-color
+  (testing "Non-zero value renders value span in bright green"
+    (let [[_ _ _ value-span] (manifest-item "soldiers" "100" false)]
+      (is (str/includes? (:class (second value-span)) "text-green-400")))))
+
+(deftest test-manifest-item-zero-color
+  (testing "Zero value renders value span dim and non-bold"
+    (let [[_ _ _ value-span] (manifest-item "soldiers" "0" true)]
+      (is (str/includes? (:class (second value-span)) "text-game-green-dim"))
+      (is (str/includes? (:class (second value-span)) "font-normal")))))
+
+(deftest test-manifest-item-label-text
+  (testing "Label text is rendered in the label span"
+    (let [[_ _ label-span] (manifest-item "fighters" "50" false)]
+      (is (= "fighters" (last label-span))))))
+
+;;;;
+;;;; snapshot-manifest-row Tests
+;;;;
+
+(deftest test-manifest-row-not-last-has-divider
+  (testing "Non-last row includes a bottom dashed divider class"
+    (let [[_ attrs] (manifest-row "EMPIRE" [] false)]
+      (is (str/includes? (:class attrs) "border-b")))))
+
+(deftest test-manifest-row-last-no-divider
+  (testing "Last row omits the bottom dashed divider class"
+    (let [[_ attrs] (manifest-row "EMPIRE" [] true)]
+      (is (not (str/includes? (:class attrs) "border-b"))))))
+
+(deftest test-manifest-row-tag-prefix
+  (testing "Tag label includes the '› ' prefix"
+    (let [tag-div (nth (manifest-row "GROUND" [] false) 2)]
+      (is (str/includes? (last tag-div) "GROUND")))))
+
+;;;;
+;;;; snapshot-hero Tests
+;;;;
+
+(deftest test-snapshot-hero-renders
+  (testing "Returns a 4-column grid hiccup div"
+    (let [result (hero sample-player)]
+      (is (vector? result))
+      (is (= :div.grid.grid-cols-4 (first result))))))
+
+(deftest test-snapshot-hero-shows-credits
+  (testing "Credits value appears in the hero strip"
+    (let [result (str (hero (assoc sample-player :player/credits 42)))]
+      (is (str/includes? result "42")))))
+
+;;;;
+;;;; snapshot-projections Tests
+;;;;
+
+(deftest test-snapshot-projections-turn-label
+  (testing "Renders the passed projection-turn string in the header"
+    (let [proj [{:name "Credits" :total 100 :rows []}]]
+      (is (str/includes? (str (projections-section proj "THIS TURN")) "THIS TURN"))
+      (is (str/includes? (str (projections-section proj "NEXT TURN")) "NEXT TURN")))))
+
+(deftest test-snapshot-projections-negative-total-amber
+  (testing "Negative total renders amber color class"
+    (let [result (str (projections-section [{:name "Credits" :total -50 :rows []}] "NEXT TURN"))]
+      (is (str/includes? result "text-amber-400")))))
+
+(deftest test-snapshot-projections-positive-total-green
+  (testing "Positive total renders green color class"
+    (let [result (str (projections-section [{:name "Credits" :total 100 :rows []}] "NEXT TURN"))]
+      (is (str/includes? result "text-green-400")))))
+
+(deftest test-snapshot-projections-total-id
+  (testing "total-id is set as the :id attribute on the total span"
+    (let [result (projections-section [{:name "Credits" :total 100 :total-id "my-id" :rows []}] "NEXT TURN")
+          result-str (str result)]
+      (is (str/includes? result-str "my-id")))))
+
+(deftest test-snapshot-projections-card-count
+  (testing "Renders one card per entry in the projections vector"
+    (let [proj  [{:name "A" :total 1 :rows []}
+                 {:name "B" :total 2 :rows []}
+                 {:name "C" :total 3 :rows []}]
+          ;; result = [:div outer {:class ...} [:div header] [:div.grid {:class ...} (for-seq)]]
+          ;; grid = index 3; the for-seq is a single lazy-seq child at index 2 of the grid
+          grid  (nth (projections-section proj "NEXT TURN") 3)
+          cards (nth grid 2)]
+      (is (= 3 (count cards))))))
 
 ;;;;
 ;;;; stat-pill Tests
@@ -377,22 +469,22 @@
 (deftest test-stat-pill-default-color
   (testing "Plain row (no :highlight? or :warn?) renders value in the soft color class"
     (let [row (stat-pill-first-row (ui/stat-pill "T" [{:label "L" :value 5}]))]
-      (is (= "text-game-green-soft" (get-in row [3 1 :class]))))))
+      (is (str/includes? (get-in row [3 1 :class]) "text-game-green-soft")))))
 
 (deftest test-stat-pill-highlight-color
   (testing ":highlight? true renders the value in bright green class"
     (let [row (stat-pill-first-row (ui/stat-pill "T" [{:label "L" :value 5 :highlight? true}]))]
-      (is (= "text-green-400" (get-in row [3 1 :class]))))))
+      (is (str/includes? (get-in row [3 1 :class]) "text-green-400")))))
 
 (deftest test-stat-pill-warn-color
   (testing ":warn? true renders the value in yellow class"
     (let [row (stat-pill-first-row (ui/stat-pill "T" [{:label "L" :value 5 :warn? true}]))]
-      (is (= "text-yellow-400" (get-in row [3 1 :class]))))))
+      (is (str/includes? (get-in row [3 1 :class]) "text-yellow-400")))))
 
 (deftest test-stat-pill-warn-overrides-highlight
   (testing ":warn? takes priority over :highlight? when both are set"
     (let [row (stat-pill-first-row (ui/stat-pill "T" [{:label "L" :value 5 :warn? true :highlight? true}]))]
-      (is (= "text-yellow-400" (get-in row [3 1 :class]))))))
+      (is (str/includes? (get-in row [3 1 :class]) "text-yellow-400")))))
 
 (deftest test-stat-pill-display-override
   (testing ":display renders a custom string instead of format-number"

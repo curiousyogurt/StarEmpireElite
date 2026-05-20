@@ -100,25 +100,18 @@
           ;; and must be allowed to finish it regardless of cooldown state.
           mid-turn?   (> (:player/current-phase player) 1)
           cooldown-ms (when-not mid-turn? (utils/round-cooldown-ms player game))]
-      (ui/page
-       {}
-       [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
-        {:class "border-[1.5px] border-game-green-border rounded bg-game-bg text-green-400 font-mono"}
-        (ui/scanline-overlay)
-        (ui/phase-topbar player game "GAME OVERVIEW")
+      (ui/phase-shell player game "GAME OVERVIEW"
         [:div.flex.flex-col.gap-2
          {:class "py-2.5 px-3.5"}
          (ui/snapshot-section player)
          (players-table {:players players})]
-        ;; Play button or cooldown message depending on round availability
-        [:div.flex.gap-2
-         {:class "py-2 px-3.5 border-t border-game-border"}
-         (ui/action-bar-link "/app" "Back to Games")
-         (if cooldown-ms
-           [:div {:class "py-[5px] px-3.5 border border-yellow-700 text-yellow-400 rounded-sm text-sm font-mono tracking-wider"}
-            (if (utils/day-exhausted? player game)
-              (str "Rounds reset in " (utils/format-cooldown-duration cooldown-ms))
-              (str "Next round opens in " (utils/format-cooldown-duration cooldown-ms)))]
-           (ui/action-bar-primary-link
-             (get-phase-url (:xt/id player) (:player/current-phase player))
-             "Play"))]]))))
+        (ui/phase-action-bar
+          (ui/action-bar-link "/app" "Back to Games")
+          (if cooldown-ms
+            [:div {:class "py-[5px] px-3.5 border border-yellow-700 text-yellow-400 rounded-sm text-sm font-mono tracking-wider"}
+             (if (utils/day-exhausted? player game)
+               (str "Rounds reset in " (utils/format-cooldown-duration cooldown-ms))
+               (str "Next round opens in " (utils/format-cooldown-duration cooldown-ms)))]
+            (ui/action-bar-primary-link
+              (get-phase-url (:xt/id player) (:player/current-phase player))
+              "Play")))))))

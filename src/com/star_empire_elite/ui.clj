@@ -198,24 +198,6 @@
 ;;;; Phase Navigation
 ;;;;
 
-(defn phase-indicator
-  "Render the 6-phase turn progress indicator. Current phase is highlighted; others are plain circles.
-
-  [current-phase int] -> hiccup"
-  [current-phase]
-  [:div.flex.items-center.gap-2
-   (for [phase (range 1 7)]
-     [:div.flex.items-center.gap-1 {:key phase}
-      [:div.w-5.h-5.rounded-full.border.border-green-400.flex.items-center.justify-center
-       {:class (if (= phase current-phase)
-                 "bg-green-400 ring-2 ring-green-300"
-                 "bg-transparent")}
-       [:span.text-base
-        {:class (if (= phase current-phase) "text-black" "text-green-400")}
-        phase]]
-      (when (< phase 6)
-        [:span.text-green-400.text-xs.ml-1 "→"])])])
-
 (defn phase-stepper
   "Render the terminal-shell topbar phase stepper. Current phase is highlighted green with active
   border; completed phases show a checkmark; future phases are muted. Used across all game phases.
@@ -238,26 +220,6 @@
          (if done? "✓" label)]
         (when (< phase 6)
           [:span.text-xs.text-game-green-muted "›"])])]))
-
-(defn phase-header
-  "Render the full phase header: phase name on the left, progress indicator on the right.
-  Stacks vertically on mobile, horizontal on large screens. Optional info-str appears as
-  small muted text beside the phase name.
-
-  ([current-phase phase-name]) ([current-phase phase-name info-str]) -> hiccup"
-  ([current-phase phase-name] (phase-header current-phase phase-name nil))
-  ([current-phase phase-name info-str]
-   [:div.mb-6
-    [:div.flex.flex-col.gap-3.lg:hidden
-     [:div.flex.items-baseline.gap-3
-      [:h2.text-xl.font-bold (str phase-name " PHASE")]
-      (when info-str [:span.text-xs.text-green-400.text-opacity-75 info-str])]
-     (phase-indicator current-phase)]
-    [:div.hidden.lg:flex.lg:items-center.lg:justify-between.lg:gap-8
-     [:div.flex.items-baseline.gap-3
-      [:h2.text-xl.font-bold (str phase-name " PHASE")]
-      (when info-str [:span.text-xs.text-green-400.text-opacity-75 info-str])]
-     (phase-indicator current-phase)]]))
 
 ;;;;
 ;;;; Terminal Shell Components
@@ -383,7 +345,7 @@
 
   [text str] -> hiccup"
   [text]
-  [:div.text-xs.uppercase.mb-1
+  [:div.text-xs.uppercase.my-1
    {:class "tracking-[0.12em] text-game-green-muted"}
    text])
 
@@ -439,13 +401,14 @@
 
   [label str, extra-attrs map] -> hiccup"
   [label extra-attrs]
-  [:button
-   (merge {:type  "button"
-           :class "inline-block text-game-green-soft font-mono text-sm rounded-sm tracking-wider border border-game-green-border bg-transparent cursor-pointer py-[5px] px-3.5"}
-          extra-attrs)
-   label])
+  (let [base  "inline-block text-game-green-soft font-mono text-sm rounded-sm tracking-wider border border-game-green-border bg-transparent cursor-pointer py-[5px] px-3.5"
+        extra (dissoc extra-attrs :class)]
+    [:button
+     (merge {:type "button" :class (str base (when-let [c (:class extra-attrs)] (str " " c)))}
+            extra)
+     label]))
 
-(defn- proj-pill-hiccup
+(defn- proj-pill-row
   "Render one projection pill span with positive / negative / zero variants.
   Adds :id and :hx-swap-oob to the root attrs when present in the opts map.
 
@@ -454,23 +417,17 @@
   (let [neg?  (neg? value)
         zero? (zero? value)]
     [:span.flex.justify-between.items-baseline.rounded-sm
-     (cond-> {:class (str "px-[6px] py-[2px] "
-                          (cond neg?  "bg-[#3a2218]"
-                                zero? "bg-[#1a201c]"
-                                :else "bg-game-green-deep"))}
+     (cond-> {:class (str "px-[6px] py-px "
+                          (if zero? "bg-[#1a201c]" "bg-game-green-deep"))}
        id          (assoc :id id)
        hx-swap-oob (assoc :hx-swap-oob hx-swap-oob))
      [:span
       {:class (str "text-[9px] tracking-[0.04em] "
-                   (cond neg?  "text-[#a78060]"
-                         zero? "text-game-green-dim"
-                         :else "text-game-green-muted"))}
+                   (if zero? "text-game-green-dim" "text-game-green-muted"))}
       label]
      [:span.font-bold
       {:class (str "text-[10px] "
-                   (cond neg?  "text-red-400"
-                         zero? "text-game-green-dim font-normal"
-                         :else "text-green-400"))}
+                   (if zero? "text-game-green-dim font-normal" "text-green-400"))}
       (cond
         neg?  (list "\u2212" (format-number (Math/abs (long value))))
         zero? "+0"
@@ -482,122 +439,139 @@
 
   [id str, label str, value number] -> hiccup"
   [id label value]
-  (proj-pill-hiccup {:label label :value value :id id :hx-swap-oob "true"}))
+  (proj-pill-row {:label label :value value :id id :hx-swap-oob "true"}))
+
+(defn- snapshot-hero
+  "Render the 4-cell hero strip: Credits, Ore/Erg/Mil Planets in oversized stat cells.
+
+  [player player-map] -> hiccup"
+  [player]
+  [:div.grid.grid-cols-4
+   {:class "border-b border-game-border"
+    :style {:background "linear-gradient(180deg, rgba(20,42,28,0.5), rgba(20,42,28,0.15))"}}
+   (for [[label value] [["CREDITS"     (format-number (:player/credits     player))]
+                        ["ORE PLANETS" (str (:player/ore-planets player))]
+                        ["ERG PLANETS" (str (:player/erg-planets player))]
+                        ["MIL PLANETS" (str (:player/mil-planets player))]]]
+     [:div.flex.flex-col.border-r.border-game-divider.last:border-r-0.min-w-0
+      {:class "px-[18px] pt-[14px] pb-[16px] gap-[5px]"}
+      [:div.uppercase {:class "text-game-green-dim text-[9px] tracking-[0.18em]"} label]
+      [:div.font-bold.leading-none.text-green-400
+       {:class "text-[28px]" :style {:text-shadow "0 0 14px rgba(61,220,132,0.25)"}}
+       value]])])
+
+(defn- snapshot-manifest-item
+  "Render a single label/value pair inside a manifest row.
+  Zero values render dim and non-bold.
+
+  [label str, display str|hiccup, zero? bool] -> hiccup"
+  [label display zero?]
+  [:span.inline-flex.items-baseline
+   {:class "gap-[7px]"}
+   [:span {:class "text-game-green-dim text-[10px] tracking-[0.04em]"} label]
+   [:span.font-bold
+    {:class (str "text-[13px] " (if zero? "text-game-green-dim font-normal" "text-green-400"))}
+    display]])
+
+(defn- snapshot-manifest-row
+  "Render one manifest row: a role tag on the left and a wrapped item list on the right.
+  last? suppresses the bottom dashed divider.
+
+  [tag str, items seq, last? bool] -> hiccup"
+  [tag items last?]
+  [:div.flex.items-baseline
+   {:class (str "gap-4 py-[5px]" (when-not last? " border-b border-dashed border-game-divider"))}
+   [:div.shrink-0.uppercase
+    {:class "text-[9px] tracking-[0.18em] text-game-green-mid w-[92px]"}
+    (str "› " tag)]
+   (into [:div.flex.flex-wrap {:class "gap-x-7 gap-y-1"}] items)])
+
+(defn- snapshot-manifest
+  "Render the manifest section: EMPIRE, GROUND, FLEET, and OPERATIONS rows.
+
+  [player player-map] -> hiccup"
+  [player]
+  (let [z? (fn [k] (zero? (or (k player) 0)))]
+    [:div {:class "px-4 pt-[10px] pb-3"}
+     (snapshot-manifest-row "EMPIRE"
+       [(snapshot-manifest-item "population" (format-population (:player/population player)) false)
+        (snapshot-manifest-item "stability"  (str (:player/stability player) "%")            false)
+        (snapshot-manifest-item "food"       (format-number (:player/food player))            (z? :player/food))
+        (snapshot-manifest-item "fuel"       (format-number (:player/fuel player))            (z? :player/fuel))]
+       false)
+     (snapshot-manifest-row "GROUND"
+       [(snapshot-manifest-item "soldiers"   (format-number (:player/soldiers   player)) (z? :player/soldiers))
+        (snapshot-manifest-item "generals"   (format-number (:player/generals   player)) (z? :player/generals))
+        (snapshot-manifest-item "transports" (format-number (:player/transports player)) (z? :player/transports))]
+       false)
+     (snapshot-manifest-row "FLEET"
+       [(snapshot-manifest-item "fighters" (format-number (:player/fighters player)) (z? :player/fighters))
+        (snapshot-manifest-item "carriers" (format-number (:player/carriers player)) (z? :player/carriers))
+        (snapshot-manifest-item "admirals" (format-number (:player/admirals player)) (z? :player/admirals))
+        (snapshot-manifest-item "stations" (format-number (:player/stations player)) (z? :player/stations))]
+       false)
+     (snapshot-manifest-row "OPERATIONS"
+       [(snapshot-manifest-item "cmd ships" (format-number (:player/cmd-ships player)) (z? :player/cmd-ships))
+        (snapshot-manifest-item "agents"    (format-number (:player/agents    player)) (z? :player/agents))]
+       true)]))
+
+(defn- snapshot-projections
+  "Render the projections subsection with a pill card for each resource.
+
+  [projections seq, projection-turn str] -> hiccup"
+  [projections projection-turn]
+  [:div {:class "px-4 pt-[10px] pb-[14px] border-t border-game-border"
+         :style {:background "rgba(20,42,28,0.10)"}}
+   [:div.flex.items-baseline.uppercase
+    {:class "text-[9px] tracking-[0.18em] text-game-green-dim mb-2"}
+    (str "› RESOURCE PROJECTIONS · " projection-turn)
+    [:span.normal-case.opacity-70
+     {:class "ml-[10px] text-[9px] tracking-[0.04em]"}
+     "calculated values, current rates"]]
+   [:div.grid.grid-cols-3
+    {:class "gap-2"}
+    (for [{:keys [name total total-id rows]} projections]
+      [:div.flex.flex-col.rounded-game.bg-game-card
+       {:class "border border-game-border px-[10px] pt-2 pb-[9px] gap-[7px]"}
+       [:div.flex.justify-between.items-baseline.border-b.border-dashed.border-game-divider
+        {:class "pb-[6px]"}
+        [:span.font-bold {:class "text-[11px] tracking-[0.02em] text-game-green-mid"} name]
+        [:span.font-bold
+         (cond-> {:class (str "text-[14px] "
+                              (if (neg? total) "text-amber-400" "text-green-400"))
+                  :style {:text-shadow "0 0 10px rgba(61,220,132,0.25)"}}
+           total-id (assoc :id total-id))
+         (format-number total)]]
+       [:div.flex.flex-col
+        {:class "gap-[2px]"}
+        (map proj-pill-row rows)]])]])
 
 (defn snapshot-section
-  "Render the empire status card: 4-cell hero, grouped manifest rows,
-  and an optional projections subsection.
+  "Render the empire status card: 4-cell hero, full manifest, and optional sections.
 
   opts map keys (all optional):
-    :show-ground? — show the GROUND manifest row (default true)
-    :show-fleet?  — show the FLEET manifest row (default true)
-    :show-ops?    — show the OPERATIONS manifest row (default true)
-    :projections  — vector of projection cards to show below the manifest.
-                    Each card is {:name str, :total number, :total-id str (optional),
-                    :rows [{:label str, :value number, :id str (optional)}]}.
-                    When absent, the projections section is omitted.
-    :extra        — pre-rendered hiccup appended inside the card after the manifest/projections,
-                    wrapped in the same border-top separator style. Use for page-specific content
-                    that should live inside the tile (e.g. deployable forces on the action page).
+    :projections     — vector of projection cards to show below the manifest.
+                       Each card is {:name str, :total number, :total-id str (optional),
+                       :rows [{:label str, :value number, :id str (optional)}]}.
+                       When absent the projections section is omitted.
+    :extra           — pre-rendered hiccup appended inside the card after the manifest/projections,
+                       wrapped in the same border-top separator style.
+    :projection-turn — turn label in the projections header, default \"NEXT TURN\". Pass \"THIS TURN\"
+                       for phases where projections reflect the current turn (expenses, exchange).
 
   [player player-map, opts? map] -> hiccup"
-  [player & [{:keys [show-ground? show-fleet? show-ops? projections extra]
-              :or   {show-ground? true show-fleet? true show-ops? true}}]]
-  (let [;; Manifest item: label + value; zero values render dim and non-bold
-        item  (fn [label display zero?]
-                [:span.inline-flex.items-baseline
-                 {:class "gap-[7px]"}
-                 [:span {:class "text-game-green-dim text-[10px] tracking-[0.04em]"} label]
-                 [:span.font-bold
-                  {:class (str "text-[13px] " (if zero? "text-game-green-dim font-normal" "text-green-400"))}
-                  display]])
-
-        ;; Manifest row: tag + wrapped item list; no bottom divider on last row
-        mrow  (fn [tag items last?]
-                [:div.flex.items-baseline
-                 {:class (str "gap-4 py-[5px]" (when-not last? " border-b border-dashed border-game-divider"))}
-                 [:div.shrink-0.uppercase
-                  {:class "text-[9px] tracking-[0.18em] text-game-green-mid w-[92px]"}
-                  (str "› " tag)]
-                 (into [:div.flex.flex-wrap {:class "gap-x-7 gap-y-1"}] items)])
-
-        show-last? (not (or show-ground? show-fleet? show-ops?))]
-
-    [:div.relative.overflow-hidden.rounded.bg-game-bg.w-full.font-mono
-     {:class "border-[1.5px] border-game-green-border"}
-
-     ;; Hero strip — 4 oversized stat cells
-     [:div.grid.grid-cols-4
-      {:class "border-b border-game-border"
-       :style {:background "linear-gradient(180deg, rgba(20,42,28,0.5), rgba(20,42,28,0.15))"}}
-      (for [[label value] [["CREDITS"     (format-number (:player/credits     player))]
-                           ["ORE PLANETS" (str (:player/ore-planets player))]
-                           ["ERG PLANETS" (str (:player/erg-planets player))]
-                           ["MIL PLANETS" (str (:player/mil-planets player))]]]
-        [:div.flex.flex-col.border-r.border-game-divider.last:border-r-0.min-w-0
-         {:class "px-[18px] pt-[14px] pb-[16px] gap-[5px]"}
-         [:div.uppercase {:class "text-game-green-dim text-[9px] tracking-[0.18em]"} label]
-         [:div.font-bold.leading-none.text-green-400
-          {:class "text-[28px]" :style {:text-shadow "0 0 14px rgba(61,220,132,0.25)"}}
-          value]])]
-
-     ;; Manifest — secondary stats grouped by role
-     [:div {:class "px-4 pt-[10px] pb-3"}
-      (mrow "EMPIRE"
-            [(item "population" (format-population (:player/population player)) false)
-             (item "stability"  (str (:player/stability player) "%")           false)
-             (item "food"       (format-number (:player/food player))           (zero? (or (:player/food player) 0)))
-             (item "fuel"       (format-number (:player/fuel player))           (zero? (or (:player/fuel player) 0)))]
-            show-last?)
-      (when show-ground?
-        (mrow "GROUND"
-              [(item "soldiers"   (format-number (:player/soldiers   player)) (zero? (or (:player/soldiers   player) 0)))
-               (item "generals"   (format-number (:player/generals   player)) (zero? (or (:player/generals   player) 0)))
-               (item "transports" (format-number (:player/transports player)) (zero? (or (:player/transports player) 0)))]
-              (not (or show-fleet? show-ops?))))
-      (when show-fleet?
-        (mrow "FLEET"
-              [(item "fighters" (format-number (:player/fighters player)) (zero? (or (:player/fighters player) 0)))
-               (item "carriers" (format-number (:player/carriers player)) (zero? (or (:player/carriers player) 0)))
-               (item "admirals" (format-number (:player/admirals player)) (zero? (or (:player/admirals player) 0)))
-               (item "stations" (format-number (:player/stations player)) (zero? (or (:player/stations player) 0)))]
-              (not show-ops?)))
-      (when show-ops?
-        (mrow "OPERATIONS"
-              [(item "cmd ships" (format-number (:player/cmd-ships player)) (zero? (or (:player/cmd-ships player) 0)))
-               (item "agents"    (format-number (:player/agents    player)) (zero? (or (:player/agents    player) 0)))]
-              true))]
-
-     ;; Projections — optional, shown when caller passes :projections data
-     (when projections
-       [:div {:class "px-4 pt-[10px] pb-[14px] border-t border-game-border"
-              :style {:background "rgba(20,42,28,0.10)"}}
-        [:div.flex.items-baseline.uppercase
-         {:class "text-[9px] tracking-[0.18em] text-game-green-dim mb-2"}
-         "› PROJECTIONS · NEXT TURN"
-         [:span.normal-case.opacity-70
-          {:class "ml-[10px] text-[9px] tracking-[0.04em]"}
-          "estimated change, current rates"]]
-        [:div.grid.grid-cols-3
-         {:class "gap-2"}
-         (for [{:keys [name total total-id rows]} projections]
-           [:div.flex.flex-col.rounded-game.bg-game-card
-            {:class "border border-game-border px-[10px] pt-2 pb-[9px] gap-[7px]"}
-            [:div.flex.justify-between.items-baseline.border-b.border-dashed.border-game-divider
-             {:class "pb-[6px]"}
-             [:span.font-bold {:class "text-[11px] tracking-[0.02em] text-game-green-mid"} name]
-             [:span.font-bold
-              (cond-> {:class (str "text-[14px] " (if (neg? total) "text-red-400" "text-green-400"))
-                       :style {:text-shadow "0 0 10px rgba(61,220,132,0.25)"}}
-                total-id (assoc :id total-id))
-              (format-number total)]]
-            [:div.flex.flex-col
-             {:class "gap-[2px]"}
-             (map proj-pill-hiccup rows)]])]])
-     (when extra
-       [:div {:class "px-4 pt-[10px] pb-[14px] border-t border-game-border"
-              :style {:background "rgba(20,42,28,0.10)"}}
-        extra])]))
+  [player & [{:keys [projections extra projection-turn]
+              :or   {projection-turn "NEXT TURN"}}]]
+  [:div.relative.overflow-hidden.rounded.bg-game-bg.w-full.font-mono
+   {:class "border-[1.5px] border-game-green-border"}
+   (snapshot-hero player)
+   (snapshot-manifest player)
+   (when projections
+     (snapshot-projections projections projection-turn))
+   (when extra
+     [:div {:class "px-4 pt-[10px] pb-[14px] border-t border-game-border"
+            :style {:background "rgba(20,42,28,0.10)"}}
+      extra])])
 
 (defn projection-pill
   "Render one projection pill card with a title, right-aligned total, and breakdown rows.
@@ -641,11 +615,22 @@
    [:div {:class "flex flex-col gap-0.5"}
     (for [{:keys [label value display highlight? warn?]} rows]
       [:div.flex.justify-between.items-baseline.rounded-sm.bg-game-green-deep.py-px
-       {:class "px-[5px]"}
-       [:span.text-xs.text-game-green-muted label]
-       [:span.text-xs.font-bold
-        {:class (cond warn? "text-yellow-400" highlight? "text-green-400" :else "text-game-green-soft")}
+       {:class "px-[6px]"}
+       [:span {:class "text-[9px] tracking-[0.04em] text-game-green-muted"} label]
+       [:span.font-bold
+        {:class (str "text-[10px] " (cond warn? "text-yellow-400" highlight? "text-green-400" :else "text-game-green-soft"))}
         (or display (format-number value))]])]])
+
+(def ^:private th-col-cls  "tracking-[0.08em] text-green-400")
+(def ^:private th-item-cls "tracking-widest text-green-400")
+
+(defn- th-span
+  "Render an uppercase text-xs table header span. align is an optional extra CSS class."
+  [text cls align]
+  [:span.text-xs.uppercase {:class (str cls (when align (str " " align)))} text])
+
+(defn- th-r [text] (th-span text th-col-cls "text-right justify-self-end"))
+(defn- th-c [text] (th-span text th-col-cls "text-center justify-self-center"))
 
 (defn deduction-table-header
   "Render the Item/Before/Change/After column-label row for expense and building deduction tables.
@@ -653,18 +638,12 @@
 
   [] -> hiccup"
   []
-  (let [header-class "gap-4 py-1 px-2 items-center bg-game-header border-b border-game-border"
-        col-cls      "tracking-[0.08em] text-green-400"
-        item-cls     "tracking-widest text-green-400"
-        label        (fn [text cls extra-class]
-                       [:span.text-xs.uppercase {:class (str cls (when extra-class (str " " extra-class)))} text])
-        r            (fn [text] (label text col-cls "text-right justify-self-end"))
-        c            (fn [text] (label text col-cls "text-center justify-self-center"))]
+  (let [header-class "gap-4 py-1 px-2 items-center bg-game-header border-b border-game-border"]
     [:<>
      [:div.expense-row-mobile {:class (str "md:hidden " header-class)}
-      (label "Item" item-cls nil) (r "Before") (c "Change") (r "After")]
+      (th-span "Item" th-item-cls nil) (th-r "Before") (th-c "Change") (th-r "After")]
      [:div.expense-row-desktop {:class (str "hidden md:grid " header-class)}
-      (label "Item" item-cls nil) [:span] (r "Before") (c "Change") (r "After")]]))
+      (th-span "Item" th-item-cls nil) [:span] (th-r "Before") (th-c "Change") (th-r "After")]]))
 
 (defn purchase-table-header
   "Render the column-label row for exchange and building purchase/sell tables.
@@ -672,20 +651,13 @@
 
   [price-label str, action-label str, total-label str] -> hiccup"
   [price-label action-label total-label]
-  (let [header-cls "bg-game-header border-b border-game-border"
-        col-cls    "tracking-[0.08em] text-green-400"
-        item-cls   "tracking-widest text-green-400"
-        label      (fn [text cls extra-class]
-                     [:span.text-xs.uppercase {:class (str cls (when extra-class (str " " extra-class)))} text])
-        r          (fn [text] (label text col-cls "text-right justify-self-end"))
-        c          (fn [text] (label text col-cls "text-center justify-self-center"))]
-    [:div.building-purchase-grid
-     {:class (str "gap-2 py-1 px-3 items-center " header-cls)}
-     (label "Item" item-cls nil)
-     (r price-label)
-     (r "Max")
-     (c action-label)
-     (r total-label)]))
+  [:div.building-purchase-grid
+   {:class "gap-2 py-1 px-3 items-center bg-game-header border-b border-game-border"}
+   (th-span "Item" th-item-cls nil)
+   (th-r price-label)
+   (th-r "Max")
+   (th-c action-label)
+   (th-r total-label)])
 
 (defn oob-pill
   "Render a signed OOB pill span for HTMX out-of-band updates.
@@ -699,49 +671,6 @@
    (if (neg? value) "-" "+")
    (format-number (Math/abs (long value)))
    (when suffix (list " " suffix))])
-
-;;;;
-;;;; Resource Display
-;;;;
-
-;; Spec drives both the field list and labels — add an entry here to show it everywhere.
-(def ^:private resource-specs
-  [{:label "Credits"    :key :credits    :player-key :player/credits}
-   {:label "Food"       :key :food       :player-key :player/food}
-   {:label "Fuel"       :key :fuel       :player-key :player/fuel}
-   {:label "Galaxars"   :key :galaxars   :player-key :player/galaxars}
-   {:label "Population" :key :population :player-key :player/population :display-fn format-population}
-   {:label "Stability"  :key :stability  :player-key :player/stability  :display-fn #(str % "%")}
-   {:label "Ore Plts"   :key :ore-planets :player-key :player/ore-planets}
-   {:label "Erg Plts"   :key :erg-planets :player-key :player/erg-planets}
-   {:label "Mil Plts"   :key :mil-planets :player-key :player/mil-planets}
-   {:label "Soldiers"   :key :soldiers   :player-key :player/soldiers}
-   {:label "Transports" :key :transports :player-key :player/transports}
-   {:label "Generals"   :key :generals   :player-key :player/generals}
-   {:label "Fighters"   :key :fighters   :player-key :player/fighters}
-   {:label "Carriers"   :key :carriers   :player-key :player/carriers}
-   {:label "Admirals"   :key :admirals   :player-key :player/admirals}
-   {:label "Stations"   :key :stations   :player-key :player/stations}
-   {:label "Cmd Ships"  :key :cmd-ships  :player-key :player/cmd-ships}
-   {:label "Agents"     :key :agents     :player-key :player/agents}])
-
-(defn resource-display-grid
-  "Display all player resources, units, and planets in a responsive grid.
-  Accepts either a player entity (uses :player/credits etc.) or a plain resource map (:credits etc.).
-  When highlight-negative? is true, values below zero are rendered in red.
-
-  ([resources title]) ([resources title highlight-negative?]) -> hiccup"
-  ([resources title] (resource-display-grid resources title false))
-  ([resources title highlight-negative?]
-   [:div.border.border-green-400.p-4.mb-4.bg-green-100.bg-opacity-5
-    [:h3.font-bold.mb-4 title]
-    [:div.grid.grid-cols-3.md:grid-cols-6.lg:grid-cols-9.gap-2
-     (for [{:keys [label key player-key display-fn]} resource-specs
-           :let [v (or (get resources key) (get resources player-key) 0)]]
-       [:div {:key label}
-        [:p.text-xs label]
-        [:p.font-mono {:class (when (and highlight-negative? (< v 0)) "text-red-400")}
-         (if display-fn (display-fn v) (format-number v))]])]]))
 
 ;;;;
 ;;;; Incoming Alerts
@@ -780,6 +709,65 @@
      (incoming-alert-content player)]))
 
 ;;;;
+;;;; Phase Page Layout Helpers
+;;;;
+
+(defn phase-shell
+  "Render the standard phase page: outer page wrapper + terminal card div + scanline overlay +
+  phase topbar. All children are rendered inside the terminal card.
+
+  [player player-map, game game-map, phase-name str & children hiccup] -> hiccup"
+  [player game phase-name & children]
+  (page
+    {}
+    (into [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.rounded.text-green-400.font-mono
+           {:class "border-[1.5px] border-game-green-border"}
+           (scanline-overlay)
+           (phase-topbar player game phase-name)]
+          children)))
+
+(defn phase-body
+  "Render the padded body area for a phase page.
+  (incoming-alert player) is always appended as the last child.
+
+  [player player-map & children hiccup] -> hiccup"
+  [player & children]
+  (into [:div.flex.flex-col.gap-2
+         {:class "py-2.5 px-3.5"}]
+        (concat children [(incoming-alert player)])))
+
+(defn phase-warning
+  "Render a fixed-height empty placeholder between phase-body and phase-action-bar.
+  Use phase-warning-div in the HTMX handler to fill it.
+
+  [id str] -> hiccup"
+  [id]
+  [:div {:id id :class "flex items-center px-6 pt-2 h-5 mb-3"}])
+
+(defn phase-warning-div
+  "Render a phase-warning div for HTMX handler responses.
+  Pass nil message to render an empty placeholder (clears any existing message).
+  opts:
+    :color — text color class, default 'text-red-400'
+    :oob?  — true to add hx-swap-oob='true' (for piggybacking on a larger response)
+
+  [id str, message str|nil, opts? map] -> hiccup"
+  [id message & [{:keys [color oob?]}]]
+  (let [color (or color "text-red-400")]
+    (cond-> [:div {:id id :class "flex items-center px-6 pt-2 h-5 mb-3"}]
+      oob?    (assoc-in [1 :hx-swap-oob] "true")
+      message (conj [:p.text-sm {:class (str color " tracking-[0.03em]")} message]))))
+
+(defn phase-action-bar
+  "Render the bottom action bar for a phase page.
+
+  [& children hiccup] -> hiccup"
+  [& children]
+  (into [:div.flex.gap-2
+         {:class "py-2 px-3.5 border-t border-game-border"}]
+        children))
+
+;;;;
 ;;;; Phase Table Components
 ;;;;
 
@@ -797,7 +785,9 @@
       :display-only? — strip name and HTMX wiring (for read-only mirrors)
       :mirror-of     — field name to sync value into on input; also enables HTMX without a name attr
       :input-class   — extra CSS classes for the <input>
+      :input-style   — inline style map applied to the <input>
       :sync-key      — JS key for syncing value across views
+      :prefix        — text displayed as an overlaid prefix inside the input (e.g. \"x\")
 
   [name value player-id hx-post-path hx-include & [opts]] -> hiccup"
   [name value player-id hx-post-path hx-include & [{:keys [display-only? mirror-of input-class input-style sync-key prefix]}]]

@@ -48,8 +48,8 @@
 
 (def exchange-hx-include
   (str/join ","
-    (for [spec (concat sell-row-specs buy-row-specs)]
-      (str "[name='" (:field spec) "']"))))
+            (for [spec (concat sell-row-specs buy-row-specs)]
+              (str "[name='" (:field spec) "']"))))
 
 (def ^:private resource-rate-keys
   "Rate keys for food and fuel that are handled separately from unit/planet credit sales."
@@ -94,9 +94,9 @@
                                               :when (not (resource-rate-keys (:rate-key spec)))]
                                           (* (get quantities (:qty-key spec)) (get rates (:rate-key spec)))))
         credits-from-resources (- (+ (* (:food-sold quantities)   (:food-sell rates))
-                                      (* (:fuel-sold quantities)   (:fuel-sell rates)))
-                                   (+ (* (:food-bought quantities) (:food-buy rates))
-                                      (* (:fuel-bought quantities) (:fuel-buy rates))))]
+                                     (* (:fuel-sold quantities)   (:fuel-sell rates)))
+                                  (+ (* (:food-bought quantities) (:food-buy rates))
+                                     (* (:fuel-bought quantities) (:fuel-buy rates))))]
     {:credits-from-sales     credits-from-sales
      :credits-from-resources credits-from-resources
      :total-credits          (+ credits-from-sales credits-from-resources)}))
@@ -214,12 +214,10 @@
         change-cell (fn [id]
                       [:div.text-base.justify-self-center.whitespace-nowrap
                        {:class (str "tracking-[0.03em] "
-                                    (cond (zero? delta) "text-game-green-muted"
-                                          (pos? delta)  "text-green-400"
-                                          :else         "text-red-400"))}
+                                    (if (zero? delta) "text-game-green-muted" "text-green-400"))}
                        [:span {:id id}
                         (if (zero? delta)
-                          "-"
+                          "0"
                           [:<> (if (pos? delta) "+" "−")
                            (ui/format-number (Math/abs (long delta)))])]])
         after-cell  (fn [id]
@@ -289,10 +287,10 @@
   [item-name str, item-name-mobile str, field-key str, price-per-unit int,
    current-quantity int, max-quantity int, player-id uuid, hx-include str,
    opts (optional map):
-     :ex-value   — when provided, adds an 'Ex' button that fills the input with this amount
-     :ex-tooltip — tooltip text for the 'Ex' button
-     :sf-value   — when provided, adds an 'Sf' button that fills the input with this amount
-     :sf-tooltip — tooltip text for the 'Sf' button] -> hiccup"
+   :ex-value   — when provided, adds an 'Ex' button that fills the input with this amount
+   :ex-tooltip — tooltip text for the 'Ex' button
+   :sf-value   — when provided, adds an 'Sf' button that fills the input with this amount
+   :sf-tooltip — tooltip text for the 'Sf' button] -> hiccup"
   [item-name item-name-mobile field-key price-per-unit current-quantity max-quantity player-id hx-include
    & [{:keys [ex-value ex-tooltip sf-value sf-tooltip]}]]
   (let [credit-value (* price-per-unit current-quantity)
@@ -302,14 +300,14 @@
         fill-onclick (fn [v]
                        (str "var i=document.querySelector('[name=\"" field-key "\"]');"
                             "if(i){i.value='" (long v) "';"
-                            "i.dispatchEvent(new Event('input',{bubbles:true}));}"))
+                                   "i.dispatchEvent(new Event('input',{bubbles:true}));}"))
         btn-cls      "absolute top-1/2 -translate-y-1/2 border border-game-green-border bg-game-green-done text-game-green-muted font-mono text-[11px] py-px px-1 rounded-sm cursor-pointer whitespace-nowrap"
         input-node   (ui/numeric-input field-key current-quantity player-id "/calculate-exchange" hx-include
-                                        {:input-class "text-xs lg:text-sm text-right min-w-0"
-                                         :input-style {:color "#7ab88a"
-                                                       :border-color "#2d6644"
-                                                       :padding-top "1px"
-                                                       :padding-bottom "1px"}})]
+                                       {:input-class "text-xs lg:text-sm text-right min-w-0"
+                                        :input-style {:color "#7ab88a"
+                                                      :border-color "#2d6644"
+                                                      :padding-top "1px"
+                                                      :padding-bottom "1px"}})]
     [:div.building-purchase-grid
      {:class "items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"}
 
@@ -416,7 +414,7 @@
           resources-after    (calculate-resources-after-exchange player quantities credit-changes)
           can-execute?       (valid-exchange? resources-after)
           max-buy-quantities (calculate-max-buy-quantities player
-                               (assoc quantities :food-bought 0 :fuel-bought 0) rates)
+                                                           (assoc quantities :food-bought 0 :fuel-bought 0) rates)
           ;; Pill exchange values
           required           (expenses/calculate-required-expenses player game)
           req-totals         (expenses/calculate-required-expense-totals required)
@@ -462,17 +460,17 @@
          ;; OOB: projection card totals
          [:span.font-bold
           {:id "projection-credits-total" :hx-swap-oob "true"
-           :class (str "text-[14px] " (if (neg? cr-total) "text-red-400" "text-green-400"))
+           :class (str "text-[14px] " (if (neg? cr-total) "text-amber-400" "text-green-400"))
            :style {:text-shadow "0 0 10px rgba(61,220,132,0.25)"}}
           (ui/format-number cr-total)]
          [:span.font-bold
           {:id "projection-food-total" :hx-swap-oob "true"
-           :class (str "text-[14px] " (if (neg? food-total) "text-red-400" "text-green-400"))
+           :class (str "text-[14px] " (if (neg? food-total) "text-amber-400" "text-green-400"))
            :style {:text-shadow "0 0 10px rgba(61,220,132,0.25)"}}
           (ui/format-number food-total)]
          [:span.font-bold
           {:id "projection-fuel-total" :hx-swap-oob "true"
-           :class (str "text-[14px] " (if (neg? fuel-total) "text-red-400" "text-green-400"))
+           :class (str "text-[14px] " (if (neg? fuel-total) "text-amber-400" "text-green-400"))
            :style {:text-shadow "0 0 10px rgba(61,220,132,0.25)"}}
           (ui/format-number fuel-total)]
 
@@ -496,11 +494,9 @@
                oob-change  (fn [id delta]
                              [:span {:id id :hx-swap-oob "true"
                                      :class (str "tracking-[0.03em] "
-                                                  (cond (zero? delta) "text-game-green-muted"
-                                                        (pos? delta)  "text-green-400"
-                                                        :else         "text-red-400"))}
+                                                 (if (zero? delta) "text-game-green-muted" "text-green-400"))}
                               (if (zero? delta)
-                                "-"
+                                "0"
                                 [:<> (if (pos? delta) "+" "−")
                                  (ui/format-number (Math/abs (long delta)))])])]
            (list
@@ -521,22 +517,18 @@
              (oob-after  "after-exchange-fuel-d"     fuel-after)))
 
          ;; OOB: warning message
-         [:div#exchange-warning.flex.items-center
-          {:hx-swap-oob "true"}
-          (when (not can-execute?)
-            (let [invalid (identify-invalid-exchanges resources-after quantities)
-                  selling? (some true? (vals (dissoc invalid :invalid-food-purchase? :invalid-fuel-purchase?)))
-                  buying?  (or (:invalid-food-purchase? invalid) (:invalid-fuel-purchase? invalid))]
-              (cond
-                (and selling? buying?)
-                [:p.text-yellow-400.text-sm {:class "tracking-[0.03em]"}
-                 "⚠ Cannot sell more than you have or buy more than you can afford."]
-                selling?
-                [:p.text-yellow-400.text-sm {:class "tracking-[0.03em]"}
-                 "⚠ Cannot sell more than you have."]
-                buying?
-                [:p.text-yellow-400.text-sm {:class "tracking-[0.03em]"}
-                 "⚠ Cannot buy more than you can afford."])))]
+         (ui/phase-warning-div "exchange-warning"
+                               (when (not can-execute?)
+                                 (let [sell-overrun? (some #(neg? (get resources-after %))
+                                                           [:soldiers :transports :generals :carriers :fighters
+                                                            :admirals :stations :cmd-ships :agents
+                                                            :mil-planets :erg-planets :ore-planets :food :fuel])
+                                       buy-overrun?  (neg? (:credits resources-after))]
+                                   (cond
+                                     (and sell-overrun? buy-overrun?) "⚠ Cannot sell more than you have or buy more than you can afford."
+                                     sell-overrun?                    "⚠ Cannot sell more than you have."
+                                     buy-overrun?                     "⚠ Cannot buy more than you can afford.")))
+                               {:oob? true})
 
          ;; OOB: submit button
          (ui/submit-button can-execute? "Make Exchange" {:hx-swap-oob "true"})]))))
@@ -558,85 +550,52 @@
         required           (expenses/calculate-required-expenses player game)
         req-totals         (expenses/calculate-required-expense-totals required)
         projections-data   (build-exchange-projections-data player req-totals)]
-    (ui/page
-      {}
-      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.rounded.text-green-400.font-mono
-       {:class "border-[1.5px] border-game-green-border"}
-
-       ;; Scanline overlay
-       (ui/scanline-overlay)
-
-       ;; Topbar
-       (ui/phase-topbar player game "EXCHANGE")
-
-       ;; Form wraps body + action bar
-       (biff/form
-         {:action (str "/app/game/" player-id "/apply-exchange") :method "post"
-          :class  "m-0"}
-
-         ;; Body
-         [:div.flex.flex-col.gap-2
-          {:class "py-2.5 px-3.5"}
-
-          ;; 1. Snapshot with expense coverage projections folded in
-          (ui/snapshot-section player {:projections projections-data})
-
-          ;; 2. Sell Assets table
-          [:div
-           (ui/section-label "Sell Assets")
-           [:div.overflow-hidden.rounded-game.bg-game-surface
-            {:class "border border-game-border"}
-            (ui/purchase-table-header "Rate" "Sell" "Credits")
-            (for [spec sell-asset-row-specs]
-              (exchange-row (:label spec) (:abbrev spec) (:field spec)
-                            (get rates (:rate-key spec)) 0
-                            (get player (:player-key spec)) player-id exchange-hx-include))]]
-
-          ;; 3. Sell Resources table
-          [:div
-           (ui/section-label "Sell Resources")
-           [:div.overflow-hidden.rounded-game.bg-game-surface
-            {:class "border border-game-border"}
-            (ui/purchase-table-header "Rate" "Sell" "Credits")
-            (for [spec sell-resource-row-specs
-                  :let [ex-val (max 0 (- (get player (:player-key spec))
-                                         (get req-totals (:resource-key spec) 0)))]]
-              (exchange-row (:label spec) (:abbrev spec) (:field spec)
-                            (get rates (:rate-key spec)) 0
-                            (get player (:player-key spec)) player-id exchange-hx-include
-                            {:ex-value ex-val :ex-tooltip (:ex-tooltip spec)}))]]
-
-          ;; 4. Buy table
-          [:div
-           (ui/section-label "Buy Resources")
-           [:div.overflow-hidden.rounded-game.bg-game-surface
-            {:class "border border-game-border"}
-            (ui/purchase-table-header "Rate" "Buy" "Credits")
-            (for [spec buy-row-specs
-                  :let [sf-val (max 0 (- (get req-totals (:resource-key spec) 0)
-                                         (get player (:player-key spec))))]]
-              (exchange-row (:label spec) (:abbrev spec) (:field spec)
-                            (get rates (:rate-key spec)) 0
-                            (get max-buy-quantities (:max-key spec)) player-id exchange-hx-include
-                            {:sf-value sf-val :sf-tooltip (:sf-tooltip spec)}))]]
-
-          ;; 5. Exchange summary bar table
-          [:div
-           (ui/section-label "Exchange Summary")
-           (exchange-bar-table player {:credits (:player/credits player)
-                                       :food    (:player/food    player)
-                                       :fuel    (:player/fuel    player)})]
-
-          ;; HTMX swap target (hidden)
-          [:div#resources-after.hidden]
-
-          ;; Warning message area
-          [:div#exchange-warning.flex.items-center]
-
-          (ui/incoming-alert player)]
-
-         ;; Action bar
-         [:div.flex.gap-2
-          {:class "py-2 px-3.5 border-t border-game-border"}
-          (ui/action-bar-link (str "/app/game/" player-id "/expenses") "Cancel Exchange")
-          (ui/submit-button false "Make Exchange")])])))
+    (ui/phase-shell player game "EXCHANGE"
+                    (biff/form
+                      {:action (str "/app/game/" player-id "/apply-exchange") :method "post"
+                       :class  "m-0"}
+                      (ui/phase-body player
+                                     (ui/snapshot-section player {:projections projections-data :projection-turn "THIS TURN"})
+                                     (ui/section-label "Sell Assets")
+                                     [:div
+                                      [:div.overflow-hidden.rounded-game.bg-game-surface
+                                       {:class "border border-game-border"}
+                                       (ui/purchase-table-header "Rate" "Sell" "Credits")
+                                       (for [spec sell-asset-row-specs]
+                                         (exchange-row (:label spec) (:abbrev spec) (:field spec)
+                                                       (get rates (:rate-key spec)) 0
+                                                       (get player (:player-key spec)) player-id exchange-hx-include))]]
+                                     (ui/section-label "Sell Resources")
+                                     [:div
+                                      [:div.overflow-hidden.rounded-game.bg-game-surface
+                                       {:class "border border-game-border"}
+                                       (ui/purchase-table-header "Rate" "Sell" "Credits")
+                                       (for [spec sell-resource-row-specs
+                                             :let [ex-val (max 0 (- (get player (:player-key spec))
+                                                                    (get req-totals (:resource-key spec) 0)))]]
+                                         (exchange-row (:label spec) (:abbrev spec) (:field spec)
+                                                       (get rates (:rate-key spec)) 0
+                                                       (get player (:player-key spec)) player-id exchange-hx-include
+                                                       {:ex-value ex-val :ex-tooltip (:ex-tooltip spec)}))]]
+                                     (ui/section-label "Buy Resources")
+                                     [:div
+                                      [:div.overflow-hidden.rounded-game.bg-game-surface
+                                       {:class "border border-game-border"}
+                                       (ui/purchase-table-header "Rate" "Buy" "Credits")
+                                       (for [spec buy-row-specs
+                                             :let [sf-val (max 0 (- (get req-totals (:resource-key spec) 0)
+                                                                    (get player (:player-key spec))))]]
+                                         (exchange-row (:label spec) (:abbrev spec) (:field spec)
+                                                       (get rates (:rate-key spec)) 0
+                                                       (get max-buy-quantities (:max-key spec)) player-id exchange-hx-include
+                                                       {:sf-value sf-val :sf-tooltip (:sf-tooltip spec)}))]]
+                                     (ui/section-label "Impact")
+                                     [:div
+                                      (exchange-bar-table player {:credits (:player/credits player)
+                                                                  :food    (:player/food    player)
+                                                                  :fuel    (:player/fuel    player)})]
+                                     [:div#resources-after.hidden])
+                      (ui/phase-warning "exchange-warning")
+                      (ui/phase-action-bar
+                        (ui/action-bar-link (str "/app/game/" player-id "/expenses") "Cancel Exchange")
+                        (ui/submit-button false "Make Exchange"))))))

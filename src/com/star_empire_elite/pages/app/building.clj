@@ -136,8 +136,8 @@
         planets-cr          (- (* new-ore-planets (:game/ore-planet-credits game))
                                (* new-total-planets (:game/planet-upkeep-credits game)))
         military-cr         (- (+ (* proj-soldiers (:game/soldier-upkeep-credits game))
-                                   (* proj-fighters (:game/fighter-upkeep-credits game))
-                                   (* proj-stations (:game/station-upkeep-credits game))))
+                                  (* proj-fighters (:game/fighter-upkeep-credits game))
+                                  (* proj-stations (:game/station-upkeep-credits game))))
         tax-cr              (* (:player/population player) (:game/population-tax-credits game))
         credits-total       (+ credits-current planets-cr military-cr tax-cr)
         ;; Food
@@ -145,15 +145,15 @@
         planets-food        (- (* new-erg-planets (:game/erg-planet-food game))
                                (* new-total-planets (:game/planet-upkeep-food game)))
         military-food       (- (+ (* proj-soldiers (:game/soldier-upkeep-food game))
-                                   (* proj-agents (:game/agent-upkeep-food game))))
+                                  (* proj-agents (:game/agent-upkeep-food game))))
         pop-food            (- (:population-food required))
         food-total          (+ food-current planets-food military-food pop-food)
         ;; Fuel
         fuel-current        (:player/fuel player)
         planets-fuel        (* new-erg-planets (:game/erg-planet-fuel game))
         military-fuel       (- (+ (* proj-fighters (:game/fighter-upkeep-fuel game))
-                                   (* proj-stations (:game/station-upkeep-fuel game))
-                                   (* proj-agents (:game/agent-upkeep-fuel game))))
+                                  (* proj-stations (:game/station-upkeep-fuel game))
+                                  (* proj-agents (:game/agent-upkeep-fuel game))))
         pop-fuel            (- (:population-fuel required))
         fuel-total          (+ fuel-current planets-fuel military-fuel pop-fuel)]
     [{:name "Credits"
@@ -263,7 +263,7 @@
         after       (- before cost)
         row-class    "items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"
         after-cls    (fn [v] (str "font-bold " (if (neg? v) "text-red-400" "text-green-400")))
-        cost-display (if (pos? cost) [:<> "-" (ui/format-number cost)] "—")]
+        cost-display (if (pos? cost) [:<> "-" (ui/format-number cost)] "0")]
     [:<>
      ;; Mobile row
      [:div.expense-row-mobile
@@ -341,7 +341,7 @@
           total           (:total-cost cost-info)
           credits-after   (:credits resources-after)
           after-cls       (str "font-bold " (if (neg? credits-after) "text-red-400" "text-green-400"))
-          cost-display    (if (pos? total) [:<> "-" (ui/format-number total)] "—")
+          cost-display    (if (pos? total) [:<> "-" (ui/format-number total)] "0")
           item-costs      (into {} (for [spec purchase-row-specs]
                                      [(:qty-key spec) (* (get quantities (:qty-key spec))
                                                          (get game (:cost-key spec)))]))
@@ -359,7 +359,7 @@
          (for [{:keys [total total-id]} proj-data]
            [:span.font-bold
             {:id total-id :hx-swap-oob "true"
-             :class (str "text-[14px] " (if (neg? total) "text-red-400" "text-green-400"))
+             :class (str "text-[14px] " (if (neg? total) "text-amber-400" "text-green-400"))
              :style {:text-shadow "0 0 10px rgba(61,220,132,0.25)"}}
             (ui/format-number total)])
          ;; OOB: after-credits spans (mobile + desktop)
@@ -386,11 +386,9 @@
                    :class (if (pos? cost) "text-green-400" "text-game-green-dark")}
             (if (pos? cost) (ui/format-number cost) "—")])
          ;; OOB: insufficient-credits warning
-         [:div#building-warning.flex.items-center
-          {:hx-swap-oob "true"}
-          (when (not affordable?)
-            [:p.text-yellow-400.text-sm {:class "tracking-[0.03em]"}
-             "⚠ Insufficient credits for purchases."])]
+         (ui/phase-warning-div "building-warning"
+                               (when (not affordable?) "⚠ Insufficient credits to pay expenses.")
+                               {:oob? true})
          ;; OOB: submit button
          (ui/submit-button affordable? "Continue to Action" {:hx-swap-oob "true"})]))))
 
@@ -407,52 +405,23 @@
         zero-quantities  (into {} (map (fn [s] [(:qty-key s) 0]) purchase-row-specs))
         max-quantities   (calculate-max-quantities player zero-quantities game)
         projections-data (build-projections-data player game zero-quantities)]
-    (ui/page
-      {}
-      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.rounded.text-green-400.font-mono
-       {:class "border-[1.5px] border-game-green-border"}
-
-       ;; Scanline overlay
-       (ui/scanline-overlay)
-
-       ;; Topbar
-       (ui/phase-topbar player game "BUILDING PHASE")
-
-       ;; Form wraps body + action bar so the submit button works
-       (biff/form
-         {:action (str "/app/game/" player-id "/apply-building") :method "post"
-          :class  "m-0"}
-
-         ;; Body
-         [:div.flex.flex-col.gap-2
-          {:class "py-2.5 px-3.5"}
-
-          ;; 1. Snapshot — full empire state with projections folded in
-          (ui/snapshot-section player {:projections projections-data})
-
-          ;; 2. Build orders table
-          [:div
-           (ui/section-label "Build Orders")
-           (build-table player game zero-quantities max-quantities)]
-
-          ;; 4. Credit impact — deduction bar showing before/change/after for credits
-          [:div
-           (ui/section-label "Credit Impact")
-           [:div.overflow-hidden.rounded-game.bg-game-surface
-            {:class "border border-game-border"}
-            (ui/deduction-table-header)
-            (build-credits-row player 0)]]
-
-          ;; Hidden HTMX swap-target placeholder
-          [:div#resources-after.hidden]
-
-          ;; Warning message area — populated by HTMX if player can't afford purchases
-          [:div#building-warning.flex.items-center]
-
-          (ui/incoming-alert player)]
-
-         ;; Action bar
-         [:div.flex.gap-2
-          {:class "py-2 px-3.5 border-t border-game-border"}
-          (ui/action-bar-link (str "/app/game/" player-id) "Pause")
-          (ui/submit-button true "Continue to Action")])])))
+    (ui/phase-shell player game "BUILDING PHASE"
+                    (biff/form
+                      {:action (str "/app/game/" player-id "/apply-building") :method "post"
+                       :class  "m-0"}
+                      (ui/phase-body player
+                                     (ui/snapshot-section player {:projections projections-data})
+                                     (ui/section-label "Build Orders")
+                                     [:div
+                                      (build-table player game zero-quantities max-quantities)]
+                                     (ui/section-label "Impact")
+                                     [:div
+                                      [:div.overflow-hidden.rounded-game.bg-game-surface
+                                       {:class "border border-game-border"}
+                                       (ui/deduction-table-header)
+                                       (build-credits-row player 0)]]
+                                     [:div#resources-after.hidden])
+                      (ui/phase-warning "building-warning")
+                      (ui/phase-action-bar
+                        (ui/action-bar-link (str "/app/game/" player-id) "Pause")
+                        (ui/submit-button true "Continue to Action"))))))
