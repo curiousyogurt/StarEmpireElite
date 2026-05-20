@@ -36,6 +36,13 @@
     (is (= 7   (utils/parse-numeric-input 7)))
     (is (= 100 (utils/parse-numeric-input 100)))))
 
+(deftest test-parse-numeric-input-overflow-protection
+  (testing "Very large inputs are capped at 1 billion to prevent long overflow"
+    (is (= 1000000000 (utils/parse-numeric-input "99999999999999999999999")))
+    (is (= 1000000000 (utils/parse-numeric-input "1000000001")))
+    (is (= 1000000000 (utils/parse-numeric-input 1000000000)))
+    (is (= 999999999  (utils/parse-numeric-input "999999999")))))
+
 ;;;;
 ;;;; validate-phase Tests
 ;;;;

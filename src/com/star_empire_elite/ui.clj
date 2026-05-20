@@ -445,76 +445,152 @@
           extra-attrs)
    label])
 
-(defn snapshot-section
-  "Render the empire status tile.
+(defn- proj-pill-hiccup
+  "Render one projection pill span with positive / negative / zero variants.
+  Adds :id and :hx-swap-oob to the root attrs when present in the opts map.
 
-  opts map keys (all optional, default true):
-    :rank         — integer rank to display in header
-    :show-ground? — show the GROUND row
-    :show-fleet?  — show the FLEET row
-    :show-ops?    — show the OPERATIONS row
+  [{:keys [label value id hx-swap-oob]}] -> hiccup"
+  [{:keys [label value id hx-swap-oob]}]
+  (let [neg?  (neg? value)
+        zero? (zero? value)]
+    [:span.flex.justify-between.items-baseline.rounded-sm
+     (cond-> {:class (str "px-[6px] py-[2px] "
+                          (cond neg?  "bg-[#3a2218]"
+                                zero? "bg-[#1a201c]"
+                                :else "bg-game-green-deep"))}
+       id          (assoc :id id)
+       hx-swap-oob (assoc :hx-swap-oob hx-swap-oob))
+     [:span
+      {:class (str "text-[9px] tracking-[0.04em] "
+                   (cond neg?  "text-[#a78060]"
+                         zero? "text-game-green-dim"
+                         :else "text-game-green-muted"))}
+      label]
+     [:span.font-bold
+      {:class (str "text-[10px] "
+                   (cond neg?  "text-red-400"
+                         zero? "text-game-green-dim font-normal"
+                         :else "text-green-400"))}
+      (cond
+        neg?  (list "\u2212" (format-number (Math/abs (long value))))
+        zero? "+0"
+        :else (list "+" (format-number value)))]]))
+
+(defn oob-proj-pill
+  "Render a projection pill span for HTMX out-of-band swap. Matches the style of pills
+  rendered inside snapshot-section: positive/negative/zero color variants.
+
+  [id str, label str, value number] -> hiccup"
+  [id label value]
+  (proj-pill-hiccup {:label label :value value :id id :hx-swap-oob "true"}))
+
+(defn snapshot-section
+  "Render the empire status card: 4-cell hero, grouped manifest rows,
+  and an optional projections subsection.
+
+  opts map keys (all optional):
+    :show-ground? — show the GROUND manifest row (default true)
+    :show-fleet?  — show the FLEET manifest row (default true)
+    :show-ops?    — show the OPERATIONS manifest row (default true)
+    :projections  — vector of projection cards to show below the manifest.
+                    Each card is {:name str, :total number, :total-id str (optional),
+                    :rows [{:label str, :value number, :id str (optional)}]}.
+                    When absent, the projections section is omitted.
 
   [player player-map, opts? map] -> hiccup"
-  [player & [{:keys [rank show-ground? show-fleet? show-ops?]
+  [player & [{:keys [show-ground? show-fleet? show-ops? projections]
               :or   {show-ground? true show-fleet? true show-ops? true}}]]
-  (let [pop-str   (format-population (:player/population player))
-        turn      (:player/current-turn  player)
-        round     (:player/current-round player)
+  (let [;; Manifest item: label + value; zero values render dim and non-bold
+        item  (fn [label display zero?]
+                [:span.inline-flex.items-baseline
+                 {:class "gap-[7px]"}
+                 [:span {:class "text-game-green-dim text-[10px] tracking-[0.04em]"} label]
+                 [:span.font-bold
+                  {:class (str "text-[13px] " (if zero? "text-game-green-dim font-normal" "text-green-400"))}
+                  display]])
 
-        col-label-cls "text-game-green-mid text-[9px] tracking-widest uppercase mb-1.5"
-        col-value-cls "text-green-400 text-[22px] font-bold leading-none"
+        ;; Manifest row: tag + wrapped item list; no bottom divider on last row
+        mrow  (fn [tag items last?]
+                [:div.flex.items-baseline
+                 {:class (str "gap-4 py-[5px]" (when-not last? " border-b border-dashed border-game-divider"))}
+                 [:div.shrink-0.uppercase
+                  {:class "text-[9px] tracking-[0.18em] text-game-green-mid w-[92px]"}
+                  (str "› " tag)]
+                 (into [:div.flex.flex-wrap {:class "gap-x-7 gap-y-1"}] items)])
 
-        big-stats [["CREDITS"     (format-number (:player/credits     player))]
-                   ["ORE PLANETS" (format-number (:player/ore-planets player))]
-                   ["ERG PLANETS" (format-number (:player/erg-planets player))]
-                   ["MIL PLANETS" (format-number (:player/mil-planets player))]]
+        show-last? (not (or show-ground? show-fleet? show-ops?))]
 
-        row-label-cls "text-game-green-mid text-[10px] tracking-widest uppercase w-[100px] shrink-0"
-        muted-cls     "text-game-green-muted text-xs"
-        bright-cls    "text-green-400 font-bold text-xs"
+    [:div.relative.overflow-hidden.rounded.bg-game-bg.w-full.font-mono
+     {:class "border-[1.5px] border-game-green-border"}
 
-        stat      (fn [label v]
-                    [:<>
-                     [:span {:class muted-cls} (str label " ")]
-                     [:span {:class bright-cls} v]])
+     ;; Hero strip — 4 oversized stat cells
+     [:div.grid.grid-cols-4
+      {:class "border-b border-game-border"
+       :style {:background "linear-gradient(180deg, rgba(20,42,28,0.5), rgba(20,42,28,0.15))"}}
+      (for [[label value] [["CREDITS"     (format-number (:player/credits     player))]
+                           ["ORE PLANETS" (str (:player/ore-planets player))]
+                           ["ERG PLANETS" (str (:player/erg-planets player))]
+                           ["MIL PLANETS" (str (:player/mil-planets player))]]]
+        [:div.flex.flex-col.border-r.border-game-divider.last:border-r-0.min-w-0
+         {:class "px-[18px] pt-[14px] pb-[16px] gap-[5px]"}
+         [:div.uppercase {:class "text-game-green-dim text-[9px] tracking-[0.18em]"} label]
+         [:div.font-bold.leading-none.text-green-400
+          {:class "text-[28px]" :style {:text-shadow "0 0 14px rgba(61,220,132,0.25)"}}
+          value]])]
 
-        row       (fn [section-label & stats]
-                    [:div.flex.items-center.py-0.5.px-3.5.gap-5
-                     [:span {:class row-label-cls} (str "› " section-label)]
-                     [:div.flex.items-center.flex-wrap.gap-5 stats]])]
-
-    [:div.rounded-game.bg-game-surface.overflow-hidden
-     {:class "border border-game-border"}
-     ;; Big 4 stat columns
-     [:div.grid.grid-cols-4.border-b.border-game-border
-      (for [[label value] big-stats]
-        [:div.pt-1.5.pb-2.px-3.5.border-r.border-game-divider
-         [:div {:class col-label-cls} label]
-         [:div {:class col-value-cls} value]])]
-     ;; Grouped rows
-     [:div
-      (row "EMPIRE"
-           (stat "population" pop-str)
-           (stat "stability"  (str (:player/stability player) "%"))
-           (stat "food"       (format-number (:player/food player)))
-           (stat "fuel"       (format-number (:player/fuel player))))
+     ;; Manifest — secondary stats grouped by role
+     [:div {:class "px-4 pt-[10px] pb-3"}
+      (mrow "EMPIRE"
+            [(item "population" (format-population (:player/population player)) false)
+             (item "stability"  (str (:player/stability player) "%")           false)
+             (item "food"       (format-number (:player/food player))           (zero? (or (:player/food player) 0)))
+             (item "fuel"       (format-number (:player/fuel player))           (zero? (or (:player/fuel player) 0)))]
+            show-last?)
       (when show-ground?
-        (row "GROUND"
-             (stat "soldiers"   (format-number (:player/soldiers   player)))
-             (stat "generals"   (format-number (:player/generals   player)))
-             (stat "transports" (format-number (:player/transports player)))))
+        (mrow "GROUND"
+              [(item "soldiers"   (format-number (:player/soldiers   player)) (zero? (or (:player/soldiers   player) 0)))
+               (item "generals"   (format-number (:player/generals   player)) (zero? (or (:player/generals   player) 0)))
+               (item "transports" (format-number (:player/transports player)) (zero? (or (:player/transports player) 0)))]
+              (not (or show-fleet? show-ops?))))
       (when show-fleet?
-        (row "FLEET"
-             (stat "fighters"   (format-number (:player/fighters   player)))
-             (stat "carriers"   (format-number (:player/carriers   player)))
-             (stat "admirals"   (format-number (:player/admirals   player)))
-             (stat "stations"   (format-number (:player/stations   player)))))
+        (mrow "FLEET"
+              [(item "fighters" (format-number (:player/fighters player)) (zero? (or (:player/fighters player) 0)))
+               (item "carriers" (format-number (:player/carriers player)) (zero? (or (:player/carriers player) 0)))
+               (item "admirals" (format-number (:player/admirals player)) (zero? (or (:player/admirals player) 0)))
+               (item "stations" (format-number (:player/stations player)) (zero? (or (:player/stations player) 0)))]
+              (not show-ops?)))
       (when show-ops?
-        [:div.flex.items-center.py-0.5.px-3.5.gap-5
-         [:span {:class row-label-cls} "› OPERATIONS"]
-         [:div.flex.items-center.gap-5
-          (stat "cmd ships" (format-number (:player/cmd-ships player)))
-          (stat "agents"    (format-number (:player/agents    player)))]])]]))
+        (mrow "OPERATIONS"
+              [(item "cmd ships" (format-number (:player/cmd-ships player)) (zero? (or (:player/cmd-ships player) 0)))
+               (item "agents"    (format-number (:player/agents    player)) (zero? (or (:player/agents    player) 0)))]
+              true))]
+
+     ;; Projections — optional, shown when caller passes :projections data
+     (when projections
+       [:div {:class "px-4 pt-[10px] pb-[14px] border-t border-game-border"
+              :style {:background "rgba(20,42,28,0.10)"}}
+        [:div.flex.items-baseline.uppercase
+         {:class "text-[9px] tracking-[0.18em] text-game-green-dim mb-2"}
+         "› PROJECTIONS · NEXT TURN"
+         [:span.normal-case.opacity-70
+          {:class "ml-[10px] text-[9px] tracking-[0.04em]"}
+          "estimated change, current rates"]]
+        [:div.grid.grid-cols-3
+         {:class "gap-2"}
+         (for [{:keys [name total total-id rows]} projections]
+           [:div.flex.flex-col.rounded-game.bg-game-card
+            {:class "border border-game-border px-[10px] pt-2 pb-[9px] gap-[7px]"}
+            [:div.flex.justify-between.items-baseline.border-b.border-dashed.border-game-divider
+             {:class "pb-[6px]"}
+             [:span.font-bold {:class "text-[11px] tracking-[0.02em] text-game-green-mid"} name]
+             [:span.font-bold
+              (cond-> {:class (str "text-[14px] " (if (neg? total) "text-red-400" "text-green-400"))
+                       :style {:text-shadow "0 0 10px rgba(61,220,132,0.25)"}}
+                total-id (assoc :id total-id))
+              (format-number total)]]
+            [:div.flex.flex-col
+             {:class "gap-[2px]"}
+             (map proj-pill-hiccup rows)]])]])]))
 
 (defn projection-pill
   "Render one projection pill card with a title, right-aligned total, and breakdown rows.

@@ -14,7 +14,6 @@
             [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]
-            [com.star-empire-elite.pages.app.income :as income]
             [com.star-empire-elite.pages.app.expenses :as expenses]))
 
 ;;;;
@@ -110,62 +109,74 @@
 ;;;; UI Components
 ;;;;
 
-(defn- projections-section
-  "Render the three resource projection pills: Credits, Food, Fuel.
-  Pulls from income and expense calculations to show net flows by category.
+(defn build-projections-data
+  "Compute the projections data structure for snapshot-section's :projections opt.
+  Accounts for proposed purchases in quantities; pass zero-quantities for the initial page render.
+  Credits 'Current' row reflects credits after the proposed build cost is deducted.
 
-  [player player-map, game game-map] -> hiccup"
-  [player game]
-  (let [income-data        (income/calculate-income player game)
-        required          (expenses/calculate-required-expenses player game)
-        credits-current   (:player/credits player)
-        food-current      (:player/food player)
-        fuel-current      (:player/fuel player)
-        credits-changes   [{:label "Planets"
-                            :value (- (:ore-credits income-data) (:planets-credits required))
-                            :id "credits-pill-planets"}
-                           {:label "Military"
-                            :value (- (+ (:soldiers-credits required)
-                                         (:fighters-credits required)
-                                         (:stations-credits required)))
-                            :id "credits-pill-military"}
-                           {:label "Taxes"
-                            :value (:tax-credits income-data)}]
-        food-changes      [{:label "Planets"
-                            :value (:erg-food income-data)
-                            :id "food-pill-planets"}
-                           {:label "Military"
-                            :value (- (+ (:soldiers-food required) (:agents-food required)))
-                            :id "food-pill-military"}
-                           {:label "Population"
-                            :value (- (:population-food required))}]
-        fuel-changes      [{:label "Planets"
-                            :value (:erg-fuel income-data)
-                            :id "fuel-pill-planets"}
-                           {:label "Military"
-                            :value (- (+ (:fighters-fuel required)
-                                         (:stations-fuel required)
-                                         (:agents-fuel required)))
-                            :id "fuel-pill-military"}
-                           {:label "Population"
-                            :value (- (:population-fuel required))}]
-        sum-changes       (fn [rows] (reduce + (map :value rows)))
-        credits-total     (+ credits-current (sum-changes credits-changes))
-        food-total        (+ food-current (sum-changes food-changes))
-        fuel-total        (+ fuel-current (sum-changes fuel-changes))
-        credits-rows      (concat [{:label "Current" :value credits-current
-                                    :id "credits-pill-current"}]
-                                  credits-changes)
-        food-rows         (concat [{:label "Current" :value food-current}]
-                                  food-changes)
-        fuel-rows         (concat [{:label "Current" :value fuel-current}]
-                                  fuel-changes)]
-    [:div
-     (ui/section-label "Resource Projections for Next Turn")
-     [:div {:class "grid grid-cols-1 md:grid-cols-3 gap-1.5"}
-      (ui/projection-pill "Credits" credits-total credits-rows {:total-id "projection-credits-total"})
-      (ui/projection-pill "Food"    food-total    food-rows {:total-id "projection-food-total"})
-      (ui/projection-pill "Fuel"    fuel-total    fuel-rows {:total-id "projection-fuel-total"})]]))
+  [player player-map, game game-map, quantities purchase-quantities] -> projection-cards"
+  [player game quantities]
+  (let [required            (expenses/calculate-required-expenses player game)
+        ;; Planet counts including proposed purchases
+        new-ore-planets     (+ (:player/ore-planets player) (:ore-planets quantities))
+        new-erg-planets     (+ (:player/erg-planets player) (:erg-planets quantities))
+        new-mil-planets     (+ (:player/mil-planets player) (:mil-planets quantities))
+        new-total-planets   (+ new-ore-planets new-erg-planets new-mil-planets)
+        ;; Military counts including proposed purchases + new mil planet production
+        mil-soldiers        (* new-mil-planets (:game/mil-planet-soldiers game))
+        mil-fighters        (* new-mil-planets (:game/mil-planet-fighters game))
+        mil-stations        (* new-mil-planets (:game/mil-planet-stations game))
+        proj-soldiers       (+ (:player/soldiers player) (:soldiers quantities) mil-soldiers)
+        proj-fighters       (+ (:player/fighters player) (:fighters quantities) mil-fighters)
+        proj-stations       (+ (:player/stations player) (:stations quantities) mil-stations)
+        proj-agents         (+ (:player/agents player) (:agents quantities))
+        ;; Credits
+        credits-current     (- (:player/credits player)
+                               (:total-cost (calculate-purchase-cost quantities game)))
+        planets-cr          (- (* new-ore-planets (:game/ore-planet-credits game))
+                               (* new-total-planets (:game/planet-upkeep-credits game)))
+        military-cr         (- (+ (* proj-soldiers (:game/soldier-upkeep-credits game))
+                                   (* proj-fighters (:game/fighter-upkeep-credits game))
+                                   (* proj-stations (:game/station-upkeep-credits game))))
+        tax-cr              (* (:player/population player) (:game/population-tax-credits game))
+        credits-total       (+ credits-current planets-cr military-cr tax-cr)
+        ;; Food
+        food-current        (:player/food player)
+        planets-food        (- (* new-erg-planets (:game/erg-planet-food game))
+                               (* new-total-planets (:game/planet-upkeep-food game)))
+        military-food       (- (+ (* proj-soldiers (:game/soldier-upkeep-food game))
+                                   (* proj-agents (:game/agent-upkeep-food game))))
+        pop-food            (- (:population-food required))
+        food-total          (+ food-current planets-food military-food pop-food)
+        ;; Fuel
+        fuel-current        (:player/fuel player)
+        planets-fuel        (* new-erg-planets (:game/erg-planet-fuel game))
+        military-fuel       (- (+ (* proj-fighters (:game/fighter-upkeep-fuel game))
+                                   (* proj-stations (:game/station-upkeep-fuel game))
+                                   (* proj-agents (:game/agent-upkeep-fuel game))))
+        pop-fuel            (- (:population-fuel required))
+        fuel-total          (+ fuel-current planets-fuel military-fuel pop-fuel)]
+    [{:name "Credits"
+      :total credits-total
+      :total-id "projection-credits-total"
+      :rows [{:label "Current"  :value credits-current :id "credits-pill-current"}
+             {:label "Planets"  :value planets-cr      :id "credits-pill-planets"}
+             {:label "Military" :value military-cr     :id "credits-pill-military"}
+             {:label "Taxes"    :value tax-cr}]}
+     {:name "Food"
+      :total food-total
+      :total-id "projection-food-total"
+      :rows [{:label "Current"    :value food-current}
+             {:label "Planets"    :value planets-food  :id "food-pill-planets"}
+             {:label "Military"   :value military-food :id "food-pill-military"}
+             {:label "Population" :value pop-food}]}
+     {:name "Fuel"
+      :total fuel-total
+      :total-id "projection-fuel-total"
+      :rows [{:label "Current"    :value fuel-current}
+             {:label "Planets"    :value planets-fuel  :id "fuel-pill-planets"}
+             {:label "Military"   :value military-fuel :id "fuel-pill-military"}
+             {:label "Population" :value pop-fuel}]}]))
 
 (defn- build-purchase-row
   "Render one purchase row with item name, unit cost, max affordable, build input, and line cost.
@@ -334,74 +345,23 @@
           item-costs      (into {} (for [spec purchase-row-specs]
                                      [(:qty-key spec) (* (get quantities (:qty-key spec))
                                                          (get game (:cost-key spec)))]))
-          ;; Credits projection: Planets row reflects proposed ore planet purchases
-          income-data          (income/calculate-income player game)
-          required             (expenses/calculate-required-expenses player game)
-          new-ore-planets      (+ (:player/ore-planets player) (:ore-planets quantities))
-          new-erg-planets      (+ (:player/erg-planets player) (:erg-planets quantities))
-          new-mil-planets      (+ (:player/mil-planets player) (:mil-planets quantities))
-          new-total-planets    (+ new-ore-planets new-erg-planets new-mil-planets)
-          new-ore-income       (* new-ore-planets (:game/ore-planet-credits game))
-          new-planet-expense   (* new-total-planets (:game/planet-upkeep-credits game))
-          new-planets-value    (- new-ore-income new-planet-expense)
-          ;; Military planet income adds to unit counts that must be maintained
-          mil-income-soldiers  (* new-mil-planets (:game/mil-planet-soldiers game))
-          mil-income-fighters  (* new-mil-planets (:game/mil-planet-fighters game))
-          mil-income-stations  (* new-mil-planets (:game/mil-planet-stations game))
-          proj-soldiers        (+ (:player/soldiers player) (:soldiers quantities) mil-income-soldiers)
-          proj-fighters        (+ (:player/fighters player) (:fighters quantities) mil-income-fighters)
-          proj-stations        (+ (:player/stations player) (:stations quantities) mil-income-stations)
-          new-military-value   (- (+ (* proj-soldiers (:game/soldier-upkeep-credits game))
-                                     (* proj-fighters (:game/fighter-upkeep-credits game))
-                                     (* proj-stations (:game/station-upkeep-credits game))))
-          proj-total           (+ credits-after new-planets-value
-                                  new-military-value
-                                  (:tax-credits income-data))
-          ;; Food projection: Planets and Military rows update dynamically
-          new-erg-food-income  (* new-erg-planets (:game/erg-planet-food game))
-          new-planet-food-exp  (* new-total-planets (:game/planet-upkeep-food game))
-          new-planets-food     (- new-erg-food-income new-planet-food-exp)
-          proj-agents          (+ (:player/agents player) (:agents quantities))
-          new-military-food    (- (+ (* proj-soldiers (:game/soldier-upkeep-food game))
-                                     (* proj-agents (:game/agent-upkeep-food game))))
-          food-current         (:player/food player)
-          pop-food             (- (:population-food required))
-          food-proj-total      (+ food-current new-planets-food new-military-food pop-food)
-          ;; Fuel projection: Planets and Military rows update dynamically
-          new-erg-fuel-income  (* new-erg-planets (:game/erg-planet-fuel game))
-          new-military-fuel    (- (+ (* proj-fighters (:game/fighter-upkeep-fuel game))
-                                     (* proj-stations (:game/station-upkeep-fuel game))
-                                     (* proj-agents   (:game/agent-upkeep-fuel   game))))
-          fuel-current         (:player/fuel player)
-          pop-fuel             (- (:population-fuel required))
-          fuel-proj-total      (+ fuel-current new-erg-fuel-income new-military-fuel pop-fuel)]
+          proj-data       (build-projections-data player game quantities)]
       (biff/render
         [:div
          ;; Renew HTMX swap-target placeholder for the next request
          [:div#resources-after]
-         ;; OOB: credits pill "Current" row — decreases as build cost rises
-         (ui/oob-pill "credits-pill-current" "Current" credits-after nil)
-         ;; OOB: credits pill "Planets" row — updates as ore/erg/mil planet purchases change
-         (ui/oob-pill "credits-pill-planets" "Planets" new-planets-value nil)
-         ;; OOB: credits pill "Military" row — updates as soldier/fighter/station purchases change
-         (ui/oob-pill "credits-pill-military" "Military" new-military-value nil)
-         ;; OOB: credits pill total — sum of all rows (current + planets + military + taxes)
-         [:span#projection-credits-total {:hx-swap-oob "true" :class "text-game-green-muted"}
-          (ui/format-number proj-total)]
-         ;; OOB: food pill "Planets" row — updates as erg/ore/mil planet purchases change
-         (ui/oob-pill "food-pill-planets" "Planets" new-planets-food nil)
-         ;; OOB: food pill "Military" row — updates as soldier/agent purchases change
-         (ui/oob-pill "food-pill-military" "Military" new-military-food nil)
-         ;; OOB: food pill total
-         [:span#projection-food-total {:hx-swap-oob "true" :class "text-game-green-muted"}
-          (ui/format-number food-proj-total)]
-         ;; OOB: fuel pill "Planets" row — updates as erg planet purchases change
-         (ui/oob-pill "fuel-pill-planets" "Planets" new-erg-fuel-income nil)
-         ;; OOB: fuel pill "Military" row — updates as fighter/station/agent purchases change
-         (ui/oob-pill "fuel-pill-military" "Military" new-military-fuel nil)
-         ;; OOB: fuel pill total
-         [:span#projection-fuel-total {:hx-swap-oob "true" :class "text-game-green-muted"}
-          (ui/format-number fuel-proj-total)]
+         ;; OOB: projection pills — all dynamic rows (those with :id)
+         (for [{:keys [rows]} proj-data
+               {:keys [label value id]} rows
+               :when id]
+           (ui/oob-proj-pill id label value))
+         ;; OOB: projection totals
+         (for [{:keys [total total-id]} proj-data]
+           [:span.font-bold
+            {:id total-id :hx-swap-oob "true"
+             :class (str "text-[14px] " (if (neg? total) "text-red-400" "text-green-400"))
+             :style {:text-shadow "0 0 10px rgba(61,220,132,0.25)"}}
+            (ui/format-number total)])
          ;; OOB: after-credits spans (mobile + desktop)
          [:span#after-credits-m {:hx-swap-oob "true" :class after-cls} (ui/format-number credits-after)]
          [:span#after-credits-d {:hx-swap-oob "true" :class after-cls} (ui/format-number credits-after)]
@@ -443,9 +403,10 @@
 
   [{:keys [player game]}] -> hiccup"
   [{:keys [player game]}]
-  (let [player-id      (:xt/id player)
-        zero-quantities (into {} (map (fn [s] [(:qty-key s) 0]) purchase-row-specs))
-        max-quantities  (calculate-max-quantities player zero-quantities game)]
+  (let [player-id        (:xt/id player)
+        zero-quantities  (into {} (map (fn [s] [(:qty-key s) 0]) purchase-row-specs))
+        max-quantities   (calculate-max-quantities player zero-quantities game)
+        projections-data (build-projections-data player game zero-quantities)]
     (ui/page
       {}
       [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.rounded.text-green-400.font-mono
@@ -466,13 +427,10 @@
          [:div.flex.flex-col.gap-2
           {:class "py-2.5 px-3.5"}
 
-          ;; 1. Snapshot — full empire state at T-0
-          (ui/snapshot-section player)
+          ;; 1. Snapshot — full empire state with projections folded in
+          (ui/snapshot-section player {:projections projections-data})
 
-          ;; 2. Projections — income/expense flows for Credits, Food, Fuel
-          (projections-section player game)
-
-          ;; 3. Build orders table
+          ;; 2. Build orders table
           [:div
            (ui/section-label "Build Orders")
            (build-table player game zero-quantities max-quantities)]
