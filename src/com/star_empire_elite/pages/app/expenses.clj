@@ -159,7 +159,7 @@
         ;; field submission — both rows are always in the DOM, only CSS hides one.
         input-style   {:color "#7ab88a" :border-color "#2d6644" :padding-top "1px" :padding-bottom "1px"}
         change-cell-m [:div.justify-self-center
-                       {:style {:width "min(140px, 100%)"}}
+                       {:class "w-[min(140px,100%)]"}
                        (ui/numeric-input field-name payment player-id
                                          "/calculate-expenses" hx-include
                                          {:input-class   "text-xs text-right"
@@ -168,7 +168,7 @@
                                           :mirror-of     field-name
                                           :prefix        "-"})]
         change-cell-d [:div.justify-self-center
-                       {:style {:width "min(140px, 100%)"}}
+                       {:class "w-[min(140px,100%)]"}
                        (ui/numeric-input field-name payment player-id
                                          "/calculate-expenses" hx-include
                                          {:input-class "text-xs lg:text-sm text-right"

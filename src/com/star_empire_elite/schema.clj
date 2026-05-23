@@ -181,10 +181,25 @@
 
             ;; Incoming events (set by attackers, displayed on defender's outcomes page)
             [:player/incoming-attacks                {:optional true} [:maybe [:vector :string]]]
-            [:player/incoming-espionage-fails        {:optional true} [:maybe :int]]
+            [:player/incoming-espionage-fails        {:optional true} [:maybe [:vector :string]]]
             [:player/incoming-espionage-agents-gained  {:optional true} [:maybe :int]]
             [:player/incoming-incite-stability-lost    {:optional true} [:maybe :int]]
             [:player/incoming-bomb-result              {:optional true} [:maybe :string]]]
+
+   :game-event/id :uuid
+   :game-event [:map {:closed true}
+                [:xt/id              :game-event/id]
+                [:event/game         :game/id]
+                [:event/at           inst?]
+                [:event/turn         :int]
+                [:event/round        :int]
+                [:event/kind         :keyword]
+                [:event/visibility   :keyword]
+                [:event/attacker      {:optional true} [:maybe :player/id]]
+                [:event/attacker-name {:optional true} [:maybe :string]]
+                [:event/defender      {:optional true} [:maybe :player/id]]
+                [:event/defender-name {:optional true} [:maybe :string]]
+                [:event/payload      :string]]
 
    })
 

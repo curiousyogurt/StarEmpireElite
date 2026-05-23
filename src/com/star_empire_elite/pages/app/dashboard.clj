@@ -220,7 +220,7 @@
       ;; Turn progress bar
       [:div.mt-1.5.bg-game-divider.relative.overflow-hidden {:class "w-[140px] h-[3px] rounded-[1px]"}
        [:div.absolute.inset-y-0.left-0
-        {:style {:width (str turn-pct "%") :background "#4a7a5a"}}]]]
+        {:class "bg-[#4a7a5a]" :style {:width (str turn-pct "%")}}]]]
 
      ;; ── Right column: Bars ───────────────────────────────────────────
      [:div.flex.flex-col.gap-3

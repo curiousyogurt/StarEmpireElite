@@ -141,6 +141,22 @@
 
 .grecaptcha-badge { visibility: hidden; }
 
+/* Collapsible card chevron indicator */
+.card-chevron {
+  transition: transform 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.3rem;
+  height: 1.3rem;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+}
+details[open] > summary .card-chevron {
+  transform: rotate(90deg);
+}
+
 /* Hide cancel buttons until a radio target is selected */
 .cancel-target { display: none; }
 form:has([name=espionage-action]:checked) .cancel-target,

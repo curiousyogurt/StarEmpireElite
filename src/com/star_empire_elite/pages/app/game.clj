@@ -107,6 +107,7 @@
          (players-table {:players players})]
         (ui/phase-action-bar
           (ui/action-bar-link "/app" "Back to Games")
+          (ui/action-bar-link (str "/app/game/" (:xt/id player) "/news") "News")
           (if cooldown-ms
             [:div {:class "py-[5px] px-3.5 border border-yellow-700 text-yellow-400 rounded-sm text-sm font-mono tracking-wider"}
              (if (utils/day-exhausted? player game)

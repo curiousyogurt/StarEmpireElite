@@ -28,6 +28,7 @@
             [com.star-empire-elite.pages.app.espionage  :as espionage]
             [com.star-empire-elite.pages.app.outcomes   :as outcomes]
             [com.star-empire-elite.pages.app.eliminated :as eliminated]
+            [com.star-empire-elite.pages.app.news       :as news]
             ;; Game functions
             [com.star-empire-elite.constants            :as const]
             [com.star-empire-elite.resolution           :as resolution]
@@ -399,6 +400,16 @@
         (outcomes/outcomes-page (resolution/resolve-turn ctx player-id player game)))))
 
 ;;;;
+;;;; News
+;;;;
+
+(defn news-handler
+  "Per-game event feed — shows all events visible to the current player."
+  [ctx]
+  (utils/with-player-and-game [player game player-id] ctx
+    (news/news-page player game (:biff/db ctx))))
+
+;;;;
 ;;;; Alerts
 ;;;;
 
@@ -412,7 +423,7 @@
         player     (xt/entity db player-id)
         had-alerts (= "true" (:had-alerts params))
         has-alerts (or (seq (:player/incoming-attacks player))
-                       (pos? (or (:player/incoming-espionage-fails player) 0)))]
+                       (seq (:player/incoming-espionage-fails player)))]
     (if (and has-alerts (not had-alerts))
       {:status 200 :headers {"content-type" "text/html" "HX-Refresh" "true"} :body ""}
       {:status  200
@@ -455,5 +466,6 @@
     ["/game/:player-id/apply-outcomes"     {:post outcomes/apply-outcomes}]
     ["/game/:player-id/eliminated"         {:get  eliminated/eliminated-page}]
     ["/game/:player-id/rejoin"             {:post eliminated/rejoin}]
+    ["/game/:player-id/news"               {:get  news-handler}]
     ["/game/:player-id/alerts"             {:get  alerts-handler}]]})
 

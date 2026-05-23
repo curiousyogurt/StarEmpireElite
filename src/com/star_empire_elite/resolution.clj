@@ -13,6 +13,7 @@
   (:require [com.biffweb               :as biff]
             [com.star-empire-elite.combat     :as combat]
             [com.star-empire-elite.constants  :as const]
+            [com.star-empire-elite.events     :as events]
             [xtdb.api                         :as xt]))
 
 ;;;;
@@ -237,7 +238,8 @@
                                        {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
                                         :player/agents (+ (:player/agents target) agents-lost)
                                         :player/incoming-espionage-fails
-                                        (inc (or (:player/incoming-espionage-fails target) 0))
+                                        (conj (or (:player/incoming-espionage-fails target) [])
+                                              (cond incite? "incite" bomb? "bomb" defect? "defect" :else "spy"))
                                         :player/incoming-espionage-agents-gained
                                         (+ (or (:player/incoming-espionage-agents-gained target) 0) agents-lost)})
                                      (when (and incite? att-wins? (pos? stab-dmg))
@@ -399,11 +401,21 @@
   results on refresh. Steps: combat → espionage → population → expense penalty →
   stability breakaway → stability recovery → elimination check.
 
+  After resolution, writes game-event documents for any freshly resolved results.
+  Cache-hit results (already persisted on a prior page load) do not produce duplicate
+  events — the cache fields on the original player entity are checked before resolution
+  to distinguish fresh vs cached.
+
   Returns a map suitable for passing directly to outcomes/outcomes-page.
 
   [ctx ring-ctx, player-id uuid, player player-map, game game-map] -> outcomes-map"
   [ctx player-id player game]
-  (let [[battle-result    p1] (resolve-combat              ctx player-id player game)
+  (let [;; Snapshot cache state before resolution to detect fresh results
+        combat-cached?    (some? (:player/last-battle-result player))
+        espionage-cached? (some? (:player/last-espionage-result player))
+        breakaway-cached? (some? (:player/last-stability-breakaway player))
+
+        [battle-result    p1] (resolve-combat              ctx player-id player game)
         [espionage-result p2] (resolve-espionage           ctx player-id p1     game)
         [pop-growth       p3] (resolve-population          ctx player-id p2     game)
         [expense-penalty  p4] (resolve-expense-penalty     ctx player-id p3     game)
@@ -416,12 +428,40 @@
         total-planets         (+ (:player/ore-planets p6)
                                  (:player/erg-planets  p6)
                                  (:player/mil-planets  p6))
-        eliminated?           (zero? total-planets)]
+        eliminated?           (zero? total-planets)
+
+        ;; Build event metadata shared by all events this resolution
+        event-meta {:game-id (:player/game player)
+                    :turn    (:player/current-turn player)
+                    :round   (:player/current-round player)
+                    :at      (java.util.Date.)}
+
+        ;; Collect events only for freshly resolved (non-cached) results
+        events (cond-> []
+                 (and battle-result (not combat-cached?))
+                 (conj (events/event-of-battle-result battle-result event-meta))
+
+                 (and espionage-result (not espionage-cached?))
+                 (into (events/event-of-espionage-result
+                         espionage-result
+                         (:player/empire-name player)
+                         event-meta))
+
+                 (and breakaway-result (:triggered? breakaway-result) (not breakaway-cached?))
+                 (conj (events/event-of-breakaway
+                         breakaway-result player-id
+                         (:player/empire-name player) event-meta))
+
+                 (and eliminated? (not= (:player/status p6) const/player-status-eliminated))
+                 (conj (events/event-of-elimination
+                         player-id (:player/empire-name player) event-meta)))]
+
     (when (and eliminated? (not= (:player/status p6) const/player-status-eliminated))
       (biff/submit-tx ctx [{:db/doc-type   :player
                             :db/op         :update
                             :xt/id         player-id
                             :player/status const/player-status-eliminated}]))
+    (events/record-events! ctx events)
     {:player           p6
      :game             game
      :battle-result    battle-result

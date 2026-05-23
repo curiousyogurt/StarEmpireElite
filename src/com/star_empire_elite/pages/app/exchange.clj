@@ -332,24 +332,21 @@
      ;; Ex buttons keep their text fields aligned.
      [:div.flex.items-center.justify-center.min-w-0
 
-      [:div
-       {:style {:position "relative"
-                :width "min(120px, 100%)"
-                :min-width "0"
-                :transform "translateX(16px)"}}
+      [:div.relative.min-w-0
+       {:class "w-[min(120px,100%)] translate-x-4"}
 
        input-node
 
        (when (some? ex-value)
          [:button
           {:type "button" :title ex-tooltip :onclick (fill-onclick ex-value)
-           :class btn-cls :style {:left "calc(100% + 4px)"}}
+           :class (str btn-cls " left-[calc(100%+4px)]")}
           "ex"])
 
        (when (some? sf-value)
          [:button
           {:type "button" :title sf-tooltip :onclick (fill-onclick sf-value)
-           :class btn-cls :style {:left "calc(100% + 4px)"}}
+           :class (str btn-cls " left-[calc(100%+4px)]")}
           "sf"])]]
 
      ;; Credits value

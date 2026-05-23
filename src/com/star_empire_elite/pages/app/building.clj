@@ -213,7 +213,7 @@
       [:div.flex.items-center.gap-1.translate-x-4.min-w-0
 
        [:div.min-w-0
-        {:style {:width "min(120px, 100%)"}}
+        {:class "w-[min(120px,100%)]"}
         (ui/numeric-input (name (:qty-key spec)) purchase-qty player-id
                           "/calculate-building" building-hx-include
                           {:input-class "text-xs lg:text-sm text-right min-w-0"

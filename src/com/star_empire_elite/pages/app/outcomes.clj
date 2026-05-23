@@ -23,7 +23,7 @@
 (defn- calculate-score
   "Compute player score: planets (dominant) + military (power-weighted) + credits (tiebreaker).
 
-  [player player-map] -> int"
+  [player] -> int"
   [player]
   (+ (* (:player/mil-planets  player) 500)
      (* (:player/erg-planets  player) 300)
@@ -53,19 +53,12 @@
    {:label "def stns"   :unit-key :stations   :loss-key :stations-lost   :defender-only? true}])
 
 (defn- mode-badge [mode]
-  (let [[text color] (case mode
-                       :raid   ["RAID"         "#4ade80"]
-                       :strike ["STRIKE"       "#4ade80"]
-                       :bomb   ["BOMBING"      "#facc15"]
-                       :growth ["GROWTH"       "#4ade80"]
-                               ["INVASION"     "#4ade80"])]
-    [:span {:style {:border (str "1px solid " color) :padding "2px 7px"
-                    :font-size "11px" :letter-spacing "0.12em" :color color}}
+  (let [[text cls] (case mode
+                     (:bomb :spy) ["ESPIONAGE" "border-[#fbbf24] text-[#fbbf24]"]
+                     :growth      ["GROWTH"    "border-[#4ade80] text-[#4ade80]"]
+                                  ["ACTION"    "border-[#f87171] text-[#f87171]"])]
+    [:span {:class (str "border px-[7px] py-[2px] text-[11px] tracking-[0.12em] " cls)}
      text]))
-
-(defn- outcome-label [won?]
-  [:span {:class (str "text-xs tracking-widest " (if won? "text-green-400" "text-red-400"))}
-   (if won? "▲ VICTORY ▲" "▼ DEFEAT ▼")])
 
 (defn- gain-cell [n]
   [:span.text-green-400 (str "+" (ui/format-number n))])
@@ -81,14 +74,182 @@
    [:td.text-center.py-1.px-2.border-r.border-game-divider.text-game-green-muted center]
    [:td.text-left.py-1.px-3 right]])
 
+;;;;
+;;;; Summary Text Helpers
+;;;;
+
+(defn- chevron
+  "Small right-pointing chevron that rotates 90° when the parent <details> is open."
+  []
+  [:span.card-chevron.text-game-green-soft.text-xs.ml-auto "❯"])
+
+(defn- unit-losses-text
+  "One-clause summary of unit losses, e.g. 'lost 12K soldiers, 5 fighters' or 'no losses'."
+  [losses]
+  (let [parts (keep (fn [[label k]]
+                      (let [n (get losses k 0)]
+                        (when (pos? n) (str (ui/format-number-str n) " " label))))
+                    [["soldiers" :soldiers-lost] ["transports" :transports-lost]
+                     ["generals" :generals-lost] ["fighters"   :fighters-lost]
+                     ["carriers" :carriers-lost] ["admirals"   :admirals-lost]
+                     ["cmd ships" :cmd-ships-lost] ["stations" :stations-lost]])]
+    (if (seq parts) (str "lost " (str/join ", " parts)) "no losses")))
+
+(defn- destroyed-units-text
+  "One-clause summary of units destroyed, e.g. 'destroyed 200 soldiers, 30 fighters'.
+  Takes a seq of [label count] pairs."
+  [pairs]
+  (let [parts (keep (fn [[label n]]
+                      (when (and n (pos? n))
+                        (str (ui/format-number-str n) " " label)))
+                    pairs)]
+    (when (seq parts) (str "destroyed " (str/join ", " parts)))))
+
+(defn- non-trivial-losses?
+  "True if any unit type suffered >5% losses relative to starting count.
+  5% is the threshold where losses start to be tactically meaningful —
+  below this, the card collapses to reduce visual noise on routine turns."
+  [counts losses]
+  (some (fn [{:keys [unit-key loss-key]}]
+          (let [n (get counts unit-key 0)
+                lost (get losses loss-key 0)]
+            (and (pos? n) (> (/ (double lost) n) 0.05))))
+        battle-unit-specs))
+
+;;;;
+;;;; Summary Strip
+;;;;
+
+(defn- compute-summary
+  "Compute net turn deltas for the summary strip from already-resolved outcomes.
+
+  Military losses are an unweighted unit count total — the strip is a glance-level
+  overview; per-unit breakdowns are in the individual cards. Planets and resources
+  are net values (positive = gained, negative = lost).
+
+  No new DB queries; all data comes from the cached outcomes map."
+  [{:keys [player battle-result espionage-result pop-growth
+           expense-penalty breakaway-result recovery-result]}]
+  (let [sum-vals   (fn [m] (reduce + 0 (vals (or m {}))))
+        ;; My outgoing combat losses
+        out-losses (when battle-result
+                     (if (= (:mode battle-result) :strike)
+                       {:cmd-ships (:cmd-ships-lost battle-result 0)}
+                       (:attacker-losses battle-result)))
+        ;; My incoming combat losses (I'm the defender)
+        incoming   (mapv read-string (or (:player/incoming-attacks player) []))
+        in-losses  (reduce (fn [acc r]
+                             (merge-with + acc
+                               (or (if (= (:mode r) :strike)
+                                     (:units-destroyed r)
+                                     (:defender-losses r))
+                                   {})))
+                           {} incoming)
+        ;; Incoming bombing losses
+        bomb-r     (some-> (:player/incoming-bomb-result player) read-string)
+        bomb-loss  (if bomb-r
+                     (+ (or (:soldiers-destroyed bomb-r) 0)
+                        (or (:transports-destroyed bomb-r) 0)
+                        (or (:fighters-destroyed bomb-r) 0)
+                        (or (:carriers-destroyed bomb-r) 0))
+                     0)
+        units-lost (+ (sum-vals out-losses) (sum-vals in-losses) bomb-loss)
+        ;; Planet deltas: gained from outgoing wins, lost from incoming + breakaway
+        out-pt     (if (and battle-result (:attacker-wins? battle-result)
+                            (not= (:mode battle-result) :strike))
+                     (or (:planets-transferred battle-result) {}) {})
+        in-pt      (reduce (fn [acc r]
+                             (if (and (:attacker-wins? r) (not= (:mode r) :strike))
+                               (merge-with + acc (or (:planets-transferred r) {}))
+                               acc))
+                           {} incoming)
+        break-pt   (if (and breakaway-result (:triggered? breakaway-result))
+                     {:ore (or (:ore-lost breakaway-result) 0)
+                      :erg (or (:erg-lost breakaway-result) 0)
+                      :mil (or (:mil-lost breakaway-result) 0)}
+                     {})
+        ore (- (or (:ore out-pt) 0) (or (:ore in-pt) 0) (or (:ore break-pt) 0))
+        erg (- (or (:erg out-pt) 0) (or (:erg in-pt) 0) (or (:erg break-pt) 0))
+        mil (- (or (:mil out-pt) 0) (or (:mil in-pt) 0) (or (:mil break-pt) 0))
+        ;; Resource deltas
+        out-res (if (and battle-result (:attacker-wins? battle-result)
+                         (not= (:mode battle-result) :strike))
+                  (or (:resources-captured battle-result) {}) {})
+        in-res  (reduce (fn [acc r]
+                          (if (and (:attacker-wins? r) (not= (:mode r) :strike))
+                            (merge-with + acc (or (:resources-captured r) {}))
+                            acc))
+                        {} incoming)
+        credits (- (or (:credits out-res) 0) (or (:credits in-res) 0))
+        food    (- (or (:food out-res) 0)    (or (:food in-res) 0))
+        fuel    (- (or (:fuel out-res) 0)    (or (:fuel in-res) 0))
+        ;; Stability delta
+        stab-loss (+ (or expense-penalty 0)
+                     (or (:player/incoming-incite-stability-lost player) 0))
+        stab-gain (if (and recovery-result (:triggered? recovery-result))
+                    (or (:amount recovery-result) 0) 0)
+        ;; Agents delta
+        esp-lost   (if (and espionage-result (not (:attacker-wins? espionage-result)))
+                     (or (:agents-captured espionage-result) 0) 0)
+        esp-gained (or (:player/incoming-espionage-agents-gained player) 0)
+        esp-defect (if (and espionage-result (:attacker-wins? espionage-result)
+                            (= (:op espionage-result) "defect"))
+                     (or (:agents-defected espionage-result) 0) 0)]
+    {:units-lost units-lost
+     :ore ore :erg erg :mil mil
+     :credits credits :food food :fuel fuel
+     :stability (- stab-gain stab-loss)
+     :population (or pop-growth 0)
+     :agents (+ (- esp-lost) esp-gained esp-defect)}))
+
+(defn- delta-pill
+  "Render a labeled delta value, colored green for gains / red for losses.
+  Returns nil when n is zero."
+  [label n & [suffix]]
+  (when-not (zero? n)
+    [:span.inline-flex.items-center.gap-1
+     [:span.text-game-green-muted label]
+     [:span {:class (if (neg? n) "text-red-400" "text-green-400")}
+      (str (if (pos? n) "+" "−") (ui/format-number-str (Math/abs n)) (or suffix ""))]]))
+
+(defn- summary-strip
+  "Compact strip showing net turn deltas. Only rendered when at least one delta
+  is non-zero. Visually lighter than event cards — no border, subtle background."
+  [summary]
+  (let [pills (keep identity
+                [(when (pos? (:units-lost summary))
+                   [:span.inline-flex.items-center.gap-1
+                    [:span.text-game-green-muted "UNITS"]
+                    [:span.text-red-400 (str "−" (ui/format-number-str (:units-lost summary)))]])
+                 (delta-pill "ORE"       (:ore       summary))
+                 (delta-pill "ERG"       (:erg       summary))
+                 (delta-pill "MIL"       (:mil       summary))
+                 (delta-pill "CREDITS"   (:credits   summary))
+                 (delta-pill "FOOD"      (:food      summary))
+                 (delta-pill "FUEL"      (:fuel      summary))
+                 (delta-pill "STABILITY" (:stability summary) "%")
+                 (when (pos? (:population summary))
+                   [:span.inline-flex.items-center.gap-1
+                    [:span.text-game-green-muted "POP"]
+                    [:span.text-green-400 (str "+" (ui/format-population (:population summary)))]])
+                 (delta-pill "AGENTS" (:agents summary))])]
+    (when (seq pills)
+      [:div.flex.flex-wrap.gap-x-5.gap-y-1.text-xs.tracking-wide.py-2.px-3.rounded
+       {:class "bg-[rgba(20,42,28,0.15)]"}
+       pills])))
+
+;;;;
+;;;; Card Components
+;;;;
+
 (defn- combat-card
-  "Render a combat card with header, 3-col symmetric table, and optional footer.
+  "Render a collapsible combat card with header summary and 3-col symmetric table.
 
   Left col: your unit count + inline red loss. Right col: opponent's loss delta.
   :stations-mine? true when you are the defender (you have stations).
-  :plunder-label customises the footer label (outgoing vs incoming framing)."
+  :open? controls the initial expansion state."
   [{:keys [mode opp-name won? my-counts my-losses opp-losses
-           stations-mine? resources-taken planets-transferred plunder-label]}]
+           stations-mine? resources-taken planets-transferred open?]}]
   (let [col-header-cls "text-[10px] tracking-widest text-game-green-dim uppercase font-normal py-1.5 px-3"
         dash           [:span.text-game-green-dim "—"]
         make-left      (fn [unit-key loss-key defender-only?]
@@ -101,32 +262,40 @@
                               (when (pos? loss)
                                 [:span.text-red-400.ml-1.5
                                  (str "−" (ui/format-number loss))]))]))
-        make-right (fn [loss-key defender-only?]
-                     (if (and defender-only? stations-mine?)
-                       dash
-                       (opp-loss-cell (get opp-losses loss-key 0))))
-        credits    (or (:credits resources-taken) 0)
-        food       (or (:food    resources-taken) 0)
-        fuel       (or (:fuel    resources-taken) 0)
-        ore-pt     (or (:ore planets-transferred) 0)
-        erg-pt     (or (:erg planets-transferred) 0)
-        mil-pt     (or (:mil planets-transferred) 0)
+        make-right     (fn [loss-key defender-only?]
+                         (if (and defender-only? stations-mine?)
+                           dash
+                           (opp-loss-cell (get opp-losses loss-key 0))))
+        credits        (or (:credits resources-taken) 0)
+        food           (or (:food    resources-taken) 0)
+        fuel           (or (:fuel    resources-taken) 0)
+        ore-pt         (or (:ore planets-transferred) 0)
+        erg-pt         (or (:erg planets-transferred) 0)
+        mil-pt         (or (:mil planets-transferred) 0)
         ;; Both sides always show: attacker gain (+N, left) and defender loss (−N, right).
         ;; When stations-mine? the columns are swapped: your loss on left, attacker gain on right.
-        transfer-row (fn [label n]
-                       (when (pos? n)
-                         (if stations-mine?
-                           (combat-row (opp-loss-cell n) label (gain-cell n))
-                           (combat-row (gain-cell n) label (opp-loss-cell n)))))]
-    [:div.rounded-game.bg-game-surface.overflow-hidden
-     {:class "border border-game-border"}
-     ;; Header: mode badge + opponent name on left, victory/defeat on right
-     [:div.flex.justify-between.items-center.py-2.px-3
-      [:div.flex.items-center.gap-3
-       (mode-badge mode)
-       [:span.text-xl.font-bold.text-green-400 opp-name]]
-      (outcome-label won?)]
-     ;; Table
+        transfer-row   (fn [label n]
+                         (when (pos? n)
+                           (if stations-mine?
+                             (combat-row (opp-loss-cell n) label (gain-cell n))
+                             (combat-row (gain-cell n) label (opp-loss-cell n)))))]
+    [:details.rounded-game.bg-game-surface.overflow-hidden
+     (cond-> {:class "border border-game-border"}
+       open? (assoc :open true))
+     [:summary.list-none.flex.items-center.py-2.px-3.gap-3.cursor-pointer
+      (mode-badge mode)
+      (let [verb       (case mode :invade "invaded" :raid "raided" "attacked")
+            result-cls (if won? "text-green-400" "text-red-400")
+            result-txt (if won? "(SUCCESS)" "(FAILURE)")]
+        [:span.text-sm.flex-1
+         (if (not stations-mine?)
+           [:<> [:span.text-game-green-soft (str "You " verb " ")]
+                [:span.text-green-300.font-bold opp-name]
+                [:span {:class result-cls} (str " " result-txt)]]
+           [:<> [:span.text-green-300.font-bold opp-name]
+                [:span.text-game-green-soft (str " " verb " you")]
+                [:span {:class result-cls} (str " " result-txt)]])])
+      (chevron)]
      [:div.overflow-x-auto
       [:table.w-full.text-xs.table-fixed
        [:thead
@@ -135,45 +304,59 @@
          [:th {:class (str col-header-cls " text-center")}  "UNIT"]
          [:th {:class (str col-header-cls " text-left")}    (str (str/upper-case opp-name) " ►")]]]
        [:tbody
-        ;; Military unit rows
         (for [{:keys [label unit-key loss-key defender-only?]} battle-unit-specs]
           (combat-row (make-left  unit-key loss-key defender-only?)
                       label
                       (make-right loss-key defender-only?)))
-        ;; Planet rows — only when planets changed hands
         (transfer-row "ore planets"      ore-pt)
         (transfer-row "energy planets"   erg-pt)
         (transfer-row "military planets" mil-pt)
-        ;; Plunder rows — only when resources were taken
         (transfer-row "credits" credits)
         (transfer-row "food"    food)
         (transfer-row "fuel"    fuel)]]]]))
 
 (defn- strike-card
-  "Render a strike result using the same 3-col table structure as combat-card.
+  "Render a collapsible strike result using the same 3-col table structure as combat-card.
   :stations-mine? true when you are the defender."
-  [{:keys [opp-name stations-mine? dispatched intercepted units-destroyed defender-stations]}]
+  [{:keys [opp-name stations-mine? dispatched intercepted units-destroyed open?]}]
   (let [col-header-cls "text-[10px] tracking-widest text-game-green-dim uppercase font-normal py-1.5 px-3"
-        dash [:span.text-game-green-dim "—"]
-        att-cmd [:<>
-                 [:span.text-game-green-soft (ui/format-number dispatched)]
-                 (when (pos? intercepted)
-                   [:span.text-red-400.ml-1.5
-                    (str "−" (ui/format-number intercepted))])]
-        ud   (or units-destroyed {})
-        rows [["cmd ships"  att-cmd                              dash]
-              ["soldiers"   dash (opp-loss-cell (:soldiers   ud))]
-              ["transports" dash (opp-loss-cell (:transports ud))]
-              ["generals"   dash (opp-loss-cell (:generals   ud))]
-              ["fighters"   dash (opp-loss-cell (:fighters   ud))]
-              ["carriers"   dash (opp-loss-cell (:carriers   ud))]
-              ["admirals"   dash (opp-loss-cell (:admirals   ud))]
-              ["def stns"   dash           (opp-loss-cell (:stations ud))]]]
-    [:div.rounded-game.bg-game-surface.overflow-hidden
-     {:class "border border-game-border"}
-     [:div.flex.items-center.py-2.px-3.gap-3
+        dash           [:span.text-game-green-dim "—"]
+        att-cmd        [:<>
+                        [:span.text-game-green-soft (ui/format-number dispatched)]
+                        (when (pos? intercepted)
+                          [:span.text-red-400.ml-1.5
+                           (str "−" (ui/format-number intercepted))])]
+        ud             (or units-destroyed {})
+        unit-pairs     [["soldiers" (:soldiers ud)] ["transports" (:transports ud)]
+                        ["fighters" (:fighters ud)] ["stations"   (:stations   ud)]]
+        summary-text   (let [destroyed (destroyed-units-text unit-pairs)]
+                         (if stations-mine?
+                           destroyed
+                           (str/join " · " (keep identity
+                                            [destroyed
+                                             (when (pos? intercepted)
+                                               (str "lost " (ui/format-number-str intercepted) " cmd ships"))]))))
+        rows           [["cmd ships"  att-cmd                              dash]
+                        ["soldiers"   dash (opp-loss-cell (:soldiers   ud))]
+                        ["transports" dash (opp-loss-cell (:transports ud))]
+                        ["generals"   dash (opp-loss-cell (:generals   ud))]
+                        ["fighters"   dash (opp-loss-cell (:fighters   ud))]
+                        ["carriers"   dash (opp-loss-cell (:carriers   ud))]
+                        ["admirals"   dash (opp-loss-cell (:admirals   ud))]
+                        ["def stns"   dash (opp-loss-cell (:stations   ud))]]]
+    [:details.rounded-game.bg-game-surface.overflow-hidden
+     (cond-> {:class "border border-game-border"}
+       open? (assoc :open true))
+     [:summary.list-none.flex.items-center.py-2.px-3.gap-3.cursor-pointer
       (mode-badge :strike)
-      [:span.text-xl.font-bold.text-green-400 opp-name]]
+      [:span.text-sm.flex-1
+       (if (not stations-mine?)
+         [:<> [:span.text-game-green-soft "You launched a missile strike on "]
+              [:span.text-green-300.font-bold opp-name]]
+         [:<> [:span.text-green-300.font-bold opp-name]
+              [:span.text-game-green-soft " launched a missile strike on you"]])]
+      (when summary-text [:span.text-xs.text-game-green-dim (str "— " summary-text)])
+      (chevron)]
      [:div.overflow-x-auto
       [:table.w-full.text-xs.table-fixed
        [:thead
@@ -187,71 +370,86 @@
             (combat-row def-cell label att-cell)
             (combat-row att-cell label def-cell)))]]]]))
 
-(defn- spy-badge [op won?]
-  (let [[text color] (if (not won?)
-                       ["FAILED"  "#f87171"]
-                       (case op
-                         "spy"    ["SPY"     "#facc15"]
-                         "incite" ["INCITE"  "#facc15"]
-                         "defect" ["DEFECT"  "#facc15"]
-                                  ["COVERT"  "#facc15"]))]
-    [:span {:style {:border (str "1px solid " color) :padding "2px 7px"
-                    :font-size "11px" :letter-spacing "0.12em" :color color}}
-     text]))
-
 (defn- spy-card
-  [{:keys [opp-name won? op spy lost stab agents-defected]}]
-  [:div.rounded-game.bg-game-surface.overflow-hidden
-   {:class "border border-game-border"}
-   [:div.flex.items-center.py-2.px-3.gap-3
-    (spy-badge op won?)
-    [:span.text-xl.font-bold.text-green-400 opp-name]]
-   [:div.py-1.5.px-3.border-t.border-game-divider
-    (cond
-      (and won? (= op "spy"))
-      (let [units [["Soldiers"   (:soldiers   spy)]
-                   ["Transports" (:transports spy)]
-                   ["Generals"   (:generals   spy)]
-                   ["Fighters"   (:fighters   spy)]
-                   ["Carriers"   (:carriers   spy)]
-                   ["Admirals"   (:admirals   spy)]
-                   ["Stations"   (:stations   spy)]
-                   ["Cmd Ships"  (:cmd-ships  spy)]
-                   ["Agents"     (:agents     spy)]]]
-        [:div.grid.grid-cols-3.gap-x-4.gap-y-0.5
-         (for [[label val] units]
-           [:div.flex.justify-between.items-center
-            [:span.text-game-green-muted.text-xs label]
-            [:span.text-game-green-soft (ui/format-number (or val 0))]])])
+  [{:keys [opp-name won? op spy lost stab agents-defected open?]}]
+  (let [summary-text (cond
+                       (not won?)      (str (or lost 0) " agents captured")
+                       (= op "incite") (str "stability −" stab)
+                       (= op "defect") (str (or agents-defected 0) " agents defected")
+                       :else           "intel gathered")]
+    [:details.rounded-game.bg-game-surface.overflow-hidden
+     (cond-> {:class "border border-game-border"}
+       open? (assoc :open true))
+     [:summary.list-none.flex.items-center.py-2.px-3.gap-3.cursor-pointer
+      (mode-badge :spy)
+      (let [verb       (case op
+                         "spy"    (if won? "spied on" "failed to spy on")
+                         "incite" (if won? "stirred unrest within" "failed to stir unrest within")
+                         "defect" (if won? "subverted agents from" "failed to subvert from")
+                                  (if won? "operated against" "failed to operate against"))
+            result-cls (if won? "text-green-400" "text-red-400")
+            result-txt (if won? "(SUCCESS)" "(FAILURE)")]
+        [:span.text-sm.flex-1
+         [:<> [:span.text-game-green-soft (str "You " verb " ")]
+              [:span.text-green-300.font-bold opp-name]
+              [:span {:class result-cls} (str " " result-txt)]]])
+      (chevron)]
+     [:div.py-1.5.px-3.border-t.border-game-divider
+      (cond
+        (and won? (= op "spy"))
+        (let [units [["Soldiers"  (:soldiers  spy)] ["Transports" (:transports spy)]
+                     ["Generals"  (:generals  spy)] ["Fighters"   (:fighters   spy)]
+                     ["Carriers"  (:carriers  spy)] ["Admirals"   (:admirals   spy)]
+                     ["Stations"  (:stations  spy)] ["Cmd Ships"  (:cmd-ships  spy)]
+                     ["Agents"    (:agents    spy)]]]
+          [:div.grid.grid-cols-3.gap-x-4.gap-y-0.5
+           (for [[label val] units]
+             [:div.flex.justify-between.items-center
+              [:span.text-game-green-muted.text-xs label]
+              [:span.text-game-green-soft (ui/format-number (or val 0))]])])
 
-      (and won? (= op "incite"))
-      [:p.text-xs.text-game-green-soft
-       (str "Your agents successfully stirred unrest. "
-            opp-name "'s stability was reduced by " stab ".")]
+        (and won? (= op "incite"))
+        [:p.text-xs.text-game-green-soft
+         (str "Your agents successfully stirred unrest. "
+              "The stability of " opp-name " was reduced by " stab "%.")]
 
-      (and won? (= op "defect"))
-      [:p.text-xs.text-game-green-soft
-       (str (or agents-defected 0)
-            " agent(s) defected from " opp-name " to your service.")]
+        (and won? (= op "defect"))
+        [:p.text-xs.text-game-green-soft
+         (str (or agents-defected 0) " agent(s) defected from " opp-name " to your service.")]
 
-      :else
-      [:p.text-xs.text-game-green-soft
-       (str "Your agents were unable to complete their mission. "
-            lost " agent(s) were captured by " opp-name ".")])]])
+        :else
+        [:p.text-xs.text-game-green-soft
+         (str "Your agents were unable to complete their mission. "
+              lost " agent(s) were captured by " opp-name ".")])]]))
 
 (defn- bomb-card
-  "Render a bombing raid result card."
-  [{:keys [opp-name won? soldiers transports fighters carriers]}]
-  (let [units [["Soldiers"   (or soldiers   0)]
-               ["Transports" (or transports 0)]
-               ["Fighters"   (or fighters   0)]
-               ["Carriers"   (or carriers   0)]]]
-    [:div.rounded-game.bg-game-surface.overflow-hidden
-     {:class "border border-game-border"}
-     [:div.flex.items-center.py-2.px-3.gap-3
+  "Render a collapsible bombing raid result card."
+  [{:keys [opp-name won? you-are-attacker? soldiers transports fighters carriers open?]}]
+  (let [units        [["Soldiers"   (or soldiers   0)]
+                      ["Transports" (or transports 0)]
+                      ["Fighters"   (or fighters   0)]
+                      ["Carriers"   (or carriers   0)]]
+        summary-text (when won?
+                       (destroyed-units-text
+                         [["soldiers" soldiers] ["transports" transports]
+                          ["fighters" fighters] ["carriers"   carriers]]))]
+    [:details.rounded-game.bg-game-surface.overflow-hidden
+     (cond-> {:class "border border-game-border"}
+       open? (assoc :open true))
+     [:summary.list-none.flex.items-center.py-2.px-3.gap-3.cursor-pointer
       (mode-badge :bomb)
-      [:span.text-xl.font-bold.text-green-400
-       (str opp-name " (" (if won? "succeeded" "failed") ")")]]
+      (let [result-cls (if won? "text-green-400" "text-red-400")
+            result-txt (if won? "(SUCCESS)" "(FAILURE)")]
+        [:span.text-sm.flex-1
+         (if you-are-attacker?
+           [:<> [:span.text-game-green-soft "You bombed "]
+                [:span.text-green-300.font-bold opp-name]
+                [:span {:class result-cls} (str " " result-txt)]]
+           [:<> [:span.text-green-300.font-bold opp-name]
+                [:span.text-game-green-soft " bombed you"]
+                [:span {:class result-cls} (str " " result-txt)]])])
+      (when summary-text [:span.text-xs.text-game-green-dim (str "— " summary-text)])
+      (chevron)]
      (when won?
        [:div.grid.grid-cols-4.py-1.5.px-3.border-t.border-game-divider
         (for [[label val] units]
@@ -259,7 +457,7 @@
            [:span.text-game-green-muted.text-xs label]
            [:span.text-game-green-soft (ui/format-number val)]])])]))
 
-(defn- growth-card [{:keys [pop-growth population]}]
+(defn- growth-card [{:keys [pop-growth]}]
   [:div.rounded-game.bg-game-surface.overflow-hidden
    {:class "border border-game-border"}
    [:div.flex.items-center.py-2.px-3.gap-3
@@ -267,15 +465,9 @@
     (if (pos? pop-growth)
       [:span.text-game-green-soft.text-sm
        "Population grew by "
-       [:span.text-green-400 (str "+" (ui/format-population pop-growth))]
-       [:span.text-game-green-dim " · "]
-       "total "
-       [:span.text-green-400 (ui/format-population population)]]
+       [:span.text-green-400 (str "+" (ui/format-population pop-growth))]]
       [:span.text-game-green-soft.text-sm
-       "Population held steady this round"
-       [:span.text-game-green-dim " · "]
-       "total "
-       [:span.text-green-400 (ui/format-population population)]])]])
+       "Population held steady this round"])]])
 
 (defn apply-outcomes
   "Advance turn/round/phase and clear stored battle and espionage results.
@@ -290,124 +482,206 @@
       (if (= (:player/status player) const/player-status-eliminated)
         {:status 303 :headers {"location" (str "/app/game/" player-id "/eliminated")}}
         (let [turns-per-round (:game/turns-per-round game)
-            now             (java.util.Date.)
-            turns-used      (inc (:player/turns-used player))
-            end-round?      (>= turns-used turns-per-round)
-            next-turn       (if end-round? 1 (inc (:player/current-turn player)))
-            next-round      (if end-round? (inc (:player/current-round player)) (:player/current-round player))
-            reset-used      (if end-round? 0 turns-used)]
-        (biff/submit-tx ctx
-          [(merge {:db/doc-type                     :player
-                   :db/op                           :update
-                   :xt/id                           player-id
-                   :player/current-turn             next-turn
-                   :player/current-round            next-round
-                   :player/turns-used               reset-used
-                   :player/current-phase            1
-                   :player/last-turn-at             now
-                   :player/last-battle-result              nil
-                   :player/last-espionage-result           nil
-                   :player/last-population-growth          nil
-                   :player/last-expense-stability-penalty  nil
-                   :player/last-stability-breakaway        nil
-                   :player/last-stability-recovery         nil
-                   :player/pending-espionage               nil
-                   :player/incoming-attacks                 nil
-                   :player/incoming-espionage-fails         0
-                   :player/incoming-espionage-agents-gained nil
-                   :player/incoming-incite-stability-lost   nil
-                   :player/incoming-bomb-result             nil
-                   :player/pending-espionage-op             nil
-                   :player/score                    (calculate-score player)}
-                  (when end-round?
-                    {:player/last-round-completed-at now}))])
-        {:status 303
-         :headers {"location" (str "/app/game/" player-id "/income")}})))))
+              now             (java.util.Date.)
+              turns-used      (inc (:player/turns-used player))
+              end-round?      (>= turns-used turns-per-round)
+              next-turn       (if end-round? 1 (inc (:player/current-turn player)))
+              next-round      (if end-round?
+                                (inc (:player/current-round player))
+                                (:player/current-round player))
+              reset-used      (if end-round? 0 turns-used)]
+          (biff/submit-tx ctx
+            [(merge {:db/doc-type                            :player
+                     :db/op                                  :update
+                     :xt/id                                  player-id
+                     :player/current-turn                    next-turn
+                     :player/current-round                   next-round
+                     :player/turns-used                      reset-used
+                     :player/current-phase                   1
+                     :player/last-turn-at                    now
+                     :player/last-battle-result              nil
+                     :player/last-espionage-result           nil
+                     :player/last-population-growth          nil
+                     :player/last-expense-stability-penalty  nil
+                     :player/last-stability-breakaway        nil
+                     :player/last-stability-recovery         nil
+                     :player/pending-espionage               nil
+                     :player/incoming-attacks                nil
+                     :player/incoming-espionage-fails        nil
+                     :player/incoming-espionage-agents-gained nil
+                     :player/incoming-incite-stability-lost  nil
+                     :player/incoming-bomb-result            nil
+                     :player/pending-espionage-op            nil
+                     :player/score                           (calculate-score player)}
+                    (when end-round?
+                      {:player/last-round-completed-at now}))])
+          {:status 303
+           :headers {"location" (str "/app/game/" player-id "/income")}})))))
 
 ;;;;
 ;;;; Page
 ;;;;
 
-(defn outcomes-page
-  "Show turn results (combat, espionage, population growth, expense penalties, breakaway) and the advance button.
+(defn- stability-card
+  "Render a collapsible stability card combining expense penalty, breakaway, and recovery."
+  [{:keys [expense-penalty breakaway-result recovery-result]}]
+  (let [has-penalty?   (and (some? expense-penalty) (pos? expense-penalty))
+        has-breakaway? (and (some? breakaway-result) (:triggered? breakaway-result))
+        has-recovery?  (and (some? recovery-result) (:triggered? recovery-result))
+        open?          (or has-penalty? has-breakaway?)
+        summary-text   (cond
+                         has-breakaway? (str "empire fractured — "
+                                             (:total-lost breakaway-result) " planets lost")
+                         has-penalty?   (str "−" expense-penalty "%")
+                         has-recovery?  (str "+" (:amount recovery-result) "% recovery")
+                         :else          "")]
+    (when (or has-penalty? has-breakaway? has-recovery?)
+      [:details.rounded-game.bg-game-surface.overflow-hidden
+       (cond-> {:class "border border-game-border"}
+         open? (assoc :open true))
+       [:summary.list-none.flex.items-center.py-2.px-3.gap-3.cursor-pointer
+        [:span {:class "border border-[#facc15] text-[#facc15] px-[7px] py-[2px] text-[11px] tracking-[0.12em]"}
+         "STABILITY"]
+        [:span.text-sm.font-bold {:class (if has-breakaway? "text-red-400" "text-yellow-400")}
+         summary-text]
+        (chevron)]
+       [:div.p-3.border-t.border-game-divider
+        (when has-penalty?
+          [:p.text-xs.mb-2.text-yellow-400
+           (str "Empire stability decreases due to unpaid expenses: −" expense-penalty "%")])
+        (when has-breakaway?
+          (let [lost-str (str/join ", "
+                           (keep identity
+                             [(when (pos? (:ore-lost breakaway-result))
+                                (str (:ore-lost breakaway-result) " ore planet(s)"))
+                              (when (pos? (:erg-lost breakaway-result))
+                                (str (:erg-lost breakaway-result) " energy planet(s)"))
+                              (when (pos? (:mil-lost breakaway-result))
+                                (str (:mil-lost breakaway-result) " military planet(s)"))]))]
+            [:p.text-xs.mb-2.text-red-400
+             (str "Empire instability prompts revolution. Lost: " lost-str)]))
+        (when has-recovery?
+          [:p.text-xs.text-green-400
+           (str "Empire stability increases due to paid expenses: +" (:amount recovery-result) "%")])]])))
 
-  [{:keys [player game battle-result espionage-result pop-growth expense-penalty breakaway-result recovery-result eliminated?]}] -> hiccup"
-  [{:keys [player game battle-result espionage-result pop-growth expense-penalty breakaway-result recovery-result eliminated?]}]
-  (let [current-turn       (:player/current-turn player)
-        turns-per-round    (:game/turns-per-round game)
-        end-current-round? (>= current-turn turns-per-round)
-        card-cls           "rounded-game bg-game-surface border border-game-border p-3"]
+(defn- incoming-card
+  "Render a single incoming attack card (combat or strike)."
+  [r]
+  (let [result (read-string r)]
+    (if (= (:mode result) :strike)
+      (strike-card {:opp-name          (:attacker-name result)
+                    :stations-mine?    true
+                    :dispatched        (:cmd-ships-dispatched result)
+                    :intercepted       (:cmd-ships-lost result)
+                    :units-destroyed   (:units-destroyed result)
+                    :open?             true})
+      (combat-card {:mode                (get result :mode :invade)
+                    :opp-name            (:attacker-name result)
+                    :won?                (not (:attacker-wins? result))
+                    :my-counts           (:defender-counts result)
+                    :my-losses           (:defender-losses result)
+                    :opp-losses          (:attacker-losses result)
+                    :stations-mine?      true
+                    :resources-taken     (:resources-captured result)
+                    :planets-transferred (:planets-transferred result)
+                    :open?               true}))))
+
+(defn- esp-fails-card
+  "Render a collapsible card for incoming espionage operations that were foiled."
+  [esp-fails esp-agents]
+  (let [op-verb  (fn [op] (case op
+                            "spy"    "spied on you"
+                            "incite" "attempted to incite unrest in your empire"
+                            "defect" "attempted to turn your agents"
+                            "bomb"   "attempted to bomb your forces"
+                                     "operated against you"))
+        summary  (if (= 1 (count esp-fails))
+                   (str "An empire " (op-verb (first esp-fails)))
+                   (str (count esp-fails) " empires operated against you"))]
+    [:details.rounded-game.bg-game-surface.overflow-hidden
+     {:class "border border-game-border"}
+     [:summary.list-none.flex.items-center.py-2.px-3.gap-3.cursor-pointer
+      (mode-badge :spy)
+      [:span.text-sm.flex-1
+       [:span.text-game-green-soft summary]
+       [:span.text-green-400 " (FOILED)"]]
+      (when (pos? esp-agents) (chevron))]
+     (when (pos? esp-agents)
+       [:div.py-2.px-3.border-t.border-game-divider
+        [:p.text-xs.text-green-400
+         (str esp-agents " captured agent(s) joined your forces.")]])]))
+
+(defn outcomes-page
+  "Show turn results with a summary strip, collapsible event cards, and the advance button.
+
+  Cards use native <details>/<summary> for collapse. Smart defaults expand events
+  that matter (incoming attacks, defeats, non-trivial losses) and collapse routine
+  successes and steady-state events.
+
+  [{:keys [player game battle-result espionage-result pop-growth expense-penalty
+           breakaway-result recovery-result eliminated?]}] -> hiccup"
+  [{:keys [player game battle-result espionage-result pop-growth expense-penalty
+           breakaway-result recovery-result eliminated?] :as outcomes}]
+  (let [current-turn    (:player/current-turn player)
+        turns-per-round (:game/turns-per-round game)
+        end-round?      (>= current-turn turns-per-round)]
     (ui/page
      {}
      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative
       {:class "bg-game-bg rounded text-green-400 font-mono border-[1.5px] border-game-green-border"}
       (ui/scanline-overlay)
       (ui/phase-topbar player game "OUTCOMES PHASE")
-      ;; Body
       [:div.flex.flex-col.gap-2.py-2.5.px-3.5
 
-       ;; Incoming attacks section (attacks received from other players this turn)
+       (summary-strip (compute-summary outcomes))
+
+       ;; Incoming section — attacks and espionage received this turn
        (let [incoming         (seq (:player/incoming-attacks player))
-             esp-fails        (or (:player/incoming-espionage-fails player) 0)
+             esp-fails        (or (:player/incoming-espionage-fails player) [])
              esp-agents       (or (:player/incoming-espionage-agents-gained player) 0)
              incite-stab-lost (or (:player/incoming-incite-stability-lost player) 0)
-             bomb-result      (some-> (:player/incoming-bomb-result player) clojure.core/read-string)]
-         (when (or incoming (pos? esp-fails) (pos? incite-stab-lost) bomb-result)
+             bomb-result      (some-> (:player/incoming-bomb-result player) read-string)]
+         (when (or incoming (seq esp-fails) (pos? incite-stab-lost) bomb-result)
            [:div.flex.flex-col.gap-2
-            (for [r incoming]
-              (let [result (clojure.core/read-string r)]
-                (if (= (:mode result) :strike)
-                  ;; --- Incoming strike ---
-                  (strike-card {:opp-name          (:attacker-name result)
-                                :stations-mine?    true
-                                :dispatched        (:cmd-ships-dispatched result)
-                                :intercepted       (:cmd-ships-lost result)
-                                :units-destroyed   (:units-destroyed result)
-                                :defender-stations (:defender-stations result)})
-                  ;; --- Incoming raid/invade ---
-                  (let [att-wins? (:attacker-wins? result)]
-                    (combat-card {:mode                (get result :mode :invade)
-                                  :opp-name            (:attacker-name result)
-                                  :won?                (not att-wins?)
-                                  :my-counts           (:defender-counts result)
-                                  :my-losses           (:defender-losses result)
-                                  :opp-losses          (:attacker-losses result)
-                                  :stations-mine?      true
-                                  :resources-taken     (:resources-captured result)
-                                  :planets-transferred (:planets-transferred result)
-                                  :plunder-label       "SEIZED FROM YOUR TREASURY"})))))
-            (when (pos? esp-fails)
-              [:div {:class card-cls}
-               [:p.font-bold.text-green-400
-                (str esp-fails " covert operation(s) against your empire were discovered and neutralized.")
-                (when (pos? esp-agents)
-                  (str " " esp-agents " captured agent(s) joined your forces."))]])
+            (map incoming-card incoming)
+            (when (seq esp-fails)
+              (esp-fails-card esp-fails esp-agents))
             (when (pos? incite-stab-lost)
-              [:div {:class card-cls}
-               [:p.font-bold.text-yellow-400
-                (str "Enemy agents successfully incited unrest in your empire. Stability reduced by "
-                     incite-stab-lost ".")]])
+              [:details.rounded-game.bg-game-surface.overflow-hidden
+               {:class "border border-game-border"}
+               [:summary.list-none.flex.items-center.py-2.px-3.gap-3.cursor-pointer
+                (mode-badge :spy)
+                [:span.text-sm.flex-1
+                 [:span.text-game-green-soft "An empire incited unrest in your empire"]
+                 [:span.text-red-400 " (SUCCESS)"]]
+                (chevron)]
+               [:div.py-2.px-3.border-t.border-game-divider
+                [:p.text-xs.text-yellow-400
+                 (str "Enemy agents stirred unrest. Stability reduced by " incite-stab-lost "%.")]]])
             (when bomb-result
-              (bomb-card {:opp-name   (:attacker-name        bomb-result)
-                          :won?       true
-                          :soldiers   (:soldiers-destroyed   bomb-result)
-                          :transports (:transports-destroyed bomb-result)
-                          :fighters   (:fighters-destroyed   bomb-result)
-                          :carriers   (:carriers-destroyed   bomb-result)}))]))
+              (bomb-card {:opp-name          (:attacker-name        bomb-result)
+                          :won?              true
+                          :you-are-attacker? false
+                          :soldiers          (:soldiers-destroyed   bomb-result)
+                          :transports        (:transports-destroyed bomb-result)
+                          :fighters          (:fighters-destroyed   bomb-result)
+                          :carriers          (:carriers-destroyed   bomb-result)
+                          :open?             true}))]))
 
-       ;; Battle result section (only shown when an attack was declared)
+       ;; Outgoing battle result
        (when battle-result
          (let [mode     (get battle-result :mode :invade)
                def-name (:defender-name battle-result)]
            (if (= mode :strike)
-             ;; --- Strike result ---
-             (strike-card {:opp-name          def-name
-                           :stations-mine?    false
-                           :dispatched        (:cmd-ships-dispatched battle-result)
-                           :intercepted       (:cmd-ships-lost       battle-result)
-                           :units-destroyed   (:units-destroyed      battle-result)
-                           :defender-stations (:defender-stations    battle-result)})
-             ;; --- Invade / Raid result ---
+             (let [committed (or (:cmd-ships-committed battle-result) 0)
+                   lost      (or (:cmd-ships-lost battle-result) 0)]
+               (strike-card {:opp-name        def-name
+                             :stations-mine?  false
+                             :dispatched      (:cmd-ships-dispatched battle-result)
+                             :intercepted     lost
+                             :units-destroyed (:units-destroyed      battle-result)
+                             :open?           (and (pos? committed)
+                                                   (> (/ (double lost) committed) 0.05))}))
              (combat-card {:mode                mode
                            :opp-name            def-name
                            :won?                (:attacker-wins? battle-result)
@@ -417,73 +691,51 @@
                            :stations-mine?      false
                            :resources-taken     (:resources-captured battle-result)
                            :planets-transferred (:planets-transferred battle-result)
-                           :plunder-label       "PLUNDERED FROM TREASURY"}))))
+                           :open?               (or (not (:attacker-wins? battle-result))
+                                                    (non-trivial-losses?
+                                                      (:attacker-counts battle-result)
+                                                      (:attacker-losses battle-result)))}))))
 
-       ;; Espionage result section (only shown when an operation was declared)
+       ;; Outgoing espionage result
        (when espionage-result
-         (let [won?  (:attacker-wins? espionage-result)
-               op    (get espionage-result :op "spy")
-               intel (:intel espionage-result)
-               lost  (or (:agents-captured espionage-result) 0)
-               stab  (:stability-damage espionage-result)]
+         (let [won? (:attacker-wins? espionage-result)
+               op   (get espionage-result :op "spy")]
            (if (= op "bomb")
-             (bomb-card {:opp-name   (:defender-name espionage-result)
-                         :won?       won?
-                         :soldiers   (:soldiers-destroyed   espionage-result)
-                         :transports (:transports-destroyed espionage-result)
-                         :fighters   (:fighters-destroyed   espionage-result)
-                         :carriers   (:carriers-destroyed   espionage-result)})
+             (bomb-card {:opp-name          (:defender-name espionage-result)
+                         :won?              won?
+                         :you-are-attacker? true
+                         :soldiers          (:soldiers-destroyed   espionage-result)
+                         :transports        (:transports-destroyed espionage-result)
+                         :fighters          (:fighters-destroyed   espionage-result)
+                         :carriers          (:carriers-destroyed   espionage-result)
+                         :open?             (not won?)})
              (spy-card {:opp-name        (:defender-name espionage-result)
                         :won?            won?
                         :op              op
-                        :spy             intel
-                        :lost            lost
-                        :stab            stab
-                        :agents-defected (:agents-defected espionage-result)}))))
+                        :spy             (:intel espionage-result)
+                        :lost            (or (:agents-captured espionage-result) 0)
+                        :stab            (:stability-damage espionage-result)
+                        :agents-defected (:agents-defected espionage-result)
+                        :open?           (not won?)}))))
 
-       ;; Stability section — only shown when at least one stability event occurred
-       (let [has-penalty?   (and (some? expense-penalty) (pos? expense-penalty))
-             has-breakaway? (and (some? breakaway-result) (:triggered? breakaway-result))
-             has-recovery?  (and (some? recovery-result) (:triggered? recovery-result))]
-         (when (or has-penalty? has-breakaway? has-recovery?)
-           [:div {:class card-cls}
-            [:h3.font-bold.mb-3.text-green-400 "Stability"]
-            (when has-penalty?
-              [:p.text-xs.mb-2.text-yellow-400
-               (str "Empire stability decreases due to unpaid expenses: −" expense-penalty "%")])
-            (when has-breakaway?
-              (let [lost-str (clojure.string/join ", "
-                               (keep identity
-                                 [(when (pos? (:ore-lost breakaway-result))
-                                    (str (:ore-lost breakaway-result) " ore planet(s)"))
-                                  (when (pos? (:erg-lost breakaway-result))
-                                    (str (:erg-lost breakaway-result) " energy planet(s)"))
-                                  (when (pos? (:mil-lost breakaway-result))
-                                    (str (:mil-lost breakaway-result) " military planet(s)"))]))]
-                [:p.text-xs.mb-2.text-red-400
-                 (str "Empire instability prompts revolution. Lost: " lost-str)]))
-            (when has-recovery?
-              [:p.text-xs.text-green-400
-               (str "Empire stability increases due to paid expenses: +" (:amount recovery-result) "%")])]))
+       (stability-card {:expense-penalty  expense-penalty
+                        :breakaway-result breakaway-result
+                        :recovery-result  recovery-result})
 
-       ;; Elimination notice (only shown when player has 0 planets)
        (when eliminated?
-         [:div {:class "rounded-game bg-game-surface border border-red-400 p-3"}
+         [:div.rounded-game.bg-game-surface.border.border-red-400.p-3
           [:h3.font-bold.mb-2.text-red-400 "Empire Eliminated"]
           [:p.text-xs.text-red-400
            "Your empire has no planets remaining. You have been eliminated."]])
 
-       ;; Population growth section (only shown at end of round)
        (when (some? pop-growth)
-         (growth-card {:pop-growth pop-growth
-                       :population (:player/population player)}))
+         (growth-card {:pop-growth pop-growth}))
 
        (ui/snapshot-section player)]
 
-      ;; Action bar
       [:div.flex.gap-2.py-2.px-3.5.border-t.border-game-border
        (ui/action-bar-link (str "/app/game/" (:xt/id player)) "Pause")
        (biff/form
         {:action (str "/app/game/" (:xt/id player) "/apply-outcomes") :method "post"
          :class  "m-0"}
-        (ui/submit-button true (if end-current-round? "End the Current Round" "Continue to Next Turn")))]])))
+        (ui/submit-button true (if end-round? "End the Current Round" "Continue to Next Turn")))]])))

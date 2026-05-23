@@ -189,7 +189,7 @@
       [:line {:x1 75  :y1 (+ ly 1) :x2 75  :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
       [:line {:x1 100 :y1 (+ ly 1) :x2 100 :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]]
      [:div.text-xs.text-gray-400.relative.mb-2
-      {:style {:height "1em"}}
+      {:class "h-[1em]"}
       [:span.absolute.left-0 "0"]
       [:span {:class "absolute left-1/2 -translate-x-1/2"} (fmt-tick (* 0.5 scale-max))]
       [:span.absolute.right-0 (fmt-tick scale-max)]]]))
@@ -231,7 +231,7 @@
   [] -> hiccup"
   []
   [:div.absolute.inset-0.pointer-events-none.z-10
-   {:style {:background "repeating-linear-gradient(to bottom, transparent 0px, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 3px)"}}])
+   {:class "bg-[repeating-linear-gradient(to_bottom,transparent_0px,transparent_2px,rgba(0,0,0,0.07)_2px,rgba(0,0,0,0.07)_3px)]"}])
 
 (defn phase-topbar
   "Render the terminal-shell topbar with empire name, turn/round subtitle, and phase stepper.
@@ -447,8 +447,7 @@
   [player player-map] -> hiccup"
   [player]
   [:div.grid.grid-cols-4
-   {:class "border-b border-game-border"
-    :style {:background "linear-gradient(180deg, rgba(20,42,28,0.5), rgba(20,42,28,0.15))"}}
+   {:class "border-b border-game-border bg-[linear-gradient(180deg,rgba(20,42,28,0.5),rgba(20,42,28,0.15))]"}
    (for [[label value] [["CREDITS"     (format-number (:player/credits     player))]
                         ["ORE PLANETS" (str (:player/ore-planets player))]
                         ["ERG PLANETS" (str (:player/erg-planets player))]
@@ -521,7 +520,7 @@
   [projections seq, projection-turn str] -> hiccup"
   [projections projection-turn]
   [:div {:class "px-4 pt-[10px] pb-[14px] border-t border-game-border"
-         :style {:background "rgba(20,42,28,0.10)"}}
+         :class "bg-[rgba(20,42,28,0.10)]"}
    [:div.flex.items-baseline.uppercase
     {:class "text-[9px] tracking-[0.18em] text-game-green-dim mb-2"}
     (str "› RESOURCE PROJECTIONS · " projection-turn)
@@ -570,7 +569,7 @@
      (snapshot-projections projections projection-turn))
    (when extra
      [:div {:class "px-4 pt-[10px] pb-[14px] border-t border-game-border"
-            :style {:background "rgba(20,42,28,0.10)"}}
+            :class "bg-[rgba(20,42,28,0.10)]"}
       extra])])
 
 (defn projection-pill
@@ -683,12 +682,12 @@
   [player player-map] -> hiccup | nil"
   [player]
   (let [attacks   (seq (:player/incoming-attacks player))
-        esp-fails (or (:player/incoming-espionage-fails player) 0)]
-    (when (or attacks (pos? esp-fails))
+        esp-fails (seq (:player/incoming-espionage-fails player))]
+    (when (or attacks esp-fails)
       [:p.mb-4.text-red-400.text-sm
        (str "\u26a0 "
             (when attacks "Your empire was attacked. ")
-            (when (pos? esp-fails) "Espionage against your empire was discovered. ")
+            (when esp-fails "Espionage against your empire was discovered. ")
             "See details in Outcomes phase.")])))
 
 (defn incoming-alert
@@ -698,7 +697,7 @@
   [player player-map] -> hiccup"
   [player]
   (let [has-alerts? (or (seq (:player/incoming-attacks player))
-                        (pos? (or (:player/incoming-espionage-fails player) 0)))
+                        (seq (:player/incoming-espionage-fails player)))
         player-id   (:xt/id player)]
     [:div#incoming-alert
      {:hx-get     (str "/app/game/" player-id "/alerts")
