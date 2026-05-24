@@ -364,9 +364,11 @@
 (defn apply-exchange
   "Commit exchanges to the database and redirect back to expenses. Stays in phase 2 to allow
   additional exchanges. Uses pure calculation functions to determine resource changes.
+  If the exchange is no longer valid against current player state (e.g. units destroyed by an
+  incoming attack between page load and submit), redirects back to the exchange page without writing.
 
-  [ctx ring-ctx] -> ring-response (303 redirect to expenses)"
-  [{:keys [path-params params biff/db] :as ctx}]
+  [ctx ring-ctx] -> ring-response (303 redirect to expenses or exchange)"
+  [{:keys [path-params params biff/db session] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (if-let [redirect (utils/validate-phase player 2 player-id)]
       redirect
@@ -374,8 +376,11 @@
             rates          (get-exchange-rates game)
             credit-changes (calculate-exchange-credits quantities rates)
             resources-after (calculate-resources-after-exchange player quantities credit-changes)]
-        (if (not (valid-exchange? resources-after))
-          {:status 400 :body "Invalid exchange: insufficient resources"}
+        (if-not (valid-exchange? resources-after)
+          {:status  303
+           :headers {"location" (str "/app/game/" player-id "/exchange")}
+           :session (utils/flash session :warn
+                      "Submission rejected due to a change in your empire (enemy attack or espionage). Please review and resubmit.")}
           (do
             (biff/submit-tx ctx
                             [{:db/doc-type :player
@@ -537,8 +542,8 @@
 (defn exchange-page
   "Show exchange options and input fields for buying/selling resources and assets.
 
-  [{:keys [player game]}] -> hiccup"
-  [{:keys [player game]}]
+  [{:keys [player game flash]}] -> hiccup"
+  [{:keys [player game flash]}]
   (let [player-id          (:xt/id player)
         rates              (get-exchange-rates game)
         zero-quantities    (into {} (for [spec (concat sell-row-specs buy-row-specs)]
@@ -552,6 +557,7 @@
                       {:action (str "/app/game/" player-id "/apply-exchange") :method "post"
                        :class  "m-0"}
                       (ui/phase-body player
+                                     (ui/flash-notice flash)
                                      (ui/snapshot-section player {:projections projections-data :projection-turn "THIS TURN"})
                                      (ui/section-label "Sell Assets")
                                      [:div

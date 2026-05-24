@@ -357,25 +357,40 @@
 
 (defn expenses-handler
   "Phase 2 — expenses. Pay upkeep for units, planets, and population."
-  [ctx]
+  [{:keys [session] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (or (utils/validate-phase player 2 player-id)
-        (expenses/expenses-page {:player player :game game}))))
+        (let [[flash new-session] (utils/take-flash session)]
+          {:status  200
+           :headers {"content-type" "text/html"}
+           :session new-session
+           :body    (rum/render-static-markup
+                      (expenses/expenses-page {:player player :game game :flash flash}))}))))
 
 (defn exchange-handler
   "Phase 2 (sub-phase) — exchange. Buy and sell food, fuel, and units on the open market.
   Shares phase 2 with expenses so the player can move between them freely."
-  [ctx]
+  [{:keys [session] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (or (utils/validate-phase player 2 player-id)
-        (exchange/exchange-page {:player player :game game}))))
+        (let [[flash new-session] (utils/take-flash session)]
+          {:status  200
+           :headers {"content-type" "text/html"}
+           :session new-session
+           :body    (rum/render-static-markup
+                      (exchange/exchange-page {:player player :game game :flash flash}))}))))
 
 (defn building-handler
   "Phase 3 — building. Purchase new units and planets."
-  [ctx]
+  [{:keys [session] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (or (utils/validate-phase player 3 player-id)
-        (building/building-page {:player player :game game}))))
+        (let [[flash new-session] (utils/take-flash session)]
+          {:status  200
+           :headers {"content-type" "text/html"}
+           :session new-session
+           :body    (rum/render-static-markup
+                      (building/building-page {:player player :game game :flash flash}))}))))
 
 (defn action-handler
   "Phase 4 — action. Declare an attack, raid, or strike against another empire."
@@ -414,21 +429,16 @@
 ;;;;
 
 (defn alerts-handler
-  "HTMX polling fragment — checks for incoming attacks or espionage failures.
-  Returns HX-Refresh to reload the page when new alerts arrive.
+  "HTMX polling fragment — returns the rendered alert banner content.
+  Updates in place every 10s; no page refresh.
 
   [ctx ring-ctx] -> ring-response (200 with HTML fragment)"
-  [{:keys [biff/db path-params params] :as ctx}]
-  (let [player-id  (java.util.UUID/fromString (:player-id path-params))
-        player     (xt/entity db player-id)
-        had-alerts (= "true" (:had-alerts params))
-        has-alerts (or (seq (:player/incoming-attacks player))
-                       (seq (:player/incoming-espionage-fails player)))]
-    (if (and has-alerts (not had-alerts))
-      {:status 200 :headers {"content-type" "text/html" "HX-Refresh" "true"} :body ""}
-      {:status  200
-       :headers {"content-type" "text/html"}
-       :body    (rum/render-static-markup (ui/incoming-alert-content player))})))
+  [{:keys [biff/db path-params] :as ctx}]
+  (let [player-id (java.util.UUID/fromString (:player-id path-params))
+        player    (xt/entity db player-id)]
+    {:status  200
+     :headers {"content-type" "text/html"}
+     :body    (rum/render-static-markup (ui/incoming-alert-content player))}))
 
 ;;;;
 ;;;; Routes

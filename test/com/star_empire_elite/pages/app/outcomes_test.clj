@@ -45,7 +45,7 @@
    :player/last-population-growth    3
    :player/pending-espionage         test-game-id ; non-nil to verify it is cleared
    :player/incoming-attacks          ["attack-1"]
-   :player/incoming-espionage-fails  2})
+   :player/incoming-espionage-fails  ["spy" "incite"]})
 
 ;;;;
 ;;;; calculate-score Tests
@@ -176,7 +176,7 @@
           (is (nil? (:player/last-population-growth   tx)))
           (is (nil? (:player/pending-espionage        tx)))
           (is (nil? (:player/incoming-attacks         tx)))
-          (is (= 0  (:player/incoming-espionage-fails tx))))))))
+          (is (nil? (:player/incoming-espionage-fails tx))))))))
 
 (deftest test-apply-outcomes-records-score
   (testing "Writes a computed score to the transaction"
@@ -259,7 +259,7 @@
                            :planets-transferred {:mil 0 :erg 0 :ore 0}}
           player-with-attacks (assoc test-player
                                      :player/incoming-attacks [(pr-str attacker-result)]
-                                     :player/incoming-espionage-fails 1)]
+                                     :player/incoming-espionage-fails ["spy"])]
       (is (vector? (outcomes/outcomes-page {:player player-with-attacks :game test-game
                                             :battle-result nil :espionage-result nil}))))))
 

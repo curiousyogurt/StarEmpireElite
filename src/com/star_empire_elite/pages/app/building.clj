@@ -292,18 +292,22 @@
 
 (defn apply-building
   "Commit purchases to the database, advance to action phase, and redirect.
+  If purchases are no longer affordable against current player state (e.g. credits lost to an
+  incoming attack between page load and submit), redirects back to the building page without writing.
 
-  [ctx ring-ctx] -> ring-response (303 redirect to action, or 400 if unaffordable)"
-  [{:keys [path-params params biff/db] :as ctx}]
+  [ctx ring-ctx] -> ring-response (303 redirect to action or building)"
+  [{:keys [path-params params biff/db session] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (if-let [redirect (utils/validate-phase player 3 player-id)]
       redirect
       (let [quantities      (parse-purchase-quantities params)
             cost-info       (calculate-purchase-cost quantities game)
             resources-after (calculate-resources-after-purchases player quantities cost-info)]
-        (if (not (can-afford-purchases? resources-after))
-          {:status 400
-           :body "Insufficient credits for purchase"}
+        (if-not (can-afford-purchases? resources-after)
+          {:status  303
+           :headers {"location" (str "/app/game/" player-id "/building")}
+           :session (utils/flash session :warn
+                      "Submission rejected due to a change in your empire (enemy attack or espionage). Please review and resubmit.")}
           (do
             (biff/submit-tx ctx
                             [{:db/doc-type :player
@@ -399,8 +403,8 @@
 (defn building-page
   "Show purchase options for buying units and planets, with snapshot, projections, and credit impact.
 
-  [{:keys [player game]}] -> hiccup"
-  [{:keys [player game]}]
+  [{:keys [player game flash]}] -> hiccup"
+  [{:keys [player game flash]}]
   (let [player-id        (:xt/id player)
         zero-quantities  (into {} (map (fn [s] [(:qty-key s) 0]) purchase-row-specs))
         max-quantities   (calculate-max-quantities player zero-quantities game)
@@ -410,6 +414,7 @@
                       {:action (str "/app/game/" player-id "/apply-building") :method "post"
                        :class  "m-0"}
                       (ui/phase-body player
+                                     (ui/flash-notice flash)
                                      (ui/snapshot-section player {:projections projections-data})
                                      (ui/section-label "Build Orders")
                                      [:div

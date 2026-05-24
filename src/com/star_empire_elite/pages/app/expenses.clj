@@ -196,9 +196,11 @@
 
 (defn apply-expenses
   "Commit expense payments to the database and advance to the building phase.
+  If expenses are no longer affordable against current player state (e.g. resources lost to an
+  incoming attack between page load and submit), redirects back to the expenses page without writing.
 
-  [ctx ring-ctx] -> ring-response (303 redirect to building)"
-  [{:keys [path-params params biff/db] :as ctx}]
+  [ctx ring-ctx] -> ring-response (303 redirect to building or expenses)"
+  [{:keys [path-params params biff/db session] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (if-let [redirect (utils/validate-phase player 2 player-id)]
       redirect
@@ -207,17 +209,23 @@
             required-totals (calculate-required-expense-totals required)
             resources-after (calculate-resources-after-expenses player payments)
             penalty         (calculate-expense-stability-penalty required-totals payments game)]
-        (biff/submit-tx ctx
-                        [{:db/doc-type                       :player
-                          :db/op                             :update
-                          :xt/id                             player-id
-                          :player/credits                    (:credits resources-after)
-                          :player/food                       (:food resources-after)
-                          :player/fuel                       (:fuel resources-after)
-                          :player/expense-stability-penalty  penalty
-                          :player/current-phase              3}])
-        {:status 303
-         :headers {"location" (str "/app/game/" player-id "/building")}}))))
+        (if-not (can-afford-expenses? resources-after)
+          {:status  303
+           :headers {"location" (str "/app/game/" player-id "/expenses")}
+           :session (utils/flash session :warn
+                      "Submission rejected due to a change in your empire (enemy attack or espionage). Please review and resubmit.")}
+          (do
+            (biff/submit-tx ctx
+                            [{:db/doc-type                       :player
+                              :db/op                             :update
+                              :xt/id                             player-id
+                              :player/credits                    (:credits resources-after)
+                              :player/food                       (:food resources-after)
+                              :player/fuel                       (:fuel resources-after)
+                              :player/expense-stability-penalty  penalty
+                              :player/current-phase              3}])
+            {:status 303
+             :headers {"location" (str "/app/game/" player-id "/building")}}))))))
 
 (defn calculate-expenses
   "Return HTMX out-of-band fragments updating the after-column cells, warning, and submit button
@@ -265,8 +273,8 @@
 (defn expenses-page
   "Show expense requirements and input fields for the player to choose payment amounts.
 
-  [{:keys [player game]}] -> hiccup"
-  [{:keys [player game]}]
+  [{:keys [player game flash]}] -> hiccup"
+  [{:keys [player game flash]}]
   (let [required         (calculate-required-expenses player game)
         required-totals  (calculate-required-expense-totals required)
         player-id        (:xt/id player)
@@ -283,6 +291,7 @@
         {:action (str "/app/game/" player-id "/apply-expenses") :method "post"
          :class  "m-0"}
         (ui/phase-body player
+          (ui/flash-notice flash)
           (ui/snapshot-section player {:projections projections-data :projection-turn "THIS TURN"})
           (ui/section-label "Impact")
           [:div.overflow-hidden.rounded-game.bg-game-surface

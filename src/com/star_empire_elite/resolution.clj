@@ -266,7 +266,9 @@
                                      (when (and defect? att-wins?)
                                        (let [n (or (:agents-defected result) 0)]
                                          {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
-                                          :player/agents (max 0 (- (or (:player/agents target) 0) n))}))]))
+                                          :player/agents (max 0 (- (or (:player/agents target) 0) n))
+                                          :player/incoming-defect-agents-lost
+                                          (+ (or (:player/incoming-defect-agents-lost target) 0) n)}))]))
             (let [agents-gained (if (and defect? att-wins?) (or (:agents-defected result) 0) 0)]
               [result (assoc player :player/agents
                              (max 0 (+ (- (:player/agents player) agents-lost) agents-gained)))])))))))

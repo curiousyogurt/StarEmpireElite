@@ -55,12 +55,12 @@
           [:game/admiral-power             :int]
 
           ;; Income generation constants
-          [:game/ore-planet-credits        :int]
-          [:game/erg-planet-food          :int]
-          [:game/erg-planet-fuel          :int]
-          [:game/mil-planet-soldiers       :int]
-          [:game/mil-planet-fighters       :int]
-          [:game/mil-planet-stations       :int]
+          [:game/ore-planet-credits  :int]
+          [:game/erg-planet-food     :int]
+          [:game/erg-planet-fuel     :int]
+          [:game/mil-planet-soldiers :int]
+          [:game/mil-planet-fighters :int]
+          [:game/mil-planet-stations :int]
           
           ;; Population tax
           [:game/population-tax-credits    :int]
@@ -184,7 +184,8 @@
             [:player/incoming-espionage-fails        {:optional true} [:maybe [:vector :string]]]
             [:player/incoming-espionage-agents-gained  {:optional true} [:maybe :int]]
             [:player/incoming-incite-stability-lost    {:optional true} [:maybe :int]]
-            [:player/incoming-bomb-result              {:optional true} [:maybe :string]]]
+            [:player/incoming-bomb-result              {:optional true} [:maybe :string]]
+            [:player/incoming-defect-agents-lost       {:optional true} [:maybe :int]]]
 
    :game-event/id :uuid
    :game-event [:map {:closed true}

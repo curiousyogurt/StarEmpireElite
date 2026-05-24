@@ -263,7 +263,7 @@
           (is (= (:mil-planets expected) (:player/mil-planets tx))))))))
 
 (deftest test-apply-building-insufficient-credits
-  (testing "Returns 400 and does not call submit-tx when player cannot afford purchases"
+  (testing "Redirects back to building and does not call submit-tx when player cannot afford purchases"
     (let [poor-player (assoc test-player :player/credits 50)
           tx-called?  (atom false)]
       (with-redefs [xt/entity      (helpers/fake-entity [poor-player test-game])
@@ -271,9 +271,8 @@
         (let [result (building/apply-building {:path-params {:player-id (str test-player-id)}
                                                :params {:soldiers "1000"} :biff/db nil})]
           (is (false? @tx-called?))
-          (is (= 400 (:status result)))
-          (is (= "Insufficient credits for purchase" (:body result))))))))
-
+          (is (= 303 (:status result)))
+          (is (clojure.string/ends-with? (get-in result [:headers "location"]) "/building")))))))
 (deftest test-apply-building-zero-purchases
   (testing "Zero purchases advance phase without changing resource counts"
     (let [tx-atom (atom nil)]

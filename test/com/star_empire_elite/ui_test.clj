@@ -163,7 +163,7 @@
   (testing "Returns a div hiccup element containing the label text"
     (let [result (ui/section-label "Sources")]
       (is (vector? result))
-      (is (= :div.text-xs.uppercase.mb-1 (first result)))
+      (is (= :div.text-xs.uppercase.my-1 (first result)))
       (is (= "Sources" (last result))))))
 
 ;;;;
@@ -262,27 +262,27 @@
 (deftest test-incoming-alert-content-no-alerts
   (testing "Returns nil when there are no attacks and zero espionage failures"
     (is (nil? (ui/incoming-alert-content {:player/incoming-attacks        nil
-                                          :player/incoming-espionage-fails 0})))
+                                          :player/incoming-espionage-fails nil})))
     (is (nil? (ui/incoming-alert-content {})))))
 
 (deftest test-incoming-alert-content-with-attacks
   (testing "Returns hiccup when the player has incoming attacks"
     (let [result (ui/incoming-alert-content {:player/incoming-attacks        [:some-attack]
-                                             :player/incoming-espionage-fails 0})]
+                                             :player/incoming-espionage-fails nil})]
       (is (some? result))
       (is (vector? result)))))
 
 (deftest test-incoming-alert-content-with-esp-fails
   (testing "Returns hiccup when espionage failures are recorded"
     (let [result (ui/incoming-alert-content {:player/incoming-attacks        nil
-                                             :player/incoming-espionage-fails 2})]
+                                             :player/incoming-espionage-fails ["spy" "incite"]})]
       (is (some? result))
       (is (vector? result)))))
 
 (deftest test-incoming-alert-content-both-alerts
   (testing "Returns hiccup when both attacks and espionage failures are present"
     (let [result (ui/incoming-alert-content {:player/incoming-attacks        [:attack]
-                                             :player/incoming-espionage-fails 1})]
+                                             :player/incoming-espionage-fails ["spy"]})]
       (is (some? result))
       (is (vector? result)))))
 

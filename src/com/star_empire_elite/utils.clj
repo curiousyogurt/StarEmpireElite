@@ -34,6 +34,34 @@
       (min (parse-long trimmed) max-input-value))))
 
 ;;;;
+;;;; Flash Messages
+;;;;
+
+(defn flash
+  "Attach a flash message to the response. The message persists in the session for exactly
+  one subsequent request, then is cleared by take-flash on the next page render.
+
+  Level is one of :info, :warn, :error (controls styling).
+
+  Usage:
+    {:status 303
+     :headers {\"location\" \"/some-path\"}
+     :session (flash session :warn \"Your submit was rejected.\")}
+
+  [session ring-session-map, level keyword, message string] -> ring-session-map"
+  [session level message]
+  (assoc session :flash {:level level :message message}))
+
+(defn take-flash
+  "Return [flash-map updated-session] where flash-map is the current flash (or nil) and
+  updated-session is the session with :flash removed. Pages call this once during render
+  and merge the updated session back into their response.
+
+  [session ring-session-map] -> [{:level keyword, :message string} | nil, ring-session-map]"
+  [session]
+  [(:flash session) (dissoc session :flash)])
+
+;;;;
 ;;;; Phase Validation
 ;;;;
 

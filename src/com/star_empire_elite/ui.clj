@@ -183,11 +183,8 @@
                                     base-x "," (+ ly arrow-h))
                        :fill "#4ade80"
                        :filter (str "url(#" filter-id ")")}])))
-      [:line {:x1 0   :y1 (+ ly 1) :x2 0   :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
-      [:line {:x1 25  :y1 (+ ly 1) :x2 25  :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
-      [:line {:x1 50  :y1 (+ ly 1) :x2 50  :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
-      [:line {:x1 75  :y1 (+ ly 1) :x2 75  :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]
-      [:line {:x1 100 :y1 (+ ly 1) :x2 100 :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}]]
+      (for [x [0 25 50 75 100]]
+        [:line {:x1 x :y1 (+ ly 1) :x2 x :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}])]
      [:div.text-xs.text-gray-400.relative.mb-2
       {:class "h-[1em]"}
       [:span.absolute.left-0 "0"]
@@ -348,6 +345,22 @@
   [:div.text-xs.uppercase.my-1
    {:class "tracking-[0.12em] text-game-green-muted"}
    text])
+
+(defn mode-badge
+  "Render a colored badge pill: ACTION (red), ESPIONAGE (amber), GROWTH (green),
+  STABILITY (yellow), or EVENT (gray). Used across outcomes, alerts, and news.
+
+  [mode keyword] -> hiccup"
+  [mode]
+  (let [[text cls] (case mode
+                     (:bomb :spy :incite :defect) ["ESPIONAGE" "border-[#fbbf24] text-[#fbbf24]"]
+                     :stability                   ["STABILITY" "border-[#facc15] text-[#facc15]"]
+                     :growth                      ["GROWTH"    "border-[#4ade80] text-[#4ade80]"]
+                     (:breakaway :elimination
+                      :event)                     ["EVENT"     "border-[#9ca3af] text-[#9ca3af]"]
+                                                  ["ACTION"    "border-[#f87171] text-[#f87171]"])]
+    [:span {:class (str "border px-[7px] py-[2px] text-[11px] tracking-[0.12em] " cls)}
+     text]))
 
 (defn resource-pills
   "Render resource pills for a phase summary card: one pill per non-zero value in value-map.
@@ -519,8 +532,7 @@
 
   [projections seq, projection-turn str] -> hiccup"
   [projections projection-turn]
-  [:div {:class "px-4 pt-[10px] pb-[14px] border-t border-game-border"
-         :class "bg-[rgba(20,42,28,0.10)]"}
+  [:div {:class "px-4 pt-[10px] pb-[14px] border-t border-game-border bg-[rgba(20,42,28,0.10)]"}
    [:div.flex.items-baseline.uppercase
     {:class "text-[9px] tracking-[0.18em] text-game-green-dim mb-2"}
     (str "› RESOURCE PROJECTIONS · " projection-turn)
@@ -568,8 +580,7 @@
    (when projections
      (snapshot-projections projections projection-turn))
    (when extra
-     [:div {:class "px-4 pt-[10px] pb-[14px] border-t border-game-border"
-            :class "bg-[rgba(20,42,28,0.10)]"}
+     [:div {:class "px-4 pt-[10px] pb-[14px] border-t border-game-border bg-[rgba(20,42,28,0.10)]"}
       extra])])
 
 (defn projection-pill
@@ -672,39 +683,128 @@
    (when suffix (list " " suffix))])
 
 ;;;;
+;;;; Flash Notice
+;;;;
+
+(defn flash-notice
+  "Render a one-shot notice strip when a flash message is present. The flash itself is
+  cleared by take-flash in the GET handler; this component only renders. Pass nil to
+  render nothing.
+
+  Styling follows the level: warn = yellow, error = red, info = green.
+
+  [flash {:level keyword, :message string} | nil] -> hiccup | nil"
+  [flash]
+  (when flash
+    (let [{:keys [level message]} flash
+          color (case level
+                  :error "#f87171"
+                  :warn  "#facc15"
+                  :info  "#4ade80"
+                  "#facc15")]
+      [:div.mb-2.pt-3.px-3.rounded-game
+       {:style {:border (str "1px solid " color)
+                :background "rgba(250, 204, 21, 0.05)"}}
+       [:p.text-sm.font-bold
+        {:style {:color color :letter-spacing "0.03em"}}
+        message]])))
+
+;;;;
 ;;;; Incoming Alerts
 ;;;;
 
+(defn- alert-line
+  "Render one alert row: badge + text, matching the news feed's minimal style.
+
+  [badge-mode keyword, & body hiccup] -> hiccup"
+  [badge-mode & body]
+  [:div.flex.items-center.gap-2.text-sm
+   {:class "py-[3px] px-2 bg-game-row rounded-sm"}
+   (mode-badge badge-mode)
+   (into [:span.text-game-green-soft.flex-1] body)])
+
+(defn- attack-summary-line
+  "Render one alert row summarizing a single incoming attack record (pr-str'd map).
+
+  [record-str string] -> hiccup"
+  [record-str]
+  (let [r             (read-string record-str)
+        mode          (:mode r)
+        attacker      (:attacker-name r)
+        attacker-wins? (:attacker-wins? r)
+        verb          (case mode
+                        :invade "invaded"
+                        :raid   "raided"
+                        :strike "launched a strike against"
+                        "attacked")
+        outcome       (when (not= mode :strike)
+                        (if attacker-wins? " (SUCCESS)" " (FAILURE)"))]
+    (alert-line mode
+      [:span.text-green-300.font-bold attacker]
+      (str " " verb " you" outcome))))
+
 (defn incoming-alert-content
-  "Render the alert banner content when the player has unread incoming attacks or espionage failures.
+  "Render the alert banner summarizing incoming activity with badges matching outcomes page style.
   Returns nil when there are no alerts.
 
   [player player-map] -> hiccup | nil"
   [player]
-  (let [attacks   (seq (:player/incoming-attacks player))
-        esp-fails (seq (:player/incoming-espionage-fails player))]
-    (when (or attacks esp-fails)
-      [:p.mb-4.text-red-400.text-sm
-       (str "\u26a0 "
-            (when attacks "Your empire was attacked. ")
-            (when esp-fails "Espionage against your empire was discovered. ")
-            "See details in Outcomes phase.")])))
+  (let [attacks            (seq (:player/incoming-attacks player))
+        esp-fails          (seq (:player/incoming-espionage-fails player))
+        esp-agents         (or (:player/incoming-espionage-agents-gained player) 0)
+        incite-stab-lost   (or (:player/incoming-incite-stability-lost player) 0)
+        bomb-result        (some-> (:player/incoming-bomb-result player) read-string)
+        defect-agents-lost (or (:player/incoming-defect-agents-lost player) 0)]
+    (when (or attacks esp-fails (pos? incite-stab-lost) bomb-result (pos? defect-agents-lost))
+      [:div.mb-4.rounded-game.border.border-game-green-border.relative
+       {:class "px-3.5 pt-2.5"}
+       ;; Refresh link — top-right corner
+       [:a.absolute.text-xs.text-game-green-dim.underline
+        {:class "top-2.5 right-3.5"
+         :href  "javascript:window.location.reload()"
+         :title "Reload the page to update empire stats. Any in-progress form input will be lost."}
+        "\u21bb refresh"]
+       ;; Heading
+       [:p.font-bold.text-yellow-400.mb-2.text-sm "\u26a0 Activity since the end of your last turn"]
+       ;; Event lines — minimal badge + text, matching news feed style
+       [:div.flex.flex-col.gap-1
+        (map attack-summary-line attacks)
+        (when bomb-result
+          (let [total (+ (or (:soldiers-destroyed bomb-result) 0)
+                         (or (:transports-destroyed bomb-result) 0)
+                         (or (:fighters-destroyed bomb-result) 0)
+                         (or (:carriers-destroyed bomb-result) 0))]
+            (alert-line :bomb
+              (str "An unknown agent bombed you " (if (pos? total) "(SUCCESS)" "(FAILURE)")))))
+        (when (pos? incite-stab-lost)
+          (alert-line :incite "An unknown agent incited unrest in your empire (SUCCESS)"))
+        (when (pos? defect-agents-lost)
+          (alert-line :defect "An unknown agent turned agents from you (SUCCESS)"))
+        (when esp-fails
+          (for [op esp-fails]
+            (let [verb (case op
+                         "spy"    "spied on"
+                         "incite" "incited unrest in"
+                         "bomb"   "bombed"
+                         "defect" "turned agents from"
+                         "attacked")]
+              (alert-line (keyword op)
+                (str "An unknown agent " verb " you (FAILED)")))))]
+       ;; Footer
+       [:p.text-game-green-dim.italic.mt-2 {:class "text-[11px]"}
+        "Full details available in Outcomes phase."]])))
 
 (defn incoming-alert
-  "Render the HTMX polling container that checks for new alerts every 10 seconds and
-  triggers a full page refresh when new ones arrive.
+  "Render the HTMX polling container that updates the alert banner in place every 10 seconds.
+  The player uses the inline refresh link to reload the page when ready.
 
   [player player-map] -> hiccup"
   [player]
-  (let [has-alerts? (or (seq (:player/incoming-attacks player))
-                        (seq (:player/incoming-espionage-fails player)))
-        player-id   (:xt/id player)]
+  (let [player-id (:xt/id player)]
     [:div#incoming-alert
      {:hx-get     (str "/app/game/" player-id "/alerts")
       :hx-trigger "every 10s"
-      :hx-swap    "innerHTML"
-      :hx-include "this"}
-     [:input {:type "hidden" :name "had-alerts" :value (if has-alerts? "true" "false")}]
+      :hx-swap    "innerHTML"}
      (incoming-alert-content player)]))
 
 ;;;;

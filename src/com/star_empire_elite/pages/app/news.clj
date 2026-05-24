@@ -44,16 +44,8 @@
 ;;;; Event Rendering — Badge + Verb Phrase
 ;;;;
 
-(defn- badge [text cls]
-  [:span {:class (str "border px-[7px] py-[2px] text-[11px] tracking-[0.12em] " cls)}
-   text])
-
 (defn- event-badge [kind]
-  (case kind
-    (:invade :raid :strike)      (badge "ACTION"    "border-[#f87171] text-[#f87171]")
-    (:spy :incite :bomb :defect) (badge "ESPIONAGE" "border-[#fbbf24] text-[#fbbf24]")
-    (:breakaway :elimination)    (badge "EVENT"     "border-[#9ca3af] text-[#9ca3af]")
-    (badge "EVENT" "border-[#9ca3af] text-[#9ca3af]")))
+  (ui/mode-badge kind))
 
 (defn- empire-span
   "Render an empire name in a highlighted span.
@@ -73,10 +65,10 @@
         def-name    (:defender-name payload)
         won?        (:attacker-wins? payload)
         verb        (case kind
-                      :invade "invaded"
-                      :raid   "raided"
-                      :strike "launched a strike against")
-        outcome     (if won? " (victory)" " (defeat)")]
+                      :invade (if won? "invaded" "attempted to invade")
+                      :raid   (if won? "raided" "attempted to raid")
+                      :strike "launched a missile strike against")
+        outcome     (if won? " (SUCCESS)" " (FAILURE)")]
     (cond
       attacker? [:span "You " verb " " (empire-span def-name) outcome]
       defender? [:span (empire-span att-name) " " verb " you" outcome]
@@ -87,19 +79,23 @@
 
   [payload map, kind keyword, player-id uuid, visibility keyword] -> hiccup-fragment"
   [payload kind player-id visibility]
-  (let [attacker?  (= :attacker-only visibility)
-        def-name   (:defender-name payload)
-        won?       (:attacker-wins? payload)
-        verb       (case kind
-                     :spy    (if won? "gathered intel on" "failed to spy on")
-                     :incite (if won? "incited unrest in" "failed to incite")
-                     :bomb   (if won? "bombed" "failed to bomb")
-                     :defect (if won? "turned agents from" "failed to subvert"))]
+  (let [attacker?   (= :attacker-only visibility)
+        def-name    (:defender-name payload)
+        won?        (:attacker-wins? payload)
+        verb-att    (case kind
+                      :spy    (if won? "spied on" "failed to spy on")
+                      :incite (if won? "incited unrest in" "failed to incite unrest in")
+                      :bomb   (if won? "bombed" "failed to bomb")
+                      :defect (if won? "turned agents from" "failed to subvert"))
+        verb-def    (case kind
+                      :spy    "spied on"
+                      :incite "incited unrest in"
+                      :bomb   "bombed"
+                      :defect "turned agents from")
+        result      (if won? " (SUCCESS)" " (FAILURE)")]
     (if attacker?
-      [:span "You " verb " " (empire-span def-name)]
-      (if won?
-        [:span "An unknown agent " verb " you"]
-        [:span "You caught a foreign spy"]))))
+      [:span "You " verb-att " " (empire-span def-name) result]
+      [:span "An unknown agent " verb-def " you " (if won? "(SUCCESS)" "(FOILED)")])))
 
 (defn- breakaway-summary
   "Verb phrase for breakaway events.

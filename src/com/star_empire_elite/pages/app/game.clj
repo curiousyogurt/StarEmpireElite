@@ -103,6 +103,7 @@
       (ui/phase-shell player game "GAME OVERVIEW"
         [:div.flex.flex-col.gap-2
          {:class "py-2.5 px-3.5"}
+         (ui/incoming-alert player)
          (ui/snapshot-section player)
          (players-table {:players players})]
         (ui/phase-action-bar
