@@ -338,13 +338,19 @@
     label]))
 
 (defn section-label
-  "Render a small uppercase section-label div used above every phase section.
+  "Render a small uppercase section-label div used above every phase section. An optional
+  subtitle string can be appended in normal-case dim text, useful for adding clarifying
+  hints (e.g. \"minimum required to avoid stability penalty\").
 
-  [text str] -> hiccup"
-  [text]
+  [text str, subtitle? str] -> hiccup"
+  [text & [subtitle]]
   [:div.text-xs.uppercase.my-1
    {:class "tracking-[0.12em] text-game-green-muted"}
-   text])
+   text
+   (when subtitle
+     [:span.normal-case.opacity-70
+      {:class "ml-[10px] text-[9px] tracking-[0.04em]"}
+      subtitle])])
 
 (defn mode-badge
   "Render a colored badge pill: ACTION (red), ESPIONAGE (amber), GROWTH (green),
@@ -999,3 +1005,4 @@
          [:span.font-mono
           {:class (when (and highlight? (number? value) (neg? value)) "text-red-400")}
           value])])]])
+

@@ -13,6 +13,7 @@
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
 
+
 ;;;;
 ;;;; Calculations
 ;;;;
@@ -48,27 +49,45 @@
       (update :fighters + (:mil-fighters income))
       (update :stations + (:mil-stations income))))
 
+
 ;;;;
 ;;;; UI Components
 ;;;;
 
+;;;
 ;;; Source grid
+;;;
 
-(defn- source-pills
-  "Render income pills for a source card: one pill per non-zero resource.
+(defn- resource-pill
+  "Render one resource pill: a small rounded badge displaying a labeled value.
+  Currently income-shaped: prefix is always passed in by the caller (typically '+'),
+  and the value is rendered as-is (no sign handling). Generalize when expenses or
+  exchange need their own pill style.
+
+  attrs is merged into the span's attribute map; pass {:key k} for iteration contexts.
+
+  [prefix str, value number, suffix str, attrs? map] -> hiccup"
+  [prefix value suffix & [attrs]]
+  [:span.text-xs.inline-block.rounded-sm.text-green-400.bg-game-green-deep
+   (merge {:style {:padding "1px 5px"}} attrs)
+   prefix (ui/format-number value) " " suffix])
+
+(defn- resource-pills
+  "Render a sequence of resource pills for a resource-card body: one pill per non-zero
+  resource amount in the income map. Iterates the six resource keys in display order.
 
   [income-map {:credits? int, :food? int, ...}] -> seq of hiccup"
   [income-map]
-  (for [[k label suffix] [[:credits "+" "cr"]    [:food "+" "food"]     [:fuel "+" "fuel"]
-                          [:soldiers "+" "sold"] [:fighters "+" "fgtr"] [:stations "+" "stn"]]
+  (for [[k prefix suffix] [[:credits  "+" "cr"]   [:food     "+" "food"] [:fuel     "+" "fuel"]
+                           [:soldiers "+" "sold"] [:fighters "+" "fgtr"] [:stations "+" "stn"]]
         :let [v (or (k income-map) 0)]
         :when (pos? v)]
-    [:span.text-xs.inline-block.rounded-sm.text-green-400.bg-game-green-deep
-     {:key k :style {:padding "1px 5px"}}
-     label (ui/format-number v) " " suffix]))
+    (resource-pill prefix v suffix {:key k})))
 
-(defn- source-card
-  "Render one income source card with name, count, and resource pills.
+(defn- resource-card
+  "Render one resource card: bordered container with a title + count header and a stack
+  of resource pills showing the amounts produced. Currently used for income sources;
+  candidate for promotion to ui.clj once it has cross-phase callers.
 
   [{:keys [name count income-map]}] -> hiccup"
   [{:keys [name count income-map]}]
@@ -78,8 +97,11 @@
     [:span.text-base.font-bold.text-green-400 name]
     [:span.text-xs.text-game-green-muted (str "x" count)]]
    [:div {:class "flex flex-col gap-0.5"}
-    (source-pills income-map)]])
+    (resource-pills income-map)]])
 
+;; Note: The resources are listed within the source-grid because we distinguish between "source" (ore 
+;; planets, energy planets, military planets, taxes) and a "resource" (credits, food, fuel, military)
+;; that is generated.
 (defn- source-grid
   "Render the 4-column income sources grid (Ore, Erg, Mil, Pop).
 
@@ -105,11 +127,16 @@
      (ui/section-label "Sources")
      [:div {:class "grid grid-cols-2 md:grid-cols-4 gap-1.5"}
       (for [src sources]
-        (source-card src))]]))
+        (resource-card src))]]))
 
-;;; Resource table
+;;;
+;;; Resource table definitions:
+;;; - resource-table-row: a single row
+;;; - resource-table-header: the table header
+;;; - resource-table: put it all together
+;;;
 
-(defn- resource-row
+(defn- resource-table-row
   "Render one resource row for the resource table.
   Emits two variants: a 4-column mobile row (no bar column) and a 5-column
   desktop row (with the SVG indicator bar), aligned with resource-table-header.
@@ -169,7 +196,7 @@
         value-label     (fn [text]
                           (col-label text col-class "text-right justify-self-end"))
         ;; Empty cell aligning the header grid with the data-row grid,
-        ;; which uses this column for the SVG indicator bar (see resource-row).
+        ;; which uses this column for the SVG indicator bar (see resource-table-row).
         bar-placeholder [:span]]
     [:<>
 
@@ -195,16 +222,17 @@
 
   [player player-map, income income-map] -> hiccup"
   [player income]
-  (let [rows [{:name "Credits"  :before (:player/credits  player) :delta (+ (:ore-credits income) (:tax-credits income)) :key? true}
-              {:name "Food"     :before (:player/food     player) :delta (:erg-food  income) :key? true}
-              {:name "Fuel"     :before (:player/fuel     player) :delta (:erg-fuel  income) :key? true}
+  (let [credits-delta (+ (:ore-credits income) (:tax-credits income))
+        rows [{:name "Credits"  :before (:player/credits  player) :delta credits-delta          :key? true}
+              {:name "Food"     :before (:player/food     player) :delta (:erg-food     income) :key? true}
+              {:name "Fuel"     :before (:player/fuel     player) :delta (:erg-fuel     income) :key? true}
               {:name "Soldiers" :before (:player/soldiers player) :delta (:mil-soldiers income) :key? false}
               {:name "Fighters" :before (:player/fighters player) :delta (:mil-fighters income) :key? false}
               {:name "Stations" :before (:player/stations player) :delta (:mil-stations income) :key? false}]]
     [:div.overflow-hidden.border.border-game-border.rounded-game.bg-game-surface
      (resource-table-header)
      (for [{:keys [name before delta key?]} rows]
-       (resource-row name before delta key? (str "glow-" (str/lower-case name))))]))
+       (resource-table-row name before delta key? (str "glow-" (str/lower-case name))))]))
 
 
 ;;;;
@@ -242,6 +270,7 @@
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/expenses")}}))))
 
+
 ;;;;
 ;;;; Page
 ;;;;
@@ -254,31 +283,15 @@
   [{:keys [player game]}]
   (let [player-id (:xt/id player)
         income    (calculate-income player game)]
-    (ui/page
-      {}
-      ;; Terminal shell: text-base sets the base font size for all descendants
-      [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.text-green-400.rounded
-       {:style {:border "1.5px solid #1e6e44"
-                :font-family "'Courier New', monospace"}}
-
-       ;; Scanline overlay
-       (ui/scanline-overlay)
-
-       ;; Topbar
-       (ui/phase-topbar player game "INCOME PHASE")
-
-       ;; Body
-       [:div.flex.flex-col.gap-2
-        {:style {:padding "10px 14px"}}
+    (ui/phase-shell player game "INCOME PHASE"
+      (ui/phase-body player
+        (ui/snapshot-section player)
         (source-grid player income)
-        (resource-table player income)
-        (ui/incoming-alert player)]
-
-       ;; Action bar
-       [:div.flex.gap-2.border-t.border-game-border
-        {:style {:padding "8px 14px"}}
+        (resource-table player income))
+      (ui/phase-action-bar
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
         (biff/form
           {:action (str "/app/game/" player-id "/apply-income") :method "post"
-           :style  {:margin 0}}
-          (ui/submit-button true "Continue to Expenses"))]])))
+           :class  "m-0"}
+          (ui/submit-button true "Continue to Expenses"))))))
+

@@ -79,11 +79,11 @@
 
   /* Income phase: two separate row grids, shown at different breakpoints */
   .income-row-mobile  { display: grid; grid-template-columns: 80px 1fr 1fr 1fr; }
-  .income-row-desktop { grid-template-columns: 160px 12fr 5fr 5fr 5fr; }
+  .income-row-desktop { grid-template-columns: 130px 10fr 5fr 5fr 5fr; }
 
   /* Expenses phase: two separate row grids, shown at different breakpoints */
   .expense-row-mobile  { display: grid; grid-template-columns: 40px 4fr 6fr 3fr; }
-  .expense-row-desktop { grid-template-columns: 100px 10fr 4fr 11fr 4fr; }
+  .expense-row-desktop { grid-template-columns: 130px 10fr 5fr 7fr 5fr; }
 }
 
 @layer utilities {

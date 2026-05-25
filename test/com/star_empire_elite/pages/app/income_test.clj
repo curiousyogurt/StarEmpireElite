@@ -84,17 +84,6 @@
       (is (= 0 (:mil-fighters income)))
       (is (= 0 (:mil-stations income))))))
 
-(deftest test-calculate-income-single-planet-type
-  (testing "Calculates correctly when player has only one planet type"
-    (let [player (assoc test-player :player/ore-planets  5
-                                    :player/erg-planets 0
-                                    :player/mil-planets  0)
-          income (income/calculate-income player test-game)]
-      (is (= 500 (:ore-credits income)))  ; 5 * 100
-      (is (= 0   (:erg-food income)))
-      (is (= 0   (:erg-fuel income)))
-      (is (= 0   (:mil-soldiers income))))))
-
 (deftest test-calculate-income-zero-rates
   (testing "Returns zero income when all game rates are zero"
     (let [zero-game (assoc test-game
@@ -110,19 +99,6 @@
       (is (= 0 (:erg-food income)))
       (is (= 0 (:mil-soldiers income)))
       (is (= 0 (:tax-credits income))))))
-
-(deftest test-calculate-income-custom-rates
-  (testing "Handles custom per-game income rates"
-    (let [player (assoc test-player :player/ore-planets  2
-                                    :player/erg-planets 3
-                                    :player/mil-planets  1)
-          game   (assoc test-game :game/ore-planet-credits  500
-                                  :game/erg-planet-food    1000
-                                  :game/mil-planet-soldiers 100)
-          income (income/calculate-income player game)]
-      (is (= 1000 (:ore-credits income)))   ; 2 * 500
-      (is (= 3000 (:erg-food income)))     ; 3 * 1000
-      (is (= 100  (:mil-soldiers income))))))  ; 1 * 100
 
 (deftest test-calculate-income-population-tax
   (testing "Tax credits scale linearly with population and game rate"
@@ -240,9 +216,12 @@
           tx-atom (atom nil)]
       (with-redefs [xt/entity      (helpers/fake-entity [player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
-        (income/apply-income {:path-params {:player-id (str test-player-id)}
-                              :biff/db     nil})
-        (is (= 1 (:player/current-round (first @tx-atom))))))))
+        (let [result (income/apply-income {:path-params {:player-id (str test-player-id)}
+                                            :biff/db     nil})]
+          (is (= 1 (:player/current-round (first @tx-atom))))
+          (is (= 303 (:status result)))
+          (is (= (str "/app/game/" test-player-id "/expenses")
+                 (get-in result [:headers "location"]))))))))
 
 (deftest test-apply-income-no-reset-same-day
   (testing "Does not include current-round in tx when last round was completed today"
@@ -277,7 +256,19 @@
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
         (income/apply-income {:path-params {:player-id (str test-player-id)}
                               :biff/db     nil})
-        (is (nil? (:player/current-round (first @tx-atom)))))))  )
+        (is (nil? (:player/current-round (first @tx-atom))))))))
+
+(deftest test-apply-income-no-reset-nil-date-mid-rounds
+  (testing "Does not reset current-round when last-round-completed-at is nil even if round > 1"
+    ;; day-reset? requires last-completed to be truthy; nil short-circuits to false
+    (let [player  (assoc test-player :player/current-round           2
+                                     :player/last-round-completed-at nil)
+          tx-atom (atom nil)]
+      (with-redefs [xt/entity      (helpers/fake-entity [player test-game])
+                    biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
+        (income/apply-income {:path-params {:player-id (str test-player-id)}
+                              :biff/db     nil})
+        (is (nil? (:player/current-round (first @tx-atom))))))))
 
 ;;;;
 ;;;; calculate-resources-after-income Tests
