@@ -164,7 +164,7 @@
     (let [result (ui/section-label "Sources")]
       (is (vector? result))
       (is (= :div.text-xs.uppercase.my-1 (first result)))
-      (is (= "Sources" (last result))))))
+      (is (= "Sources" (nth result 2))))))
 
 ;;;;
 ;;;; action-bar-link Tests

@@ -57,77 +57,48 @@
 ;;;
 ;;; Source grid
 ;;;
+(defn- income-rows
+  "Convert an income-map to the row-spec format expected by ui/info-card.
+  Iterates the six resource keys in display order, skipping any with zero value.
 
-(defn- resource-pill
-  "Render one resource pill: a small rounded badge displaying a labeled value.
-  Currently income-shaped: prefix is always passed in by the caller (typically '+'),
-  and the value is rendered as-is (no sign handling). Generalize when expenses or
-  exchange need their own pill style.
-
-  attrs is merged into the span's attribute map; pass {:key k} for iteration contexts.
-
-  [prefix str, value number, suffix str, attrs? map] -> hiccup"
-  [prefix value suffix & [attrs]]
-  [:span.text-xs.inline-block.rounded-sm.text-green-400.bg-game-green-deep
-   (merge {:style {:padding "1px 5px"}} attrs)
-   prefix (ui/format-number value) " " suffix])
-
-(defn- resource-pills
-  "Render a sequence of resource pills for a resource-card body: one pill per non-zero
-  resource amount in the income map. Iterates the six resource keys in display order.
-
-  [income-map {:credits? int, :food? int, ...}] -> seq of hiccup"
+  [income-map {:credits? int, :food? int, ...}] -> seq of {:key, :value, :sign, :unit}"
   [income-map]
-  (for [[k prefix suffix] [[:credits  "+" "cr"]   [:food     "+" "food"] [:fuel     "+" "fuel"]
-                           [:soldiers "+" "sold"] [:fighters "+" "fgtr"] [:stations "+" "stn"]]
+  (for [[k unit] [[:credits  "cred"] [:food     "food"] [:fuel     "fuel"]
+                  [:soldiers "sold"] [:fighters "fgtr"] [:stations "stn"]]
         :let [v (or (k income-map) 0)]
-        :when (pos? v)]
-    (resource-pill prefix v suffix {:key k})))
+        :when (pos? v)] ; Ignore if value is nil
+    {:key k :value v :sign "+" :unit unit}))
 
-(defn- resource-card
-  "Render one resource card: bordered container with a title + count header and a stack
-  of resource pills showing the amounts produced. Currently used for income sources;
-  candidate for promotion to ui.clj once it has cross-phase callers.
-
-  [{:keys [name count income-map]}] -> hiccup"
-  [{:keys [name count income-map]}]
-  [:div.flex.flex-col.gap-1.border.border-game-border.rounded-game.bg-game-card
-   {:style {:padding "6px 8px"}}
-   [:div.flex.justify-between.items-baseline
-    [:span.text-base.font-bold.text-green-400 name]
-    [:span.text-xs.text-game-green-muted (str "x" count)]]
-   [:div {:class "flex flex-col gap-0.5"}
-    (resource-pills income-map)]])
-
-;; Note: The resources are listed within the source-grid because we distinguish between "source" (ore 
-;; planets, energy planets, military planets, taxes) and a "resource" (credits, food, fuel, military)
-;; that is generated.
 (defn- source-grid
-  "Render the 4-column income sources grid (Ore, Erg, Mil, Pop).
+  "Render the income sources grid: four cards (Ore, Erg, Mil, Tax) in a 2×4 responsive grid,
+  each showing planet/population count and the resources produced this turn.
 
   [player player-map, income income-map] -> hiccup"
   [player income]
-  (let [pop-count (-> (format "%.1f" (double (:player/population player)))
-                      (str/replace #"\.0$" "")
-                      (str "M"))
-        sources [{:name "Ore"
-                  :count (:player/ore-planets player)
-                  :income-map {:credits (:ore-credits income)}}
-                 {:name "Erg"
-                  :count (:player/erg-planets player)
-                  :income-map {:food (:erg-food income) :fuel (:erg-fuel income)}}
-                 {:name "Mil"
-                  :count (:player/mil-planets player)
-                  :income-map {:soldiers (:mil-soldiers income)
-                               :fighters (:mil-fighters income)
-                               :stations (:mil-stations income)}}
-                 {:name "Taxes" :count pop-count
-                  :income-map {:credits (:tax-credits income)}}]]
-    [:div
-     (ui/section-label "Sources")
-     [:div {:class "grid grid-cols-2 md:grid-cols-4 gap-1.5"}
-      (for [src sources]
-        (resource-card src))]]))
+  (let [pop-count (ui/format-population (:player/population player))
+        sources   [{:key :ore :title "Ore" :aside (str "x" (:player/ore-planets player))
+                    :income-map {:credits (:ore-credits income)}}
+
+                   {:key :erg :title "Erg" :aside (str "x" (:player/erg-planets player))
+                    :income-map {:food (:erg-food income)
+                                 :fuel (:erg-fuel income)}}
+
+                   {:key :mil :title "Mil" :aside (str "x" (:player/mil-planets player))
+                    :income-map {:soldiers (:mil-soldiers income)
+                                 :fighters (:mil-fighters income)
+                                 :stations (:mil-stations income)}}
+
+                   {:key :taxes :title "Tax" :aside (str "x" pop-count)
+                    :income-map {:credits (:tax-credits income)}}]]
+    (ui/info-grid
+      {:label "Sources"
+       :grid-class "grid grid-cols-2 md:grid-cols-4 gap-1.5"
+       :cards
+       (for [{:keys [key title aside income-map]} sources]
+         {:key key
+          :title title
+          :aside aside
+          :rows (income-rows income-map)})})))
 
 ;;;
 ;;; Resource table definitions:
@@ -143,79 +114,47 @@
 
   [name str, before int, delta int, key? bool, filter-id str] -> hiccup"
   [name before delta key? filter-id]
-  (let [after       (+ before delta)
-        row-class   (str "items-center gap-2 py-1 px-3 border-b border-game-divider"
-                         (when key? " bg-game-row"))
-        name-cell   [:div.text-base
-                     {:class (if key? "font-bold text-green-400" "text-game-green-muted")}
-                     name]
-        before-cell [:div.text-base.text-right.text-game-green-muted
-                     (ui/format-number before)]
-        delta-class (cond
-                      (zero? delta) "text-game-green-muted"
-                      key?          "text-green-400 font-bold"
-                      :else         "text-green-400")
-        delta-cell  [:div.text-base.text-right.whitespace-nowrap
-                     {:class delta-class
-                      :style (cond-> {:letter-spacing "0.03em"}
-                               (and key? (not (zero? delta)))
-                               (assoc :text-shadow "0 0 8px rgba(74,222,128,0.6)"))}
-                     (if (zero? delta) "-" [:<> "+" (ui/format-number delta)])]
-        after-cell  [:div.text-base.text-right
-                     {:class (if key? "text-green-400 font-bold" "text-game-green-soft")}
-                     (ui/format-number after)]]
+  (let [after        (+ before delta)
+        row-class    (str "items-center gap-2 py-1 px-3 border-b border-game-divider"
+                          (when key? " bg-game-row"))
+        name-cell    [:div.text-base
+                      {:class (if key? "font-bold text-green-400" "text-game-green-muted")}
+                      name]
+        before-cell  [:div.text-base.text-right.text-game-green-muted
+                      (ui/format-number before)]
+        change-class (cond
+                       (zero? delta) "text-game-green-muted"
+                       key?          "text-green-400 font-bold"
+                       :else         "text-green-400")
+        change-cell  [:div.text-base.text-right.whitespace-nowrap
+                      {:class change-class
+                       :style (cond-> {:letter-spacing "0.03em"}
+                                (and key? (not (zero? delta)))
+                                (assoc :text-shadow "0 0 8px rgba(74,222,128,0.6)"))}
+                      (if (zero? delta) "-" [:<> "+" (ui/format-number delta)])]
+        after-cell   [:div.text-base.text-right
+                      {:class (if key? "text-green-400 font-bold" "text-game-green-soft")}
+                      (ui/format-number after)]]
     [:<>
 
      ;; Mobile
      [:div.income-row-mobile
       {:class (str "md:hidden " row-class)}
-      name-cell before-cell delta-cell after-cell]
+      name-cell before-cell change-cell after-cell]
 
      ;; Desktop
      [:div.income-row-desktop
       {:class (str "hidden md:grid " row-class)}
       name-cell
       (ui/svg-indicator-bar :gain before after filter-id)
-      before-cell delta-cell after-cell]]))
+      before-cell change-cell after-cell]]))
 
 (defn- resource-table-header
-  "Render the column-label row for the resource table.
-  Emits two variants: a 4-column mobile row (no bar column) and a 5-column
-  desktop row with an empty cell aligning the header grid to the data-row grid,
-  which uses that column for the SVG indicator bar.
+  "Render the column-label row for the income resource table.
 
   [] -> hiccup"
   []
-  (let [header-class    "gap-2 py-1 px-3 items-center bg-game-header border-b border-game-border"
-        col-class       "tracking-[0.08em] text-green-400"
-        item-class      "tracking-[0.1em] text-green-400"
-        col-label       (fn [text base-cls extra-cls]
-                          [:span.text-xs.uppercase
-                           {:class (str base-cls (when extra-cls (str " " extra-cls)))}
-                           text])
-        value-label     (fn [text]
-                          (col-label text col-class "text-right justify-self-end"))
-        ;; Empty cell aligning the header grid with the data-row grid,
-        ;; which uses this column for the SVG indicator bar (see resource-table-row).
-        bar-placeholder [:span]]
-    [:<>
-
-     ;; Mobile
-     [:div.income-row-mobile
-      {:class (str "md:hidden " header-class)}
-      (col-label "Item" item-class nil)
-      (value-label "before")
-      (value-label "change")
-      (value-label "after")]
-
-     ;; Desktop
-     [:div.income-row-desktop
-      {:class (str "hidden md:grid " header-class)}
-      (col-label "Item" item-class nil)
-      bar-placeholder
-      (value-label "before")
-      (value-label "change")
-      (value-label "after")]]))
+  (ui/impact-table-header "income"))
 
 (defn- resource-table
   "Render the Resource Changes table with before/delta/after columns and SVG bars.
@@ -284,14 +223,14 @@
   (let [player-id (:xt/id player)
         income    (calculate-income player game)]
     (ui/phase-shell player game "INCOME PHASE"
-      (ui/phase-body player
-        (ui/snapshot-section player)
-        (source-grid player income)
-        (resource-table player income))
-      (ui/phase-action-bar
-        (ui/action-bar-link (str "/app/game/" player-id) "Pause")
-        (biff/form
-          {:action (str "/app/game/" player-id "/apply-income") :method "post"
-           :class  "m-0"}
-          (ui/submit-button true "Continue to Expenses"))))))
+                    (ui/phase-body player
+                                   (ui/snapshot-section player)
+                                   (source-grid player income)
+                                   (resource-table player income))
+                    (ui/phase-action-bar
+                      (ui/action-bar-link (str "/app/game/" player-id) "Pause")
+                      (biff/form
+                        {:action (str "/app/game/" player-id "/apply-income") :method "post"
+                         :class  "m-0"}
+                        (ui/submit-button true "Continue to Expenses"))))))
 

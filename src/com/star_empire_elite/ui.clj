@@ -69,6 +69,14 @@
     (let [[s abbreviated?] (format-number-core n)]
       (if abbreviated? [:span {:title (str n)} s] s))))
 
+(defn format-signed-number
+  "Format a number with an explicit sign. Uses a typographic minus for negatives."
+  [n]
+  (cond
+    (neg? n)  (str "–" (format-number (Math/abs (long n))))
+    (zero? n) "0"
+    :else     (str "+" (format-number n))))
+
 (defn format-number-str
   "Like format-number but always returns a plain string. Use where hiccup is not appropriate,
   e.g. when building slash-separated compound display values.
@@ -382,7 +390,7 @@
      {:key k :class "py-px px-[5px] bg-game-green-deep"}
      sign (format-number v) " " suffix]))
 
-(defn phase-summary-card
+(defn phase-info-card
   "Render a phase summary card: name header with optional count, and pills content below.
   pills is pre-rendered content, typically from resource-pills.
 
@@ -661,6 +669,20 @@
      [:div.expense-row-desktop {:class (str "hidden md:grid " header-class)}
       (th-span "Item" th-item-cls nil) [:span] (th-r "Before") (th-c "Change") (th-r "After")]]))
 
+(defn impact-table-header
+  "Render the Item/Before/Change/After column-label row for income and expense impact tables.
+  Emits two variants: mobile (4-col, no bar) and desktop (5-col, with bar placeholder).
+  row-prefix determines the CSS grid class (e.g. \"income\" → .income-row-mobile).
+
+  [row-prefix str] -> hiccup"
+  [row-prefix]
+  (let [header-class "gap-2 py-1 px-3 items-center bg-game-header border-b border-game-border"]
+    [:<>
+     [:div {:class (str row-prefix "-row-mobile md:hidden " header-class)}
+      (th-span "Item" th-item-cls nil) (th-r "Before") (th-r "Change") (th-r "After")]
+     [:div {:class (str "hidden md:grid " row-prefix "-row-desktop " header-class)}
+      (th-span "Item" th-item-cls nil) [:span] (th-r "Before") (th-r "Change") (th-r "After")]]))
+
 (defn purchase-table-header
   "Render the column-label row for exchange and building purchase/sell tables.
   Uses the building-purchase-grid CSS class for a 5-column layout.
@@ -729,7 +751,7 @@
    (mode-badge badge-mode)
    (into [:span.text-game-green-soft.flex-1] body)])
 
-(defn- attack-summary-line
+(defn- attack-info-line
   "Render one alert row summarizing a single incoming attack record (pr-str'd map).
 
   [record-str string] -> hiccup"
@@ -774,7 +796,7 @@
        [:p.font-bold.text-yellow-400.mb-2.text-sm "\u26a0 Activity since the end of your last turn"]
        ;; Event lines — minimal badge + text, matching news feed style
        [:div.flex.flex-col.gap-1
-        (map attack-summary-line attacks)
+        (map attack-info-line attacks)
         (when bomb-result
           (let [total (+ (or (:soldiers-destroyed bomb-result) 0)
                          (or (:transports-destroyed bomb-result) 0)
@@ -1006,3 +1028,66 @@
           {:class (when (and highlight? (number? value) (neg? value)) "text-red-400")}
           value])])]])
 
+;;;
+;;; Info cards
+;;;
+(defn info-pill
+  "Render one small value pill.
+
+  Row shape:
+  {:key     optional hiccup key
+   :label   optional label before the value
+   :value   number
+   :unit    optional unit after the value
+   :sign    optional literal sign, e.g. \"+\"
+   :signed? true to render +/−/0 automatically}
+
+  Examples:
+  {:value 1000 :sign \"+\" :unit \"cr\"}          -> +1000 cr
+  {:label \"Planets\" :value -2000 :signed? true} -> Planets −2000"
+  [{:keys [key label value unit sign signed?]}]
+  [:span
+   {:key   (or key label unit)
+    :class "text-xs inline-block rounded-sm text-green-400 bg-game-green-deep"
+    :style {:padding "1px 5px"}}
+   (when label
+     (str label " "))
+   (cond
+     signed? (format-signed-number value)
+     sign    (str sign (format-number value))
+     :else   (format-number value))
+   (when unit
+     (str " " unit))])
+
+(defn info-card
+  "Render one compact card with title, right-side header value, and stacked pills.
+
+  Card shape:
+  {:key         optional hiccup key
+   :title       string
+   :aside       right-side header value
+   :aside-class optional full class string
+   :rows        seq of info-pill row maps}"
+  [{:keys [key title aside aside-class rows]}]
+  [:div
+   {:key   (or key title)
+    :class "flex flex-col gap-1 border border-game-border rounded-game bg-game-card"
+    :style {:padding "6px 8px"}}
+   [:div.flex.justify-between.items-baseline
+    [:span.text-base.font-bold.text-green-400 title]
+    (when aside
+      [:span
+       {:class (or aside-class "text-xs text-game-green-muted")}
+       aside])]
+   [:div {:class "flex flex-col gap-0.5"}
+    (map info-pill rows)]])
+
+(defn info-grid
+  "Render a labeled grid of summary cards."
+  [{:keys [label sublabel grid-class cards]}]
+  [:div
+   (if sublabel
+     (section-label label sublabel)
+     (section-label label))
+   [:div {:class grid-class}
+    (map info-card cards)]])

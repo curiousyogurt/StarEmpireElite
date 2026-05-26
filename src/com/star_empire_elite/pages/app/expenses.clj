@@ -158,6 +158,43 @@
 ;;;;
 
 ;;;
+;;; Obligations grid
+;;;
+
+(defn- obligation-rows
+  "Convert a seq of obligation row specs to the format expected by ui/info-card.
+  Each input row is {:label str, :value int}; values are signed (negative = owed).
+
+  [rows seq of {:label, :value}] -> seq of {:key, :label, :value, :signed?}"
+  [rows]
+  (for [{:keys [label value]} rows]
+    {:key label
+     :label label
+     :value value
+     :signed? true}))
+
+(defn- obligations-grid
+  "Render the obligations grid: three cards (Credits, Food/Fuel, Planets) in a 3-column grid,
+  each showing the minimum required payment and its breakdown. Totals are signed negative.
+
+  [obligations seq of obligation-card-maps from build-expense-obligations-data] -> hiccup"
+  [obligations]
+  (ui/info-grid
+   {:label "Obligations"
+    :sublabel "minimum required to avoid stability penalty"
+    :grid-class "grid grid-cols-3 gap-2"
+    :cards
+    (for [{:keys [name total rows]} obligations]
+      {:key name
+       :title name
+       :aside (ui/format-signed-number total)
+       :aside-class (str "text-xs "
+                         (if (neg? total)
+                           "text-amber-400"
+                           "text-game-green-muted"))
+       :rows (obligation-rows rows)})}))
+
+;;;
 ;;; Expense table definitions:
 ;;; - expense-table-row: a single editable row with HTMX input
 ;;; - expense-table-header: the column-label row
@@ -175,22 +212,29 @@
    player-id uuid, hx-include str] -> hiccup"
   [name before payment filter-id field-name player-id hx-include]
   (let [after       (- before payment)
-        slug        (str/lower-case name)
+        row-id      (str/lower-case name)
         row-class   "items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"
         name-cell   [:div.text-base.font-bold.text-green-400 name]
         before-cell [:div.text-base.text-right.text-game-green-muted
                      (ui/format-number before)]
         after-class (str "font-bold " (if (neg? after) "text-red-400" "text-green-400"))
+        ;; after-cell-m/d might seem like duplicate code; but if two elements share the same id (as 
+        ;; would be the case if we just used a generic after-cell), then only one element (the first) 
+        ;; would get updated dynamically.  So even though only one value is shown at a time, they are 
+        ;; both part of the page, and we need both to update each time any update is warranted.
         after-cell-m [:div.text-base.text-right
-                      [:span {:id (str "after-" slug "-m") :class after-class}
+                      [:span {:id (str "after-" row-id "-m") :class after-class}
                        (ui/format-number after)]]
         after-cell-d [:div.text-base.text-right
-                      [:span {:id (str "after-" slug "-d") :class after-class}
+                      [:span {:id (str "after-" row-id "-d") :class after-class}
                        (ui/format-number after)]]
         ;; Mobile row uses display-only input (no name, no HTMX) to avoid duplicate
         ;; field submission — both rows are always in the DOM, only CSS hides one.
         input-style  {:color "#7ab88a" :border-color "#2d6644"
                       :padding-top "1px" :padding-bottom "1px"}
+        ;; change-cell-m/d might also seem like duplicate code; but here, we set up the elements with 
+        ;; their own names, but where change-cell-m is a mirror of change-cell-d (the authoritative 
+        ;; element).
         change-cell-m [:div.justify-self-end
                        {:class "w-[min(140px,100%)]"}
                        (ui/numeric-input field-name payment player-id
@@ -212,54 +256,22 @@
      ;; Mobile
      [:div.expense-row-mobile
       {:class (str "md:hidden " row-class)}
-      name-cell before-cell change-cell-m after-cell-m]
+      name-cell 
+      before-cell change-cell-m after-cell-m]
 
      ;; Desktop
      [:div.expense-row-desktop
       {:class (str "hidden md:grid " row-class)}
       name-cell
-      [:div {:id (str "bar-" slug)} (ui/svg-indicator-bar :loss before payment filter-id)]
+      [:div {:id (str "bar-" row-id)} (ui/svg-indicator-bar :loss before payment filter-id)]
       before-cell change-cell-d after-cell-d]]))
 
 (defn- expense-table-header
-  "Render the column-label row for the expense table.
-  Emits two variants: a 4-column mobile row (no bar column) and a 5-column
-  desktop row with an empty cell aligning the header grid to the data-row grid,
-  which uses that column for the SVG indicator bar.
-  Before, Change, and After headers are all right-justified.
+  "Render the column-label row for the expense impact table.
 
   [] -> hiccup"
   []
-  (let [header-class    "gap-2 py-1 px-3 items-center bg-game-header border-b border-game-border"
-        col-class       "tracking-[0.08em] text-green-400"
-        item-class      "tracking-[0.1em] text-green-400"
-        col-label       (fn [text base-cls extra-cls]
-                          [:span.text-xs.uppercase
-                           {:class (str base-cls (when extra-cls (str " " extra-cls)))}
-                           text])
-        value-label     (fn [text]
-                          (col-label text col-class "text-right justify-self-end"))
-        ;; Empty cell aligning the header grid with the data-row grid,
-        ;; which uses this column for the SVG indicator bar (see expense-table-row).
-        bar-placeholder [:span]]
-    [:<>
-
-     ;; Mobile
-     [:div.expense-row-mobile
-      {:class (str "md:hidden " header-class)}
-      (col-label "Item" item-class nil)
-      (value-label "before")
-      (value-label "change")
-      (value-label "after")]
-
-     ;; Desktop
-     [:div.expense-row-desktop
-      {:class (str "hidden md:grid " header-class)}
-      (col-label "Item" item-class nil)
-      bar-placeholder
-      (value-label "before")
-      (value-label "change")
-      (value-label "after")]]))
+  (ui/impact-table-header "expense"))
 
 (defn- expense-table
   "Render the Impact table: three editable rows where the player chooses credits/food/fuel
@@ -278,57 +290,6 @@
     (expense-table-row "Fuel"    (:player/fuel    player) (:fuel    required-totals)
                        "glow-fuel"    "fuel-pay"    player-id hx-include)]])
 
-;;;
-;;; Obligations grid
-;;;
-
-(defn- obligation-pill
-  "Render one obligation pill: a small rounded badge with label and signed value.
-  Styled to match income's resource-pill (same size, padding, colours).
-
-  [{:keys [label value]}] -> hiccup"
-  [{:keys [label value]}]
-  [:span.text-xs.inline-block.rounded-sm.text-green-400.bg-game-green-deep
-   {:key   label
-    :style {:padding "1px 5px"}}
-   label " "
-   (cond
-     (neg? value)  (list "−" (ui/format-number (Math/abs (long value))))
-     (zero? value) "0"
-     :else         (list "+" (ui/format-number value)))])
-
-(defn- obligation-card
-  "Render one obligation card: bordered container with title + signed total header and a
-  stack of obligation pills showing the breakdown by source. Styled to match income's
-  resource-card (same shell, title, header layout, body gap); negative totals display
-  in amber, everything else in the same muted green as income's count.
-
-  [{:keys [name total rows]}] -> hiccup"
-  [{:keys [name total rows]}]
-  [:div.flex.flex-col.gap-1.border.border-game-border.rounded-game.bg-game-card
-   {:key   name
-    :style {:padding "6px 8px"}}
-   [:div.flex.justify-between.items-baseline
-    [:span.text-base.font-bold.text-green-400 name]
-    [:span.text-xs {:class (if (neg? total) "text-amber-400" "text-game-green-muted")}
-     (ui/format-number total)]]
-   [:div {:class "flex flex-col gap-0.5"}
-    (map obligation-pill rows)]])
-
-(defn- obligations-grid
-  "Render the empire obligations grid: one obligation card per resource (Credits, Food,
-  Fuel), showing the minimum payments required this turn and the breakdown by source.
-  Underpayment triggers a stability penalty (see calculate-expense-stability-penalty).
-
-  Standalone body element; renders its own section label.
-
-  [obligations seq of obligation-card-maps] -> hiccup"
-  [obligations]
-  [:div
-   (ui/section-label "Obligations" "minimum required to avoid stability penalty")
-   [:div.grid.grid-cols-3
-    {:class "gap-2"}
-    (map obligation-card obligations)]])
 
 ;;;;
 ;;;; Actions
