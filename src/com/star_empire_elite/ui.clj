@@ -70,12 +70,17 @@
       (if abbreviated? [:span {:title (str n)} s] s))))
 
 (defn format-signed-number
-  "Format a number with an explicit sign. Uses a typographic minus for negatives."
+  "Format a number with an explicit sign. Uses a typographic minus for negatives.
+  Returns a string for small numbers, or a hiccup fragment for abbreviated numbers."
   [n]
   (cond
-    (neg? n)  (str "–" (format-number (Math/abs (long n))))
     (zero? n) "0"
-    :else     (str "+" (format-number n))))
+    :else (let [abs-val          (Math/abs (long n))
+                sign             (if (neg? n) "–" "+")
+                [s abbreviated?] (format-number-core abs-val)]
+            (if abbreviated?
+              [:<> sign [:span {:title (str abs-val)} s]]
+              (str sign s)))))
 
 (defn format-number-str
   "Like format-number but always returns a plain string. Use where hiccup is not appropriate,
@@ -435,38 +440,6 @@
             extra)
      label]))
 
-(defn- proj-pill-row
-  "Render one projection pill span with positive / negative / zero variants.
-  Adds :id and :hx-swap-oob to the root attrs when present in the opts map.
-
-  [{:keys [label value id hx-swap-oob]}] -> hiccup"
-  [{:keys [label value id hx-swap-oob]}]
-  (let [neg?  (neg? value)
-        zero? (zero? value)]
-    [:span.flex.justify-between.items-baseline.rounded-sm
-     (cond-> {:class (str "px-[6px] py-px "
-                          (if zero? "bg-[#1a201c]" "bg-game-green-deep"))}
-       id          (assoc :id id)
-       hx-swap-oob (assoc :hx-swap-oob hx-swap-oob))
-     [:span
-      {:class (str "text-[9px] tracking-[0.04em] "
-                   (if zero? "text-game-green-dim" "text-game-green-muted"))}
-      label]
-     [:span.font-bold
-      {:class (str "text-[10px] "
-                   (if zero? "text-game-green-dim font-normal" "text-green-400"))}
-      (cond
-        neg?  (list "\u2212" (format-number (Math/abs (long value))))
-        zero? "+0"
-        :else (list "+" (format-number value)))]]))
-
-(defn oob-proj-pill
-  "Render a projection pill span for HTMX out-of-band swap. Matches the style of pills
-  rendered inside snapshot-section: positive/negative/zero color variants.
-
-  [id str, label str, value number] -> hiccup"
-  [id label value]
-  (proj-pill-row {:label label :value value :id id :hx-swap-oob "true"}))
 
 (defn- snapshot-hero
   "Render the 4-cell hero strip: Credits, Ore/Erg/Mil Planets in oversized stat cells.
@@ -541,58 +514,19 @@
         (snapshot-manifest-item "agents"    (format-number (:player/agents    player)) (z? :player/agents))]
        true)]))
 
-(defn- snapshot-projections
-  "Render the projections subsection with a pill card for each resource.
-
-  [projections seq, projection-turn str] -> hiccup"
-  [projections projection-turn]
-  [:div {:class "px-4 pt-[10px] pb-[14px] border-t border-game-border bg-[rgba(20,42,28,0.10)]"}
-   [:div.flex.items-baseline.uppercase
-    {:class "text-[9px] tracking-[0.18em] text-game-green-dim mb-2"}
-    (str "› RESOURCE PROJECTIONS · " projection-turn)
-    [:span.normal-case.opacity-70
-     {:class "ml-[10px] text-[9px] tracking-[0.04em]"}
-     "calculated values, current rates"]]
-   [:div.grid.grid-cols-3
-    {:class "gap-2"}
-    (for [{:keys [name total total-id rows]} projections]
-      [:div.flex.flex-col.rounded-game.bg-game-card
-       {:class "border border-game-border px-[10px] pt-2 pb-[9px] gap-[7px]"}
-       [:div.flex.justify-between.items-baseline.border-b.border-dashed.border-game-divider
-        {:class "pb-[6px]"}
-        [:span.font-bold {:class "text-[11px] tracking-[0.02em] text-game-green-mid"} name]
-        [:span.font-bold
-         (cond-> {:class (str "text-[14px] "
-                              (if (neg? total) "text-amber-400" "text-green-400"))
-                  :style {:text-shadow "0 0 10px rgba(61,220,132,0.25)"}}
-           total-id (assoc :id total-id))
-         (format-number total)]]
-       [:div.flex.flex-col
-        {:class "gap-[2px]"}
-        (map proj-pill-row rows)]])]])
-
 (defn snapshot-section
-  "Render the empire status card: 4-cell hero, full manifest, and optional sections.
+  "Render the empire status card: 4-cell hero and full manifest.
 
   opts map keys (all optional):
-    :projections     — vector of projection cards to show below the manifest.
-                       Each card is {:name str, :total number, :total-id str (optional),
-                       :rows [{:label str, :value number, :id str (optional)}]}.
-                       When absent the projections section is omitted.
-    :extra           — pre-rendered hiccup appended inside the card after the manifest/projections,
-                       wrapped in the same border-top separator style.
-    :projection-turn — turn label in the projections header, default \"NEXT TURN\". Pass \"THIS TURN\"
-                       for phases where projections reflect the current turn (expenses, exchange).
+    :extra — pre-rendered hiccup appended inside the card after the manifest,
+             wrapped in a border-top separator style.
 
   [player player-map, opts? map] -> hiccup"
-  [player & [{:keys [projections extra projection-turn]
-              :or   {projection-turn "NEXT TURN"}}]]
+  [player & [{:keys [extra]}]]
   [:div.relative.overflow-hidden.rounded.bg-game-bg.w-full.font-mono
    {:class "border-[1.5px] border-game-green-border"}
    (snapshot-hero player)
    (snapshot-manifest player)
-   (when projections
-     (snapshot-projections projections projection-turn))
    (when extra
      [:div {:class "px-4 pt-[10px] pb-[14px] border-t border-game-border bg-[rgba(20,42,28,0.10)]"}
       extra])])
@@ -669,6 +603,54 @@
      [:div.expense-row-desktop {:class (str "hidden md:grid " header-class)}
       (th-span "Item" th-item-cls nil) [:span] (th-r "Before") (th-c "Change") (th-r "After")]]))
 
+(defn impact-row
+  "Render one before/change/after row for an OOB-updatable impact table.
+  Emits mobile (4-col, no bar) and desktop (5-col, with bidirectional SVG bar) variants.
+  Bar direction is inferred: gain when after >= before, loss otherwise.
+
+  id-prefix is used for OOB element IDs: change-{prefix}-{row-id}-{m|d},
+  after-{prefix}-{row-id}-{m|d}, bar-{prefix}-{row-id}.
+
+  [name str, before int, after int, id-prefix str, filter-id str] -> hiccup"
+  [name before after id-prefix filter-id]
+  (let [delta      (- after before)
+        row-id     (str/lower-case name)
+        row-class  "items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"
+        name-cell  [:div.text-base.font-bold.text-green-400 name]
+        before-cell [:div.text-base.text-right.text-game-green-muted
+                     (format-number before)]
+        bar        (if (>= after before)
+                     (svg-indicator-bar :gain before after filter-id)
+                     (svg-indicator-bar :loss before (- before after) filter-id))
+        change-display (cond
+                         (zero? delta) "0"
+                         (pos? delta)  [:<> "+" (format-number delta)]
+                         :else         [:<> "−" (format-number (Math/abs (long delta)))])
+        change-class (str "tracking-[0.03em] "
+                          (if (zero? delta) "text-game-green-muted" "text-green-400"))
+        after-class  (str "font-bold " (if (neg? after) "text-red-400" "text-green-400"))
+        change-cell (fn [id]
+                      [:div.text-base.justify-self-center.whitespace-nowrap
+                       {:class change-class}
+                       [:span {:id id} change-display]])
+        after-cell  (fn [id]
+                      [:div.text-base.text-right
+                       [:span {:id id :class after-class}
+                        (format-number after)]])]
+    [:<>
+     [:div.expense-row-mobile
+      {:class (str "md:hidden " row-class)}
+      name-cell before-cell
+      (change-cell (str "change-" id-prefix "-" row-id "-m"))
+      (after-cell  (str "after-"  id-prefix "-" row-id "-m"))]
+     [:div.expense-row-desktop
+      {:class (str "hidden md:grid " row-class)}
+      name-cell
+      [:div {:id (str "bar-" id-prefix "-" row-id)} bar]
+      before-cell
+      (change-cell (str "change-" id-prefix "-" row-id "-d"))
+      (after-cell  (str "after-"  id-prefix "-" row-id "-d"))]]))
+
 (defn impact-table-header
   "Render the Item/Before/Change/After column-label row for income and expense impact tables.
   Emits two variants: mobile (4-col, no bar) and desktop (5-col, with bar placeholder).
@@ -687,14 +669,43 @@
   "Render the column-label row for exchange and building purchase/sell tables.
   Uses the building-purchase-grid CSS class for a 5-column layout.
 
-  [price-label str, action-label str, total-label str] -> hiccup"
-  [price-label action-label total-label]
+  opts map keys (all optional):
+    :action-btn-placeholder — when truthy, adds an invisible spacer matching the width of the
+                              companion button (e.g. \"max\") so the header aligns with the input's
+                              right edge rather than the input+button group's right edge.
+
+  [price-label str, action-label str, total-label str, opts? map] -> hiccup"
+  [price-label action-label total-label & [{:keys [action-btn-placeholder]}]]
   [:div.building-purchase-grid
    {:class "gap-2 py-1 px-3 items-center bg-game-header border-b border-game-border"}
    (th-span "Item" th-item-cls nil)
    (th-r price-label)
    (th-r "Max")
-   (th-c action-label)
+   ;; Mimic the input column layout so the header right-aligns with the right
+   ;; edge of the input box below. Uses the same centering + translate-x-4 as rows.
+   ;; When action-btn-placeholder is set, an invisible button occupies the same
+   ;; space as the row's companion button (e.g. "max") to match centering.
+   (let [;; Invisible input that sizes the div identically to the row's input wrapper.
+         ;; Uses the same classes as numeric-input's <input> element.
+         sizing-input [:input.invisible.w-full.bg-black.border.border-green-400.p-2.font-mono
+                       {:type "text" :tabindex "-1" :aria-hidden "true"
+                        :class "text-xs lg:text-sm"
+                        :style {:padding-top "1px" :padding-bottom "1px"}}]
+         label-overlay [:div.absolute.inset-0.flex.items-center.justify-end
+                        (th-span action-label th-col-cls nil)]]
+     [:div.flex.items-center.justify-center.min-w-0
+      (if action-btn-placeholder
+        ;; Building: input + visible "max" button in a flex group.
+        [:div.flex.items-center.gap-1.translate-x-4.min-w-0
+         [:div.relative.min-w-0 {:class "w-[min(120px,100%)]"}
+          sizing-input label-overlay]
+         [:button.text-xs.shrink-0.border.border-game-green-border.bg-transparent.py-px.px-1.rounded-sm.cursor-pointer.whitespace-nowrap
+          {:type "button" :tabindex "-1" :aria-hidden "true"
+           :style {:visibility "hidden"}}
+          action-btn-placeholder]]
+        ;; Exchange: input alone; buttons are absolutely positioned in the row.
+        [:div.relative.min-w-0 {:class "w-[min(120px,100%)] translate-x-4"}
+         sizing-input label-overlay])])
    (th-r total-label)])
 
 (defn oob-pill
@@ -1035,21 +1046,25 @@
   "Render one small value pill.
 
   Row shape:
-  {:key     optional hiccup key
-   :label   optional label before the value
-   :value   number
-   :unit    optional unit after the value
-   :sign    optional literal sign, e.g. \"+\"
-   :signed? true to render +/−/0 automatically}
+  {:key          optional hiccup key
+   :label        optional label before the value
+   :value        number
+   :unit         optional unit after the value
+   :sign         optional literal sign, e.g. \"+\"
+   :signed?      true to render +/−/0 automatically
+   :id           optional element id (for HTMX OOB swaps)
+   :hx-swap-oob  optional HTMX out-of-band swap attribute}
 
   Examples:
   {:value 1000 :sign \"+\" :unit \"cr\"}          -> +1000 cr
   {:label \"Planets\" :value -2000 :signed? true} -> Planets −2000"
-  [{:keys [key label value unit sign signed?]}]
+  [{:keys [key label value unit sign signed? id hx-swap-oob]}]
   [:span
-   {:key   (or key label unit)
-    :class "text-xs inline-block rounded-sm text-green-400 bg-game-green-deep"
-    :style {:padding "1px 5px"}}
+   (cond-> {:key   (or key label unit)
+            :class "text-xs inline-block rounded-sm text-green-400 bg-game-green-deep"
+            :style {:padding "1px 5px"}}
+     id          (assoc :id id)
+     hx-swap-oob (assoc :hx-swap-oob hx-swap-oob))
    (when label
      (str label " "))
    (cond
@@ -1059,6 +1074,14 @@
    (when unit
      (str " " unit))])
 
+(defn oob-proj-pill
+  "Render a projection pill span for HTMX out-of-band swap. Matches the style of pills
+  rendered inside projection-grid: signed value with label.
+
+  [id str, label str, value number] -> hiccup"
+  [id label value]
+  (info-pill {:label label :value value :signed? true :id id :hx-swap-oob "true"}))
+
 (defn info-card
   "Render one compact card with title, right-side header value, and stacked pills.
 
@@ -1067,8 +1090,9 @@
    :title       string
    :aside       right-side header value
    :aside-class optional full class string
+   :aside-id    optional element id on the aside span (for HTMX OOB swaps)
    :rows        seq of info-pill row maps}"
-  [{:keys [key title aside aside-class rows]}]
+  [{:keys [key title aside aside-class aside-id rows]}]
   [:div
    {:key   (or key title)
     :class "flex flex-col gap-1 border border-game-border rounded-game bg-game-card"
@@ -1077,7 +1101,8 @@
     [:span.text-base.font-bold.text-green-400 title]
     (when aside
       [:span
-       {:class (or aside-class "text-xs text-game-green-muted")}
+       (cond-> {:class (or aside-class "text-xs text-game-green-muted")}
+         aside-id (assoc :id aside-id))
        aside])]
    [:div {:class "flex flex-col gap-0.5"}
     (map info-pill rows)]])
@@ -1091,3 +1116,30 @@
      (section-label label))
    [:div {:class grid-class}
     (map info-card cards)]])
+
+(defn projection-grid
+  "Render the resource projections grid: a labeled section with pill cards for each resource,
+  each showing a signed total and breakdown rows. Parallel to obligations-grid in expenses.
+  Uses info-grid / info-card / info-pill.
+
+  opts map keys (all optional):
+    :projection-turn — turn label in the header, default \"NEXT TURN\". Pass \"THIS TURN\"
+                       for phases where projections reflect the current turn.
+
+  [projections seq, opts? map] -> hiccup"
+  [projections & [{:keys [projection-turn]
+                   :or   {projection-turn "NEXT TURN"}}]]
+  (info-grid
+    {:label    "Resource Projections"
+     :sublabel (str projection-turn " · calculated values, current rates")
+     :grid-class "grid grid-cols-3 gap-2"
+     :cards
+     (for [{:keys [name total total-id rows]} projections]
+       {:key       name
+        :title     name
+        :aside     (format-signed-number total)
+        :aside-class (str "text-xs "
+                          (if (neg? total) "text-amber-400" "text-green-400"))
+        :aside-id  total-id
+        :rows      (for [{:keys [label value id]} rows]
+                     {:label label :value value :signed? true :id id})})}))

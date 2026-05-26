@@ -57,6 +57,7 @@
 ;;;
 ;;; Source grid
 ;;;
+
 (defn- income-rows
   "Convert an income-map to the row-spec format expected by ui/info-card.
   Iterates the six resource keys in display order, skipping any with zero value.
@@ -65,8 +66,8 @@
   [income-map]
   (for [[k unit] [[:credits  "cred"] [:food     "food"] [:fuel     "fuel"]
                   [:soldiers "sold"] [:fighters "fgtr"] [:stations "stn"]]
-        :let [v (or (k income-map) 0)]
-        :when (pos? v)] ; Ignore if value is nil
+        :let [v (k income-map)]
+        :when (and v (pos? v))] ; include only if v is present (~nil) and pos? (~zero)
     {:key k :value v :sign "+" :unit unit}))
 
 (defn- source-grid
@@ -101,7 +102,9 @@
           :rows (income-rows income-map)})})))
 
 ;;;
-;;; Resource table definitions:
+;;; Resource table 
+;;;
+;;; Definitions:
 ;;; - resource-table-row: a single row
 ;;; - resource-table-header: the table header
 ;;; - resource-table: put it all together
@@ -122,6 +125,7 @@
                       name]
         before-cell  [:div.text-base.text-right.text-game-green-muted
                       (ui/format-number before)]
+        ;; Give a resource that has changed or is key a green glow; otherwise green muted
         change-class (cond
                        (zero? delta) "text-game-green-muted"
                        key?          "text-green-400 font-bold"
@@ -131,7 +135,7 @@
                        :style (cond-> {:letter-spacing "0.03em"}
                                 (and key? (not (zero? delta)))
                                 (assoc :text-shadow "0 0 8px rgba(74,222,128,0.6)"))}
-                      (if (zero? delta) "-" [:<> "+" (ui/format-number delta)])]
+                      (if (zero? delta) "—" [:<> "+" (ui/format-number delta)])]
         after-cell   [:div.text-base.text-right
                       {:class (if key? "text-green-400 font-bold" "text-game-green-soft")}
                       (ui/format-number after)]]

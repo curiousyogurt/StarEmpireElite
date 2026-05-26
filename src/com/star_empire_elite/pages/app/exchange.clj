@@ -22,29 +22,49 @@
 ;;;;
 
 (def sell-asset-row-specs
-  [{:label "Soldiers"         :abbrev "Soldiers"   :field "soldiers-sold"     :qty-key :soldiers-sold     :rate-key :soldier-sell    :player-key :player/soldiers}
-   {:label "Transports"       :abbrev "Transports" :field "transports-sold"   :qty-key :transports-sold   :rate-key :transport-sell  :player-key :player/transports}
-   {:label "Generals"         :abbrev "Generals"   :field "generals-sold"     :qty-key :generals-sold     :rate-key :general-sell    :player-key :player/generals}
-   {:label "Fighters"         :abbrev "Fighters"   :field "fighters-sold"     :qty-key :fighters-sold     :rate-key :fighter-sell    :player-key :player/fighters}
-   {:label "Carriers"         :abbrev "Carriers"   :field "carriers-sold"     :qty-key :carriers-sold     :rate-key :carrier-sell    :player-key :player/carriers}
-   {:label "Admirals"         :abbrev "Admirals"   :field "admirals-sold"     :qty-key :admirals-sold     :rate-key :admiral-sell    :player-key :player/admirals}
-   {:label "Defence Stations" :abbrev "Def Stns"   :field "stations-sold"     :qty-key :stations-sold     :rate-key :station-sell    :player-key :player/stations}
-   {:label "Command Ships"    :abbrev "Cmd Ships"  :field "cmd-ships-sold"    :qty-key :cmd-ships-sold    :rate-key :cmd-ship-sell   :player-key :player/cmd-ships}
-   {:label "Agents"           :abbrev "Agents"     :field "agents-sold"       :qty-key :agents-sold       :rate-key :agent-sell      :player-key :player/agents}
-   {:label "Military Planets" :abbrev "Mil Plts"   :field "mil-planets-sold"  :qty-key :mil-planets-sold  :rate-key :mil-planet-sell :player-key :player/mil-planets}
-   {:label "Energy Planets"   :abbrev "Erg Plts"   :field "erg-planets-sold"  :qty-key :erg-planets-sold  :rate-key :erg-planet-sell :player-key :player/erg-planets}
-   {:label "Ore Planets"      :abbrev "Ore Plts"   :field "ore-planets-sold"  :qty-key :ore-planets-sold  :rate-key :ore-planet-sell :player-key :player/ore-planets}])
+  [{:label "Soldiers"          :abbrev "Soldiers"         :field "soldiers-sold"     
+    :qty-key :soldiers-sold    :rate-key :soldier-sell    :player-key :player/soldiers}
+   {:label "Transports"        :abbrev "Transports"       :field "transports-sold"   
+    :qty-key :transports-sold  :rate-key :transport-sell  :player-key :player/transports}
+   {:label "Generals"          :abbrev "Generals"         :field "generals-sold"     
+    :qty-key :generals-sold    :rate-key :general-sell    :player-key :player/generals}
+   {:label "Fighters"          :abbrev "Fighters"         :field "fighters-sold"     
+    :qty-key :fighters-sold    :rate-key :fighter-sell    :player-key :player/fighters}
+   {:label "Carriers"          :abbrev "Carriers"         :field "carriers-sold"     
+    :qty-key :carriers-sold    :rate-key :carrier-sell    :player-key :player/carriers}
+   {:label "Admirals"          :abbrev "Admirals"         :field "admirals-sold"     
+    :qty-key :admirals-sold    :rate-key :admiral-sell    :player-key :player/admirals}
+   {:label "Defence Stations"  :abbrev "Def Stns"         :field "stations-sold"     
+    :qty-key :stations-sold    :rate-key :station-sell    :player-key :player/stations}
+   {:label "Command Ships"     :abbrev "Cmd Ships"        :field "cmd-ships-sold"    
+    :qty-key :cmd-ships-sold   :rate-key :cmd-ship-sell   :player-key :player/cmd-ships}
+   {:label "Agents"            :abbrev "Agents"           :field "agents-sold"       
+    :qty-key :agents-sold      :rate-key :agent-sell      :player-key :player/agents}
+   {:label "Military Planets"  :abbrev "Mil Plts"         :field "mil-planets-sold"  
+    :qty-key :mil-planets-sold :rate-key :mil-planet-sell :player-key :player/mil-planets}
+   {:label "Energy Planets"    :abbrev "Erg Plts"         :field "erg-planets-sold"  
+    :qty-key :erg-planets-sold :rate-key :erg-planet-sell :player-key :player/erg-planets}
+   {:label "Ore Planets"       :abbrev "Ore Plts"         :field "ore-planets-sold"  
+    :qty-key :ore-planets-sold :rate-key :ore-planet-sell :player-key :player/ore-planets}])
 
 (def sell-resource-row-specs
-  [{:label "Food"             :abbrev "Food"       :field "food-sold"         :qty-key :food-sold         :rate-key :food-sell       :player-key :player/food :resource-key :food :ex-tooltip "Sell food excess"}
-   {:label "Fuel"             :abbrev "Fuel"       :field "fuel-sold"         :qty-key :fuel-sold         :rate-key :fuel-sell       :player-key :player/fuel :resource-key :fuel :ex-tooltip "Sell fuel excess"}])
+  [{:label "Food"        :abbrev "Food"           :field "food-sold"  :qty-key :food-sold 
+    :rate-key :food-sell :player-key :player/food :resource-key :food 
+    :ex-tooltip "Sell food excess"}
+   {:label "Fuel"        :abbrev "Fuel"           :field "fuel-sold"  :qty-key :fuel-sold  
+    :rate-key :fuel-sell :player-key :player/fuel :resource-key :fuel  
+    :ex-tooltip "Sell fuel excess"}])
 
 (def sell-row-specs
   (concat sell-asset-row-specs sell-resource-row-specs))
 
 (def buy-row-specs
-  [{:label "Food" :abbrev "Food" :field "food-bought" :qty-key :food-bought :rate-key :food-buy :max-key :max-food :resource-key :food :player-key :player/food :sf-tooltip "Buy food shortfall"}
-   {:label "Fuel" :abbrev "Fuel" :field "fuel-bought" :qty-key :fuel-bought :rate-key :fuel-buy :max-key :max-fuel :resource-key :fuel :player-key :player/fuel :sf-tooltip "Buy fuel shortfall"}])
+  [{:label "Food"       :abbrev "Food"     :field "food-bought" :qty-key :food-bought 
+    :rate-key :food-buy :max-key :max-food :resource-key :food  :player-key :player/food 
+    :sf-tooltip "Buy food shortfall"}
+   {:label "Fuel"       :abbrev "Fuel"     :field "fuel-bought" :qty-key :fuel-bought 
+    :rate-key :fuel-buy :max-key :max-fuel :resource-key :fuel  :player-key :player/fuel 
+    :sf-tooltip "Buy fuel shortfall"}])
 
 (def exchange-hx-include
   (str/join ","
@@ -161,8 +181,8 @@
    :invalid-mil-planet-sale?    (< (:mil-planets resources-after) 0)
    :invalid-energy-planet-sale? (< (:erg-planets resources-after) 0)
    :invalid-ore-planet-sale?    (< (:ore-planets resources-after) 0)
-   :invalid-food-sale?          (and (> (:food-sold quantities) 0) (< (:food resources-after) 0))
-   :invalid-fuel-sale?          (and (> (:fuel-sold quantities) 0) (< (:fuel resources-after) 0))
+   :invalid-food-sale?          (and (> (:food-sold quantities) 0)   (< (:food resources-after) 0))
+   :invalid-fuel-sale?          (and (> (:fuel-sold quantities) 0)   (< (:fuel resources-after) 0))
    :invalid-food-purchase?      (and (> (:food-bought quantities) 0) (< (:credits resources-after) 0))
    :invalid-fuel-purchase?      (and (> (:fuel-bought quantities) 0) (< (:credits resources-after) 0))})
 
@@ -181,84 +201,32 @@
     {:credits (+ (* (:soldiers-sold  quantities) (:game/soldier-upkeep-credits  game))
                  (* (:fighters-sold  quantities) (:game/fighter-upkeep-credits  game))
                  (* (:stations-sold  quantities) (:game/station-upkeep-credits  game))
-                 (* planets-sold                  (:game/planet-upkeep-credits   game)))
+                 (* planets-sold                 (:game/planet-upkeep-credits   game)))
      :food    (+ (* (:soldiers-sold  quantities) (:game/soldier-upkeep-food     game))
                  (* (:agents-sold    quantities) (:game/agent-upkeep-food       game))
-                 (* planets-sold                  (:game/planet-upkeep-food      game)))
+                 (* planets-sold                 (:game/planet-upkeep-food      game)))
      :fuel    (+ (* (:fighters-sold  quantities) (:game/fighter-upkeep-fuel     game))
                  (* (:stations-sold  quantities) (:game/station-upkeep-fuel     game))
                  (* (:agents-sold    quantities) (:game/agent-upkeep-fuel       game)))}))
 
-(defn- exchange-resource-bar
-  "Render a bidirectional SVG indicator bar for exchange resources.
-  Points right when after >= before (gain), left when after < before (loss).
-
-  [before int, after int, filter-id str] -> hiccup"
-  [before after filter-id]
-  (if (>= after before)
-    (ui/svg-indicator-bar :gain before after filter-id)
-    (ui/svg-indicator-bar :loss before (- before after) filter-id)))
-
-(defn- exchange-bar-row
-  "Render one resource row in two variants: mobile (no bar) and desktop (with bar).
-  Bar direction is determined dynamically based on net change.
-
-  [name str, before int, after int, filter-id str] -> hiccup"
-  [name before after filter-id]
-  (let [delta      (- after before)
-        slug       (str/lower-case name)
-        row-class  "items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"
-        name-cell  [:div.text-base.font-bold.text-green-400 name]
-        before-cell [:div.text-base.text-right.text-game-green-muted
-                     (ui/format-number before)]
-        change-cell (fn [id]
-                      [:div.text-base.justify-self-center.whitespace-nowrap
-                       {:class (str "tracking-[0.03em] "
-                                    (if (zero? delta) "text-game-green-muted" "text-green-400"))}
-                       [:span {:id id}
-                        (if (zero? delta)
-                          "0"
-                          [:<> (if (pos? delta) "+" "−")
-                           (ui/format-number (Math/abs (long delta)))])]])
-        after-cell  (fn [id]
-                      [:div.text-base.text-right
-                       [:span {:id id
-                               :class (str "font-bold " (if (neg? after) "text-red-400" "text-green-400"))}
-                        (ui/format-number after)]])]
-    [:<>
-     ;; Mobile: 4-col grid, no bar
-     [:div.expense-row-mobile
-      {:class (str "md:hidden " row-class)}
-      name-cell before-cell
-      (change-cell (str "change-exchange-" slug "-m"))
-      (after-cell  (str "after-exchange-"  slug "-m"))]
-     ;; Desktop: 5-col grid, with bar
-     [:div.expense-row-desktop
-      {:class (str "hidden md:grid " row-class)}
-      name-cell
-      [:div {:id (str "bar-exchange-" slug)} (exchange-resource-bar before after filter-id)]
-      before-cell
-      (change-cell (str "change-exchange-" slug "-d"))
-      (after-cell  (str "after-exchange-"  slug "-d"))]]))
-
-(defn- exchange-bar-table
-  "Render the Credits/Food/Fuel indicator bar table showing net resource changes from exchange.
+(defn- exchange-impact-table
+  "Render the Credits/Food/Fuel impact table showing net resource changes from exchange.
 
   [player player-map, resources-after {:credits int, :food int, :fuel int}] -> hiccup"
   [player resources-after]
   [:div.overflow-hidden.rounded-game.bg-game-surface
    {:class "border border-game-border"}
    (ui/deduction-table-header)
-   (exchange-bar-row "Credits" (:player/credits player) (:credits resources-after) "glow-ex-credits")
-   (exchange-bar-row "Food"    (:player/food    player) (:food    resources-after) "glow-ex-food")
-   (exchange-bar-row "Fuel"    (:player/fuel    player) (:fuel    resources-after) "glow-ex-fuel")])
+   (ui/impact-row "Credits" (:player/credits player) (:credits resources-after) "exchange" "glow-ex-credits")
+   (ui/impact-row "Food"    (:player/food    player) (:food    resources-after) "exchange" "glow-ex-food")
+   (ui/impact-row "Fuel"    (:player/fuel    player) (:fuel    resources-after) "exchange" "glow-ex-fuel")])
 
 ;;;;
 ;;;; UI Components
 ;;;;
 
 (defn build-exchange-projections-data
-  "Compute the projections data structure for snapshot-section's :projections opt.
+  "Compute the projections data structure consumed by projection-grid.
   Shows current holdings, required expenses, and exchange impact for Credits, Food, and Fuel.
   Required rows are negative; Exchange rows start at 0 and are updated via HTMX OOB.
 
@@ -269,17 +237,16 @@
         fuel-current (:player/fuel    player)]
     [{:name "Credits" :total (- cr-current   (:credits req-totals)) :total-id "projection-credits-total"
       :rows [{:label "Current"  :value cr-current}
-             {:label "Required" :value (- (:credits req-totals)) :id "credits-pill-required"}
-             {:label "Exchange" :value 0                         :id "credits-pill-exchange"}]}
+             {:label "Required" :value (- (:credits    req-totals)) :id "credits-pill-required"}
+             {:label "Exchange" :value 0                            :id "credits-pill-exchange"}]}
      {:name "Food"    :total (- food-current (:food    req-totals)) :total-id "projection-food-total"
       :rows [{:label "Current"  :value food-current}
-             {:label "Required" :value (- (:food    req-totals)) :id "food-pill-required"}
-             {:label "Exchange" :value 0                         :id "food-pill-exchange"}]}
+             {:label "Required" :value (- (:food       req-totals)) :id "food-pill-required"}
+             {:label "Exchange" :value 0                            :id "food-pill-exchange"}]}
      {:name "Fuel"    :total (- fuel-current (:fuel    req-totals)) :total-id "projection-fuel-total"
       :rows [{:label "Current"  :value fuel-current}
-             {:label "Required" :value (- (:fuel    req-totals)) :id "fuel-pill-required"}
-             {:label "Exchange" :value 0                         :id "fuel-pill-exchange"}]}]))
-
+             {:label "Required" :value (- (:fuel       req-totals)) :id "fuel-pill-required"}
+             {:label "Exchange" :value 0                            :id "fuel-pill-exchange"}]}]))
 
 (defn exchange-row
   "Render one exchange row (sell or buy) with building-page styling.
@@ -488,7 +455,9 @@
                fuel-delta  (- fuel-after fuel-before)
                oob-bar     (fn [id before after filter-id]
                              [:div {:id id :hx-swap-oob "true"}
-                              (exchange-resource-bar before after filter-id)])
+                              (if (>= after before)
+                                (ui/svg-indicator-bar :gain before after filter-id)
+                                (ui/svg-indicator-bar :loss before (- before after) filter-id))])
                oob-after   (fn [id v]
                              [:span {:id id :hx-swap-oob "true"
                                      :class (str "font-bold " (if (neg? v) "text-red-400" "text-green-400"))}
@@ -558,7 +527,8 @@
                        :class  "m-0"}
                       (ui/phase-body player
                                      (ui/flash-notice flash)
-                                     (ui/snapshot-section player {:projections projections-data :projection-turn "THIS TURN"})
+                                     (ui/snapshot-section player)
+                                     (ui/projection-grid projections-data {:projection-turn "THIS TURN"})
                                      (ui/section-label "Sell Assets")
                                      [:div
                                       [:div.overflow-hidden.rounded-game.bg-game-surface
@@ -594,9 +564,9 @@
                                                        {:sf-value sf-val :sf-tooltip (:sf-tooltip spec)}))]]
                                      (ui/section-label "Impact")
                                      [:div
-                                      (exchange-bar-table player {:credits (:player/credits player)
-                                                                  :food    (:player/food    player)
-                                                                  :fuel    (:player/fuel    player)})]
+                                      (exchange-impact-table player {:credits (:player/credits player)
+                                                                    :food    (:player/food    player)
+                                                                    :fuel    (:player/fuel    player)})]
                                      [:div#resources-after.hidden])
                       (ui/phase-warning "exchange-warning")
                       (ui/phase-action-bar

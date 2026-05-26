@@ -8,7 +8,7 @@
 (def ^:private manifest-row         #'ui/snapshot-manifest-row)
 (def ^:private hero                  #'ui/snapshot-hero)
 (def ^:private manifest              #'ui/snapshot-manifest)
-(def ^:private projections-section   #'ui/snapshot-projections)
+(def ^:private projections-section   ui/projection-grid)
 
 ;;;;
 ;;;; format-number Tests
@@ -330,24 +330,6 @@
     (let [result (str (ui/snapshot-section sample-player))]
       (is (not (str/includes? result "PROJECTIONS"))))))
 
-(deftest test-snapshot-section-with-projections
-  (testing "Projections section appears when :projections opt is passed"
-    (let [result (str (ui/snapshot-section sample-player
-                        {:projections [{:name "Credits" :total 500 :rows []}]}))]
-      (is (str/includes? result "PROJECTIONS")))))
-
-(deftest test-snapshot-section-projection-turn-default
-  (testing "Default projection-turn is NEXT TURN"
-    (let [result (str (ui/snapshot-section sample-player
-                        {:projections [{:name "Credits" :total 0 :rows []}]}))]
-      (is (str/includes? result "NEXT TURN")))))
-
-(deftest test-snapshot-section-projection-turn-this
-  (testing "THIS TURN label is used when :projection-turn is passed"
-    (let [result (str (ui/snapshot-section sample-player
-                        {:projections     [{:name "Credits" :total 0 :rows []}]
-                         :projection-turn "THIS TURN"}))]
-      (is (str/includes? result "THIS TURN")))))
 
 
 ;;;;
@@ -405,39 +387,39 @@
       (is (str/includes? result "42")))))
 
 ;;;;
-;;;; snapshot-projections Tests
+;;;; projection-grid Tests
 ;;;;
 
-(deftest test-snapshot-projections-turn-label
+(deftest test-projection-grid-turn-label
   (testing "Renders the passed projection-turn string in the header"
     (let [proj [{:name "Credits" :total 100 :rows []}]]
-      (is (str/includes? (str (projections-section proj "THIS TURN")) "THIS TURN"))
-      (is (str/includes? (str (projections-section proj "NEXT TURN")) "NEXT TURN")))))
+      (is (str/includes? (str (projections-section proj {:projection-turn "THIS TURN"})) "THIS TURN"))
+      (is (str/includes? (str (projections-section proj {:projection-turn "NEXT TURN"})) "NEXT TURN")))))
 
-(deftest test-snapshot-projections-negative-total-amber
+(deftest test-projection-grid-negative-total-amber
   (testing "Negative total renders amber color class"
-    (let [result (str (projections-section [{:name "Credits" :total -50 :rows []}] "NEXT TURN"))]
+    (let [result (str (projections-section [{:name "Credits" :total -50 :rows []}]))]
       (is (str/includes? result "text-amber-400")))))
 
-(deftest test-snapshot-projections-positive-total-green
+(deftest test-projection-grid-positive-total-green
   (testing "Positive total renders green color class"
-    (let [result (str (projections-section [{:name "Credits" :total 100 :rows []}] "NEXT TURN"))]
+    (let [result (str (projections-section [{:name "Credits" :total 100 :rows []}]))]
       (is (str/includes? result "text-green-400")))))
 
-(deftest test-snapshot-projections-total-id
+(deftest test-projection-grid-total-id
   (testing "total-id is set as the :id attribute on the total span"
-    (let [result (projections-section [{:name "Credits" :total 100 :total-id "my-id" :rows []}] "NEXT TURN")
+    (let [result (projections-section [{:name "Credits" :total 100 :total-id "my-id" :rows []}])
           result-str (str result)]
       (is (str/includes? result-str "my-id")))))
 
-(deftest test-snapshot-projections-card-count
+(deftest test-projection-grid-card-count
   (testing "Renders one card per entry in the projections vector"
     (let [proj  [{:name "A" :total 1 :rows []}
                  {:name "B" :total 2 :rows []}
                  {:name "C" :total 3 :rows []}]
-          ;; result = [:div outer {:class ...} [:div header] [:div.grid {:class ...} (for-seq)]]
-          ;; grid = index 3; the for-seq is a single lazy-seq child at index 2 of the grid
-          grid  (nth (projections-section proj "NEXT TURN") 3)
+          ;; result = [:div [:div section-label] [:div.grid {:class ...} (for-seq)]]
+          ;; grid = index 2; the for-seq is a single lazy-seq child at index 2 of the grid
+          grid  (nth (projections-section proj) 2)
           cards (nth grid 2)]
       (is (= 3 (count cards))))))
 

@@ -110,7 +110,7 @@
 ;;;;
 
 (defn build-projections-data
-  "Compute the projections data structure for snapshot-section's :projections opt.
+  "Compute the projections data structure consumed by projection-grid.
   Accounts for proposed purchases in quantities; pass zero-quantities for the initial page render.
   Credits 'Current' row reflects credits after the proposed build cost is deducted.
 
@@ -246,7 +246,7 @@
   (let [player-id (:xt/id player)]
     [:div.overflow-hidden.rounded-game.bg-game-surface
      {:class "border border-game-border"}
-     (ui/purchase-table-header "Each" "Build" "Cost")
+     (ui/purchase-table-header "Each" "Build" "Cost" {:action-btn-placeholder "max"})
      (for [spec purchase-row-specs
            :let [qty-key      (:qty-key spec)
                  purchase-qty (get quantities qty-key 0)
@@ -254,37 +254,12 @@
        (build-purchase-row spec purchase-qty max-qty game player-id))]))
 
 (defn- build-credits-row
-  "Render the credits row in the Credit Impact section.
-  Shows a deduction bar (desktop) and OOB-updatable spans for cost and after-credits.
+  "Render the credits row in the Credit Impact section using ui/impact-row.
 
   [player player-map, cost int] -> hiccup"
   [player cost]
-  (let [before      (:player/credits player)
-        after       (- before cost)
-        row-class    "items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"
-        after-cls    (fn [v] (str "font-bold " (if (neg? v) "text-red-400" "text-green-400")))
-        cost-display (if (pos? cost) [:<> "-" (ui/format-number cost)] "0")]
-    [:<>
-     ;; Mobile row
-     [:div.expense-row-mobile
-      {:class (str "md:hidden " row-class)}
-      [:div.text-base.font-bold.text-green-400 "Credits"]
-      [:div.text-base.text-right.text-game-green-muted (ui/format-number before)]
-      [:div.justify-self-center.text-base.whitespace-nowrap.text-red-400
-       [:span#build-cost-display-m cost-display]]
-      [:div.text-base.text-right
-       [:span#after-credits-m {:class (after-cls after)} (ui/format-number after)]]]
-
-     ;; Desktop row
-     [:div.expense-row-desktop
-      {:class (str "hidden md:grid " row-class)}
-      [:div.text-base.font-bold.text-green-400 "Credits"]
-      [:div {:id "bar-build-credits"} (ui/svg-indicator-bar :loss before cost "glow-build-credits")]
-      [:div.text-base.text-right.text-game-green-muted (ui/format-number before)]
-      [:div.justify-self-center.text-base.whitespace-nowrap.text-red-400
-       [:span#build-cost-display-d cost-display]]
-      [:div.text-base.text-right
-       [:span#after-credits-d {:class (after-cls after)} (ui/format-number after)]]]]))
+  (ui/impact-row "Credits" (:player/credits player) (- (:player/credits player) cost)
+                 "build" "glow-build-credits"))
 
 ;;;;
 ;;;; Actions
@@ -345,7 +320,6 @@
           total           (:total-cost cost-info)
           credits-after   (:credits resources-after)
           after-cls       (str "font-bold " (if (neg? credits-after) "text-red-400" "text-green-400"))
-          cost-display    (if (pos? total) [:<> "-" (ui/format-number total)] "0")
           item-costs      (into {} (for [spec purchase-row-specs]
                                      [(:qty-key spec) (* (get quantities (:qty-key spec))
                                                          (get game (:cost-key spec)))]))
@@ -366,14 +340,22 @@
              :class (str "text-[14px] " (if (neg? total) "text-amber-400" "text-green-400"))
              :style {:text-shadow "0 0 10px rgba(61,220,132,0.25)"}}
             (ui/format-number total)])
-         ;; OOB: after-credits spans (mobile + desktop)
-         [:span#after-credits-m {:hx-swap-oob "true" :class after-cls} (ui/format-number credits-after)]
-         [:span#after-credits-d {:hx-swap-oob "true" :class after-cls} (ui/format-number credits-after)]
-         ;; OOB: deduction bar (desktop)
+         ;; OOB: impact row — after-credits spans (mobile + desktop)
+         [:span#after-build-credits-m {:hx-swap-oob "true" :class after-cls} (ui/format-number credits-after)]
+         [:span#after-build-credits-d {:hx-swap-oob "true" :class after-cls} (ui/format-number credits-after)]
+         ;; OOB: impact row — deduction bar (desktop)
          [:div#bar-build-credits {:hx-swap-oob "true"} (ui/svg-indicator-bar :loss (:player/credits player) total "glow-build-credits")]
-         ;; OOB: cost change display (mobile + desktop)
-         [:span#build-cost-display-m {:hx-swap-oob "true" :class "text-green-400"} cost-display]
-         [:span#build-cost-display-d {:hx-swap-oob "true" :class "text-green-400"} cost-display]
+         ;; OOB: impact row — change display (mobile + desktop)
+         (let [delta      (- credits-after (:player/credits player))
+               change-cls (str "tracking-[0.03em] "
+                               (if (zero? delta) "text-game-green-muted" "text-green-400"))
+               change-val (cond
+                            (zero? delta) "0"
+                            (pos? delta)  [:<> "+" (ui/format-number delta)]
+                            :else         [:<> "−" (ui/format-number (Math/abs (long delta)))])]
+           (list
+             [:span#change-build-credits-m {:hx-swap-oob "true" :class change-cls} change-val]
+             [:span#change-build-credits-d {:hx-swap-oob "true" :class change-cls} change-val]))
          ;; OOB: max quantities per item
          (for [[item-key max-qty] max-quantities]
            [:span {:id (str "max-qty-" (name item-key))
@@ -415,7 +397,8 @@
                        :class  "m-0"}
                       (ui/phase-body player
                                      (ui/flash-notice flash)
-                                     (ui/snapshot-section player {:projections projections-data})
+                                     (ui/snapshot-section player)
+                                     (ui/projection-grid projections-data)
                                      (ui/section-label "Build Orders")
                                      [:div
                                       (build-table player game zero-quantities max-quantities)]
