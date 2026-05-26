@@ -516,7 +516,7 @@
                     :open?               true}))))
 
 (defn- esp-fails-card
-  "Render a collapsible card for incoming espionage operations that were foiled."
+  "Render a collapsible card for incoming espionage operations that failed."
   [esp-fails esp-agents]
   (let [op-verb  (fn [op] (case op
                             "spy"    "spied on you"

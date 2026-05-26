@@ -26,7 +26,6 @@
                                          :tax-credits int}"
   [player game]
   ;; Keys such as :player/ore-planets are fully qualified keys in the player map.
-  ;; That is, there is a key in the player map named :player/ore-planets, etc.
   ;;             (* resource-count-for-player     resource-value-in-game)
   {:ore-credits  (* (:player/ore-planets player) (:game/ore-planet-credits game))
    :erg-food     (* (:player/erg-planets player) (:game/erg-planet-food game))
@@ -55,7 +54,9 @@
 ;;;;
 
 ;;;
-;;; Source grid
+;;; Source grid:
+;;; - income-rows: the rows of each income card
+;;; - source-grid: four cards for the income sources grid
 ;;;
 
 (defn- income-rows
@@ -92,7 +93,7 @@
                    {:key :taxes :title "Tax" :aside (str "x" pop-count)
                     :income-map {:credits (:tax-credits income)}}]]
     (ui/info-grid
-      {:label "Sources"
+      {:label "Income"
        :grid-class "grid grid-cols-2 md:grid-cols-4 gap-1.5"
        :cards
        (for [{:keys [key title aside income-map]} sources]
@@ -103,10 +104,7 @@
 
 ;;;
 ;;; Resource table 
-;;;
-;;; Definitions:
 ;;; - resource-table-row: a single row
-;;; - resource-table-header: the table header
 ;;; - resource-table: put it all together
 ;;;
 
@@ -126,10 +124,9 @@
         before-cell  [:div.text-base.text-right.text-game-green-muted
                       (ui/format-number before)]
         ;; Give a resource that has changed or is key a green glow; otherwise green muted
-        change-class (cond
-                       (zero? delta) "text-game-green-muted"
-                       key?          "text-green-400 font-bold"
-                       :else         "text-green-400")
+        change-class (cond (zero? delta) "text-game-green-muted"
+                           key?          "text-green-400 font-bold"
+                           :else         "text-green-400")
         change-cell  [:div.text-base.text-right.whitespace-nowrap
                       {:class change-class
                        :style (cond-> {:letter-spacing "0.03em"}
@@ -144,21 +141,19 @@
      ;; Mobile
      [:div.income-row-mobile
       {:class (str "md:hidden " row-class)}
-      name-cell before-cell change-cell after-cell]
+      name-cell 
+      before-cell 
+      change-cell 
+      after-cell]
 
      ;; Desktop
      [:div.income-row-desktop
       {:class (str "hidden md:grid " row-class)}
       name-cell
       (ui/svg-indicator-bar :gain before after filter-id)
-      before-cell change-cell after-cell]]))
-
-(defn- resource-table-header
-  "Render the column-label row for the income resource table.
-
-  [] -> hiccup"
-  []
-  (ui/impact-table-header "income"))
+      before-cell 
+      change-cell 
+      after-cell]]))
 
 (defn- resource-table
   "Render the Resource Changes table with before/delta/after columns and SVG bars.
@@ -166,20 +161,26 @@
   [player player-map, income income-map] -> hiccup"
   [player income]
   (let [credits-delta (+ (:ore-credits income) (:tax-credits income))
-        rows [{:name "Credits"  :before (:player/credits  player) :delta credits-delta          :key? true}
-              {:name "Food"     :before (:player/food     player) :delta (:erg-food     income) :key? true}
-              {:name "Fuel"     :before (:player/fuel     player) :delta (:erg-fuel     income) :key? true}
-              {:name "Soldiers" :before (:player/soldiers player) :delta (:mil-soldiers income) :key? false}
-              {:name "Fighters" :before (:player/fighters player) :delta (:mil-fighters income) :key? false}
-              {:name "Stations" :before (:player/stations player) :delta (:mil-stations income) :key? false}]]
+        rows [{:name "Credits"               :before (:player/credits  player) 
+               :delta credits-delta          :key?   true}
+              {:name "Food"                  :before (:player/food     player)
+               :delta (:erg-food income)     :key? true}
+              {:name "Fuel"                  :before (:player/fuel     player) 
+               :delta (:erg-fuel income)     :key? true}
+              {:name "Soldiers"              :before (:player/soldiers player) 
+               :delta (:mil-soldiers income) :key? false}
+              {:name "Fighters"              :before (:player/fighters player) 
+               :delta (:mil-fighters income) :key? false}
+              {:name "Stations"              :before (:player/stations player) 
+               :delta (:mil-stations income) :key? false}]]
     [:div.overflow-hidden.border.border-game-border.rounded-game.bg-game-surface
-     (resource-table-header)
+     (ui/impact-table-header "income")
      (for [{:keys [name before delta key?]} rows]
        (resource-table-row name before delta key? (str "glow-" (str/lower-case name))))]))
 
 
 ;;;;
-;;;; Actions
+;;;; Page
 ;;;;
 
 (defn apply-income
@@ -213,28 +214,33 @@
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/expenses")}}))))
 
-
-;;;;
-;;;; Page
-;;;;
-
 (defn income-page
   "Show income page for the current turn. No player decisions required. Income is informational
   only, so no htmx dynamic updates are needed.
 
   [{:keys [player game]}] -> hiccup"
-  [{:keys [player game]}]
+  [{:keys [player game flash]}]
   (let [player-id (:xt/id player)
         income    (calculate-income player game)]
-    (ui/phase-shell player game "INCOME PHASE"
-                    (ui/phase-body player
-                                   (ui/snapshot-section player)
-                                   (source-grid player income)
-                                   (resource-table player income))
-                    (ui/phase-action-bar
-                      (ui/action-bar-link (str "/app/game/" player-id) "Pause")
-                      (biff/form
-                        {:action (str "/app/game/" player-id "/apply-income") :method "post"
-                         :class  "m-0"}
-                        (ui/submit-button true "Continue to Expenses"))))))
+    ;; Page header
+    (ui/phase-shell 
+      player
+      game 
+      "Income Phase"
+      (ui/phase-body player
+        ;; Flash if necessary
+        (ui/flash-notice flash)
+        ;; Empire status
+        (ui/snapshot-section player)
+        ;; Current resources
+        (source-grid player income)
+        ;; Incoming resources
+        (resource-table player income))
+      ;; Buttons
+      (ui/phase-action-bar
+        (ui/action-bar-link (str "/app/game/" player-id) "Pause")
+        (biff/form
+          {:action (str "/app/game/" player-id "/apply-income") :method "post"
+           :class  "m-0"}
+          (ui/submit-button true "Continue to Expenses"))))))
 

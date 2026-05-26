@@ -80,22 +80,22 @@
 
   [game game-map] -> {:soldier-sell int, :transport-sell int, ...}"
   [game]
-  {:soldier-sell     (:game/soldier-sell     game)
-   :transport-sell   (:game/transport-sell   game)
-   :general-sell     (:game/general-sell     game)
-   :fighter-sell     (:game/fighter-sell     game)
-   :carrier-sell     (:game/carrier-sell     game)
-   :admiral-sell     (:game/admiral-sell     game)
-   :station-sell     (:game/station-sell     game)
-   :cmd-ship-sell    (:game/cmd-ship-sell    game)
-   :agent-sell       (:game/agent-sell       game)
-   :mil-planet-sell  (:game/mil-planet-sell  game)
-   :erg-planet-sell  (:game/erg-planet-sell  game)
-   :ore-planet-sell  (:game/ore-planet-sell  game)
-   :food-buy         (:game/food-buy         game)
-   :food-sell        (:game/food-sell        game)
-   :fuel-buy         (:game/fuel-buy         game)
-   :fuel-sell        (:game/fuel-sell        game)})
+  {:soldier-sell     (:game/soldier-sell    game)
+   :transport-sell   (:game/transport-sell  game)
+   :general-sell     (:game/general-sell    game)
+   :fighter-sell     (:game/fighter-sell    game)
+   :carrier-sell     (:game/carrier-sell    game)
+   :admiral-sell     (:game/admiral-sell    game)
+   :station-sell     (:game/station-sell    game)
+   :cmd-ship-sell    (:game/cmd-ship-sell   game)
+   :agent-sell       (:game/agent-sell      game)
+   :mil-planet-sell  (:game/mil-planet-sell game)
+   :erg-planet-sell  (:game/erg-planet-sell game)
+   :ore-planet-sell  (:game/ore-planet-sell game)
+   :food-buy         (:game/food-buy        game)
+   :food-sell        (:game/food-sell       game)
+   :fuel-buy         (:game/fuel-buy        game)
+   :fuel-sell        (:game/fuel-sell       game)})
 
 (defn parse-exchange-quantities
   "Parse all exchange quantity inputs from request params.
@@ -108,7 +108,8 @@
 (defn calculate-exchange-credits
   "Calculate net credit change from selling units/planets and buying/selling resources.
 
-  [quantities exchange-quantities, rates exchange-rates] -> {:credits-from-sales int, :credits-from-resources int, :total-credits int}"
+  [quantities exchange-quantities, rates exchange-rates] ->
+  {:credits-from-sales int, :credits-from-resources int, :total-credits int}"
   [quantities rates]
   (let [credits-from-sales    (reduce + (for [spec sell-row-specs
                                               :when (not (resource-rate-keys (:rate-key spec)))]
@@ -227,26 +228,26 @@
 
 (defn build-exchange-projections-data
   "Compute the projections data structure consumed by projection-grid.
-  Shows current holdings, required expenses, and exchange impact for Credits, Food, and Fuel.
-  Required rows are negative; Exchange rows start at 0 and are updated via HTMX OOB.
+  Shows current holdings, required, and exchange impact for Credits, Food, and Fuel.
+  Expense rows are negative; Exchange rows start at 0 and are updated via HTMX OOB.
 
-  [player player-map, req-totals {:credits int, :food int, :fuel int}] -> projection-cards"
-  [player req-totals]
+  [player player-map, required-totals {:credits int, :food int, :fuel int}] -> projection-cards"
+  [player required-totals]
   (let [cr-current   (:player/credits player)
         food-current (:player/food    player)
         fuel-current (:player/fuel    player)]
-    [{:name "Credits" :total (- cr-current   (:credits req-totals)) :total-id "projection-credits-total"
+    [{:name "Credits" :total (- cr-current   (:credits required-totals)) :total-id "projection-credits-total"
       :rows [{:label "Current"  :value cr-current}
-             {:label "Required" :value (- (:credits    req-totals)) :id "credits-pill-required"}
-             {:label "Exchange" :value 0                            :id "credits-pill-exchange"}]}
-     {:name "Food"    :total (- food-current (:food    req-totals)) :total-id "projection-food-total"
+             {:label "Required" :value (- (:credits    required-totals)) :id "credits-pill-required"}
+             {:label "Exchange" :value 0                                   :id "credits-pill-exchange"}]}
+     {:name "Food"    :total (- food-current (:food    required-totals)) :total-id "projection-food-total"
       :rows [{:label "Current"  :value food-current}
-             {:label "Required" :value (- (:food       req-totals)) :id "food-pill-required"}
-             {:label "Exchange" :value 0                            :id "food-pill-exchange"}]}
-     {:name "Fuel"    :total (- fuel-current (:fuel    req-totals)) :total-id "projection-fuel-total"
+             {:label "Required" :value (- (:food       required-totals)) :id "food-pill-required"}
+             {:label "Exchange" :value 0                                   :id "food-pill-exchange"}]}
+     {:name "Fuel"    :total (- fuel-current (:fuel    required-totals)) :total-id "projection-fuel-total"
       :rows [{:label "Current"  :value fuel-current}
-             {:label "Required" :value (- (:fuel       req-totals)) :id "fuel-pill-required"}
-             {:label "Exchange" :value 0                            :id "fuel-pill-exchange"}]}]))
+             {:label "Required" :value (- (:fuel       required-totals)) :id "fuel-pill-required"}
+             {:label "Exchange" :value 0                                   :id "fuel-pill-exchange"}]}]))
 
 (defn exchange-row
   "Render one exchange row (sell or buy) with building-page styling.
@@ -385,18 +386,18 @@
           max-buy-quantities (calculate-max-buy-quantities player
                                                            (assoc quantities :food-bought 0 :fuel-bought 0) rates)
           ;; Pill exchange values
-          required           (expenses/calculate-required-expenses player game)
-          req-totals         (expenses/calculate-required-expense-totals required)
+          required        (expenses/calculate-required-expenses player game)
+          required-totals  (expenses/calculate-required-expense-totals required)
           expense-reduction  (calculate-required-expense-reduction quantities game)
           exchange-credits   (:total-credits credit-changes)
           exchange-food      (- (:food-bought quantities) (:food-sold quantities))
           exchange-fuel      (- (:fuel-bought quantities) (:fuel-sold quantities))
-          adj-cr-required    (- (:credits req-totals) (:credits expense-reduction))
-          adj-food-required  (- (:food    req-totals) (:food    expense-reduction))
-          adj-fuel-required  (- (:fuel    req-totals) (:fuel    expense-reduction))
-          cr-total           (+ (- (:player/credits player) adj-cr-required)   exchange-credits)
-          food-total         (+ (- (:player/food    player) adj-food-required) exchange-food)
-          fuel-total         (+ (- (:player/fuel    player) adj-fuel-required) exchange-fuel)]
+          adj-cr-required   (- (:credits required-totals) (:credits expense-reduction))
+          adj-food-required (- (:food    required-totals) (:food    expense-reduction))
+          adj-fuel-required (- (:fuel    required-totals) (:fuel    expense-reduction))
+          cr-total      (+ (- (:player/credits player) adj-cr-required)   exchange-credits)
+          food-total    (+ (- (:player/food    player) adj-food-required) exchange-food)
+          fuel-total    (+ (- (:player/fuel    player) adj-fuel-required) exchange-fuel)]
       (biff/render
         [:div
          ;; Renew HTMX swap-target so subsequent requests can find it
@@ -519,56 +520,64 @@
                                       [(:qty-key spec) 0]))
         max-buy-quantities (calculate-max-buy-quantities player zero-quantities rates)
         required           (expenses/calculate-required-expenses player game)
-        req-totals         (expenses/calculate-required-expense-totals required)
-        projections-data   (build-exchange-projections-data player req-totals)]
-    (ui/phase-shell player game "EXCHANGE"
+        required-totals    (expenses/calculate-required-expense-totals required)
+        projections-data   (build-exchange-projections-data player required-totals)]
+    (ui/phase-shell player game "Exchange"
                     (biff/form
                       {:action (str "/app/game/" player-id "/apply-exchange") :method "post"
                        :class  "m-0"}
-                      (ui/phase-body player
-                                     (ui/flash-notice flash)
-                                     (ui/snapshot-section player)
-                                     (ui/projection-grid projections-data {:projection-turn "THIS TURN"})
-                                     (ui/section-label "Sell Assets")
-                                     [:div
-                                      [:div.overflow-hidden.rounded-game.bg-game-surface
-                                       {:class "border border-game-border"}
-                                       (ui/purchase-table-header "Rate" "Sell" "Credits")
-                                       (for [spec sell-asset-row-specs]
-                                         (exchange-row (:label spec) (:abbrev spec) (:field spec)
-                                                       (get rates (:rate-key spec)) 0
-                                                       (get player (:player-key spec)) player-id exchange-hx-include))]]
-                                     (ui/section-label "Sell Resources")
-                                     [:div
-                                      [:div.overflow-hidden.rounded-game.bg-game-surface
-                                       {:class "border border-game-border"}
-                                       (ui/purchase-table-header "Rate" "Sell" "Credits")
-                                       (for [spec sell-resource-row-specs
-                                             :let [ex-val (max 0 (- (get player (:player-key spec))
-                                                                    (get req-totals (:resource-key spec) 0)))]]
-                                         (exchange-row (:label spec) (:abbrev spec) (:field spec)
-                                                       (get rates (:rate-key spec)) 0
-                                                       (get player (:player-key spec)) player-id exchange-hx-include
-                                                       {:ex-value ex-val :ex-tooltip (:ex-tooltip spec)}))]]
-                                     (ui/section-label "Buy Resources")
-                                     [:div
-                                      [:div.overflow-hidden.rounded-game.bg-game-surface
-                                       {:class "border border-game-border"}
-                                       (ui/purchase-table-header "Rate" "Buy" "Credits")
-                                       (for [spec buy-row-specs
-                                             :let [sf-val (max 0 (- (get req-totals (:resource-key spec) 0)
-                                                                    (get player (:player-key spec))))]]
-                                         (exchange-row (:label spec) (:abbrev spec) (:field spec)
-                                                       (get rates (:rate-key spec)) 0
-                                                       (get max-buy-quantities (:max-key spec)) player-id exchange-hx-include
-                                                       {:sf-value sf-val :sf-tooltip (:sf-tooltip spec)}))]]
-                                     (ui/section-label "Impact")
-                                     [:div
-                                      (exchange-impact-table player {:credits (:player/credits player)
-                                                                    :food    (:player/food    player)
-                                                                    :fuel    (:player/fuel    player)})]
-                                     [:div#resources-after.hidden])
+                      (ui/phase-body
+                        player
+                        ;; Flash if necessary
+                        (ui/flash-notice flash)
+                        ;; Empire status
+                        (ui/snapshot-section player)
+                        ;; Projections
+                        (ui/projection-grid projections-data {:projection-turn "THIS TURN"})
+                        ;; Assets to sell
+                        (ui/section-label "Sell Assets")
+                        [:div
+                         [:div.overflow-hidden.rounded-game.bg-game-surface
+                          {:class "border border-game-border"}
+                          (ui/purchase-table-header "Rate" "Sell" "Credits")
+                          (for [spec sell-asset-row-specs]
+                            (exchange-row (:label spec) (:abbrev spec) (:field spec)
+                                          (get rates (:rate-key spec)) 0
+                                          (get player (:player-key spec)) player-id exchange-hx-include))]]
+                        ;; Resources to sell
+                        (ui/section-label "Sell Resources")
+                        [:div
+                         [:div.overflow-hidden.rounded-game.bg-game-surface
+                          {:class "border border-game-border"}
+                          (ui/purchase-table-header "Rate" "Sell" "Credits")
+                          (for [spec sell-resource-row-specs
+                                :let [ex-val (max 0 (- (get player (:player-key spec))
+                                                       (get required-totals (:resource-key spec) 0)))]]
+                            (exchange-row (:label spec) (:abbrev spec) (:field spec)
+                                          (get rates (:rate-key spec)) 0
+                                          (get player (:player-key spec)) player-id exchange-hx-include
+                                          {:ex-value ex-val :ex-tooltip (:ex-tooltip spec)}))]]
+                        ;; Resources to buy
+                        (ui/section-label "Buy Resources")
+                        [:div
+                         [:div.overflow-hidden.rounded-game.bg-game-surface
+                          {:class "border border-game-border"}
+                          (ui/purchase-table-header "Rate" "Buy" "Credits")
+                          (for [spec buy-row-specs
+                                :let [sf-val (max 0 (- (get required-totals (:resource-key spec) 0)
+                                                       (get player (:player-key spec))))]]
+                            (exchange-row (:label spec) (:abbrev spec) (:field spec)
+                                          (get rates (:rate-key spec)) 0
+                                          (get max-buy-quantities (:max-key spec)) player-id exchange-hx-include
+                                          {:sf-value sf-val :sf-tooltip (:sf-tooltip spec)}))]]
+                        (ui/section-label "Impact")
+                        [:div
+                         (exchange-impact-table player {:credits (:player/credits player)
+                                                        :food    (:player/food    player)
+                                                        :fuel    (:player/fuel    player)})]
+                        [:div#resources-after.hidden])
                       (ui/phase-warning "exchange-warning")
                       (ui/phase-action-bar
                         (ui/action-bar-link (str "/app/game/" player-id "/expenses") "Cancel Exchange")
                         (ui/submit-button false "Make Exchange"))))))
+

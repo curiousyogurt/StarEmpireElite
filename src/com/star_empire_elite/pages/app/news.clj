@@ -82,20 +82,15 @@
   (let [attacker?   (= :attacker-only visibility)
         def-name    (:defender-name payload)
         won?        (:attacker-wins? payload)
-        verb-att    (case kind
-                      :spy    (if won? "spied on" "failed to spy on")
-                      :incite (if won? "incited unrest in" "failed to incite unrest in")
-                      :bomb   (if won? "bombed" "failed to bomb")
-                      :defect (if won? "turned agents from" "failed to subvert"))
-        verb-def    (case kind
-                      :spy    "spied on"
-                      :incite "incited unrest in"
-                      :bomb   "bombed"
-                      :defect "turned agents from")
+        verb        (case kind
+                      :spy    (if won? "spied on"           "attempted to spy on")
+                      :incite (if won? "incited unrest in"  "attempted to incite unrest in")
+                      :bomb   (if won? "bombed"             "attempted to bomb")
+                      :defect (if won? "turned agents from" "attempted to turn agents from"))
         result      (if won? " (SUCCESS)" " (FAILURE)")]
     (if attacker?
-      [:span "You " verb-att " " (empire-span def-name) result]
-      [:span "An unknown agent " verb-def " you " (if won? "(SUCCESS)" "(FOILED)")])))
+      [:span "You " verb " " (empire-span def-name) result]
+      [:span "An unknown agent " verb " you " result])))
 
 (defn- breakaway-summary
   "Verb phrase for breakaway events.

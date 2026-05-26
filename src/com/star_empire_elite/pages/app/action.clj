@@ -145,24 +145,21 @@
         :method "post"
         :class  "m-0"}
        (ui/phase-body player
-        (ui/snapshot-section player
-          {:extra
-           [:div {:class "grid grid-cols-1 md:grid-cols-3 gap-1.5"}
-            (ui/stat-pill "Ground"
-              (cond-> [{:label "Soldiers"   :value soldiers-total}
-                       {:label "Deployable" :value soldiers-avail
-                        :highlight? (= soldiers-avail soldiers-total)
-                        :warn?      (< soldiers-avail soldiers-total)}]
-                army-limit (conj {:label "Limited by" :display army-limit})))
-            (ui/stat-pill "Fleet"
-              (cond-> [{:label "Fighters"   :value fighters-total}
-                       {:label "Deployable" :value fighters-avail
-                        :highlight? (= fighters-avail fighters-total)
-                        :warn?      (< fighters-avail fighters-total)}]
-                fleet-limit (conj {:label "Limited by" :display fleet-limit})))
-            (ui/stat-pill "Operations"
-              [{:label "Cmd ships" :value (:player/cmd-ships player)}
-               {:label "Agents"    :value (:player/agents    player)}])]})
+        (ui/snapshot-section player)
+        (ui/info-grid
+          {:label      "Forces"
+           :grid-class "grid grid-cols-2 gap-1.5"
+           :cards
+           [{:title "Ground"
+             :rows  (cond-> [{:label "Soldiers"   :value soldiers-total}
+                             {:label "Deployable" :value soldiers-avail
+                              :warn? (< soldiers-avail soldiers-total)}]
+                      army-limit (conj {:label "Limited by " :display army-limit}))}
+            {:title "Fleet"
+             :rows  (cond-> [{:label "Fighters"   :value fighters-total}
+                             {:label "Deployable" :value fighters-avail
+                              :warn? (< fighters-avail fighters-total)}]
+                      fleet-limit (conj {:label "Limited by " :display fleet-limit}))}]})
         (if (empty? other-players)
           [:p.text-sm.text-game-green-soft
            "There are no other empires in the galaxy to attack."]

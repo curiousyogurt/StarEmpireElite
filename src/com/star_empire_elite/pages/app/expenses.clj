@@ -25,12 +25,12 @@
 (defn calculate-required-expenses
   "Calculate required upkeep costs for all empire assets using game constants.
 
-  [player player-map, game game-map] -> {:planets-credits int,   :planets-food int,
-                                         :soldiers-credits int,  :soldiers-food int,
-                                         :fighters-credits int,  :fighters-fuel int,
-                                         :stations-credits int,  :stations-fuel int,
-                                         :agents-food int,       :agents-fuel int,
-                                         :population-food int,   :population-fuel int}"
+  [player player-map, game game-map] -> {:planets-credits int,  :planets-food int,
+                                         :soldiers-credits int, :soldiers-food int,
+                                         :fighters-credits int, :fighters-fuel int,
+                                         :stations-credits int, :stations-fuel int,
+                                         :agents-food int,      :agents-fuel int,
+                                         :population-food int,  :population-fuel int}"
   [player game]
   (let [planet-count (+ (:player/mil-planets player)
                         (:player/erg-planets player)
@@ -130,12 +130,12 @@
 ;;;; View Models
 ;;;;
 
-(defn build-expense-obligations-data
-  "Compute the obligations data structure consumed by obligations-grid.
+(defn build-expense-summary-data
+  "Compute the expense summary data structure consumed by expense-summary-grid.
   Shows the required expense breakdown for Credits, Food, and Fuel.
   All rows and totals are negative, showing what the empire owes per category.
 
-  [required expenses-map, required-totals totals-map] -> seq of obligation-card-maps"
+  [required expenses-map, required-totals totals-map] -> seq of expense-card-maps"
   [required required-totals]
   [{:name "Credits"    :total (- (:credits required-totals))
     :rows [{:label "Planets"  :value (- (:planets-credits required))}
@@ -158,11 +158,11 @@
 ;;;;
 
 ;;;
-;;; Obligations grid
+;;; Expense summary grid
 ;;;
 
-(defn- obligation-rows
-  "Convert a seq of obligation row specs to the format expected by ui/info-card.
+(defn- expense-summary-rows
+  "Convert a seq of expense row specs to the format expected by ui/info-card.
   Each input row is {:label str, :value int}; values are signed (negative = owed).
 
   [rows seq of {:label, :value}] -> seq of {:key, :label, :value, :signed?}"
@@ -173,18 +173,18 @@
      :value value
      :signed? true}))
 
-(defn- obligations-grid
-  "Render the obligations grid: three cards (Credits, Food/Fuel, Planets) in a 3-column grid,
+(defn- expense-summary-grid
+  "Render the expense summary grid: three cards (Credits, Food, Fuel) in a 3-column grid,
   each showing the minimum required payment and its breakdown. Totals are signed negative.
 
-  [obligations seq of obligation-card-maps from build-expense-obligations-data] -> hiccup"
-  [obligations]
+  [expense-summary seq of expense-card-maps from build-expense-summary-data] -> hiccup"
+  [expense-summary]
   (ui/info-grid
-   {:label "Obligations"
-    :sublabel "minimum required to avoid stability penalty"
+   {:label "Expenses"
+    :sublabel "THIS TURN · required to avoid stability penalty"
     :grid-class "grid grid-cols-3 gap-2"
     :cards
-    (for [{:keys [name total rows]} obligations]
+    (for [{:keys [name total rows]} expense-summary]
       {:key name
        :title name
        :aside (ui/format-signed-number total)
@@ -192,7 +192,7 @@
                          (if (neg? total)
                            "text-amber-400"
                            "text-game-green-muted"))
-       :rows (obligation-rows rows)})}))
+       :rows (expense-summary-rows rows)})}))
 
 ;;;
 ;;; Expense table definitions:
@@ -339,8 +339,10 @@
           resources-after (calculate-resources-after-expenses player payments)
           affordable?     (can-afford-expenses? resources-after)
           oob-span        (fn [id v]
-                            [:span {:id id :hx-swap-oob "true"
-                                    :class (str "font-bold " (if (neg? v) "text-red-400" "text-green-400"))}
+                            [:span {:id id
+                                    :hx-swap-oob "true"
+                                    :class (str "font-bold " 
+                                                (if (neg? v) "text-red-400" "text-green-400"))}
                              (ui/format-number v)])
           oob-bar         (fn [id before payment filter-id]
                             [:div {:id id :hx-swap-oob "true"}
@@ -379,18 +381,25 @@
   (let [required         (calculate-required-expenses player game)
         required-totals  (calculate-required-expense-totals required)
         player-id        (:xt/id player)
-        obligations-data (build-expense-obligations-data required required-totals)
+        expense-summary  (build-expense-summary-data required required-totals)
         affordable?      (expenses-affordable-by-default? player required-totals)
         ;; hx-include covers all three payment inputs so every change re-evaluates all resources
         hx-include       "[name='credits-pay'],[name='food-pay'],[name='fuel-pay']"]
-    (ui/phase-shell player game "EXPENSES PHASE"
+    (ui/phase-shell 
+      player 
+      game 
+      "Expenses Phase"
       (biff/form
-        {:action (str "/app/game/" player-id "/apply-expenses") :method "post"
-         :class  "m-0"}
-        (ui/phase-body player
+        {:action (str "/app/game/" player-id "/apply-expenses") :method "post" :class  "m-0"}
+        (ui/phase-body
+          player
+          ;; Flash if necessary
           (ui/flash-notice flash)
+          ;; Empire status
           (ui/snapshot-section player)
-          (obligations-grid obligations-data)
+          ;; Required expense summary
+          (expense-summary-grid expense-summary)
+          ;; Outgoing expenses
           (expense-table player required-totals player-id hx-include)
           ;; HTMX OOB swap target: renewed each request by calculate-expenses
           [:div#resources-after.hidden])

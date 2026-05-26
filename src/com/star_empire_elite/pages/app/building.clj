@@ -116,7 +116,7 @@
 
   [player player-map, game game-map, quantities purchase-quantities] -> projection-cards"
   [player game quantities]
-  (let [required            (expenses/calculate-required-expenses player game)
+  (let [required          (expenses/calculate-required-expenses player game)
         ;; Planet counts including proposed purchases
         new-ore-planets     (+ (:player/ore-planets player) (:ore-planets quantities))
         new-erg-planets     (+ (:player/erg-planets player) (:erg-planets quantities))

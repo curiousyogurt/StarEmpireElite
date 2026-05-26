@@ -486,7 +486,7 @@
    (into [:div.flex.flex-wrap {:class "gap-x-7 gap-y-1"}] items)])
 
 (defn- snapshot-manifest
-  "Render the manifest section: EMPIRE, GROUND, FLEET, and OPERATIONS rows.
+  "Render the manifest section: EMPIRE, GROUND, and FLEET rows.
 
   [player player-map] -> hiccup"
   [player]
@@ -501,17 +501,15 @@
      (snapshot-manifest-row "GROUND"
        [(snapshot-manifest-item "soldiers"   (format-number (:player/soldiers   player)) (z? :player/soldiers))
         (snapshot-manifest-item "generals"   (format-number (:player/generals   player)) (z? :player/generals))
-        (snapshot-manifest-item "transports" (format-number (:player/transports player)) (z? :player/transports))]
+        (snapshot-manifest-item "transports" (format-number (:player/transports player)) (z? :player/transports))
+        (snapshot-manifest-item "agents"     (format-number (:player/agents     player)) (z? :player/agents))]
        false)
      (snapshot-manifest-row "FLEET"
-       [(snapshot-manifest-item "fighters" (format-number (:player/fighters player)) (z? :player/fighters))
-        (snapshot-manifest-item "carriers" (format-number (:player/carriers player)) (z? :player/carriers))
-        (snapshot-manifest-item "admirals" (format-number (:player/admirals player)) (z? :player/admirals))
-        (snapshot-manifest-item "stations" (format-number (:player/stations player)) (z? :player/stations))]
-       false)
-     (snapshot-manifest-row "OPERATIONS"
-       [(snapshot-manifest-item "cmd ships" (format-number (:player/cmd-ships player)) (z? :player/cmd-ships))
-        (snapshot-manifest-item "agents"    (format-number (:player/agents    player)) (z? :player/agents))]
+       [(snapshot-manifest-item "fighters"  (format-number (:player/fighters  player)) (z? :player/fighters))
+        (snapshot-manifest-item "carriers"  (format-number (:player/carriers  player)) (z? :player/carriers))
+        (snapshot-manifest-item "admirals"  (format-number (:player/admirals  player)) (z? :player/admirals))
+        (snapshot-manifest-item "stations"  (format-number (:player/stations  player)) (z? :player/stations))
+        (snapshot-manifest-item "cmd ships" (format-number (:player/cmd-ships player)) (z? :player/cmd-ships))]
        true)]))
 
 (defn snapshot-section
@@ -861,7 +859,7 @@
     (into [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.rounded.text-green-400.font-mono
            {:class "border-[1.5px] border-game-green-border"}
            (scanline-overlay)
-           (phase-topbar player game phase-name)]
+           (phase-topbar player game (str/upper-case phase-name))]
           children)))
 
 (defn phase-body
@@ -1049,25 +1047,30 @@
   {:key          optional hiccup key
    :label        optional label before the value
    :value        number
+   :display      optional string — rendered as-is instead of formatting :value
    :unit         optional unit after the value
    :sign         optional literal sign, e.g. \"+\"
    :signed?      true to render +/−/0 automatically
+   :warn?        true to render value in amber instead of green
    :id           optional element id (for HTMX OOB swaps)
    :hx-swap-oob  optional HTMX out-of-band swap attribute}
 
   Examples:
   {:value 1000 :sign \"+\" :unit \"cr\"}          -> +1000 cr
-  {:label \"Planets\" :value -2000 :signed? true} -> Planets −2000"
-  [{:keys [key label value unit sign signed? id hx-swap-oob]}]
+  {:label \"Planets\" :value -2000 :signed? true} -> Planets −2000
+  {:label \"Limited\" :display \"Transports\"}    -> Limited Transports"
+  [{:keys [key label value display unit sign signed? warn? id hx-swap-oob]}]
   [:span
    (cond-> {:key   (or key label unit)
-            :class "text-xs inline-block rounded-sm text-green-400 bg-game-green-deep"
+            :class (str "text-xs inline-block rounded-sm bg-game-green-deep "
+                        (if warn? "text-yellow-400" "text-green-400"))
             :style {:padding "1px 5px"}}
      id          (assoc :id id)
      hx-swap-oob (assoc :hx-swap-oob hx-swap-oob))
    (when label
      (str label " "))
    (cond
+     display  display
      signed? (format-signed-number value)
      sign    (str sign (format-number value))
      :else   (format-number value))
@@ -1119,7 +1122,7 @@
 
 (defn projection-grid
   "Render the resource projections grid: a labeled section with pill cards for each resource,
-  each showing a signed total and breakdown rows. Parallel to obligations-grid in expenses.
+  each showing a signed total and breakdown rows. Parallel to expense-summary-grid in expenses.
   Uses info-grid / info-card / info-pill.
 
   opts map keys (all optional):
@@ -1130,8 +1133,8 @@
   [projections & [{:keys [projection-turn]
                    :or   {projection-turn "NEXT TURN"}}]]
   (info-grid
-    {:label    "Resource Projections"
-     :sublabel (str projection-turn " · calculated values, current rates")
+    {:label    "Expense Projections"
+     :sublabel (str projection-turn " · required to avoid stability penalty")
      :grid-class "grid grid-cols-3 gap-2"
      :cards
      (for [{:keys [name total total-id rows]} projections]
