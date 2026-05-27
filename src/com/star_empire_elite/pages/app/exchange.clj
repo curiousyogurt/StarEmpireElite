@@ -210,20 +210,8 @@
                  (* (:stations-sold  quantities) (:game/station-upkeep-fuel     game))
                  (* (:agents-sold    quantities) (:game/agent-upkeep-fuel       game)))}))
 
-(defn- exchange-impact-table
-  "Render the Credits/Food/Fuel impact table showing net resource changes from exchange.
-
-  [player player-map, resources-after {:credits int, :food int, :fuel int}] -> hiccup"
-  [player resources-after]
-  [:div.overflow-hidden.rounded-game.bg-game-surface
-   {:class "border border-game-border"}
-   (ui/deduction-table-header)
-   (ui/impact-row "Credits" (:player/credits player) (:credits resources-after) "exchange" "glow-ex-credits")
-   (ui/impact-row "Food"    (:player/food    player) (:food    resources-after) "exchange" "glow-ex-food")
-   (ui/impact-row "Fuel"    (:player/fuel    player) (:fuel    resources-after) "exchange" "glow-ex-fuel")])
-
 ;;;;
-;;;; UI Components
+;;;; View Models
 ;;;;
 
 (defn build-exchange-projections-data
@@ -248,6 +236,23 @@
       :rows [{:label "Current"  :value fuel-current}
              {:label "Required" :value (- (:fuel       required-totals)) :id "fuel-pill-required"}
              {:label "Exchange" :value 0                                   :id "fuel-pill-exchange"}]}]))
+
+
+;;;;
+;;;; UI Components
+;;;;
+
+(defn- exchange-impact-table
+  "Render the Credits/Food/Fuel impact table showing net resource changes from exchange.
+
+  [player player-map, resources-after {:credits int, :food int, :fuel int}] -> hiccup"
+  [player resources-after]
+  [:div.overflow-hidden.rounded-game.bg-game-surface
+   {:class "border border-game-border"}
+   (ui/deduction-table-header)
+   (ui/impact-row "Credits" (:player/credits player) (:credits resources-after) "exchange" "glow-ex-credits")
+   (ui/impact-row "Food"    (:player/food    player) (:food    resources-after) "exchange" "glow-ex-food")
+   (ui/impact-row "Fuel"    (:player/fuel    player) (:fuel    resources-after) "exchange" "glow-ex-fuel")])
 
 (defn exchange-row
   "Render one exchange row (sell or buy) with building-page styling.
@@ -533,6 +538,7 @@
                         ;; Empire status
                         (ui/snapshot-section player)
                         ;; Projections
+                        (ui/section-label "Expenses" "‣ Current Turn + Exchange")
                         (ui/projection-grid projections-data {:projection-turn "THIS TURN"})
                         ;; Assets to sell
                         (ui/section-label "Sell Assets")

@@ -390,11 +390,10 @@
 ;;;; projection-grid Tests
 ;;;;
 
-(deftest test-projection-grid-turn-label
-  (testing "Renders the passed projection-turn string in the header"
+(deftest test-projection-grid-accepts-opts
+  (testing "Accepts optional opts map without error (callers may still pass one)"
     (let [proj [{:name "Credits" :total 100 :rows []}]]
-      (is (str/includes? (str (projections-section proj {:projection-turn "THIS TURN"})) "THIS TURN"))
-      (is (str/includes? (str (projections-section proj {:projection-turn "NEXT TURN"})) "NEXT TURN")))))
+      (is (some? (projections-section proj {:projection-turn "THIS TURN"}))))))
 
 (deftest test-projection-grid-negative-total-amber
   (testing "Negative total renders amber color class"
@@ -417,10 +416,10 @@
     (let [proj  [{:name "A" :total 1 :rows []}
                  {:name "B" :total 2 :rows []}
                  {:name "C" :total 3 :rows []}]
-          ;; result = [:div [:div section-label] [:div.grid {:class ...} (for-seq)]]
-          ;; grid = index 2; the for-seq is a single lazy-seq child at index 2 of the grid
-          grid  (nth (projections-section proj) 2)
-          cards (nth grid 2)]
+          ;; result = [:div {:class ...} (map-seq)]
+          ;; the map-seq is a single lazy-seq child at index 2
+          result (projections-section proj)
+          cards  (nth result 2)]
       (is (= 3 (count cards))))))
 
 ;;;;

@@ -362,7 +362,7 @@
    text
    (when subtitle
      [:span.normal-case.opacity-70
-      {:class "ml-[10px] text-[9px] tracking-[0.04em]"}
+      {:class "ml-[10px] text-[10px] tracking-[0.04em]"}
       subtitle])])
 
 (defn mode-badge
@@ -589,30 +589,31 @@
 (defn- th-c [text] (th-span text th-col-cls "text-center justify-self-center"))
 
 (defn deduction-table-header
-  "Render the Item/Before/Change/After column-label row for expense and building deduction tables.
+  "Render the Item/Before/Change/After column-label row for impact tables (exchange, building).
   Emits two variants: mobile (4-col, no bar) and desktop (5-col, with bar placeholder).
+  Uses impact-row-* CSS classes.
 
   [] -> hiccup"
   []
-  (let [header-class "gap-4 py-1 px-2 items-center bg-game-header border-b border-game-border"]
+  (let [header-class "gap-2 py-1 px-3 items-center bg-game-header border-b border-game-border"]
     [:<>
-     [:div.expense-row-mobile {:class (str "md:hidden " header-class)}
-      (th-span "Item" th-item-cls nil) (th-r "Before") (th-c "Change") (th-r "After")]
-     [:div.expense-row-desktop {:class (str "hidden md:grid " header-class)}
-      (th-span "Item" th-item-cls nil) [:span] (th-r "Before") (th-c "Change") (th-r "After")]]))
+     [:div.impact-row-mobile {:class (str "md:hidden " header-class)}
+      (th-span "Item" th-item-cls nil) (th-r "Before") (th-r "Change") (th-r "After")]
+     [:div.impact-row-desktop {:class (str "hidden md:grid " header-class)}
+      (th-span "Item" th-item-cls nil) [:span] (th-r "Before") (th-r "Change") (th-r "After")]]))
 
 (defn impact-row
   "Render one before/change/after row for an OOB-updatable impact table.
   Emits mobile (4-col, no bar) and desktop (5-col, with bidirectional SVG bar) variants.
   Bar direction is inferred: gain when after >= before, loss otherwise.
 
-  id-prefix is used for OOB element IDs: change-{prefix}-{row-id}-{m|d},
-  after-{prefix}-{row-id}-{m|d}, bar-{prefix}-{row-id}.
+  id-prefix is used for OOB element IDs: change-{prefix}-{slug}-{m|d},
+  after-{prefix}-{slug}-{m|d}, bar-{prefix}-{slug}.
 
   [name str, before int, after int, id-prefix str, filter-id str] -> hiccup"
   [name before after id-prefix filter-id]
   (let [delta      (- after before)
-        row-id     (str/lower-case name)
+        slug       (str/lower-case name)
         row-class  "items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"
         name-cell  [:div.text-base.font-bold.text-green-400 name]
         before-cell [:div.text-base.text-right.text-game-green-muted
@@ -628,7 +629,7 @@
                           (if (zero? delta) "text-game-green-muted" "text-green-400"))
         after-class  (str "font-bold " (if (neg? after) "text-red-400" "text-green-400"))
         change-cell (fn [id]
-                      [:div.text-base.justify-self-center.whitespace-nowrap
+                      [:div.text-base.text-right.whitespace-nowrap
                        {:class change-class}
                        [:span {:id id} change-display]])
         after-cell  (fn [id]
@@ -636,32 +637,35 @@
                        [:span {:id id :class after-class}
                         (format-number after)]])]
     [:<>
-     [:div.expense-row-mobile
+     [:div.impact-row-mobile
       {:class (str "md:hidden " row-class)}
       name-cell before-cell
-      (change-cell (str "change-" id-prefix "-" row-id "-m"))
-      (after-cell  (str "after-"  id-prefix "-" row-id "-m"))]
-     [:div.expense-row-desktop
+      (change-cell (str "change-" id-prefix "-" slug "-m"))
+      (after-cell  (str "after-"  id-prefix "-" slug "-m"))]
+     [:div.impact-row-desktop
       {:class (str "hidden md:grid " row-class)}
       name-cell
-      [:div {:id (str "bar-" id-prefix "-" row-id)} bar]
+      [:div {:id (str "bar-" id-prefix "-" slug)} bar]
       before-cell
-      (change-cell (str "change-" id-prefix "-" row-id "-d"))
-      (after-cell  (str "after-"  id-prefix "-" row-id "-d"))]]))
+      (change-cell (str "change-" id-prefix "-" slug "-d"))
+      (after-cell  (str "after-"  id-prefix "-" slug "-d"))]]))
 
 (defn impact-table-header
-  "Render the Item/Before/Change/After column-label row for income and expense impact tables.
-  Emits two variants: mobile (4-col, no bar) and desktop (5-col, with bar placeholder).
-  row-prefix determines the CSS grid class (e.g. \"income\" → .income-row-mobile).
+  "Render the Item/Before/Change/After column-label row for impact tables.
+  When :single-row? true, emits one row with the bar column hidden on mobile.
+  Otherwise emits dual mobile/desktop variants using {prefix}-row-mobile/-desktop CSS classes.
 
-  [row-prefix str] -> hiccup"
-  [row-prefix]
+  [row-prefix str, opts? {:single-row? bool}] -> hiccup"
+  [row-prefix & [{:keys [single-row?]}]]
   (let [header-class "gap-2 py-1 px-3 items-center bg-game-header border-b border-game-border"]
-    [:<>
-     [:div {:class (str row-prefix "-row-mobile md:hidden " header-class)}
-      (th-span "Item" th-item-cls nil) (th-r "Before") (th-r "Change") (th-r "After")]
-     [:div {:class (str "hidden md:grid " row-prefix "-row-desktop " header-class)}
-      (th-span "Item" th-item-cls nil) [:span] (th-r "Before") (th-r "Change") (th-r "After")]]))
+    (if single-row?
+      [:div {:class (str row-prefix "-row " header-class)}
+       (th-span "Item" th-item-cls nil) [:span.hidden.md:block] (th-r "Before") (th-r "Change") (th-r "After")]
+      [:<>
+       [:div {:class (str row-prefix "-row-mobile md:hidden " header-class)}
+        (th-span "Item" th-item-cls nil) (th-r "Before") (th-r "Change") (th-r "After")]
+       [:div {:class (str "hidden md:grid " row-prefix "-row-desktop " header-class)}
+        (th-span "Item" th-item-cls nil) [:span] (th-r "Before") (th-r "Change") (th-r "After")]])))
 
 (defn purchase-table-header
   "Render the column-label row for exchange and building purchase/sell tables.
@@ -1098,8 +1102,7 @@
   [{:keys [key title aside aside-class aside-id rows]}]
   [:div
    {:key   (or key title)
-    :class "flex flex-col gap-1 border border-game-border rounded-game bg-game-card"
-    :style {:padding "6px 8px"}}
+    :class "flex flex-col gap-1 py-1.5 px-2 border border-game-border rounded-game bg-game-card"}
    [:div.flex.justify-between.items-baseline
     [:span.text-base.font-bold.text-green-400 title]
     (when aside
@@ -1111,31 +1114,21 @@
     (map info-pill rows)]])
 
 (defn info-grid
-  "Render a labeled grid of summary cards."
-  [{:keys [label sublabel grid-class cards]}]
-  [:div
-   (if sublabel
-     (section-label label sublabel)
-     (section-label label))
-   [:div {:class grid-class}
-    (map info-card cards)]])
+  "Render a grid of summary cards.
+
+  [{:keys [grid-class cards]}] -> hiccup"
+  [{:keys [grid-class cards]}]
+  [:div {:class grid-class}
+   (map info-card cards)])
 
 (defn projection-grid
-  "Render the resource projections grid: a labeled section with pill cards for each resource,
-  each showing a signed total and breakdown rows. Parallel to expense-summary-grid in expenses.
-  Uses info-grid / info-card / info-pill.
+  "Render the resource projections grid: pill cards for each resource,
+  each showing a signed total and breakdown rows. Callers provide section-label separately.
 
-  opts map keys (all optional):
-    :projection-turn — turn label in the header, default \"NEXT TURN\". Pass \"THIS TURN\"
-                       for phases where projections reflect the current turn.
-
-  [projections seq, opts? map] -> hiccup"
-  [projections & [{:keys [projection-turn]
-                   :or   {projection-turn "NEXT TURN"}}]]
+  [projections seq] -> hiccup"
+  [projections & _opts]
   (info-grid
-    {:label    "Expense Projections"
-     :sublabel (str projection-turn " · required to avoid stability penalty")
-     :grid-class "grid grid-cols-3 gap-2"
+    {:grid-class "grid grid-cols-3 gap-2"
      :cards
      (for [{:keys [name total total-id rows]} projections]
        {:key       name

@@ -54,9 +54,9 @@
 ;;;;
 
 ;;;
-;;; Source grid:
+;;; Income grid:
 ;;; - income-rows: the rows of each income card
-;;; - source-grid: four cards for the income sources grid
+;;; - income-grid: four cards for the income sources grid
 ;;;
 
 (defn- income-rows
@@ -71,9 +71,9 @@
         :when (and v (pos? v))] ; include only if v is present (~nil) and pos? (~zero)
     {:key k :value v :sign "+" :unit unit}))
 
-(defn- source-grid
-  "Render the income sources grid: four cards (Ore, Erg, Mil, Tax) in a 2×4 responsive grid,
-  each showing planet/population count and the resources produced this turn.
+(defn- income-grid
+  "Render the income grid: four cards (Ore, Erg, Mil, Tax) in a 2×4 responsive grid,
+  each with a header, aside, and income-rows showing resources produced this turn.
 
   [player player-map, income income-map] -> hiccup"
   [player income]
@@ -93,8 +93,7 @@
                    {:key :taxes :title "Tax" :aside (str "x" pop-count)
                     :income-map {:credits (:tax-credits income)}}]]
     (ui/info-grid
-      {:label "Income"
-       :grid-class "grid grid-cols-2 md:grid-cols-4 gap-1.5"
+      {:grid-class "grid grid-cols-2 md:grid-cols-4 gap-1.5"
        :cards
        (for [{:keys [key title aside income-map]} sources]
          {:key key
@@ -110,50 +109,33 @@
 
 (defn- resource-table-row
   "Render one resource row for the resource table.
-  Emits two variants: a 4-column mobile row (no bar column) and a 5-column
-  desktop row (with the SVG indicator bar), aligned with resource-table-header.
+  Single-row layout: the SVG bar column is hidden on mobile via CSS.
 
   [name str, before int, delta int, key? bool, filter-id str] -> hiccup"
   [name before delta key? filter-id]
   (let [after        (+ before delta)
-        row-class    (str "items-center gap-2 py-1 px-3 border-b border-game-divider"
-                          (when key? " bg-game-row"))
-        name-cell    [:div.text-base
-                      {:class (if key? "font-bold text-green-400" "text-game-green-muted")}
-                      name]
-        before-cell  [:div.text-base.text-right.text-game-green-muted
-                      (ui/format-number before)]
-        ;; Give a resource that has changed or is key a green glow; otherwise green muted
         change-class (cond (zero? delta) "text-game-green-muted"
                            key?          "text-green-400 font-bold"
-                           :else         "text-green-400")
-        change-cell  [:div.text-base.text-right.whitespace-nowrap
-                      {:class change-class
-                       :style (cond-> {:letter-spacing "0.03em"}
-                                (and key? (not (zero? delta)))
-                                (assoc :text-shadow "0 0 8px rgba(74,222,128,0.6)"))}
-                      (if (zero? delta) "—" [:<> "+" (ui/format-number delta)])]
-        after-cell   [:div.text-base.text-right
-                      {:class (if key? "text-green-400 font-bold" "text-game-green-soft")}
-                      (ui/format-number after)]]
-    [:<>
-
-     ;; Mobile
-     [:div.income-row-mobile
-      {:class (str "md:hidden " row-class)}
-      name-cell 
-      before-cell 
-      change-cell 
-      after-cell]
-
-     ;; Desktop
-     [:div.income-row-desktop
-      {:class (str "hidden md:grid " row-class)}
-      name-cell
-      (ui/svg-indicator-bar :gain before after filter-id)
-      before-cell 
-      change-cell 
-      after-cell]]))
+                           :else         "text-green-400")]
+    [:div.income-row
+     {:class (str "items-center gap-2 py-1 px-3 border-b border-game-divider"
+                  (when key? " bg-game-row"))}
+     [:div.text-base
+      {:class (if key? "font-bold text-green-400" "text-game-green-muted")}
+      name]
+     [:div.hidden.md:block
+      (ui/svg-indicator-bar :gain before after filter-id)]
+     [:div.text-base.text-right.text-game-green-muted
+      (ui/format-number before)]
+     [:div.text-base.text-right.whitespace-nowrap
+      {:class change-class
+       :style (cond-> {:letter-spacing "0.03em"}
+                (and key? (not (zero? delta)))
+                (assoc :text-shadow "0 0 8px rgba(74,222,128,0.6)"))}
+      (if (zero? delta) "—" [:<> "+" (ui/format-number delta)])]
+     [:div.text-base.text-right
+      {:class (if key? "text-green-400 font-bold" "text-game-green-soft")}
+      (ui/format-number after)]]))
 
 (defn- resource-table
   "Render the Resource Changes table with before/delta/after columns and SVG bars.
@@ -174,13 +156,13 @@
               {:name "Stations"              :before (:player/stations player) 
                :delta (:mil-stations income) :key? false}]]
     [:div.overflow-hidden.border.border-game-border.rounded-game.bg-game-surface
-     (ui/impact-table-header "income")
+     (ui/impact-table-header "income" {:single-row? true})
      (for [{:keys [name before delta key?]} rows]
        (resource-table-row name before delta key? (str "glow-" (str/lower-case name))))]))
 
 
 ;;;;
-;;;; Page
+;;;; Actions
 ;;;;
 
 (defn apply-income
@@ -196,7 +178,7 @@
       (let [income         (calculate-income player game)
             after          (calculate-resources-after-income player income)
             last-completed (:player/last-round-completed-at player)
-            day-reset?     (and (> (:player/current-round player) 1)
+           day-reset?     (and (> (:player/current-round player) 1)
                                 last-completed
                                 (not (utils/same-calendar-day? last-completed)))]
         (biff/submit-tx ctx
@@ -214,16 +196,20 @@
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/expenses")}}))))
 
+
+;;;;
+;;;; Page
+;;;;
+
 (defn income-page
   "Show income page for the current turn. No player decisions required. Income is informational
   only, so no htmx dynamic updates are needed.
 
-  [{:keys [player game]}] -> hiccup"
+  [{:keys [player game flash]}] -> hiccup"
   [{:keys [player game flash]}]
   (let [player-id (:xt/id player)
         income    (calculate-income player game)]
-    ;; Page header
-    (ui/phase-shell 
+    (ui/phase-shell
       player
       game 
       "Income Phase"
@@ -233,8 +219,10 @@
         ;; Empire status
         (ui/snapshot-section player)
         ;; Current resources
-        (source-grid player income)
+        (ui/section-label "Income" "‣ Current Turn")
+        (income-grid player income)
         ;; Incoming resources
+        (ui/section-label "Impact")
         (resource-table player income))
       ;; Buttons
       (ui/phase-action-bar

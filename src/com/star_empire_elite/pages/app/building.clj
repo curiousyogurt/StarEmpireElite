@@ -395,20 +395,22 @@
                     (biff/form
                       {:action (str "/app/game/" player-id "/apply-building") :method "post"
                        :class  "m-0"}
-                      (ui/phase-body player
-                                     (ui/flash-notice flash)
-                                     (ui/snapshot-section player)
-                                     (ui/projection-grid projections-data)
-                                     (ui/section-label "Build Orders")
-                                     [:div
-                                      (build-table player game zero-quantities max-quantities)]
-                                     (ui/section-label "Impact")
-                                     [:div
-                                      [:div.overflow-hidden.rounded-game.bg-game-surface
-                                       {:class "border border-game-border"}
-                                       (ui/deduction-table-header)
-                                       (build-credits-row player 0)]]
-                                     [:div#resources-after.hidden])
+                      (ui/phase-body 
+                        player
+                        (ui/flash-notice flash)
+                        (ui/snapshot-section player)
+                        (ui/section-label "Projected Resources" "‣ Next Turn + Building")
+                        (ui/projection-grid projections-data)
+                        (ui/section-label "Build Orders")
+                        [:div
+                         (build-table player game zero-quantities max-quantities)]
+                        (ui/section-label "Impact")
+                        [:div
+                         [:div.overflow-hidden.rounded-game.bg-game-surface
+                          {:class "border border-game-border"}
+                          (ui/deduction-table-header)
+                          (build-credits-row player 0)]]
+                        [:div#resources-after.hidden])
                       (ui/phase-warning "building-warning")
                       (ui/phase-action-bar
                         (ui/action-bar-link (str "/app/game/" player-id) "Pause")

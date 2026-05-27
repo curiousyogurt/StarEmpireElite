@@ -61,8 +61,9 @@ Each phase namespace follows a standard section order:
 - Short bindings like `v`, `n`, `k` are fine in tight scopes (2-3 lines). Use descriptive names in longer scopes.
 
 **DOM IDs for HTMX OOB:**
-- After-value spans: `"after-{slug}"` (e.g. `"after-credits"`)
-- Bar containers: `"bar-{slug}"` (e.g. `"bar-credits"`)
+- After-value spans: `"after-{slug}"` (e.g. `"after-credits"`) or `"after-{prefix}-{slug}"` when a shared component like `impact-row` needs to disambiguate across pages (e.g. `"after-exchange-credits-d"`)
+- Bar containers: `"bar-{slug}"` or `"bar-{prefix}-{slug}"` (same rule)
+- Change spans: `"change-{prefix}-{slug}"` (e.g. `"change-exchange-credits-d"`)
 - Warnings: `"{phase}-warning"` (e.g. `"expense-warning"`)
 - Projection pills: `"{resource}-pill-{label}"` (e.g. `"credits-pill-current"`)
 - Max quantity spans: `"max-qty-{item}"` (e.g. `"max-qty-soldiers"`)
@@ -136,7 +137,10 @@ The contract line uses informal type names: `int`, `str`, `bool`, `uuid`, `map`,
 - `:mirror-of` — syncs value to the named input
 - `:sync-key` — JS key for cross-view syncing
 
-**Shared table headers:** Use `ui/deduction-table-header` for Item/Before/Change/After tables (expenses, building impact). Use `ui/purchase-table-header` for Item/Rate/Max/Action/Total tables (exchange, building orders).
+**Shared table headers:**
+- `ui/impact-table-header` — Before/Change/After tables with a parameterized row-prefix for CSS grid classes (income, expenses). Supports `:single-row?` for CSS-only responsive layouts.
+- `ui/deduction-table-header` — Before/Change/After tables hard-coded to `expense-row-*` CSS classes (exchange impact, building impact). Uses centered Change column alignment.
+- `ui/purchase-table-header` — Item/Rate/Max/Action/Total tables (exchange, building orders).
 
 **Phase page structure:** Every phase page follows this layout:
 

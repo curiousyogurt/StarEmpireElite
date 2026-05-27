@@ -36,8 +36,7 @@
                         (:player/erg-planets player)
                         (:player/ore-planets player))]
     ;; Keys such as :player/soldiers are fully qualified keys in the player map.
-    ;; That is, there is a key in the player map named :player/soldiers, etc.
-    ;;                   (* asset-count-for-player     upkeep-cost-per-asset-in-game)
+    ;;                    asset-count-for-player       upkeep-cost-per-asset-in-game)
     {:planets-credits  (* planet-count                (:game/planet-upkeep-credits  game))
      :planets-food     (* planet-count                (:game/planet-upkeep-food     game))
      :soldiers-credits (* (:player/soldiers   player) (:game/soldier-upkeep-credits game))
@@ -212,7 +211,7 @@
    player-id uuid, hx-include str] -> hiccup"
   [name before payment filter-id field-name player-id hx-include]
   (let [after       (- before payment)
-        row-id      (str/lower-case name)
+        slug        (str/lower-case name)
         row-class   "items-center gap-2 py-1 px-3 border-b border-game-divider bg-game-row"
         name-cell   [:div.text-base.font-bold.text-green-400 name]
         before-cell [:div.text-base.text-right.text-game-green-muted
@@ -223,10 +222,10 @@
         ;; would get updated dynamically.  So even though only one value is shown at a time, they are 
         ;; both part of the page, and we need both to update each time any update is warranted.
         after-cell-m [:div.text-base.text-right
-                      [:span {:id (str "after-" row-id "-m") :class after-class}
+                      [:span {:id (str "after-" slug "-m") :class after-class}
                        (ui/format-number after)]]
         after-cell-d [:div.text-base.text-right
-                      [:span {:id (str "after-" row-id "-d") :class after-class}
+                      [:span {:id (str "after-" slug "-d") :class after-class}
                        (ui/format-number after)]]
         ;; Mobile row uses display-only input (no name, no HTMX) to avoid duplicate
         ;; field submission — both rows are always in the DOM, only CSS hides one.
@@ -263,7 +262,7 @@
      [:div.expense-row-desktop
       {:class (str "hidden md:grid " row-class)}
       name-cell
-      [:div {:id (str "bar-" row-id)} (ui/svg-indicator-bar :loss before payment filter-id)]
+      [:div {:id (str "bar-" slug)} (ui/svg-indicator-bar :loss before payment filter-id)]
       before-cell change-cell-d after-cell-d]]))
 
 (defn- expense-table-header
@@ -280,7 +279,6 @@
   [player player-map, required-totals totals-map, player-id uuid, hx-include str] -> hiccup"
   [player required-totals player-id hx-include]
   [:div
-   (ui/section-label "Impact")
    [:div.overflow-hidden.border.border-game-border.rounded-game.bg-game-surface
     (expense-table-header)
     (expense-table-row "Credits" (:player/credits player) (:credits required-totals)
@@ -378,11 +376,11 @@
 
   [{:keys [player game flash]}] -> hiccup"
   [{:keys [player game flash]}]
-  (let [required         (calculate-required-expenses player game)
-        required-totals  (calculate-required-expense-totals required)
-        player-id        (:xt/id player)
-        expense-summary  (build-expense-summary-data required required-totals)
-        affordable?      (expenses-affordable-by-default? player required-totals)
+  (let [player-id       (:xt/id player)
+        required        (calculate-required-expenses player game)
+        required-totals (calculate-required-expense-totals required)
+        expense-summary (build-expense-summary-data required required-totals)
+        affordable?     (expenses-affordable-by-default? player required-totals)
         ;; hx-include covers all three payment inputs so every change re-evaluates all resources
         hx-include       "[name='credits-pay'],[name='food-pay'],[name='fuel-pay']"]
     (ui/phase-shell 
@@ -398,8 +396,10 @@
           ;; Empire status
           (ui/snapshot-section player)
           ;; Required expense summary
+          (ui/section-label "Expenses" "‣ Current Turn")
           (expense-summary-grid expense-summary)
           ;; Outgoing expenses
+          (ui/section-label "Impact")
           (expense-table player required-totals player-id hx-include)
           ;; HTMX OOB swap target: renewed each request by calculate-expenses
           [:div#resources-after.hidden])
