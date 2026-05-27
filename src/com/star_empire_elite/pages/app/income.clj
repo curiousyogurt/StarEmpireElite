@@ -7,6 +7,27 @@
 ;;;;; generated before the player advances to the next phase.
 ;;;;;
 
+;;;;; Logical Structure:
+;;;;;
+;;;;; 1)  income-page ← calculate-income
+;;;;;     └─ ui/phase-shell
+;;;;;        ├─ ui/phase-body
+;;;;;        │  ├─ ui/flash-notice
+;;;;;        │  ├─ ui/snapshot-section
+;;;;;        │  ├─ ui/section-label "Income"
+;;;;;        │  ├─ income-grid
+;;;;;        │  │  └─ income-card  (×4: Ore, Erg, Mil, Tax)
+;;;;;        │  │     └─ income-row  (per resource with positive gain)
+;;;;;        │  ├─ ui/section-label "Impact"
+;;;;;        │  └─ income-table
+;;;;;        │     ├─ ui/impact-table-header
+;;;;;        │     └─ income-table-row  (×6: Credits, Food, Fuel, Soldiers, Fighters, Stations)
+;;;;;        └─ ui/phase-action-bar
+;;;;;           ├─ ui/action-bar-link "Pause"
+;;;;;           └─ ui/submit-button "Continue to Expenses"
+;;;;;
+;;;;; 2)  apply-income ← calculate-income, calculate-resources-after-income
+
 (ns com.star-empire-elite.pages.app.income
   (:require [clojure.string :as str]
             [com.biffweb :as biff]
@@ -51,114 +72,141 @@
 
 ;;;;
 ;;;; UI Components
+;;;; - Income Grid
+;;;; - Income Table
 ;;;;
 
 ;;;
-;;; Income grid:
-;;; - income-rows: the rows of each income card
-;;; - income-grid: four cards for the income sources grid
+;;; The Income Grid shows income from four sources: ore planets, erg planets, mil planets, and tax
+;;; due to population, each in a card.  Each card contains a header/aside, plus relevant income rows.
+;;; The idea is that the player can easily survey the sources of income, as well as the particular
+;;; types of income that come from each source.
+;;;
+;;; Income Grid:
+;;; - income-row:  one pill row for a particular card, showing a single resource gain
+;;; - income-card: one card with header (on the left), aside (on right), and income rows
+;;; - income-grid: four cards in a 2×4 responsive grid
 ;;;
 
-(defn- income-rows
-  "Convert an income-map to the row-spec format expected by ui/info-card.
-  Iterates the six resource keys in display order, skipping any with zero value.
+(defn- income-row
+  "Render one income row pill for a resource with a positive gain.
 
-  [income-map {:credits? int, :food? int, ...}] -> seq of {:key, :value, :sign, :unit}"
-  [income-map]
-  (for [[k unit] [[:credits  "cred"] [:food     "food"] [:fuel     "fuel"]
-                  [:soldiers "sold"] [:fighters "fgtr"] [:stations "stn"]]
-        :let [v (k income-map)]
-        :when (and v (pos? v))] ; include only if v is present (~nil) and pos? (~zero)
-    {:key k :value v :sign "+" :unit unit}))
+  [k keyword, unit str, income-map map] -> hiccup or nil"
+  [k unit income-map]
+  (let [v (k income-map)]
+    ;; Only make available rows for values that are non-nil and pos
+    (when (and v (pos? v))
+      (ui/info-pill {:key k :value v :sign "+" :unit unit}))))
+
+(defn- income-card
+  "Render one income source card with a header, aside count, and income rows.
+
+  [title str, aside str, income-map map] -> hiccup"
+  [title aside income-map]
+  [:div
+   {:class "flex flex-col gap-1 py-1.5 px-2 border border-game-border rounded-game bg-game-card"}
+   [:div.flex.justify-between.items-baseline
+    [:span.text-base.font-bold.text-green-400 title]
+    [:span.text-xs.text-game-green-muted aside]]
+   [:div {:class "flex flex-col gap-0.5"}
+    ;; Call income-row for all possible; but nils in the income map not display
+    (income-row :credits  "cred" income-map)
+    (income-row :food     "food" income-map)
+    (income-row :fuel     "fuel" income-map)
+    (income-row :soldiers "sold" income-map)
+    (income-row :fighters "fgtr" income-map)
+    (income-row :stations "stn"  income-map)]])
 
 (defn- income-grid
   "Render the income grid: four cards (Ore, Erg, Mil, Tax) in a 2×4 responsive grid,
-  each with a header, aside, and income-rows showing resources produced this turn.
+  each with a header, aside, and income rows showing resources produced this turn.
 
   [player player-map, income income-map] -> hiccup"
   [player income]
-  (let [pop-count (ui/format-population (:player/population player))
-        sources   [{:key :ore :title "Ore" :aside (str "x" (:player/ore-planets player))
-                    :income-map {:credits (:ore-credits income)}}
-
-                   {:key :erg :title "Erg" :aside (str "x" (:player/erg-planets player))
-                    :income-map {:food (:erg-food income)
-                                 :fuel (:erg-fuel income)}}
-
-                   {:key :mil :title "Mil" :aside (str "x" (:player/mil-planets player))
-                    :income-map {:soldiers (:mil-soldiers income)
-                                 :fighters (:mil-fighters income)
-                                 :stations (:mil-stations income)}}
-
-                   {:key :taxes :title "Tax" :aside (str "x" pop-count)
-                    :income-map {:credits (:tax-credits income)}}]]
-    (ui/info-grid
-      {:grid-class "grid grid-cols-2 md:grid-cols-4 gap-1.5"
-       :cards
-       (for [{:keys [key title aside income-map]} sources]
-         {:key key
-          :title title
-          :aside aside
-          :rows (income-rows income-map)})})))
+  (let [pop-count (ui/format-population (:player/population player))]
+    [:div {:class "grid grid-cols-2 md:grid-cols-4 gap-1.5"}
+     (income-card "Ore" (str "x" (:player/ore-planets player))
+                  {:credits (:ore-credits income)})
+     (income-card "Erg" (str "x" (:player/erg-planets player))
+                  {:food (:erg-food income)
+                   :fuel (:erg-fuel income)})
+     (income-card "Mil" (str "x" (:player/mil-planets player))
+                  {:soldiers (:mil-soldiers income)
+                   :fighters (:mil-fighters income)
+                   :stations (:mil-stations income)})
+     (income-card "Tax" (str "x" pop-count)
+                  {:credits (:tax-credits income)})]))
 
 ;;;
-;;; Resource table 
-;;; - resource-table-row: a single row
-;;; - resource-table: put it all together
+;;; The Income Table shows income by type instead of by source: credits, food, fuel; soldiers, 
+;;; fighters, stations.  The layout columns are item name, indicator-bar, before, change, and after.  
+;;; Everything is static: the player gets what the player gets, and cannot make choices.  This means 
+;;; that the resource table (along with everything else in the income phase) is for information only.
+;;;
+;;; Income Table
+;;; - income-table-row: a single row
+;;; - income-table:     assembles header (from ui/impact-table-header) and rows
 ;;;
 
-(defn- resource-table-row
-  "Render one resource row for the resource table.
+(defn- income-table-row
+  "Render one row for the income table.
   Single-row layout: the SVG bar column is hidden on mobile via CSS.
 
-  [name str, before int, delta int, key? bool, filter-id str] -> hiccup"
-  [name before delta key? filter-id]
-  (let [after        (+ before delta)
-        change-class (cond (zero? delta) "text-game-green-muted"
-                           key?          "text-green-400 font-bold"
-                           :else         "text-green-400")]
+  [name str, before int, change int, key? bool, filter-id str] -> hiccup"
+  [name before change key? filter-id]
+  (let [after        (+ before change)
+        change-class (cond (zero? change) "text-game-green-muted"
+                           key?           "text-green-400 font-bold" ; Bold if a key value
+                           :else          "text-green-400")]
     [:div.income-row
      {:class (str "items-center gap-2 py-1 px-3 border-b border-game-divider"
                   (when key? " bg-game-row"))}
+     ;; Name
      [:div.text-base
       {:class (if key? "font-bold text-green-400" "text-game-green-muted")}
       name]
+     ;; Indicator Bar
      [:div.hidden.md:block
       (ui/svg-indicator-bar :gain before after filter-id)]
+     ;; Before
      [:div.text-base.text-right.text-game-green-muted
       (ui/format-number before)]
+     ;; Change
      [:div.text-base.text-right.whitespace-nowrap
       {:class change-class
        :style (cond-> {:letter-spacing "0.03em"}
-                (and key? (not (zero? delta)))
+                (and key? (not (zero? change)))
                 (assoc :text-shadow "0 0 8px rgba(74,222,128,0.6)"))}
-      (if (zero? delta) "—" [:<> "+" (ui/format-number delta)])]
+      (if (zero? change) "+0" [:<> "+" (ui/format-number change)])]
+     ;; After
      [:div.text-base.text-right
       {:class (if key? "text-green-400 font-bold" "text-game-green-soft")}
       (ui/format-number after)]]))
 
-(defn- resource-table
-  "Render the Resource Changes table with before/delta/after columns and SVG bars.
+(defn- income-table
+  "Render the income table: header and before/change/after rows with SVG bars.
 
   [player player-map, income income-map] -> hiccup"
   [player income]
-  (let [credits-delta (+ (:ore-credits income) (:tax-credits income))
-        rows [{:name "Credits"               :before (:player/credits  player) 
-               :delta credits-delta          :key?   true}
-              {:name "Food"                  :before (:player/food     player)
-               :delta (:erg-food income)     :key? true}
-              {:name "Fuel"                  :before (:player/fuel     player) 
-               :delta (:erg-fuel income)     :key? true}
-              {:name "Soldiers"              :before (:player/soldiers player) 
-               :delta (:mil-soldiers income) :key? false}
-              {:name "Fighters"              :before (:player/fighters player) 
-               :delta (:mil-fighters income) :key? false}
-              {:name "Stations"              :before (:player/stations player) 
-               :delta (:mil-stations income) :key? false}]]
+  (let [credits-change (+ (:ore-credits income) (:tax-credits income))
+        rows [{:name "Credits"                :before (:player/credits  player)
+               :change credits-change         :key?   true}
+              {:name "Food"                   :before (:player/food     player)
+               :change (:erg-food income)     :key? true}
+              {:name "Fuel"                   :before (:player/fuel     player)
+               :change (:erg-fuel income)     :key? true}
+              {:name "Soldiers"               :before (:player/soldiers player)
+               :change (:mil-soldiers income) :key? false}
+              {:name "Fighters"               :before (:player/fighters player)
+               :change (:mil-fighters income) :key? false}
+              {:name "Stations"               :before (:player/stations player)
+               :change (:mil-stations income) :key? false}]]
     [:div.overflow-hidden.border.border-game-border.rounded-game.bg-game-surface
+     ;; Table header
      (ui/impact-table-header "income" {:single-row? true})
-     (for [{:keys [name before delta key?]} rows]
-       (resource-table-row name before delta key? (str "glow-" (str/lower-case name))))]))
+     ;; Table rows
+     (for [{:keys [name before change key?]} rows]
+       (income-table-row name before change key? (str "glow-" (str/lower-case name))))]))
 
 
 ;;;;
@@ -178,21 +226,23 @@
       (let [income         (calculate-income player game)
             after          (calculate-resources-after-income player income)
             last-completed (:player/last-round-completed-at player)
-           day-reset?     (and (> (:player/current-round player) 1)
+            day-reset?     (and (> (:player/current-round player) 1)
                                 last-completed
                                 (not (utils/same-calendar-day? last-completed)))]
-        (biff/submit-tx ctx
-                        [(cond-> {:db/doc-type          :player
-                                  :db/op                :update
-                                  :xt/id                player-id
-                                  :player/credits       (:credits after)
-                                  :player/food          (:food after)
-                                  :player/fuel          (:fuel after)
-                                  :player/soldiers      (:soldiers after)
-                                  :player/fighters      (:fighters after)
-                                  :player/stations      (:stations after)
-                                  :player/current-phase 2}
-                           day-reset? (assoc :player/current-round 1))])
+        ;; Write to db
+        (biff/submit-tx 
+          ctx
+          [(cond-> {:db/doc-type          :player
+                    :db/op                :update
+                    :xt/id                player-id
+                    :player/credits       (:credits after)
+                    :player/food          (:food after)
+                    :player/fuel          (:fuel after)
+                    :player/soldiers      (:soldiers after)
+                    :player/fighters      (:fighters after)
+                    :player/stations      (:stations after)
+                    :player/current-phase 2} ; Next phase
+             day-reset? (assoc :player/current-round 1))])
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/expenses")}}))))
 
@@ -213,7 +263,8 @@
       player
       game 
       "Income Phase"
-      (ui/phase-body player
+      (ui/phase-body 
+        player
         ;; Flash if necessary
         (ui/flash-notice flash)
         ;; Empire status
@@ -223,7 +274,7 @@
         (income-grid player income)
         ;; Incoming resources
         (ui/section-label "Impact")
-        (resource-table player income))
+        (income-table player income))
       ;; Buttons
       (ui/phase-action-bar
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
