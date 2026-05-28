@@ -11,6 +11,9 @@
 ;;;;; afford their selected expense amounts before submitting.
 ;;;;;
 
+;;;;; Logical Structure:
+;;;;; 1) expenses-page ← calculate-required-expenses
+
 (ns com.star-empire-elite.pages.app.expenses
   (:require [clojure.string :as str]
             [com.biffweb :as biff]
@@ -372,7 +375,8 @@
 ;;;;
 
 (defn expenses-page
-  "Show expense requirements and input fields for the player to choose payment amounts.
+  "Show expenses page for the curernt turn. This comprises required expenses and input fields for the 
+  player to choose payment amounts.  Htmx dynamic updates are needed.
 
   [{:keys [player game flash]}] -> hiccup"
   [{:keys [player game flash]}]
@@ -387,6 +391,7 @@
       player 
       game 
       "Expenses Phase"
+      ;; Wrap the phase-body in a form so that we can accept input. Post calls apply-expenses.
       (biff/form
         {:action (str "/app/game/" player-id "/apply-expenses") :method "post" :class  "m-0"}
         (ui/phase-body
@@ -397,10 +402,10 @@
           (ui/snapshot-section player)
           ;; Required expense summary
           (ui/section-label "Expenses" "‣ Current Turn")
-          (expense-summary-grid expense-summary)
+          (expense-summary-grid expense-summary) ;; Look at this
           ;; Outgoing expenses
-          (ui/section-label "Impact")
-          (expense-table player required-totals player-id hx-include)
+          (ui/section-label "Choices and Impact")
+          (expense-table player required-totals player-id hx-include) ;; Look at this
           ;; HTMX OOB swap target: renewed each request by calculate-expenses
           [:div#resources-after.hidden])
         (ui/phase-warning "expense-warning")
