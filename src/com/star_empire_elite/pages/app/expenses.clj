@@ -12,7 +12,7 @@
 ;;;;;
 
 ;;;;; Logical Structure:
-;;;;; 1) expenses-page ← calculate-required-expenses
+;;;;; 1) expenses-page ← calculate-expenses
 
 (ns com.star-empire-elite.pages.app.expenses
   (:require [clojure.string :as str]
@@ -25,7 +25,7 @@
 ;;;; Calculations
 ;;;;
 
-(defn calculate-required-expenses
+(defn calculate-expenses
   "Calculate required upkeep costs for all empire assets using game constants.
 
   [player player-map, game game-map] -> {:planets-credits int,  :planets-food int,
@@ -53,7 +53,7 @@
      :population-food  (* (:player/population player) (:game/population-upkeep-food game))
      :population-fuel  (* (:player/population player) (:game/population-upkeep-fuel game))}))
 
-(defn calculate-required-expense-totals
+(defn calculate-expense-totals
   "Aggregate per-category required expenses into per-resource totals.
   These are the minimum payments needed to avoid stability penalties.
 
@@ -76,6 +76,29 @@
       (update :food    - (:food-pay    payments))
       (update :fuel    - (:fuel-pay    payments))))
 
+(defn valid-expenses?
+  "Returns true if all spendable resources after expenses are non-negative.
+
+  [resources-after resources-map] -> boolean"
+  [resources-after]
+  (and (>= (:credits resources-after) 0)
+       (>= (:food    resources-after) 0)
+       (>= (:fuel    resources-after) 0)))
+
+(defn- initial-valid-expenses?
+  "Returns true if the player can afford their required expenses when paying the full required
+  amount on each resource. Used by expenses-page to set the initial state of the submit button
+  before the player has made any input adjustments.
+
+  [player player-map, required-totals totals-map] -> boolean"
+  [player required-totals]
+  (valid-expenses?
+    (calculate-resources-after-expenses
+      player
+      {:credits-pay (:credits required-totals)
+       :food-pay    (:food    required-totals)
+       :fuel-pay    (:fuel    required-totals)})))
+
 (defn calculate-expense-stability-penalty
   "Calculate stability penalty for underpaying expenses.
   Compares per-resource payments against required totals; sums fractional shortfalls
@@ -94,113 +117,83 @@
                                    (double (/ shortfall (max 1 required)))))]
     (long (* total-fraction (:game/expense-stability-penalty game))))) ; Round down
 
-(defn can-afford-expenses?
-  "Returns true if all spendable resources after expenses are non-negative.
-
-  [resources-after resources-map] -> boolean"
-  [resources-after]
-  (and (>= (:credits resources-after) 0)
-       (>= (:food    resources-after) 0)
-       (>= (:fuel    resources-after) 0)))
-
-(defn- expenses-affordable-by-default?
-  "Returns true if the player can afford their required expenses when paying the full required
-  amount on each resource. Used by expenses-page to set the initial state of the submit button
-  before the player has made any input adjustments.
-
-  [player player-map, required-totals totals-map] -> boolean"
-  [player required-totals]
-  (can-afford-expenses?
-    (calculate-resources-after-expenses
-      player
-      {:credits-pay (:credits required-totals)
-       :food-pay    (:food    required-totals)
-       :fuel-pay    (:fuel    required-totals)})))
-
-(defn parse-expense-payments
-  "Parse the three total expense payment inputs from request params.
-  Invalid or missing values default to 0.
-
-  [params ring-params] -> {:credits-pay int, :food-pay int, :fuel-pay int}"
-  [params]
-  {:credits-pay (utils/parse-numeric-input (:credits-pay params))
-   :food-pay    (utils/parse-numeric-input (:food-pay    params))
-   :fuel-pay    (utils/parse-numeric-input (:fuel-pay    params))})
-
-
-;;;;
-;;;; View Models
-;;;;
-
-(defn build-expense-summary-data
-  "Compute the expense summary data structure consumed by expense-summary-grid.
-  Shows the required expense breakdown for Credits, Food, and Fuel.
-  All rows and totals are negative, showing what the empire owes per category.
-
-  [required expenses-map, required-totals totals-map] -> seq of expense-card-maps"
-  [required required-totals]
-  [{:name "Credits"    :total (- (:credits required-totals))
-    :rows [{:label "Planets"  :value (- (:planets-credits required))}
-           {:label "Military" :value (- (+ (:soldiers-credits required)
-                                            (:fighters-credits required)
-                                            (:stations-credits required)))}]}
-   {:name "Food"       :total (- (:food required-totals))
-    :rows [{:label "Planets"    :value (- (:planets-food required))}
-           {:label "Military"   :value (- (+ (:soldiers-food required)
-                                              (:agents-food required)))}
-           {:label "Population" :value (- (:population-food required))}]}
-   {:name "Fuel"       :total (- (:fuel required-totals))
-    :rows [{:label "Military"   :value (- (+ (:fighters-fuel required)
-                                              (:stations-fuel required)
-                                              (:agents-fuel required)))}
-           {:label "Population" :value (- (:population-fuel required))}]}])
 
 ;;;;
 ;;;; UI Components
+;;;; - Expense Grid
+;;;; - Expense Table
 ;;;;
 
 ;;;
-;;; Expense summary grid
+;;; The Expense Grid shows required expenses for three resources: Credits, Food, and Fuel, each in
+;;; a card.  Each card contains a header/aside showing the total owed, plus rows breaking down the
+;;; expense by relevant category (Planets, Military, Population).
+;;;
+;;; Expense Grid:
+;;; - expense-row:  one pill for a category, showing a single signed expense
+;;; - expense-card: one card with title, signed total aside, and expense rows
+;;; - expense-grid: three cards (Credits, Food, Fuel) in a 3-column grid
 ;;;
 
-(defn- expense-summary-rows
-  "Convert a seq of expense row specs to the format expected by ui/info-card.
-  Each input row is {:label str, :value int}; values are signed (negative = owed).
+(defn- expense-row
+  "Render one expense row pill for a category with a non-zero amount.
+  Returns nil when the value is nil or zero, so cards can call all rows uniformly.
 
-  [rows seq of {:label, :value}] -> seq of {:key, :label, :value, :signed?}"
-  [rows]
-  (for [{:keys [label value]} rows]
-    {:key label
-     :label label
-     :value value
-     :signed? true}))
+  [category keyword, expense-map map] -> hiccup or nil"
+  [category expense-map]
+  (let [amount (category expense-map)]
+    (when (and amount (pos? amount))
+      (ui/info-pill {:key category :label (str/capitalize (name category)) :value (- amount) :signed? true}))))
 
-(defn- expense-summary-grid
-  "Render the expense summary grid: three cards (Credits, Food, Fuel) in a 3-column grid,
-  each showing the minimum required payment and its breakdown. Totals are signed negative.
+(defn- expense-card
+  "Render one expense card with title, signed total aside, and breakdown rows.
+  Calls expense-row for all three categories; nils do not display.
 
-  [expense-summary seq of expense-card-maps from build-expense-summary-data] -> hiccup"
-  [expense-summary]
-  (ui/info-grid
-   {:label "Expenses"
-    :sublabel "THIS TURN · required to avoid stability penalty"
-    :grid-class "grid grid-cols-3 gap-2"
-    :cards
-    (for [{:keys [name total rows]} expense-summary]
-      {:key name
-       :title name
-       :aside (ui/format-signed-number total)
-       :aside-class (str "text-xs "
-                         (if (neg? total)
-                           "text-amber-400"
-                           "text-game-green-muted"))
-       :rows (expense-summary-rows rows)})}))
+  [title str, total int, expense-map map] -> hiccup"
+  [title total expense-map]
+  [:div
+   {:class "flex flex-col gap-1 py-1.5 px-2 border border-game-border rounded-game bg-game-card"}
+   [:div.flex.justify-between.items-baseline
+    [:span.text-base.font-bold.text-green-400 title]
+    [:span.text-xs.text-game-green-muted (ui/format-signed-number (- total))]]
+   [:div {:class "flex flex-col gap-0.5"}
+    (expense-row :planets    expense-map)
+    (expense-row :military   expense-map)
+    (expense-row :population expense-map)]])
+
+(defn- expense-grid
+  "Render the expense grid: three cards (Credits, Food, Fuel) in a 3-column grid,
+  each showing the minimum required payment and its breakdown. Totals are signed negative,
+  and do not update based on player inputs.
+
+  [required expenses-map, required-totals totals-map] -> hiccup"
+  [required required-totals]
+  [:div {:class "grid grid-cols-3 gap-2"}
+   (expense-card "Credits" (:credits required-totals)
+     {:planets  (:planets-credits required)
+      :military (+ (:soldiers-credits required)
+                   (:fighters-credits required)
+                   (:stations-credits required))})
+   (expense-card "Food" (:food required-totals)
+     {:planets    (:planets-food required)
+      :military   (+ (:soldiers-food required)
+                     (:agents-food required))
+      :population (:population-food required)})
+   (expense-card "Fuel" (:fuel required-totals)
+     {:military   (+ (:fighters-fuel required)
+                     (:stations-fuel required)
+                     (:agents-fuel required))
+      :population (:population-fuel required)})])
 
 ;;;
-;;; Expense table definitions:
-;;; - expense-table-row: a single editable row with HTMX input
-;;; - expense-table-header: the column-label row
-;;; - expense-table: put it all together
+;;; The Expense Table shows the player's payment choices and their impact on resources.  Unlike the
+;;; income table, expense rows are interactive: each contains a numeric input with HTMX live-update
+;;; so the player sees real-time validation as they adjust payments.  The layout uses dual mobile/
+;;; desktop rows because the input elements need separate DOM ids for OOB updates.
+;;;
+;;; Expense Table:
+;;; - expense-table-row:    a single editable row with HTMX input (dual mobile/desktop variants)
+;;; - expense-table:        assembles header and three rows (Credits, Food, Fuel)
 ;;;
 
 (defn- expense-table-row
@@ -208,7 +201,7 @@
   Emits two variants: a 4-column mobile row (no bar column) and a 5-column
   desktop row (with the SVG indicator bar), aligned with expense-table-header.
   The change column contains a numeric input with HTMX live-update integration.
-  The after column contains id'd spans for HTMX OOB updates.
+  The after column contains id spans for HTMX OOB updates.
 
   [name str, before int, payment int, filter-id str, field-name str,
    player-id uuid, hx-include str] -> hiccup"
@@ -221,9 +214,9 @@
                      (ui/format-number before)]
         after-class (str "font-bold " (if (neg? after) "text-red-400" "text-green-400"))
         ;; after-cell-m/d might seem like duplicate code; but if two elements share the same id (as 
-        ;; would be the case if we just used a generic after-cell), then only one element (the first) 
-        ;; would get updated dynamically.  So even though only one value is shown at a time, they are 
-        ;; both part of the page, and we need both to update each time any update is warranted.
+        ;; would be the case if we used after-cell for both), then only one element (the first) would 
+        ;; get updated dynamically.  So even though only one value is shown at a time, they are both 
+        ;; part of the page, and so we need both to update each time any update is warranted.
         after-cell-m [:div.text-base.text-right
                       [:span {:id (str "after-" slug "-m") :class after-class}
                        (ui/format-number after)]]
@@ -245,35 +238,32 @@
                                           :input-style   input-style
                                           :display-only? true
                                           :mirror-of     field-name
-                                          :prefix        "-"})]
+                                          :prefix        "—"})]
         change-cell-d [:div.justify-self-end
                        {:class "w-[min(140px,100%)]"}
                        (ui/numeric-input field-name payment player-id
                                          "/calculate-expenses" hx-include
                                          {:input-class "text-xs lg:text-sm text-right"
                                           :input-style input-style
-                                          :prefix      "-"})]]
+                                          :prefix      "—"})]]
     [:<>
 
      ;; Mobile
      [:div.expense-row-mobile
       {:class (str "md:hidden " row-class)}
       name-cell 
-      before-cell change-cell-m after-cell-m]
+      before-cell 
+      change-cell-m 
+      after-cell-m]
 
      ;; Desktop
      [:div.expense-row-desktop
       {:class (str "hidden md:grid " row-class)}
       name-cell
       [:div {:id (str "bar-" slug)} (ui/svg-indicator-bar :loss before payment filter-id)]
-      before-cell change-cell-d after-cell-d]]))
-
-(defn- expense-table-header
-  "Render the column-label row for the expense impact table.
-
-  [] -> hiccup"
-  []
-  (ui/impact-table-header "expense"))
+      before-cell 
+      change-cell-d 
+      after-cell-d]]))
 
 (defn- expense-table
   "Render the Impact table: three editable rows where the player chooses credits/food/fuel
@@ -283,7 +273,9 @@
   [player required-totals player-id hx-include]
   [:div
    [:div.overflow-hidden.border.border-game-border.rounded-game.bg-game-surface
-    (expense-table-header)
+    ;; Call table header with expense prefix
+    (ui/impact-table-header "expense")
+    ;; Table rows
     (expense-table-row "Credits" (:player/credits player) (:credits required-totals)
                        "glow-credits" "credits-pay" player-id hx-include)
     (expense-table-row "Food"    (:player/food    player) (:food    required-totals)
@@ -296,6 +288,16 @@
 ;;;; Actions
 ;;;;
 
+(defn- parse-expense-choices
+  "Parse the three total expense payment inputs from request params.
+  Invalid or missing values default to 0.
+
+  [params ring-params] -> {:credits-pay int, :food-pay int, :fuel-pay int}"
+  [params]
+  {:credits-pay (utils/parse-numeric-input (:credits-pay params))
+   :food-pay    (utils/parse-numeric-input (:food-pay    params))
+   :fuel-pay    (utils/parse-numeric-input (:fuel-pay    params))})
+
 (defn apply-expenses
   "Commit expense payments to the database and advance to the building phase.
   If expenses are no longer affordable against current player state (e.g. resources lost to an
@@ -306,39 +308,41 @@
   (utils/with-player-and-game [player game player-id] ctx
     (if-let [redirect (utils/validate-phase player 2 player-id)]
       redirect
-      (let [payments        (parse-expense-payments params)
-            required        (calculate-required-expenses player game)
-            required-totals (calculate-required-expense-totals required)
+      (let [payments        (parse-expense-choices params)
+            required        (calculate-expenses player game)
+            required-totals (calculate-expense-totals required)
             resources-after (calculate-resources-after-expenses player payments)
             penalty         (calculate-expense-stability-penalty required-totals payments game)]
-        (if-not (can-afford-expenses? resources-after)
+        (if-not (valid-expenses? resources-after)
           {:status  303
            :headers {"location" (str "/app/game/" player-id "/expenses")}
            :session (utils/flash session :warn
                       "Submission rejected due to a change in your empire (enemy attack or espionage). Please review and resubmit.")}
           (do
-            (biff/submit-tx ctx
-                            [{:db/doc-type                       :player
-                              :db/op                             :update
-                              :xt/id                             player-id
-                              :player/credits                    (:credits resources-after)
-                              :player/food                       (:food resources-after)
-                              :player/fuel                       (:fuel resources-after)
-                              :player/expense-stability-penalty  penalty
-                              :player/current-phase              3}])
+            ;; Write to the db
+            (biff/submit-tx 
+              ctx
+              [{:db/doc-type                       :player
+                :db/op                             :update
+                :xt/id                             player-id
+                :player/credits                    (:credits resources-after)
+                :player/food                       (:food resources-after)
+                :player/fuel                       (:fuel resources-after)
+                :player/expense-stability-penalty  penalty
+                :player/current-phase              3}])
             {:status 303
              :headers {"location" (str "/app/game/" player-id "/building")}}))))))
 
-(defn calculate-expenses
+(defn calculate-expenses-oob
   "Return HTMX out-of-band fragments updating the after-column cells, warning, and submit button
   in real time as the player adjusts expense inputs.
 
   [ctx ring-ctx] -> hiccup (HTMX oob fragments)"
   [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
-    (let [payments        (parse-expense-payments params)
+    (let [payments        (parse-expense-choices params)
           resources-after (calculate-resources-after-expenses player payments)
-          affordable?     (can-afford-expenses? resources-after)
+          affordable?     (valid-expenses? resources-after)
           oob-span        (fn [id v]
                             [:span {:id id
                                     :hx-swap-oob "true"
@@ -381,10 +385,9 @@
   [{:keys [player game flash]}] -> hiccup"
   [{:keys [player game flash]}]
   (let [player-id       (:xt/id player)
-        required        (calculate-required-expenses player game)
-        required-totals (calculate-required-expense-totals required)
-        expense-summary (build-expense-summary-data required required-totals)
-        affordable?     (expenses-affordable-by-default? player required-totals)
+        required        (calculate-expenses player game)
+        required-totals (calculate-expense-totals required)
+        affordable?     (initial-valid-expenses? player required-totals)
         ;; hx-include covers all three payment inputs so every change re-evaluates all resources
         hx-include       "[name='credits-pay'],[name='food-pay'],[name='fuel-pay']"]
     (ui/phase-shell 
@@ -402,11 +405,11 @@
           (ui/snapshot-section player)
           ;; Required expense summary
           (ui/section-label "Expenses" "‣ Current Turn")
-          (expense-summary-grid expense-summary) ;; Look at this
+          (expense-grid required required-totals)
           ;; Outgoing expenses
           (ui/section-label "Choices and Impact")
           (expense-table player required-totals player-id hx-include) ;; Look at this
-          ;; HTMX OOB swap target: renewed each request by calculate-expenses
+          ;; HTMX OOB swap target: renewed each request by calculate-expenses-oob
           [:div#resources-after.hidden])
         (ui/phase-warning "expense-warning")
         (ui/phase-action-bar

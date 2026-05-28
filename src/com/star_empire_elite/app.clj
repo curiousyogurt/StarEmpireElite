@@ -459,7 +459,7 @@
     ["/game/:player-id/apply-income"       {:post income/apply-income}]
     ["/game/:player-id/expenses"           {:get  expenses-handler}]
     ["/game/:player-id/apply-expenses"     {:post expenses/apply-expenses}]
-    ["/game/:player-id/calculate-expenses" {:post expenses/calculate-expenses}]
+    ["/game/:player-id/calculate-expenses" {:post expenses/calculate-expenses-oob}]
     ["/game/:player-id/exchange"           {:get  exchange-handler}]
     ["/game/:player-id/apply-exchange"     {:post exchange/apply-exchange}]
     ["/game/:player-id/calculate-exchange" {:post exchange/calculate-exchange}]

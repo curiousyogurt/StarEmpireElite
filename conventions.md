@@ -43,9 +43,9 @@ Each phase namespace follows a standard section order:
 
 **Functions:**
 - Private helpers use `defn-`, not `defn` with `^:private`.
-- Boolean predicates end in `?`: `can-afford-expenses?`, `day-exhausted?`, `att-wins?`.
+- Boolean predicates end in `?`: `valid-expenses?`, `day-exhausted?`, `att-wins?`.
 - Pure calculation functions are named `calculate-*` and take/return plain maps.
-- Parse functions are named `parse-*`: `parse-expense-payments`, `parse-purchase-quantities`.
+- Parse functions are named `parse-*-choices`: `parse-expense-choices`, `parse-purchase-quantities`.
 - Resource-after functions are named `calculate-resources-after-*`.
 - Apply functions (POST handlers) are named `apply-*`: `apply-income`, `apply-expenses`.
 - HTMX handler functions are named `calculate-*` (for OOB update endpoints).

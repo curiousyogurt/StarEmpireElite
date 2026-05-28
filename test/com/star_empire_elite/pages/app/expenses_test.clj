@@ -52,9 +52,9 @@
 ;;;; Pure Function Tests
 ;;;;
 
-(deftest test-calculate-required-expenses-basic
+(deftest test-calculate-expenses-basic
   (testing "Computes per-category upkeep from player counts and game constants"
-    (let [req (expenses/calculate-required-expenses test-player test-game)]
+    (let [req (expenses/calculate-expenses test-player test-game)]
       ;; planets: (2+2+1)=5 planets
       (is (= (* 5 75) (:planets-credits req)))
       (is (= (* 5  1) (:planets-food    req)))
@@ -74,10 +74,10 @@
       (is (= (* 9000 2) (:population-food req)))
       (is (= (* 9000 7) (:population-fuel req))))))
 
-(deftest test-calculate-required-expense-totals
+(deftest test-calculate-expense-totals
   (testing "Aggregates per-category expenses into per-resource totals"
-    (let [req    (expenses/calculate-required-expenses test-player test-game)
-          totals (expenses/calculate-required-expense-totals req)]
+    (let [req    (expenses/calculate-expenses test-player test-game)
+          totals (expenses/calculate-expense-totals req)]
       (is (= (+ (:planets-credits req) (:soldiers-credits req)
                 (:fighters-credits req) (:stations-credits req))
              (:credits totals)))
@@ -95,7 +95,7 @@
       (is (= (- (:player/credits test-player) 100) (:credits after)))
       (is (= (- (:player/food    test-player)  50) (:food    after)))
       (is (= (- (:player/fuel    test-player)  20) (:fuel    after)))))
-  (testing "Allows negative resources (overspending is caught by can-afford-expenses?)"
+  (testing "Allows negative resources (overspending is caught by valid-expenses?)"
     (let [after (expenses/calculate-resources-after-expenses test-player
                                                              {:credits-pay 9999 :food-pay 0 :fuel-pay 0})]
       (is (neg? (:credits after))))))
@@ -125,14 +125,14 @@
           paid   {:credits-pay 50 :food-pay 75 :fuel-pay 50}]
       (is (= 3 (expenses/calculate-expense-stability-penalty totals paid {:game/expense-stability-penalty 4}))))))
 
-(deftest test-can-afford-expenses
+(deftest test-valid-expenses
   (testing "Returns true when all resources are non-negative"
-    (is (true?  (expenses/can-afford-expenses? {:credits 0    :food 0   :fuel 0})))
-    (is (true?  (expenses/can-afford-expenses? {:credits 1000 :food 500 :fuel 100}))))
+    (is (true?  (expenses/valid-expenses? {:credits 0    :food 0   :fuel 0})))
+    (is (true?  (expenses/valid-expenses? {:credits 1000 :food 500 :fuel 100}))))
   (testing "Returns false when any resource is negative"
-    (is (false? (expenses/can-afford-expenses? {:credits -1   :food 0   :fuel 0})))
-    (is (false? (expenses/can-afford-expenses? {:credits 100  :food -1  :fuel 0})))
-    (is (false? (expenses/can-afford-expenses? {:credits 100  :food 100 :fuel -1})))))
+    (is (false? (expenses/valid-expenses? {:credits -1   :food 0   :fuel 0})))
+    (is (false? (expenses/valid-expenses? {:credits 100  :food -1  :fuel 0})))
+    (is (false? (expenses/valid-expenses? {:credits 100  :food 100 :fuel -1})))))
 
 ;;
 ;; Happy path and error/edge-case tests for apply-expenses
@@ -246,12 +246,12 @@
 
 ;;
 ;; Testing expense calculation logic directly would normally be done for pure fns,
-;; but since calculate-expenses renders a hiccup page (and is tied to parameters),
+;; but since calculate-expenses-oob renders a hiccup page (and is tied to parameters),
 ;; we'll check that under sample conditions it returns a vector and that major logic holds.
 ;;
 
-(deftest test-calculate-expenses-hiccup-render
-  (testing "calculate-expenses returns hiccup and handles negative result markup"
+(deftest test-calculate-expenses-oob-hiccup-render
+  (testing "calculate-expenses-oob returns hiccup and handles negative result markup"
     (let [params {"planets-pay" "123"}]
       (with-redefs [utils/load-player-and-game
                     (fn [db player-id-str]
@@ -262,7 +262,7 @@
         (let [ctx {:path-params {:player-id (str test-player-id)}
                    :params params
                    :biff/db nil}
-              result (expenses/calculate-expenses ctx)]
+              result (expenses/calculate-expenses-oob ctx)]
           ;; Check the basic form of rendering
           (is (vector? result))
           (is (seq result)))))))

@@ -48,13 +48,13 @@
   [player game]
   ;; Keys such as :player/ore-planets are fully qualified keys in the player map.
   ;;             (* resource-count-for-player     resource-value-in-game)
-  {:ore-credits  (* (:player/ore-planets player) (:game/ore-planet-credits game))
-   :erg-food     (* (:player/erg-planets player) (:game/erg-planet-food game))
-   :erg-fuel     (* (:player/erg-planets player) (:game/erg-planet-fuel game))
-   :mil-soldiers (* (:player/mil-planets player) (:game/mil-planet-soldiers game))
-   :mil-fighters (* (:player/mil-planets player) (:game/mil-planet-fighters game))
-   :mil-stations (* (:player/mil-planets player) (:game/mil-planet-stations game))
-   :tax-credits  (* (:player/population player)  (:game/population-tax-credits game))})
+  {:ore-credits  (* (:player/ore-planets player) (:game/ore-planet-credits     game))
+   :erg-food     (* (:player/erg-planets player) (:game/erg-planet-food        game))
+   :erg-fuel     (* (:player/erg-planets player) (:game/erg-planet-fuel        game))
+   :mil-soldiers (* (:player/mil-planets player) (:game/mil-planet-soldiers    game))
+   :mil-fighters (* (:player/mil-planets player) (:game/mil-planet-fighters    game))
+   :mil-stations (* (:player/mil-planets player) (:game/mil-planet-stations    game))
+   :tax-credits  (* (:player/population  player) (:game/population-tax-credits game))})
 
 (defn calculate-resources-after-income
   "Calculate all player resources after applying income.
@@ -62,9 +62,9 @@
   [player player-map, income income-map] -> {:credits int, :food int, ...}"
   [player income]
   (-> (utils/player-snapshot player)
-      (update :credits + (:ore-credits income) (:tax-credits income))
-      (update :food    + (:erg-food     income))
-      (update :fuel    + (:erg-fuel     income))
+      (update :credits  + (:ore-credits  income) (:tax-credits income))
+      (update :food     + (:erg-food     income))
+      (update :fuel     + (:erg-fuel     income))
       (update :soldiers + (:mil-soldiers income))
       (update :fighters + (:mil-fighters income))
       (update :stations + (:mil-stations income))))
@@ -91,12 +91,12 @@
 (defn- income-row
   "Render one income row pill for a resource with a positive gain.
 
-  [k keyword, unit str, income-map map] -> hiccup or nil"
-  [k unit income-map]
-  (let [v (k income-map)]
+  [resource keyword, unit str, income-map map] -> hiccup or nil"
+  [resource unit income-map]
+  (let [amount (resource income-map)]
     ;; Only make available rows for values that are non-nil and pos
-    (when (and v (pos? v))
-      (ui/info-pill {:key k :value v :sign "+" :unit unit}))))
+    (when (and amount (pos? amount))
+      (ui/info-pill {:key resource :value amount :sign "+" :unit unit}))))
 
 (defn- income-card
   "Render one income source card with a header, aside count, and income rows.
@@ -202,7 +202,7 @@
               {:name "Stations"               :before (:player/stations player)
                :change (:mil-stations income) :key? false}]]
     [:div.overflow-hidden.border.border-game-border.rounded-game.bg-game-surface
-     ;; Table header
+     ;; Call table header with income prefix
      (ui/impact-table-header "income" {:single-row? true})
      ;; Table rows
      (for [{:keys [name before change key?]} rows]
@@ -229,9 +229,8 @@
             day-reset?     (and (> (:player/current-round player) 1)
                                 last-completed
                                 (not (utils/same-calendar-day? last-completed)))]
-        ;; Write to db
-        (biff/submit-tx 
-          ctx
+        ;; Write to the db
+        (biff/submit-tx ctx
           [(cond-> {:db/doc-type          :player
                     :db/op                :update
                     :xt/id                player-id

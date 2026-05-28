@@ -391,8 +391,8 @@
           max-buy-quantities (calculate-max-buy-quantities player
                                                            (assoc quantities :food-bought 0 :fuel-bought 0) rates)
           ;; Pill exchange values
-          required        (expenses/calculate-required-expenses player game)
-          required-totals  (expenses/calculate-required-expense-totals required)
+          required        (expenses/calculate-expenses player game)
+          required-totals  (expenses/calculate-expense-totals required)
           expense-reduction  (calculate-required-expense-reduction quantities game)
           exchange-credits   (:total-credits credit-changes)
           exchange-food      (- (:food-bought quantities) (:food-sold quantities))
@@ -524,8 +524,8 @@
         zero-quantities    (into {} (for [spec (concat sell-row-specs buy-row-specs)]
                                       [(:qty-key spec) 0]))
         max-buy-quantities (calculate-max-buy-quantities player zero-quantities rates)
-        required           (expenses/calculate-required-expenses player game)
-        required-totals    (expenses/calculate-required-expense-totals required)
+        required           (expenses/calculate-expenses player game)
+        required-totals    (expenses/calculate-expense-totals required)
         projections-data   (build-exchange-projections-data player required-totals)]
     (ui/phase-shell player game "Exchange"
                     (biff/form
