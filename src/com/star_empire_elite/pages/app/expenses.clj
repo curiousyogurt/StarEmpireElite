@@ -12,7 +12,33 @@
 ;;;;;
 
 ;;;;; Logical Structure:
-;;;;; 1) expenses-page ← calculate-expenses
+;;;;;
+;;;;; 1)  expenses-page ← calculate-expenses, calculate-expense-totals, initial-valid-expenses?
+;;;;;     └─ ui/phase-shell
+;;;;;        ├─ biff/form
+;;;;;        │  ├─ ui/phase-body
+;;;;;        │  │  ├─ ui/flash-notice
+;;;;;        │  │  ├─ ui/snapshot-section
+;;;;;        │  │  ├─ ui/section-label "Expenses"
+;;;;;        │  │  ├─ expense-grid
+;;;;;        │  │  │  └─ expense-card  (×3: Credits, Food, Fuel)
+;;;;;        │  │  │     └─ expense-row  (per category with non-zero cost)
+;;;;;        │  │  ├─ ui/section-label "Choices and Impact"
+;;;;;        │  │  └─ expense-table
+;;;;;        │  │     ├─ ui/impact-table-header
+;;;;;        │  │     └─ expense-table-row  (×3: Credits, Food, Fuel)
+;;;;;        │  └─ ui/phase-warning
+;;;;;        └─ ui/phase-action-bar
+;;;;;           ├─ ui/action-bar-link "Pause"
+;;;;;           ├─ ui/action-bar-link "Go to Exchange"
+;;;;;           └─ ui/submit-button "Continue to Building"
+;;;;;
+;;;;; 2)  calculate-expenses-oob ← parse-expense-quantities, calculate-resources-after-expenses,
+;;;;;                               valid-expenses? (HTMX OOB handler)
+;;;;;
+;;;;; 3)  apply-expenses ← parse-expense-quantities, calculate-expenses, calculate-expense-totals,
+;;;;;                       calculate-resources-after-expenses, calculate-expense-stability-penalty,
+;;;;;                       valid-expenses?
 
 (ns com.star-empire-elite.pages.app.expenses
   (:require [clojure.string :as str]
@@ -288,7 +314,7 @@
 ;;;; Actions
 ;;;;
 
-(defn- parse-expense-choices
+(defn- parse-expense-quantities
   "Parse the three total expense payment inputs from request params.
   Invalid or missing values default to 0.
 
@@ -308,7 +334,7 @@
   (utils/with-player-and-game [player game player-id] ctx
     (if-let [redirect (utils/validate-phase player 2 player-id)]
       redirect
-      (let [payments        (parse-expense-choices params)
+      (let [payments        (parse-expense-quantities params)
             required        (calculate-expenses player game)
             required-totals (calculate-expense-totals required)
             resources-after (calculate-resources-after-expenses player payments)
@@ -340,9 +366,9 @@
   [ctx ring-ctx] -> hiccup (HTMX oob fragments)"
   [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
-    (let [payments        (parse-expense-choices params)
+    (let [payments        (parse-expense-quantities params)
           resources-after (calculate-resources-after-expenses player payments)
-          affordable?     (valid-expenses? resources-after)
+          valid?          (valid-expenses? resources-after)
           oob-span        (fn [id v]
                             [:span {:id id
                                     :hx-swap-oob "true"
@@ -369,10 +395,11 @@
          (oob-bar "bar-fuel"    (:player/fuel    player) (:fuel-pay    payments) "glow-fuel")
          ;; OOB: insufficient-resources warning
          (ui/phase-warning-div "expense-warning"
-           (when (not affordable?) "⚠ Insufficient resources to pay expenses.")
+           (when (not valid?) "⚠ Insufficient resources to pay expenses.")
            {:oob? true})
          ;; OOB: submit button
-         (ui/submit-button affordable? "Continue to Building" {:hx-swap-oob "true"})]))))
+         (ui/submit-button valid? "Continue to Building" {:hx-swap-oob "true"})]))))
+
 
 ;;;;
 ;;;; Page
@@ -384,19 +411,18 @@
 
   [{:keys [player game flash]}] -> hiccup"
   [{:keys [player game flash]}]
-  (let [player-id       (:xt/id player)
-        required        (calculate-expenses player game)
-        required-totals (calculate-expense-totals required)
-        affordable?     (initial-valid-expenses? player required-totals)
+  (let [player-id      (:xt/id player)
+        expenses       (calculate-expenses player game)
+        expense-totals (calculate-expense-totals expenses)
+        valid?         (initial-valid-expenses? player expense-totals)
         ;; hx-include covers all three payment inputs so every change re-evaluates all resources
-        hx-include       "[name='credits-pay'],[name='food-pay'],[name='fuel-pay']"]
-    (ui/phase-shell 
-      player 
-      game 
+        hx-include     "[name='credits-pay'],[name='food-pay'],[name='fuel-pay']"]
+    (ui/phase-shell
+      player
+      game
       "Expenses Phase"
-      ;; Wrap the phase-body in a form so that we can accept input. Post calls apply-expenses.
       (biff/form
-        {:action (str "/app/game/" player-id "/apply-expenses") :method "post" :class  "m-0"}
+        {:action (str "/app/game/" player-id "/apply-expenses") :method "post" :class "m-0"}
         (ui/phase-body
           player
           ;; Flash if necessary
@@ -405,15 +431,15 @@
           (ui/snapshot-section player)
           ;; Required expense summary
           (ui/section-label "Expenses" "‣ Current Turn")
-          (expense-grid required required-totals)
+          (expense-grid expenses expense-totals)
           ;; Outgoing expenses
           (ui/section-label "Choices and Impact")
-          (expense-table player required-totals player-id hx-include) ;; Look at this
+          (expense-table player expense-totals player-id hx-include)
           ;; HTMX OOB swap target: renewed each request by calculate-expenses-oob
           [:div#resources-after.hidden])
         (ui/phase-warning "expense-warning")
         (ui/phase-action-bar
           (ui/action-bar-link (str "/app/game/" player-id) "Pause")
           (ui/action-bar-link (str "/app/game/" player-id "/exchange") "Go to Exchange")
-          (ui/submit-button affordable? "Continue to Building"))))))
+          (ui/submit-button valid? "Continue to Building"))))))
 

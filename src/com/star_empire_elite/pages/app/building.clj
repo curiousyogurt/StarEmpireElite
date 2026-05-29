@@ -332,7 +332,7 @@
          (for [{:keys [rows]} proj-data
                {:keys [label value id]} rows
                :when id]
-           (ui/oob-proj-pill id label value))
+           (ui/proj-pill-oob id label value))
          ;; OOB: projection totals
          (for [{:keys [total total-id]} proj-data]
            [:span.font-bold

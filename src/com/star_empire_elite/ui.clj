@@ -710,7 +710,7 @@
          sizing-input label-overlay])])
    (th-r total-label)])
 
-(defn oob-pill
+(defn pill-oob
   "Render a signed OOB pill span for HTMX out-of-band updates.
   Prefixes value with + or - sign and appends suffix.
 
@@ -1081,7 +1081,7 @@
    (when unit
      (str " " unit))])
 
-(defn oob-proj-pill
+(defn proj-pill-oob
   "Render a projection pill span for HTMX out-of-band swap. Matches the style of pills
   rendered inside projection-grid: signed value with label.
 

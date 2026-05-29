@@ -229,30 +229,30 @@
       (is (= "food-total" (get-in total-span [1 :id]))))))
 
 ;;;;
-;;;; oob-pill Tests
+;;;; pill-oob Tests
 ;;;;
 
-(deftest test-oob-pill-renders
+(deftest test-pill-oob-renders
   (testing "Returns a span hiccup element"
-    (let [result (ui/oob-pill "my-id" "Planets" 300 "cr")]
+    (let [result (ui/pill-oob "my-id" "Planets" 300 "cr")]
       (is (vector? result))
       (is (= :span.text-xs.inline-block.rounded-sm.text-green-400 (first result))))))
 
-(deftest test-oob-pill-id-and-oob
+(deftest test-pill-oob-id-and-oob
   (testing "Sets :id and :hx-swap-oob attributes"
-    (let [result (ui/oob-pill "credits-pill" "Taxes" 500 "cr")
+    (let [result (ui/pill-oob "credits-pill" "Taxes" 500 "cr")
           attrs  (second result)]
       (is (= "credits-pill" (:id attrs)))
       (is (= "true" (:hx-swap-oob attrs))))))
 
-(deftest test-oob-pill-positive-sign
+(deftest test-pill-oob-positive-sign
   (testing "Positive value gets a + prefix"
-    (let [result (ui/oob-pill "id" "Label" 100 "cr")]
+    (let [result (ui/pill-oob "id" "Label" 100 "cr")]
       (is (some #(= "+" %) (rest result))))))
 
-(deftest test-oob-pill-negative-sign
+(deftest test-pill-oob-negative-sign
   (testing "Negative value gets a - prefix"
-    (let [result (ui/oob-pill "id" "Label" -50 "fuel")]
+    (let [result (ui/pill-oob "id" "Label" -50 "fuel")]
       (is (some #(= "-" %) (rest result))))))
 
 ;;;;

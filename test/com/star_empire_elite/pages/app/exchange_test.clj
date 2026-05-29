@@ -13,7 +13,7 @@
 (def test-player-id #uuid "00000000-0000-0000-0000-000000000042")
 (def test-game-id   #uuid "00000000-1111-2222-3333-444444444444")
 
-;; Game entity with exchange rates stored as game-level configuration.
+;; Game entity with exchange costs stored as game-level configuration.
 (def test-game
   {:xt/id              test-game-id
    :game/soldier-sell     250
@@ -94,24 +94,24 @@
    :fuel-bought      0 :fuel-sold         0})
 
 ;;;;
-;;;; get-exchange-rates Tests
+;;;; get-exchange-costs Tests
 ;;;;
-;;;; get-exchange-rate- is a pure function that extracts rates from the game entity.
+;;;; get-exchange-costs is a pure function that extracts costs from the game entity.
 ;;;;
 
-(deftest test-get-exchange-rates
-  (testing "Extracts all exchange rate fields from the game entity"
-    (let [rates (exchange/get-exchange-rates test-game)]
-      (is (= 250   (:soldier-sell     rates)))
-      (is (= 375   (:fighter-sell     rates)))
-      (is (= 500   (:station-sell     rates)))
-      (is (= 1000  (:mil-planet-sell  rates)))
-      (is (= 5500  (:erg-planet-sell rates)))
-      (is (= 11000 (:ore-planet-sell  rates)))
-      (is (= 6     (:food-buy         rates)))
-      (is (= 2     (:food-sell        rates)))
-      (is (= 6     (:fuel-buy         rates)))
-      (is (= 3     (:fuel-sell        rates))))))
+(deftest test-get-exchange-costs
+  (testing "Extracts all exchange cost fields from the game entity"
+    (let [costs (exchange/get-exchange-costs test-game)]
+      (is (= 250   (:soldier-sell     costs)))
+      (is (= 375   (:fighter-sell     costs)))
+      (is (= 500   (:station-sell     costs)))
+      (is (= 1000  (:mil-planet-sell  costs)))
+      (is (= 5500  (:erg-planet-sell costs)))
+      (is (= 11000 (:ore-planet-sell  costs)))
+      (is (= 6     (:food-buy         costs)))
+      (is (= 2     (:food-sell        costs)))
+      (is (= 6     (:fuel-buy         costs)))
+      (is (= 3     (:fuel-sell        costs))))))
 
 ;;;;
 ;;;; parse-exchange-quantities Tests
@@ -127,7 +127,7 @@
                   :stations-sold "3"  :cmd-ships-sold  "0" :agents-sold   "2"
                   :mil-planets-sold "1" :erg-planets-sold "1" :ore-planets-sold "1"
                   :food-bought "50" :food-sold "20" :fuel-bought "30" :fuel-sold "10"}
-          q (exchange/parse-exchange-quantities params)]
+          q (#'exchange/parse-exchange-quantities params)]
       (is (= 10 (:soldiers-sold q)))
       (is (= 2  (:transports-sold q)))
       (is (= 2  (:agents-sold q)))
@@ -135,7 +135,7 @@
       (is (= 10 (:fuel-sold q)))))
 
   (testing "Missing params default to 0"
-    (let [q (exchange/parse-exchange-quantities {})]
+    (let [q (#'exchange/parse-exchange-quantities {})]
       (is (= 0 (:soldiers-sold q)))
       (is (= 0 (:agents-sold q)))
       (is (= 0 (:fuel-bought q))))))
@@ -151,8 +151,8 @@
   (testing "Credits from selling military units accumulate correctly"
     (let [quantities (merge zero-quantities {:soldiers-sold 10 :fighters-sold 5 :stations-sold 2
                                              :mil-planets-sold 1 :erg-planets-sold 1 :ore-planets-sold 1})
-          rates (exchange/get-exchange-rates test-game)
-          result (exchange/calculate-exchange-credits quantities rates)
+          costs (exchange/get-exchange-costs test-game)
+          result (exchange/calculate-exchange-credits quantities costs)
           expected (+ (* 10 (:game/soldier-sell test-game)) (* 5 (:game/fighter-sell test-game))
                       (* 2 (:game/station-sell test-game))
                       (* 1 (:game/mil-planet-sell test-game)) (* 1 (:game/erg-planet-sell test-game)) (* 1 (:game/ore-planet-sell test-game)))]
@@ -164,8 +164,8 @@
   (testing "Credits from buying and selling food and fuel net correctly"
     ;; Selling earns credits; buying costs credits. The net is credits-from-resources.
     (let [quantities (merge zero-quantities {:food-bought 20 :food-sold 10 :fuel-bought 15 :fuel-sold 5})
-          rates (exchange/get-exchange-rates test-game)
-          result (exchange/calculate-exchange-credits quantities rates)
+          costs (exchange/get-exchange-costs test-game)
+          result (exchange/calculate-exchange-credits quantities costs)
           expected-net (- (+ (* 10 (:game/food-sell test-game)) (* 5 (:game/fuel-sell test-game)))
                           (+ (* 20 (:game/food-buy test-game))  (* 15 (:game/fuel-buy test-game))))]
       (is (= 0 (:credits-from-sales result)))
@@ -175,16 +175,16 @@
 (deftest test-calculate-exchange-credits-agents
   (testing "Agent sales are counted in credits-from-sales"
     (let [quantities (merge zero-quantities {:agents-sold 3})
-          rates (exchange/get-exchange-rates test-game)
-          result (exchange/calculate-exchange-credits quantities rates)]
+          costs (exchange/get-exchange-costs test-game)
+          result (exchange/calculate-exchange-credits quantities costs)]
       (is (= (* 3 (:game/agent-sell test-game)) (:credits-from-sales result))))))
 
 (deftest test-calculate-exchange-credits-mixed
   (testing "Unit sales and resource trades are summed correctly into total-credits"
     (let [quantities (merge zero-quantities {:soldiers-sold 5 :fighters-sold 2 :stations-sold 1
                                              :food-sold 20 :fuel-sold 10 :food-bought 10 :fuel-bought 5})
-          rates (exchange/get-exchange-rates test-game)
-          result (exchange/calculate-exchange-credits quantities rates)
+          costs (exchange/get-exchange-costs test-game)
+          result (exchange/calculate-exchange-credits quantities costs)
           expected-sales     (+ (* 5 (:game/soldier-sell test-game)) (* 2 (:game/fighter-sell test-game)) (* 1 (:game/station-sell test-game)))
           expected-resources (- (+ (* 20 (:game/food-sell test-game)) (* 10 (:game/fuel-sell test-game)))
                                 (+ (* 10 (:game/food-buy test-game))  (* 5  (:game/fuel-buy test-game))))]
@@ -194,7 +194,7 @@
 
 (deftest test-calculate-exchange-credits-zero-quantities
   (testing "All-zero quantities produce zero credits"
-    (let [result (exchange/calculate-exchange-credits zero-quantities (exchange/get-exchange-rates test-game))]
+    (let [result (exchange/calculate-exchange-credits zero-quantities (exchange/get-exchange-costs test-game))]
       (is (= 0 (:credits-from-sales result)))
       (is (= 0 (:credits-from-resources result)))
       (is (= 0 (:total-credits result))))))
@@ -285,35 +285,35 @@
 
 (deftest test-calculate-max-buy-quantities
   (testing "Max affordable quantities reflect current credits after sells"
-    (let [rates (exchange/get-exchange-rates test-game)
+    (let [costs (exchange/get-exchange-costs test-game)
           ;; No sells — max is based on existing credits only.
           sell-none (assoc zero-quantities :food-bought 0 :fuel-bought 0)
-          {:keys [max-food max-fuel]} (exchange/calculate-max-buy-quantities test-player sell-none rates)]
+          {:keys [max-food max-fuel]} (exchange/calculate-max-buy-quantities test-player sell-none costs)]
       ;; Each max should equal floor(credits / rate)
-      (is (= (quot (:player/credits test-player) (:food-buy rates)) max-food))
-      (is (= (quot (:player/credits test-player) (:fuel-buy rates)) max-fuel))))
+      (is (= (quot (:player/credits test-player) (:food-buy costs)) max-food))
+      (is (= (quot (:player/credits test-player) (:fuel-buy costs)) max-fuel))))
 
   (testing "Sells that earn credits increase the max purchaseable quantities"
-    (let [rates (exchange/get-exchange-rates test-game)
+    (let [costs (exchange/get-exchange-costs test-game)
           ;; Sell 10 soldiers to earn extra credits.
           sell-some  (assoc zero-quantities :soldiers-sold 10 :food-bought 0 :fuel-bought 0)
-          base-max   (exchange/calculate-max-buy-quantities test-player (assoc zero-quantities :food-bought 0 :fuel-bought 0) rates)
-          sell-max   (exchange/calculate-max-buy-quantities test-player sell-some rates)]
+          base-max   (exchange/calculate-max-buy-quantities test-player (assoc zero-quantities :food-bought 0 :fuel-bought 0) costs)
+          sell-max   (exchange/calculate-max-buy-quantities test-player sell-some costs)]
       ;; With extra credits from sells, max quantities must be ≥ base.
       (is (>= (:max-food sell-max) (:max-food base-max)))
       (is (>= (:max-fuel sell-max) (:max-fuel base-max)))))
 
   (testing "Max quantities are clamped to zero when player has no credits"
     (let [broke-player (assoc test-player :player/credits 0)
-          rates (exchange/get-exchange-rates test-game)
+          costs (exchange/get-exchange-costs test-game)
           {:keys [max-food max-fuel]} (exchange/calculate-max-buy-quantities broke-player
                                                                              (assoc zero-quantities :food-bought 0 :fuel-bought 0)
-                                                                             rates)]
+                                                                             costs)]
       (is (= 0 max-food))
       (is (= 0 max-fuel)))))
 
 ;;;;
-;;;; calculate-required-expense-reduction Tests
+;;;; calculate-expense-reduction Tests
 ;;;;
 ;;;; Tests use a game with concrete upkeep values so that reductions are verifiable.
 ;;;;
@@ -332,58 +332,58 @@
           :game/planet-upkeep-credits  2500
           :game/planet-upkeep-food     100}))
 
-(deftest test-calculate-required-expense-reduction-soldiers
+(deftest test-calculate-expense-reduction-soldiers
   (testing "Selling soldiers reduces credits and food requirements"
     (let [q (merge zero-quantities {:soldiers-sold 10})
-          r (exchange/calculate-required-expense-reduction q upkeep-game)]
+          r (exchange/calculate-expense-reduction q upkeep-game)]
       (is (= (* 10 25) (:credits r)))   ; 250 credits
       (is (= (* 10 10) (:food r)))      ; 100 food
       (is (= 0         (:fuel r))))))
 
-(deftest test-calculate-required-expense-reduction-fighters
+(deftest test-calculate-expense-reduction-fighters
   (testing "Selling fighters reduces credits and fuel requirements"
     (let [q (merge zero-quantities {:fighters-sold 5})
-          r (exchange/calculate-required-expense-reduction q upkeep-game)]
+          r (exchange/calculate-expense-reduction q upkeep-game)]
       (is (= (* 5 100) (:credits r)))   ; 500 credits
       (is (= 0         (:food r)))
       (is (= (* 5 10)  (:fuel r))))))   ; 50 fuel
 
-(deftest test-calculate-required-expense-reduction-stations
+(deftest test-calculate-expense-reduction-stations
   (testing "Selling stations reduces credits and fuel requirements"
     (let [q (merge zero-quantities {:stations-sold 3})
-          r (exchange/calculate-required-expense-reduction q upkeep-game)]
+          r (exchange/calculate-expense-reduction q upkeep-game)]
       (is (= (* 3 100) (:credits r)))   ; 300 credits
       (is (= 0         (:food r)))
       (is (= (* 3 10)  (:fuel r))))))   ; 30 fuel
 
-(deftest test-calculate-required-expense-reduction-agents
+(deftest test-calculate-expense-reduction-agents
   (testing "Selling agents reduces food and fuel requirements (no credits)"
     (let [q (merge zero-quantities {:agents-sold 4})
-          r (exchange/calculate-required-expense-reduction q upkeep-game)]
+          r (exchange/calculate-expense-reduction q upkeep-game)]
       (is (= 0         (:credits r)))
       (is (= (* 4 10)  (:food r)))      ; 40 food
       (is (= (* 4 10)  (:fuel r))))))   ; 40 fuel
 
-(deftest test-calculate-required-expense-reduction-planets
+(deftest test-calculate-expense-reduction-planets
   (testing "Selling mil, erg, and ore planets all reduce credits and food"
     (let [q (merge zero-quantities {:mil-planets-sold 1 :erg-planets-sold 1 :ore-planets-sold 1})
-          r (exchange/calculate-required-expense-reduction q upkeep-game)]
+          r (exchange/calculate-expense-reduction q upkeep-game)]
       (is (= (* 3 2500) (:credits r)))  ; 7500 credits
       (is (= (* 3 100)  (:food r)))     ; 300 food
       (is (= 0          (:fuel r)))))
   (testing "Only sold planet types contribute"
     (let [q (merge zero-quantities {:ore-planets-sold 2})
-          r (exchange/calculate-required-expense-reduction q upkeep-game)]
+          r (exchange/calculate-expense-reduction q upkeep-game)]
       (is (= (* 2 2500) (:credits r)))
       (is (= (* 2 100)  (:food r))))))
 
-(deftest test-calculate-required-expense-reduction-combined
+(deftest test-calculate-expense-reduction-combined
   (testing "All reductions accumulate correctly across unit and planet types"
     ;; Sell 10 soldiers, 5 fighters, 3 stations, 4 agents, 1 mil + 1 erg + 1 ore planet
     (let [q (merge zero-quantities {:soldiers-sold 10 :fighters-sold 5 :stations-sold 3
                                     :agents-sold 4
                                     :mil-planets-sold 1 :erg-planets-sold 1 :ore-planets-sold 1})
-          r (exchange/calculate-required-expense-reduction q upkeep-game)
+          r (exchange/calculate-expense-reduction q upkeep-game)
           expected-credits (+ (* 10 25) (* 5 100) (* 3 100) (* 3 2500))
           expected-food    (+ (* 10 10) (* 4 10)  (* 3 100))
           expected-fuel    (+ (* 5 10)  (* 3 10)  (* 4 10))]
@@ -391,19 +391,19 @@
       (is (= expected-food    (:food    r)))
       (is (= expected-fuel    (:fuel    r))))))
 
-(deftest test-calculate-required-expense-reduction-no-upkeep-units
+(deftest test-calculate-expense-reduction-no-upkeep-units
   (testing "Transports, generals, carriers, admirals, and cmd-ships produce zero reduction"
     (let [q (merge zero-quantities {:transports-sold 5 :generals-sold 2
                                     :carriers-sold 1   :admirals-sold 1
                                     :cmd-ships-sold 1})
-          r (exchange/calculate-required-expense-reduction q upkeep-game)]
+          r (exchange/calculate-expense-reduction q upkeep-game)]
       (is (= 0 (:credits r)))
       (is (= 0 (:food    r)))
       (is (= 0 (:fuel    r))))))
 
-(deftest test-calculate-required-expense-reduction-zero-quantities
+(deftest test-calculate-expense-reduction-zero-quantities
   (testing "All-zero quantities produce zero reduction in all resources"
-    (let [r (exchange/calculate-required-expense-reduction zero-quantities upkeep-game)]
+    (let [r (exchange/calculate-expense-reduction zero-quantities upkeep-game)]
       (is (= 0 (:credits r)))
       (is (= 0 (:food    r)))
       (is (= 0 (:fuel    r))))))
@@ -444,9 +444,9 @@
                                                :params params :biff/db nil})
               tx     (first @tx-atom)
               ;; Derive expected values from the same pure functions the handler uses.
-              quantities (exchange/parse-exchange-quantities params)
-              rates      (exchange/get-exchange-rates test-game)
-              credits    (exchange/calculate-exchange-credits quantities rates)
+              quantities (#'exchange/parse-exchange-quantities params)
+              costs      (exchange/get-exchange-costs test-game)
+              credits    (exchange/calculate-exchange-credits quantities costs)
               expected   (exchange/calculate-resources-after-exchange test-player quantities credits)]
           ;; Redirect
           (is (= 303 (:status result)))
@@ -505,16 +505,16 @@
     (is (vector? (exchange/exchange-page {:player test-player :game test-game})))))
 
 (deftest test-exchange-row-renders
-  (let [rates (exchange/get-exchange-rates test-game)]
+  (let [costs (exchange/get-exchange-costs test-game)]
     (testing "Renders hiccup for a typical sell row"
       (is (vector? (exchange/exchange-row "Soldiers" "Soldiers" "soldiers-sold"
-                                          (:soldier-sell rates) 0 100 test-player-id "form"))))
+                                          (:soldier-sell costs) 0 100 test-player-id "form"))))
     (testing "Renders without error when max-quantity is negative (shown as 0)"
       (is (vector? (exchange/exchange-row "Soldiers" "Soldiers" "soldiers-sold"
-                                          (:soldier-sell rates) 0 -5 test-player-id "form"))))
+                                          (:soldier-sell costs) 0 -5 test-player-id "form"))))
     (testing "Renders hiccup for a typical buy row"
       (is (vector? (exchange/exchange-row "Food" "Food" "food-bought"
-                                          (:food-buy rates) 0 500 test-player-id "form"))))
+                                          (:food-buy costs) 0 500 test-player-id "form"))))
     (testing "Renders without error when max-quantity is zero"
       (is (vector? (exchange/exchange-row "Food" "Food" "food-bought"
-                                          (:food-buy rates) 0 0 test-player-id "form"))))))
+                                          (:food-buy costs) 0 0 test-player-id "form"))))))
