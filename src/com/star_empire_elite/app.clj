@@ -465,7 +465,7 @@
     ["/game/:player-id/calculate-exchange" {:post exchange/calculate-exchange-oob}]
     ["/game/:player-id/building"           {:get  building-handler}]
     ["/game/:player-id/apply-building"     {:post building/apply-building}]
-    ["/game/:player-id/calculate-building" {:post building/calculate-building}]
+    ["/game/:player-id/calculate-building" {:post building/calculate-building-oob}]
     ["/game/:player-id/action"             {:get  action-handler}]
     ["/game/:player-id/action-warning"     {:post action/update-action-warning}]
     ["/game/:player-id/apply-action"       {:post action/apply-action}]

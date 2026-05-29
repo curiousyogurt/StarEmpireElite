@@ -152,7 +152,7 @@
       (is (= 5    (:erg-planets r)))   ; 4 + 1
       (is (= 7    (:ore-planets r))))) ; 6 + 1
 
-  (testing "Allows negative credits (overspending is caught by can-afford-purchases?, not here)"
+  (testing "Allows negative credits (overspending is caught by valid-purchase?, not here)"
     (let [player    {:player/credits 100 :player/agents 0
                      :player/soldiers 0 :player/transports 0 :player/generals 0
                      :player/carriers 0 :player/fighters  0 :player/admirals 0
@@ -165,16 +165,16 @@
       (is (= 100  (:soldiers r)))))) ; 0 + 100
 
 ;;;;
-;;;; can-afford-purchases? Tests
+;;;; valid-purchase? Tests
 ;;;;
 
-(deftest test-can-afford-purchases
+(deftest test-valid-purchase
   (testing "Returns true when credits are zero or positive"
-    (is (true?  (building/can-afford-purchases? {:credits 1000})))
-    (is (true?  (building/can-afford-purchases? {:credits 0}))))
+    (is (true?  (building/valid-purchase? {:credits 1000})))
+    (is (true?  (building/valid-purchase? {:credits 0}))))
   (testing "Returns false when credits are negative"
-    (is (false? (building/can-afford-purchases? {:credits -1})))
-    (is (false? (building/can-afford-purchases? {:credits -1000})))))
+    (is (false? (building/valid-purchase? {:credits -1})))
+    (is (false? (building/valid-purchase? {:credits -1000})))))
 
 ;;;;
 ;;;; calculate-max-quantities Tests
@@ -235,7 +235,7 @@
                                                :params params :biff/db nil})
               tx     (first @tx-atom)
               ;; Derive expected values from the same pure functions the handler uses.
-              quantities (building/parse-purchase-quantities params)
+              quantities (#'building/parse-purchase-quantities params)
               cost-info  (building/calculate-purchase-cost quantities test-game)
               expected   (building/calculate-resources-after-purchases test-player quantities cost-info)]
           ;; Redirect
@@ -286,47 +286,47 @@
           (is (= 4 (:player/current-phase tx))))))))
 
 ;;;;
-;;;; calculate-building Tests
+;;;; calculate-building-oob Tests
 ;;;;
-;;;; calculate-building is the HTMX endpoint that provides OOB updates as the
+;;;; calculate-building-oob is the HTMX endpoint that provides OOB updates as the
 ;;;; user changes purchase quantities. Tests focus on phase validation and that
 ;;;; the handler produces renderable output under normal and edge conditions.
 ;;;;
 
-(deftest test-calculate-building-any-phase-renders
-  ;; calculate-building is a read-only HTMX endpoint; phase validation is only
+(deftest test-calculate-building-oob-any-phase-renders
+  ;; calculate-building-oob is a read-only HTMX endpoint; phase validation is only
   ;; enforced on the state-mutating apply-building handler.
   (testing "Renders regardless of current phase"
     (let [player (assoc test-player :player/current-phase 2)]
       (with-redefs [xt/entity (helpers/fake-entity [player test-game])]
-        (let [result (building/calculate-building {:path-params {:player-id (str test-player-id)}
+        (let [result (building/calculate-building-oob {:path-params {:player-id (str test-player-id)}
                                                    :params {} :biff/db nil})]
           (is (some? result)))))))
 
-(deftest test-calculate-building-player-not-found
+(deftest test-calculate-building-oob-player-not-found
   (testing "Returns 404 when player is not in the database"
     (with-redefs [xt/entity (fn [_ _] nil)]
-      (let [result (building/calculate-building {:path-params {:player-id (str test-player-id)}
+      (let [result (building/calculate-building-oob {:path-params {:player-id (str test-player-id)}
                                                  :params {} :biff/db nil})]
         (is (= 404 (:status result)))))))
 
-(deftest test-calculate-building-renders
+(deftest test-calculate-building-oob-renders
   (testing "Returns renderable hiccup for a valid phase-3 player with no purchases"
     (with-redefs [xt/entity (helpers/fake-entity [test-player test-game])]
-      (let [result (building/calculate-building {:path-params {:player-id (str test-player-id)}
+      (let [result (building/calculate-building-oob {:path-params {:player-id (str test-player-id)}
                                                  :params {} :biff/db nil})]
         (is (some? result)))))
 
   (testing "Returns renderable hiccup with purchases that do not exceed credits"
     (with-redefs [xt/entity (helpers/fake-entity [test-player test-game])]
-      (let [result (building/calculate-building {:path-params {:player-id (str test-player-id)}
+      (let [result (building/calculate-building-oob {:path-params {:player-id (str test-player-id)}
                                                  :params {:soldiers "5" :fighters "2"} :biff/db nil})]
         (is (some? result)))))
 
   (testing "Returns renderable hiccup when player cannot afford purchases"
     (let [poor-player (assoc test-player :player/credits 5)]
       (with-redefs [xt/entity (helpers/fake-entity [poor-player test-game])]
-        (let [result (building/calculate-building {:path-params {:player-id (str test-player-id)}
+        (let [result (building/calculate-building-oob {:path-params {:player-id (str test-player-id)}
                                                    :params {:soldiers "1000"} :biff/db nil})]
           (is (some? result)))))))
 
