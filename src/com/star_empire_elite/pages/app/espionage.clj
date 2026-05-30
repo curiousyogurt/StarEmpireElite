@@ -11,6 +11,26 @@
 ;;;;;   Both ops share the same failure mechanic: some agents are captured by the defender.
 ;;;;;
 
+;;;;; Logical Structure:
+;;;;;
+;;;;; 1)  espionage-page ← utils/get-other-players
+;;;;;     └─ ui/phase-shell
+;;;;;        ├─ biff/form
+;;;;;        │  ├─ ui/phase-body
+;;;;;        │  │  ├─ ui/snapshot-section
+;;;;;        │  │  ├─ ui/section-label "Choose a Target"
+;;;;;        │  │  └─ target-row  (per other player)
+;;;;;        │  │     └─ op-radio  (×4: Spy, Incite, Bomb, Defect)
+;;;;;        │  └─ ui/phase-warning
+;;;;;        └─ ui/phase-action-bar
+;;;;;           ├─ ui/action-bar-link "Pause"
+;;;;;           ├─ ui/action-bar-button "Cancel Operation"
+;;;;;           └─ ui/submit-button "Continue to Outcomes"
+;;;;;
+;;;;; 2)  update-espionage-warning  (HTMX OOB handler — toggles operation-queued warning)
+;;;;;
+;;;;; 3)  apply-espionage ← parse espionage-action param
+
 (ns com.star-empire-elite.pages.app.espionage
   (:require [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]
@@ -18,7 +38,17 @@
 
 ;;;;
 ;;;; UI Components
+;;;; - Op Radio
+;;;; - Target Row
 ;;;;
+
+;;;
+;;; Op Radio renders a single radio-button input for one operation on one target.
+;;; The radio group name "espionage-action" ensures only one selection across
+;;; the whole table. Toggle-on-reclick behaviour is handled via onclick JS.
+;;;
+;;; - op-radio: one radio input + styled label
+;;;
 
 (def ^:private op-js
   (str "var p=this.dataset.was==='true';"
@@ -45,7 +75,15 @@
     {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
     label]])
 
-(defn target-row
+;;;
+;;; Target rows populate the targets table, one row per other player in the game.
+;;; Each row shows empire name, planet count, score, and four radio-button operation
+;;; modes (Spy, Incite, Bomb, Defect).
+;;;
+;;; - target-row: one table row with four radio-button operation modes
+;;;
+
+(defn- target-row
   "Render a single row in the targets table with Spy, Incite, Bomb, and Defect radio buttons.
 
   [player player-map, attacker-id-str string] -> hiccup"

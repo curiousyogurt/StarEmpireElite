@@ -8,6 +8,28 @@
 ;;;;; without choosing a target.
 ;;;;;
 
+;;;;; Logical Structure:
+;;;;;
+;;;;; 1)  action-page ← combat/effective-forces, utils/get-other-players
+;;;;;     └─ ui/phase-shell
+;;;;;        ├─ biff/form
+;;;;;        │  ├─ ui/phase-body
+;;;;;        │  │  ├─ ui/snapshot-section
+;;;;;        │  │  ├─ forces-grid
+;;;;;        │  │  │  └─ forces-card  (×2: Ground, Fleet)
+;;;;;        │  │  │     └─ forces-row  (per force stat)
+;;;;;        │  │  ├─ ui/section-label "Choose a Target"
+;;;;;        │  │  └─ target-row  (per other player)
+;;;;;        │  └─ ui/phase-warning
+;;;;;        └─ ui/phase-action-bar
+;;;;;           ├─ ui/action-bar-link "Pause"
+;;;;;           ├─ ui/action-bar-button "Cancel Attack"
+;;;;;           └─ ui/submit-button "Continue to Espionage"
+;;;;;
+;;;;; 2)  update-action-warning  (HTMX OOB handler — toggles attack-queued warning)
+;;;;;
+;;;;; 3)  apply-action ← parse target-action param
+
 (ns com.star-empire-elite.pages.app.action
   (:require [clojure.string :as str]
             [com.biffweb :as biff]
@@ -18,9 +40,89 @@
 
 ;;;;
 ;;;; UI Components
+;;;; - Forces Grid
+;;;; - Target Row
 ;;;;
 
-(defn target-row
+;;;
+;;; The Forces Grid shows deployable Ground and Fleet strength in two cards.
+;;; Each card lists total units and deployable count (with tooltip when capped).
+;;;
+;;; Forces Grid:
+;;; - forces-row:  one pill for a force stat (total, deployable, or limit)
+;;; - forces-card: one card with title and force rows
+;;; - forces-grid: two cards (Ground, Fleet) in a 2-column grid
+;;;
+
+(defn- forces-row
+  "Render one forces pill row.
+
+  [label str, value int-or-str, & [{:keys [warn? display title]}]] -> hiccup"
+  [label value & [{:keys [warn? display title]}]]
+  (let [pill (ui/info-pill (cond-> {:key label :label label}
+                             display (assoc :display display)
+                             (not display) (assoc :value value)
+                             warn? (assoc :warn? true)))]
+    (if title
+      (assoc-in pill [1 :title] title)
+      pill)))
+
+(defn- forces-card
+  "Render one forces card with title and pill rows.
+
+  [title str, & body hiccup] -> hiccup"
+  [title & body]
+  [:div
+   {:class "flex flex-col gap-1 py-1.5 px-2 border border-game-border rounded-game bg-game-card"}
+   [:div.flex.justify-between.items-baseline
+    [:span.text-base.font-bold.text-green-400 title]]
+   [:div {:class "flex flex-col gap-0.5"}
+    body]])
+
+(defn- forces-grid
+  "Render Ground and Fleet deployable-forces cards in a 2-column grid.
+
+  [player player-map] -> hiccup"
+  [player]
+  (let [ef             (combat/effective-forces player)
+        generals       (get player :player/generals   0)
+        transports     (get player :player/transports 0)
+        soldiers-total (get player :player/soldiers   0)
+        soldiers-avail (:soldiers ef)
+        admirals       (get player :player/admirals   0)
+        carriers       (get player :player/carriers   0)
+        fighters-total (get player :player/fighters   0)
+        fighters-avail (:fighters ef)]
+    [:div {:class "grid grid-cols-2 gap-1.5"}
+     (forces-card "Ground"
+                  (forces-row "Generals"   generals)
+                  (forces-row "Transports" transports)
+                  (forces-row "Soldiers"   soldiers-total)
+                  (if (= soldiers-avail soldiers-total)
+                    (forces-row "Deployable: " nil {:display "All"})
+                    (forces-row "ⓘ Deployable: " soldiers-avail
+                                {:warn? true
+                                 :title "Full deployment of solders requires 100:1 soldiers-to-transports, and 1000:1 soldiers-to-generals"})))
+     (forces-card "Fleet"
+                  (forces-row "Admirals"   admirals)
+                  (forces-row "Carriers"   carriers)
+                  (forces-row "Fighters"   fighters-total)
+                  (if (= fighters-avail fighters-total)
+                    (forces-row "Deployable: " nil {:display "All"})
+                    (forces-row "ⓘ Deployable: " fighters-avail
+                                {:warn? true
+                                 :title "Full deployment of fighters requires 100:1 fighters-to-carriers, and 1000:1 fighters-to-admirals"})))]))
+
+;;;
+;;; Target rows populate the targets table, one row per other player in the game.
+;;; Each row shows empire name, planet count, score, and three radio-button attack
+;;; modes (Invade, Raid, Strike).  Strike is disabled when the attacker has no
+;;; command ships.
+;;;
+;;; - target-row: one table row with three radio-button attack modes
+;;;
+
+(defn- target-row
   "Render a single row in the targets table with Invade, Raid, and Strike selectors.
   Each row produces three radio inputs sharing the same group name so only one
   selection across the whole table can be made.
@@ -52,7 +154,7 @@
                          [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
                           {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
                           label]])
-        can-strike?   (pos? attacker-cmd-ships)
+        can-strike?   (pos? attacker-cmd-ships) ; Command ships needed to strike
         strike-btn    (if can-strike?
                         (action-btn :strike "Strike")
                         [:label
@@ -117,49 +219,18 @@
   (let [player-id      (:xt/id player)
         attacker-id    (str player-id)
         other-players  (utils/get-other-players db (:player/game player) player-id)
-        th-cls         "text-green-400 text-[11px] tracking-[0.08em] uppercase"
-        ef             (combat/effective-forces player)
-        soldiers-avail (:soldiers ef)
-        fighters-avail (:fighters ef)
-        soldiers-total (get player :player/soldiers 0)
-        fighters-total (get player :player/fighters 0)
-        trans-cap      (* (get player :player/transports 0) const/soldiers-per-transport)
-        gen-cap        (* (get player :player/generals   0) const/soldiers-per-general)
-        carrier-cap    (* (get player :player/carriers   0) const/fighters-per-carrier)
-        admiral-cap    (* (get player :player/admirals   0) const/fighters-per-admiral)
-        army-limit     (when (< soldiers-avail soldiers-total)
-                         (cond
-                           (and (= soldiers-avail trans-cap)
-                                (= soldiers-avail gen-cap)) "Transports/Generals"
-                           (= soldiers-avail trans-cap)     "Transports"
-                           :else                            "Generals"))
-        fleet-limit    (when (< fighters-avail fighters-total)
-                         (cond
-                           (and (= fighters-avail carrier-cap)
-                                (= fighters-avail admiral-cap)) "Carriers/Admirals"
-                           (= fighters-avail carrier-cap)       "Carriers"
-                           :else                                "Admirals"))]
-    (ui/phase-shell player game "ACTION PHASE"
+        th-cls         "text-green-400 text-[11px] tracking-[0.08em] uppercase"]
+    (ui/phase-shell 
+      player 
+      game 
+      "Action Phase"
       (biff/form
        {:action (str "/app/game/" player-id "/apply-action")
         :method "post"
         :class  "m-0"}
        (ui/phase-body player
         (ui/snapshot-section player)
-        (ui/info-grid
-          {:label      "Forces"
-           :grid-class "grid grid-cols-2 gap-1.5"
-           :cards
-           [{:title "Ground"
-             :rows  (cond-> [{:label "Soldiers"   :value soldiers-total}
-                             {:label "Deployable" :value soldiers-avail
-                              :warn? (< soldiers-avail soldiers-total)}]
-                      army-limit (conj {:label "Limited by " :display army-limit}))}
-            {:title "Fleet"
-             :rows  (cond-> [{:label "Fighters"   :value fighters-total}
-                             {:label "Deployable" :value fighters-avail
-                              :warn? (< fighters-avail fighters-total)}]
-                      fleet-limit (conj {:label "Limited by " :display fleet-limit}))}]})
+        (forces-grid player)
         (if (empty? other-players)
           [:p.text-sm.text-game-green-soft
            "There are no other empires in the galaxy to attack."]

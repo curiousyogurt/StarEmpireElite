@@ -91,7 +91,7 @@
 
 (deftest test-target-row-renders
   (testing "Returns a hiccup table row vector"
-    (let [result (action/target-row test-target 1 "attacker-id")]
+    (let [result (#'action/target-row test-target 1 "attacker-id")]
       (is (vector? result))
       (is (clojure.string/starts-with? (name (first result)) "tr"))))
 
@@ -99,16 +99,16 @@
     ;; test-target has 2 mil + 1 food + 3 ore = 6 total planets.
     ;; row: [:tr.classes [:td empire-name] [:td total-planets] [:td score] [:td invade] [:td raid] [:td strike]]
     ;; index 0=:tr, 1=empire-td, 2=planets-td; planets-td is [:td {attrs} 6].
-    (let [result (action/target-row test-target 1 "attacker-id")
+    (let [result (#'action/target-row test-target 1 "attacker-id")
           planet-td (nth result 2)]
       (is (= 6 (last planet-td)))))
 
   (testing "Renders Invade, Raid, and Strike buttons"
-    (let [result (action/target-row test-target 1 "attacker-id")]
+    (let [result (#'action/target-row test-target 1 "attacker-id")]
       (is (= 7 (count result)))))  ; :tr + 6 tds (no separate attrs map)
 
   (testing "Radio values contain composite player-id:mode format"
-    (let [result   (action/target-row test-target 1 "attacker-id")
+    (let [result   (#'action/target-row test-target 1 "attacker-id")
           hiccup   (tree-seq coll? seq result)
           values   (filter #(and (map? %) (:value %)) hiccup)
           val-strs (map :value values)]
@@ -117,14 +117,14 @@
       (is (some #(= % (str test-target-id ":strike")) val-strs))))
 
   (testing "Strike button is enabled when attacker has cmd-ships"
-    (let [result (action/target-row test-target 5 "attacker-id")
+    (let [result (#'action/target-row test-target 5 "attacker-id")
           hiccup (tree-seq coll? seq result)
           inputs (filter #(and (map? %) (= "radio" (:type %))) hiccup)]
       ;; All radio inputs should be enabled (none disabled)
       (is (every? #(not (:disabled %)) inputs))))
 
   (testing "Strike button is disabled when attacker has 0 cmd-ships"
-    (let [result (action/target-row test-target 0 "attacker-id")
+    (let [result (#'action/target-row test-target 0 "attacker-id")
           hiccup (tree-seq coll? seq result)
           inputs (filter #(and (map? %) (= "radio" (:type %))) hiccup)]
       ;; The disabled Strike input should be present
@@ -241,107 +241,3 @@
           (is (nil? (:player/pending-attack      tx)))
           (is (nil? (:player/pending-attack-mode tx))))))))
 
-;;;;
-;;;; Action Page Readiness Pills Tests
-;;;;
-;;;; Ground and Fleet pills show a "Limit" row when transports/carriers or
-;;;; generals/admirals cap the deployable force count. Tests render the full
-;;;; action-page hiccup and search for the expected limit label string.
-;;;;
-;;;; Constants used by effective-forces:
-;;;;   soldiers-per-transport = 100   fighters-per-carrier = 100
-;;;;   soldiers-per-general   = 1000  fighters-per-admiral = 1000
-;;;;
-
-(def ^:private test-game {:game/turns-per-round 6 :game/rounds-per-day 2})
-
-(defn- hiccup-contains-str?
-  "Returns true if s appears anywhere as an exact string value in the hiccup tree."
-  [tree s]
-  (some #(= s %) (tree-seq coll? seq tree)))
-
-;; --- Ground pill fixture players ---
-
-;; soldiers(200) > trans-cap(1*100=100); gen-cap(10*1000=10000) not limiting
-(def ^:private transport-limited-player
-  (assoc test-player :player/soldiers 200 :player/transports 1 :player/generals 10))
-
-;; soldiers(2000) > gen-cap(1*1000=1000); trans-cap(100*100=10000) not limiting
-(def ^:private general-limited-player
-  (assoc test-player :player/soldiers 2000 :player/transports 100 :player/generals 1))
-
-;; soldiers(5000) > trans-cap(10*100=1000) == gen-cap(1*1000=1000) — both limiting
-(def ^:private both-ground-limited-player
-  (assoc test-player :player/soldiers 5000 :player/transports 10 :player/generals 1))
-
-;; --- Fleet pill fixture players ---
-
-;; fighters(200) > carrier-cap(1*100=100); admiral-cap(10*1000=10000) not limiting
-(def ^:private carrier-limited-player
-  (assoc test-player :player/fighters 200 :player/carriers 1 :player/admirals 10))
-
-;; fighters(2000) > admiral-cap(1*1000=1000); carrier-cap(100*100=10000) not limiting
-(def ^:private admiral-limited-player
-  (assoc test-player :player/fighters 2000 :player/carriers 100 :player/admirals 1))
-
-;; fighters(5000) > carrier-cap(10*100=1000) == admiral-cap(1*1000=1000) — both limiting
-(def ^:private both-fleet-limited-player
-  (assoc test-player :player/fighters 5000 :player/carriers 10 :player/admirals 1))
-
-(deftest test-action-page-ground-transport-limit
-  (testing "Shows 'Transports' when transports cap deployable soldiers"
-    (with-redefs [biff/q (fn [_ _ & _] [])]
-      (is (hiccup-contains-str?
-           (action/action-page {:player transport-limited-player :game test-game :db nil})
-           "Transports")))))
-
-(deftest test-action-page-ground-general-limit
-  (testing "Shows 'Generals' when generals cap deployable soldiers"
-    (with-redefs [biff/q (fn [_ _ & _] [])]
-      (is (hiccup-contains-str?
-           (action/action-page {:player general-limited-player :game test-game :db nil})
-           "Generals")))))
-
-(deftest test-action-page-ground-both-limit
-  (testing "Shows 'Transports/Generals' when both transports and generals cap deployable soldiers"
-    (with-redefs [biff/q (fn [_ _ & _] [])]
-      (is (hiccup-contains-str?
-           (action/action-page {:player both-ground-limited-player :game test-game :db nil})
-           "Transports/Generals")))))
-
-(deftest test-action-page-ground-no-limit
-  (testing "Shows no limit row when soldiers are not capped"
-    ;; test-player: soldiers=100, trans-cap=5*100=500, gen-cap=2*1000=2000 → uncapped
-    (with-redefs [biff/q (fn [_ _ & _] [])]
-      (let [result (action/action-page {:player test-player :game test-game :db nil})]
-        (is (not (hiccup-contains-str? result "Trans")))
-        (is (not (hiccup-contains-str? result "Gen")))))))
-
-(deftest test-action-page-fleet-carrier-limit
-  (testing "Shows 'Carriers' when carriers cap deployable fighters"
-    (with-redefs [biff/q (fn [_ _ & _] [])]
-      (is (hiccup-contains-str?
-           (action/action-page {:player carrier-limited-player :game test-game :db nil})
-           "Carriers")))))
-
-(deftest test-action-page-fleet-admiral-limit
-  (testing "Shows 'Admirals' when admirals cap deployable fighters"
-    (with-redefs [biff/q (fn [_ _ & _] [])]
-      (is (hiccup-contains-str?
-           (action/action-page {:player admiral-limited-player :game test-game :db nil})
-           "Admirals")))))
-
-(deftest test-action-page-fleet-both-limit
-  (testing "Shows 'Carriers/Admirals' when both carriers and admirals cap deployable fighters"
-    (with-redefs [biff/q (fn [_ _ & _] [])]
-      (is (hiccup-contains-str?
-           (action/action-page {:player both-fleet-limited-player :game test-game :db nil})
-           "Carriers/Admirals")))))
-
-(deftest test-action-page-fleet-no-limit
-  (testing "Shows no fleet limit row when fighters are not capped"
-    ;; test-player: fighters=50, carrier-cap=3*100=300, admiral-cap=1*1000=1000 → uncapped
-    (with-redefs [biff/q (fn [_ _ & _] [])]
-      (let [result (action/action-page {:player test-player :game test-game :db nil})]
-        (is (not (hiccup-contains-str? result "Carr")))
-        (is (not (hiccup-contains-str? result "Adm")))))))
