@@ -29,8 +29,8 @@
    :defender-name     "Crimson Hand"
    :attacker-wins?    true
    :margin            0.35
-   :attacker-losses   {:soldiers-lost 10 :fighters-lost 5}
-   :defender-losses   {:soldiers-lost 50 :fighters-lost 20}
+   :attacker-losses   {:soldiers 10 :fighters 5}
+   :defender-losses   {:soldiers 50 :fighters 20}
    :planets-transferred {:mil 1 :erg 0 :ore 2}
    :resources-captured  {:credits 5000 :food 1000 :fuel 0}})
 
@@ -47,7 +47,7 @@
    :cmd-ships-dispatched 3
    :cmd-ships-lost      1
    :damage-rate         0.05
-   :units-destroyed     {:soldiers 100 :transports 2 :fighters 10
+   :defender-losses     {:soldiers 100 :transports 2 :fighters 10
                          :carriers 0 :admirals 0 :generals 0 :stations 1}})
 
 (deftest test-event-of-battle-result-raid
@@ -104,10 +104,10 @@
    :defender-id          (str defender-id)
    :defender-name        "Crimson Hand"
    :attacker-wins?       true
-   :soldiers-destroyed   200
-   :transports-destroyed 5
-   :fighters-destroyed   30
-   :carriers-destroyed   1
+   :soldiers             200
+   :transports           5
+   :fighters             30
+   :carriers             1
    :agents-captured      nil})
 
 (def defect-result

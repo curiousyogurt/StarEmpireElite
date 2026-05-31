@@ -83,14 +83,14 @@
 
   [forces force-map, rate float] -> losses-map"
   [forces rate]
-  {:soldiers-lost   (max 0 (long (* (:soldiers   forces) rate)))
-   :transports-lost (max 0 (long (* (:transports forces) rate)))
-   :generals-lost   (max 0 (long (* (:generals   forces) rate)))
-   :fighters-lost   (max 0 (long (* (:fighters   forces) rate)))
-   :carriers-lost   (max 0 (long (* (:carriers   forces) rate)))
-   :admirals-lost   (max 0 (long (* (:admirals   forces) rate)))
-   :cmd-ships-lost  (max 0 (long (* (:cmd-ships  forces) rate)))
-   :stations-lost   (max 0 (long (* (:stations   forces) rate)))})
+  {:soldiers   (max 0 (long (* (:soldiers   forces) rate)))
+   :transports (max 0 (long (* (:transports forces) rate)))
+   :generals   (max 0 (long (* (:generals   forces) rate)))
+   :fighters   (max 0 (long (* (:fighters   forces) rate)))
+   :carriers   (max 0 (long (* (:carriers   forces) rate)))
+   :admirals   (max 0 (long (* (:admirals   forces) rate)))
+   :cmd-ships  (max 0 (long (* (:cmd-ships  forces) rate)))
+   :stations   (max 0 (long (* (:stations   forces) rate)))})
 
 (defn- select-planets
   "Randomly select n planets from the defender's pool, returning a {:mil n :erg n :ore n} map of how
@@ -222,7 +222,7 @@
      :cmd-ships-dispatched dispatched
      :cmd-ships-lost      ships-lost
      :damage-rate         damage-rate
-     :units-destroyed     (if (zero? committed)
+     :defender-losses     (if (zero? committed)
                             {:soldiers 0 :transports 0 :generals 0
                              :fighters 0 :carriers 0  :admirals 0 :stations 0}
                             {:soldiers   (long (* damage-rate (:player/soldiers   defender)))
@@ -312,10 +312,10 @@
      :defender-id          (str (:xt/id defender))
      :defender-name        (:player/empire-name defender)
      :attacker-wins?       att-wins?
-     :soldiers-destroyed   (when att-wins? (long (* (:player/soldiers   defender) const/bomb-damage-rate)))
-     :transports-destroyed (when att-wins? (long (* (:player/transports defender) const/bomb-damage-rate)))
-     :fighters-destroyed   (when att-wins? (long (* (:player/fighters   defender) const/bomb-damage-rate)))
-     :carriers-destroyed   (when att-wins? (long (* (:player/carriers   defender) const/bomb-damage-rate)))
+     :soldiers             (when att-wins? (long (* (:player/soldiers   defender) const/bomb-damage-rate)))
+     :transports           (when att-wins? (long (* (:player/transports defender) const/bomb-damage-rate)))
+     :fighters             (when att-wins? (long (* (:player/fighters   defender) const/bomb-damage-rate)))
+     :carriers             (when att-wins? (long (* (:player/carriers   defender) const/bomb-damage-rate)))
      :agents-captured      agents-captured}))
 
 (defn resolve-defect

@@ -20,7 +20,6 @@
 ;;;;;        │  │  ├─ ui/snapshot-section
 ;;;;;        │  │  ├─ ui/section-label "Choose a Target"
 ;;;;;        │  │  └─ target-row  (per other player)
-;;;;;        │  │     └─ op-radio  (×4: Spy, Incite, Bomb, Defect)
 ;;;;;        │  └─ ui/phase-warning
 ;;;;;        └─ ui/phase-action-bar
 ;;;;;           ├─ ui/action-bar-link "Pause"
@@ -32,59 +31,31 @@
 ;;;;; 3)  apply-espionage ← parse espionage-action param
 
 (ns com.star-empire-elite.pages.app.espionage
-  (:require [com.biffweb :as biff]
+  (:require [clojure.string :as str]
+            [com.biffweb :as biff]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
 
 ;;;;
 ;;;; UI Components
-;;;; - Op Radio
 ;;;; - Target Row
 ;;;;
 
 ;;;
-;;; Op Radio renders a single radio-button input for one operation on one target.
-;;; The radio group name "espionage-action" ensures only one selection across
-;;; the whole table. Toggle-on-reclick behaviour is handled via onclick JS.
-;;;
-;;; - op-radio: one radio input + styled label
-;;;
-
-(def ^:private op-js
-  (str "var p=this.dataset.was==='true';"
-       "document.querySelectorAll('[name=espionage-action]').forEach(function(r){r.dataset.was='false';});"
-       "if(p){this.checked=false;}else{this.dataset.was='true';}"))
-
-(defn- op-radio
-  "Render a radio input + styled label for one operation on one target.
-  attacker-id-str is the current player's id, used for the HTMX warning endpoint.
-
-  [op string, target-id-str string, attacker-id-str string, label string] -> hiccup"
-  [op target-id-str attacker-id-str label]
-  [:label.block.cursor-pointer
-   [:input.peer.sr-only
-    {:type       "radio"
-     :name       "espionage-action"
-     :value      (str op ":" target-id-str)
-     :hx-post    (str "/app/game/" attacker-id-str "/espionage-warning")
-     :hx-trigger "click"
-     :hx-target  "#espionage-warning"
-     :hx-swap    "outerHTML"
-     :onclick    op-js}]
-   [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
-    {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
-    label]])
-
-;;;
 ;;; Target rows populate the targets table, one row per other player in the game.
 ;;; Each row shows empire name, planet count, score, and four radio-button operation
-;;; modes (Spy, Incite, Bomb, Defect).
+;;; modes (Spy, Incite, Bomb, Defect). A local `op-btn` fn renders each radio input
+;;; with toggle-on-reclick behaviour and HTMX warning updates.
 ;;;
 ;;; - target-row: one table row with four radio-button operation modes
 ;;;
 
 (defn- target-row
   "Render a single row in the targets table with Spy, Incite, Bomb, and Defect radio buttons.
+  Each row produces four radio inputs sharing the same group name so only one
+  selection across the whole table can be made.
+  Composite radio values 'op:player-id' are parsed in apply-espionage.
+  attacker-id-str is the current player's id, used for the HTMX warning endpoint.
 
   [player player-map, attacker-id-str string] -> hiccup"
   [player attacker-id-str]
@@ -93,15 +64,31 @@
                          (:player/ore-planets player))
         target-id-str (str (:xt/id player))
         td-cls        "border-r border-game-border py-1 px-3 text-game-green-soft"
-        td-right-cls  "border-r border-game-border py-1 px-3 text-game-green-soft text-right"]
+        td-right-cls  "border-r border-game-border py-1 px-3 text-game-green-soft text-right"
+        op-btn        (fn [op label]
+                        [:label.block.cursor-pointer
+                         [:input.peer.sr-only
+                          {:type       "radio"
+                           :name       "espionage-action"
+                           :value      (str op ":" target-id-str)
+                           :hx-post    (str "/app/game/" attacker-id-str "/espionage-warning")
+                           :hx-trigger "click"
+                           :hx-target  "#espionage-warning"
+                           :hx-swap    "outerHTML"
+                           :onclick    (str "var p=this.dataset.was==='true';"
+                                            "document.querySelectorAll('[name=espionage-action]').forEach(function(r){r.dataset.was='false';});"
+                                            "if(p){this.checked=false;}else{this.dataset.was='true';}")}]
+                         [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
+                          {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
+                          label]])]
     [:tr.bg-game-row.border-b.border-game-divider
      [:td {:class td-cls}       (:player/empire-name player)]
      [:td {:class td-right-cls} total-planets]
      [:td {:class td-right-cls} (:player/score player)]
-     [:td.py-1.px-3 (op-radio "spy"    target-id-str attacker-id-str "Spy")]
-     [:td.py-1.px-3 (op-radio "incite" target-id-str attacker-id-str "Incite")]
-     [:td.py-1.px-3 (op-radio "bomb"   target-id-str attacker-id-str "Bomb")]
-     [:td.py-1.px-3 (op-radio "defect" target-id-str attacker-id-str "Defect")]]))
+     [:td.py-1.px-3 (op-btn "spy"    "Spy")]
+     [:td.py-1.px-3 (op-btn "incite" "Incite")]
+     [:td.py-1.px-3 (op-btn "bomb"   "Bomb")]
+     [:td.py-1.px-3 (op-btn "defect" "Defect")]]))
 
 ;;;;
 ;;;; Actions
@@ -127,16 +114,15 @@
   (utils/with-player-and-game [player game player-id] ctx
     (if-let [redirect (utils/validate-phase player 5 player-id)]
       redirect
-      (let [action    (get params :espionage-action)
-            match     (when (seq action) (re-matches #"(spy|incite|bomb|defect):(.*)" action))
-            op        (get match 1)
-            id-str    (get match 2)
-            target-id (when id-str (java.util.UUID/fromString id-str))]
+      (let [espionage-action (:espionage-action params)
+            [op target-id-str] (when (and espionage-action (str/includes? espionage-action ":"))
+                                 (str/split espionage-action #":" 2))
+            target-uuid (when target-id-str (parse-uuid target-id-str))]
         (biff/submit-tx ctx [{:db/doc-type                  :player
                               :db/op                        :update
                               :xt/id                        player-id
                               :player/current-phase         6
-                              :player/pending-espionage     target-id
+                              :player/pending-espionage     target-uuid
                               :player/pending-espionage-op  op}])
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/outcomes")}}))))
@@ -165,10 +151,8 @@
           (zero? (:player/agents player))
           [:p.text-sm.text-yellow-400
            "\u26a0 You have no agents. You cannot undertake covert operations this turn."]
-
           (empty? other-players)
           [:p.text-sm.text-game-green-soft "There are no other empires to target."]
-
           :else
           [:div
            (ui/section-label "Choose a Target")

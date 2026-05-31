@@ -98,8 +98,12 @@
                   (forces-row "Generals"   generals)
                   (forces-row "Transports" transports)
                   (forces-row "Soldiers"   soldiers-total)
-                  (if (= soldiers-avail soldiers-total)
+                  (cond
+                    (zero? soldiers-avail)
+                    (forces-row "Deployable: " 0 {:warn? true})
+                    (= soldiers-avail soldiers-total)
                     (forces-row "Deployable: " nil {:display "All"})
+                    :else
                     (forces-row "ⓘ Deployable: " soldiers-avail
                                 {:warn? true
                                  :title "Full deployment of solders requires 100:1 soldiers-to-transports, and 1000:1 soldiers-to-generals"})))
@@ -107,8 +111,12 @@
                   (forces-row "Admirals"   admirals)
                   (forces-row "Carriers"   carriers)
                   (forces-row "Fighters"   fighters-total)
-                  (if (= fighters-avail fighters-total)
+                  (cond
+                    (zero? fighters-avail)
+                    (forces-row "Deployable: " 0 {:warn? true})
+                    (= fighters-avail fighters-total)
                     (forces-row "Deployable: " nil {:display "All"})
+                    :else
                     (forces-row "ⓘ Deployable: " fighters-avail
                                 {:warn? true
                                  :title "Full deployment of fighters requires 100:1 fighters-to-carriers, and 1000:1 fighters-to-admirals"})))]))
@@ -116,8 +124,9 @@
 ;;;
 ;;; Target rows populate the targets table, one row per other player in the game.
 ;;; Each row shows empire name, planet count, score, and three radio-button attack
-;;; modes (Invade, Raid, Strike).  Strike is disabled when the attacker has no
-;;; command ships.
+;;; modes (Invade, Raid, Strike).  Invade requires deployable soldiers, deployable
+;;; fighters, and command ships.  Raid requires deployable soldiers and deployable
+;;; fighters.  Strike requires command ships.
 ;;;
 ;;; - target-row: one table row with three radio-button attack modes
 ;;;
@@ -127,11 +136,13 @@
   Each row produces three radio inputs sharing the same group name so only one
   selection across the whole table can be made.
   Composite radio values 'player-id:mode' are parsed in apply-action.
-  attacker-cmd-ships is used to disable the Strike button when the attacker has none.
+  Invade requires deployable soldiers, deployable fighters, and command ships.
+  Raid requires deployable soldiers and deployable fighters.
+  Strike requires command ships.
   attacker-id-str is the current player's id, used for the HTMX warning endpoint.
 
-  [player player-map, attacker-cmd-ships int, attacker-id-str string] -> hiccup"
-  [player attacker-cmd-ships attacker-id-str]
+  [player player-map, ef {:soldiers int :fighters int}, cmd-ships int, attacker-id-str string] -> hiccup"
+  [player ef cmd-ships attacker-id-str]
   (let [total-planets (+ (:player/mil-planets player)
                          (:player/erg-planets player)
                          (:player/ore-planets player))
@@ -154,20 +165,23 @@
                          [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
                           {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
                           label]])
-        can-strike?   (pos? attacker-cmd-ships) ; Command ships needed to strike
-        strike-btn    (if can-strike?
-                        (action-btn :strike "Strike")
+        disabled-btn  (fn [label]
                         [:label
                          [:input.sr-only {:type "radio" :name "target-action" :disabled true}]
                          [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.text-game-green-dim.border-game-border.cursor-not-allowed
-                          "Strike"]])]
+                          label]])
+        has-soldiers? (pos? (:soldiers ef))
+        has-fighters? (pos? (:fighters ef))
+        has-cmd?      (pos? cmd-ships)
+        can-invade?   (and has-soldiers? has-fighters? has-cmd?)
+        can-raid?     (and has-soldiers? has-fighters?)]
     [:tr.bg-game-row.border-b.border-game-divider
      [:td {:class td-cls} (:player/empire-name player)]
      [:td {:class td-right-cls}  total-planets]
      [:td {:class td-right-cls}  (:player/score player)]
-     [:td.py-1.px-2 (action-btn :invade "Invade")]
-     [:td.py-1.px-2 (action-btn :raid   "Raid")]
-     [:td.py-1.px-2 strike-btn]]))
+     [:td.py-1.px-2 (if can-invade? (action-btn :invade "Invade") (disabled-btn "Invade"))]
+     [:td.py-1.px-2 (if can-raid?   (action-btn :raid   "Raid")   (disabled-btn "Raid"))]
+     [:td.py-1.px-2 (if has-cmd?    (action-btn :strike "Strike") (disabled-btn "Strike"))]]))
 
 ;;;;
 ;;;; Actions
@@ -218,6 +232,7 @@
   [{:keys [player game db]}]
   (let [player-id      (:xt/id player)
         attacker-id    (str player-id)
+        ef             (combat/effective-forces player)
         other-players  (utils/get-other-players db (:player/game player) player-id)
         th-cls         "text-green-400 text-[11px] tracking-[0.08em] uppercase"]
     (ui/phase-shell 
@@ -231,6 +246,9 @@
        (ui/phase-body player
         (ui/snapshot-section player)
         (forces-grid player)
+        (when (and (zero? (:soldiers ef)) (zero? (:fighters ef)))
+          [:p.text-sm.text-yellow-400
+           "\u26a0 You have no deployable soldiers or fighters. You cannot undertake invasions or raids this turn."])
         (if (empty? other-players)
           [:p.text-sm.text-game-green-soft
            "There are no other empires in the galaxy to attack."]
@@ -249,7 +267,7 @@
                [:th.px-3.py-1.text-center {:class th-cls :col-span 3} "Operations"]]]
              [:tbody
               (for [target other-players]
-                (target-row target (:player/cmd-ships player) attacker-id))]]]]))
+                (target-row target ef (:player/cmd-ships player) attacker-id))]]]]))
        (ui/phase-warning "action-warning")
        (ui/phase-action-bar
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")

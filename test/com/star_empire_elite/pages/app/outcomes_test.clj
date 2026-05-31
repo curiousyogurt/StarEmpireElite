@@ -204,12 +204,12 @@
                      :carriers 1 :generals 1 :admirals 0}
    :defender-forces {:soldiers 30 :fighters 5 :cmd-ships 0 :transports 0
                      :carriers 0 :generals 0 :admirals 0 :stations 3}
-   :attacker-losses {:soldiers-lost 5 :fighters-lost 1 :cmd-ships-lost 0
-                     :transports-lost 0 :carriers-lost 0 :generals-lost 0
-                     :admirals-lost 0 :stations-lost 0}
-   :defender-losses {:soldiers-lost 15 :fighters-lost 3 :cmd-ships-lost 0
-                     :transports-lost 0 :carriers-lost 0 :generals-lost 0
-                     :admirals-lost 0 :stations-lost 1}
+   :attacker-losses {:soldiers 5 :fighters 1 :cmd-ships 0
+                     :transports 0 :carriers 0 :generals 0
+                     :admirals 0 :stations 0}
+   :defender-losses {:soldiers 15 :fighters 3 :cmd-ships 0
+                     :transports 0 :carriers 0 :generals 0
+                     :admirals 0 :stations 1}
    :attacker-counts {:soldiers 50 :fighters 10 :cmd-ships 0 :transports 5
                      :carriers 1 :generals 1 :admirals 0}
    :planets-transferred {:mil 0 :erg 0 :ore 0}})
@@ -250,12 +250,12 @@
                            :attacker-name  "Aggressor"
                            :defender-counts {:soldiers 50 :fighters 5 :cmd-ships 0 :transports 2
                                              :carriers 0 :generals 1 :admirals 0 :stations 3}
-                           :attacker-losses {:soldiers-lost 0 :fighters-lost 0 :cmd-ships-lost 0
-                                             :transports-lost 0 :carriers-lost 0 :generals-lost 0
-                                             :admirals-lost 0 :stations-lost 0}
-                           :defender-losses {:soldiers-lost 10 :fighters-lost 2 :cmd-ships-lost 0
-                                             :transports-lost 0 :carriers-lost 0 :generals-lost 0
-                                             :admirals-lost 0 :stations-lost 1}
+                           :attacker-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 0}
+                           :defender-losses {:soldiers 10 :fighters 2 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 1}
                            :planets-transferred {:mil 0 :erg 0 :ore 0}}
           player-with-attacks (assoc test-player
                                      :player/incoming-attacks [(pr-str attacker-result)]

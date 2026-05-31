@@ -91,7 +91,7 @@
 
 (deftest test-target-row-renders
   (testing "Returns a hiccup table row vector"
-    (let [result (#'action/target-row test-target 1 "attacker-id")]
+    (let [result (#'action/target-row test-target {:soldiers 100 :fighters 50} 1 "attacker-id")]
       (is (vector? result))
       (is (clojure.string/starts-with? (name (first result)) "tr"))))
 
@@ -99,16 +99,16 @@
     ;; test-target has 2 mil + 1 food + 3 ore = 6 total planets.
     ;; row: [:tr.classes [:td empire-name] [:td total-planets] [:td score] [:td invade] [:td raid] [:td strike]]
     ;; index 0=:tr, 1=empire-td, 2=planets-td; planets-td is [:td {attrs} 6].
-    (let [result (#'action/target-row test-target 1 "attacker-id")
+    (let [result (#'action/target-row test-target {:soldiers 100 :fighters 50} 1 "attacker-id")
           planet-td (nth result 2)]
       (is (= 6 (last planet-td)))))
 
   (testing "Renders Invade, Raid, and Strike buttons"
-    (let [result (#'action/target-row test-target 1 "attacker-id")]
+    (let [result (#'action/target-row test-target {:soldiers 100 :fighters 50} 1 "attacker-id")]
       (is (= 7 (count result)))))  ; :tr + 6 tds (no separate attrs map)
 
   (testing "Radio values contain composite player-id:mode format"
-    (let [result   (#'action/target-row test-target 1 "attacker-id")
+    (let [result   (#'action/target-row test-target {:soldiers 100 :fighters 50} 1 "attacker-id")
           hiccup   (tree-seq coll? seq result)
           values   (filter #(and (map? %) (:value %)) hiccup)
           val-strs (map :value values)]
@@ -116,19 +116,38 @@
       (is (some #(= % (str test-target-id ":raid"))   val-strs))
       (is (some #(= % (str test-target-id ":strike")) val-strs))))
 
-  (testing "Strike button is enabled when attacker has cmd-ships"
-    (let [result (#'action/target-row test-target 5 "attacker-id")
+  (testing "All buttons enabled when attacker has soldiers, fighters, and cmd-ships"
+    (let [result (#'action/target-row test-target {:soldiers 100 :fighters 50} 5 "attacker-id")
           hiccup (tree-seq coll? seq result)
           inputs (filter #(and (map? %) (= "radio" (:type %))) hiccup)]
-      ;; All radio inputs should be enabled (none disabled)
       (is (every? #(not (:disabled %)) inputs))))
 
-  (testing "Strike button is disabled when attacker has 0 cmd-ships"
-    (let [result (#'action/target-row test-target 0 "attacker-id")
+  (testing "Invade disabled, Raid and Strike enabled when attacker has 0 cmd-ships"
+    (let [result (#'action/target-row test-target {:soldiers 100 :fighters 50} 0 "attacker-id")
           hiccup (tree-seq coll? seq result)
           inputs (filter #(and (map? %) (= "radio" (:type %))) hiccup)]
-      ;; The disabled Strike input should be present
-      (is (some :disabled inputs)))))
+      ;; Invade and Strike disabled (2 of 3)
+      (is (= 2 (count (filter :disabled inputs))))))
+
+  (testing "Invade and Raid disabled when attacker has 0 deployable soldiers"
+    (let [result (#'action/target-row test-target {:soldiers 0 :fighters 50} 5 "attacker-id")
+          hiccup (tree-seq coll? seq result)
+          inputs (filter #(and (map? %) (= "radio" (:type %))) hiccup)]
+      ;; Invade and Raid disabled (2 of 3)
+      (is (= 2 (count (filter :disabled inputs))))))
+
+  (testing "Invade and Raid disabled when attacker has 0 deployable fighters"
+    (let [result (#'action/target-row test-target {:soldiers 100 :fighters 0} 5 "attacker-id")
+          hiccup (tree-seq coll? seq result)
+          inputs (filter #(and (map? %) (= "radio" (:type %))) hiccup)]
+      ;; Invade and Raid disabled (2 of 3)
+      (is (= 2 (count (filter :disabled inputs))))))
+
+  (testing "All buttons disabled when attacker has no forces"
+    (let [result (#'action/target-row test-target {:soldiers 0 :fighters 0} 0 "attacker-id")
+          hiccup (tree-seq coll? seq result)
+          inputs (filter #(and (map? %) (= "radio" (:type %))) hiccup)]
+      (is (every? :disabled inputs)))))
 
 ;;;;
 ;;;; action-page Tests

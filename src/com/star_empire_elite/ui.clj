@@ -811,10 +811,10 @@
        [:div.flex.flex-col.gap-1
         (map attack-info-line attacks)
         (when bomb-result
-          (let [total (+ (or (:soldiers-destroyed bomb-result) 0)
-                         (or (:transports-destroyed bomb-result) 0)
-                         (or (:fighters-destroyed bomb-result) 0)
-                         (or (:carriers-destroyed bomb-result) 0))]
+          (let [total (+ (or (:soldiers bomb-result) 0)
+                         (or (:transports bomb-result) 0)
+                         (or (:fighters bomb-result) 0)
+                         (or (:carriers bomb-result) 0))]
             (alert-line :bomb
               (str "An unknown agent bombed you " (if (pos? total) "(SUCCESS)" "(FAILURE)")))))
         (when (pos? incite-stab-lost)

@@ -513,16 +513,16 @@
     (let [attacker (assoc strong-attacker :player/cmd-ships 10)
           defender (assoc strike-defender :player/stations 0)
           result   (combat/resolve-strike game attacker defender)
-          ud       (:units-destroyed result)]
+          dl       (:defender-losses result)]
       ;; 10 ships × 1% = 10% damage
-      (is (= 100 (:soldiers   ud)))  ; 10% of 1000
-      (is (= 10  (:transports ud)))  ; 10% of 100
-      (is (= 1   (:generals   ud)))  ; 10% of 10
-      (is (= 50  (:fighters   ud)))  ; 10% of 500
-      (is (= 5   (:carriers   ud)))  ; 10% of 50
-      (is (= 0   (:admirals   ud)))  ; 10% of 5 = 0.5 → floor 0
+      (is (= 100 (:soldiers   dl)))  ; 10% of 1000
+      (is (= 10  (:transports dl)))  ; 10% of 100
+      (is (= 1   (:generals   dl)))  ; 10% of 10
+      (is (= 50  (:fighters   dl)))  ; 10% of 500
+      (is (= 5   (:carriers   dl)))  ; 10% of 50
+      (is (= 0   (:admirals   dl)))  ; 10% of 5 = 0.5 → floor 0
       ;; Stations take damage too
-      (is (= 0   (:stations  ud))))))  ; 10% of 5 = 0.5 → floor 0
+      (is (= 0   (:stations  dl))))))  ; 10% of 5 = 0.5 → floor 0
 
 (deftest strike-dispatch-caps-at-15
   (testing "Attacker with 50 cmd-ships dispatches only 15; damage is 15% not 50%"
@@ -533,7 +533,7 @@
       (is (= 15  (:cmd-ships-dispatched result)))
       (is (= 0.15 (:damage-rate result)))
       ;; 15% of 1000 soldiers = 150
-      (is (= 150 (:soldiers (:units-destroyed result)))))))
+      (is (= 150 (:soldiers (:defender-losses result)))))))
 
 (deftest strike-dispatches-all-when-under-cap
   (testing "Attacker with 8 cmd-ships dispatches all 8; damage is 8%"
@@ -591,10 +591,10 @@
       (is (= 0 (:cmd-ships-dispatched result)))
       (is (= 0 (:cmd-ships-lost       result)))
       (is (= 0.0 (:damage-rate result)))
-      (let [ud (:units-destroyed result)]
-        (is (= 0 (:soldiers   ud)))
-        (is (= 0 (:fighters   ud)))
-        (is (= 0 (:carriers   ud)))))))
+      (let [dl (:defender-losses result)]
+        (is (= 0 (:soldiers   dl)))
+        (is (= 0 (:fighters   dl)))
+        (is (= 0 (:carriers   dl)))))))
 
 (deftest strike-does-not-capture-planets-or-resources
   (testing "Strike result map contains no planet-transfer or resource-capture keys"

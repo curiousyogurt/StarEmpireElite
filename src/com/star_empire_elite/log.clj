@@ -158,11 +158,11 @@
                    :agents-captured (when-not att-wins? (:agents-captured result))}
          "incite" {:stability-damage (when att-wins? (:stability-damage result))
                    :agents-captured  (when-not att-wins? (:agents-captured result))}
-         "bomb"   (nz {:soldiers-destroyed   (or (:soldiers-destroyed   result) 0)
-                        :transports-destroyed (or (:transports-destroyed result) 0)
-                        :fighters-destroyed   (or (:fighters-destroyed   result) 0)
-                        :carriers-destroyed   (or (:carriers-destroyed   result) 0)
-                        :agents-captured      (or (when-not att-wins? (:agents-captured result)) 0)})
+         "bomb"   (nz {:soldiers        (or (:soldiers   result) 0)
+                        :transports      (or (:transports result) 0)
+                        :fighters        (or (:fighters   result) 0)
+                        :carriers        (or (:carriers   result) 0)
+                        :agents-captured (or (when-not att-wins? (:agents-captured result)) 0)})
          {:agents-captured (when-not att-wins? (:agents-captured result))})})))
 
 ;;;;
