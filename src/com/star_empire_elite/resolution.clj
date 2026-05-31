@@ -114,20 +114,21 @@
             (let [result     (combat/resolve-strike game player defender)
                   dl         (:defender-losses result)
                   ships-lost (:cmd-ships-lost result)]
-              (biff/submit-tx ctx
-                              [{:db/doc-type :player :db/op :update :xt/id player-id
-                                :player/last-battle-result (pr-str result)
-                                :player/cmd-ships (max 0 (- (:player/cmd-ships player) ships-lost))}
-                               {:db/doc-type :player :db/op :update :xt/id (:xt/id defender)
-                                :player/soldiers   (max 0 (- (:player/soldiers   defender) (:soldiers   dl)))
-                                :player/transports (max 0 (- (:player/transports defender) (:transports dl)))
-                                :player/generals   (max 0 (- (:player/generals   defender) (:generals   dl)))
-                                :player/fighters   (max 0 (- (:player/fighters   defender) (:fighters   dl)))
-                                :player/carriers   (max 0 (- (:player/carriers   defender) (:carriers   dl)))
-                                :player/admirals   (max 0 (- (:player/admirals   defender) (:admirals   dl)))
-                                :player/stations   (max 0 (- (:player/stations   defender) (:stations   dl)))
-                                :player/incoming-attacks
-                                (conj (or (:player/incoming-attacks defender) []) (pr-str result))}])
+              (biff/submit-tx 
+                ctx
+                [{:db/doc-type :player :db/op :update :xt/id player-id
+                  :player/last-battle-result (pr-str result)
+                  :player/cmd-ships (max 0 (- (:player/cmd-ships player) ships-lost))}
+                 {:db/doc-type :player :db/op :update :xt/id (:xt/id defender)
+                  :player/soldiers   (max 0 (- (:player/soldiers   defender) (:soldiers   dl)))
+                  :player/transports (max 0 (- (:player/transports defender) (:transports dl)))
+                  :player/generals   (max 0 (- (:player/generals   defender) (:generals   dl)))
+                  :player/fighters   (max 0 (- (:player/fighters   defender) (:fighters   dl)))
+                  :player/carriers   (max 0 (- (:player/carriers   defender) (:carriers   dl)))
+                  :player/admirals   (max 0 (- (:player/admirals   defender) (:admirals   dl)))
+                  :player/stations   (max 0 (- (:player/stations   defender) (:stations   dl)))
+                  :player/incoming-attacks
+                  (conj (or (:player/incoming-attacks defender) []) (pr-str result))}])
               [result (assoc player :player/cmd-ships
                              (max 0 (- (:player/cmd-ships player) ships-lost)))])
             ;; --- Invade / Raid branch ---
@@ -156,52 +157,55 @@
                   att-credits    (+ (:player/credits      player) rc-credits)
                   att-food       (+ (:player/food         player) rc-food)
                   att-fuel       (+ (:player/fuel         player) rc-fuel)]
-              (biff/submit-tx ctx
-                              [{:db/doc-type :player :db/op :update :xt/id player-id
-                                :player/last-battle-result (pr-str capped)
-                                :player/soldiers     att-soldiers
-                                :player/transports   att-transports
-                                :player/generals     att-generals
-                                :player/fighters     att-fighters
-                                :player/carriers     att-carriers
-                                :player/admirals     att-admirals
-                                :player/cmd-ships    att-cmd-ships
-                                :player/mil-planets  att-mil-plts
-                                :player/erg-planets  att-erg-plts
-                                :player/ore-planets  att-ore-plts
-                                :player/credits      att-credits
-                                :player/food         att-food
-                                :player/fuel         att-fuel}
-                               {:db/doc-type :player :db/op :update :xt/id (:xt/id defender)
-                                :player/soldiers     (max 0 (- (:player/soldiers    defender) (:soldiers   dl)))
-                                :player/transports   (max 0 (- (:player/transports  defender) (:transports dl)))
-                                :player/generals     (max 0 (- (:player/generals    defender) (:generals   dl)))
-                                :player/fighters     (max 0 (- (:player/fighters    defender) (:fighters   dl)))
-                                :player/carriers     (max 0 (- (:player/carriers    defender) (:carriers   dl)))
-                                :player/admirals     (max 0 (- (:player/admirals    defender) (:admirals   dl)))
-                                :player/cmd-ships    (max 0 (- (:player/cmd-ships   defender) (:cmd-ships  dl)))
-                                :player/stations     (max 0 (- (:player/stations    defender) (:stations   dl)))
-                                :player/mil-planets  (max 0 (- (:player/mil-planets defender) pt-mil))
-                                :player/erg-planets  (max 0 (- (:player/erg-planets defender) pt-erg))
-                                :player/ore-planets  (max 0 (- (:player/ore-planets defender) pt-ore))
-                                :player/credits      (max 0 (- (:player/credits     defender) rc-credits))
-                                :player/food         (max 0 (- (:player/food        defender) rc-food))
-                                :player/fuel         (max 0 (- (:player/fuel        defender) rc-fuel))
-                                :player/incoming-attacks
-                                (conj (or (:player/incoming-attacks defender) []) (pr-str capped))}])
-              [capped (merge player {:player/soldiers     att-soldiers
-                                     :player/transports   att-transports
-                                     :player/generals     att-generals
-                                     :player/fighters     att-fighters
-                                     :player/carriers     att-carriers
-                                     :player/admirals     att-admirals
-                                     :player/cmd-ships    att-cmd-ships
-                                     :player/mil-planets  att-mil-plts
-                                     :player/erg-planets  att-erg-plts
-                                     :player/ore-planets  att-ore-plts
-                                     :player/credits      att-credits
-                                     :player/food         att-food
-                                     :player/fuel         att-fuel})])))))))
+              (biff/submit-tx 
+                ctx
+                [{:db/doc-type :player :db/op :update :xt/id player-id
+                  :player/last-battle-result (pr-str capped)
+                  :player/soldiers     att-soldiers
+                  :player/transports   att-transports
+                  :player/generals     att-generals
+                  :player/fighters     att-fighters
+                  :player/carriers     att-carriers
+                  :player/admirals     att-admirals
+                  :player/cmd-ships    att-cmd-ships
+                  :player/mil-planets  att-mil-plts
+                  :player/erg-planets  att-erg-plts
+                  :player/ore-planets  att-ore-plts
+                  :player/credits      att-credits
+                  :player/food         att-food
+                  :player/fuel         att-fuel}
+                 {:db/doc-type :player :db/op :update :xt/id (:xt/id defender)
+                  :player/soldiers     (max 0 (- (:player/soldiers    defender) (:soldiers   dl)))
+                  :player/transports   (max 0 (- (:player/transports  defender) (:transports dl)))
+                  :player/generals     (max 0 (- (:player/generals    defender) (:generals   dl)))
+                  :player/fighters     (max 0 (- (:player/fighters    defender) (:fighters   dl)))
+                  :player/carriers     (max 0 (- (:player/carriers    defender) (:carriers   dl)))
+                  :player/admirals     (max 0 (- (:player/admirals    defender) (:admirals   dl)))
+                  :player/cmd-ships    (max 0 (- (:player/cmd-ships   defender) (:cmd-ships  dl)))
+                  :player/stations     (max 0 (- (:player/stations    defender) (:stations   dl)))
+                  :player/mil-planets  (max 0 (- (:player/mil-planets defender) pt-mil))
+                  :player/erg-planets  (max 0 (- (:player/erg-planets defender) pt-erg))
+                  :player/ore-planets  (max 0 (- (:player/ore-planets defender) pt-ore))
+                  :player/credits      (max 0 (- (:player/credits     defender) rc-credits))
+                  :player/food         (max 0 (- (:player/food        defender) rc-food))
+                  :player/fuel         (max 0 (- (:player/fuel        defender) rc-fuel))
+                  :player/incoming-attacks
+                  (conj (or (:player/incoming-attacks defender) []) (pr-str capped))}])
+              [capped 
+               (merge player 
+                      {:player/soldiers     att-soldiers
+                       :player/transports   att-transports
+                       :player/generals     att-generals
+                       :player/fighters     att-fighters
+                       :player/carriers     att-carriers
+                       :player/admirals     att-admirals
+                       :player/cmd-ships    att-cmd-ships
+                       :player/mil-planets  att-mil-plts
+                       :player/erg-planets  att-erg-plts
+                       :player/ore-planets  att-ore-plts
+                       :player/credits      att-credits
+                       :player/food         att-food
+                       :player/fuel         att-fuel})])))))))
 
 (defn- resolve-espionage
   "Resolve espionage on first load; return cached result on refresh.
@@ -229,46 +233,47 @@
                 att-wins?   (:attacker-wins? result)
                 agents-lost (or (:agents-captured result) 0)
                 stab-dmg    (or (:stability-damage result) 0)]
-            (biff/submit-tx ctx
-                            (remove nil?
-                                    [{:db/doc-type :player :db/op :update :xt/id player-id
-                                      :player/last-espionage-result (pr-str result)
-                                      :player/agents (max 0 (- (:player/agents player) agents-lost))}
-                                     (when (pos? agents-lost)
-                                       {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
-                                        :player/agents (+ (or (:player/agents target) 0) agents-lost)
-                                        :player/incoming-espionage-fails
-                                        (conj (or (:player/incoming-espionage-fails target) [])
-                                              (cond incite? "incite" bomb? "bomb" defect? "defect" :else "spy"))
-                                        :player/incoming-espionage-agents-gained
-                                        (+ (or (:player/incoming-espionage-agents-gained target) 0) agents-lost)})
-                                     (when (and incite? att-wins? (pos? stab-dmg))
-                                       {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
-                                        :player/stability (max 0 (- (:player/stability target) stab-dmg))
-                                        :player/incoming-incite-stability-lost
-                                        (+ (or (:player/incoming-incite-stability-lost target) 0) stab-dmg)})
-                                     (when (and bomb? att-wins?)
-                                       (let [sd (or (:soldiers   result) 0)
-                                             td (or (:transports result) 0)
-                                             fd (or (:fighters   result) 0)
-                                             cd (or (:carriers   result) 0)]
-                                         {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
-                                          :player/soldiers   (max 0 (- (:player/soldiers   target) sd))
-                                          :player/transports (max 0 (- (:player/transports target) td))
-                                          :player/fighters   (max 0 (- (:player/fighters   target) fd))
-                                          :player/carriers   (max 0 (- (:player/carriers   target) cd))
-                                          :player/incoming-bomb-result
-                                          (pr-str {:attacker-name (:player/empire-name player)
-                                                   :soldiers      sd
-                                                   :transports    td
-                                                   :fighters      fd
-                                                   :carriers      cd})}))
-                                     (when (and defect? att-wins?)
-                                       (let [n (or (:agents-defected result) 0)]
-                                         {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
-                                          :player/agents (max 0 (- (or (:player/agents target) 0) n))
-                                          :player/incoming-defect-agents-lost
-                                          (+ (or (:player/incoming-defect-agents-lost target) 0) n)}))]))
+            (biff/submit-tx 
+              ctx
+              (remove nil?
+                      [{:db/doc-type :player :db/op :update :xt/id player-id
+                        :player/last-espionage-result (pr-str result)
+                        :player/agents (max 0 (- (:player/agents player) agents-lost))}
+                       (when (pos? agents-lost)
+                         {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
+                          :player/agents (+ (or (:player/agents target) 0) agents-lost)
+                          :player/incoming-espionage-fails
+                          (conj (or (:player/incoming-espionage-fails target) [])
+                                (cond incite? "incite" bomb? "bomb" defect? "defect" :else "spy"))
+                          :player/incoming-espionage-agents-gained
+                          (+ (or (:player/incoming-espionage-agents-gained target) 0) agents-lost)})
+                       (when (and incite? att-wins? (pos? stab-dmg))
+                         {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
+                          :player/stability (max 0 (- (:player/stability target) stab-dmg))
+                          :player/incoming-incite-stability-lost
+                          (+ (or (:player/incoming-incite-stability-lost target) 0) stab-dmg)})
+                       (when (and bomb? att-wins?)
+                         (let [sd (or (:soldiers   result) 0)
+                               td (or (:transports result) 0)
+                               fd (or (:fighters   result) 0)
+                               cd (or (:carriers   result) 0)]
+                           {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
+                            :player/soldiers   (max 0 (- (:player/soldiers   target) sd))
+                            :player/transports (max 0 (- (:player/transports target) td))
+                            :player/fighters   (max 0 (- (:player/fighters   target) fd))
+                            :player/carriers   (max 0 (- (:player/carriers   target) cd))
+                            :player/incoming-bomb-result
+                            (pr-str {:attacker-name (:player/empire-name player)
+                                     :soldiers      sd
+                                     :transports    td
+                                     :fighters      fd
+                                     :carriers      cd})}))
+                       (when (and defect? att-wins?)
+                         (let [n (or (:agents-defected result) 0)]
+                           {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
+                            :player/agents (max 0 (- (or (:player/agents target) 0) n))
+                            :player/incoming-defect-agents-lost
+                            (+ (or (:player/incoming-defect-agents-lost target) 0) n)}))]))
             (let [agents-gained (if (and defect? att-wins?) (or (:agents-defected result) 0) 0)]
               [result (assoc player :player/agents
                              (max 0 (+ (- (:player/agents player) agents-lost) agents-gained)))])))))))

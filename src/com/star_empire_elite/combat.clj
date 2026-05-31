@@ -74,6 +74,7 @@
   (+ (- 1.0 const/combat-variance)
      (* (rand) (* 2 const/combat-variance))))
 
+
 ;;;;
 ;;;; Attack Resolution
 ;;;;
@@ -232,6 +233,7 @@
                              :carriers   (long (* damage-rate (:player/carriers   defender)))
                              :admirals   (long (* damage-rate (:player/admirals   defender)))
                              :stations   (long (* damage-rate (:player/stations   defender)))})}))
+
 
 ;;;;
 ;;;; Espionage Resolution

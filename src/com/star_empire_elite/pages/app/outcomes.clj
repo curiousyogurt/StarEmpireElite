@@ -201,32 +201,29 @@
   [{:keys [player battle-result espionage-result pop-growth
            expense-penalty breakaway-result recovery-result]}]
   (let [sum-vals    (fn [m] (reduce + 0 (vals (or m {}))))
-        ;; Did we win a ground battle (invade/raid)? Used for planets + resources.
+        ;; Helpers
         won-ground? (and battle-result
                          (:attacker-wins? battle-result)
                          (not= (:mode battle-result) :strike))
-        ;; Attacker: outgoing combat losses
-        out-losses  (when battle-result
-                      (if (= (:mode battle-result) :strike)
-                        {:cmd-ships (:cmd-ships-lost battle-result 0)}
-                        (:attacker-losses battle-result)))
-        ;; Defender: incoming combat losses (deserialised from DB-stored pr-str'd maps)
         incoming    (mapv clojure.edn/read-string (:player/incoming-attacks player []))
-        in-losses   (reduce (fn [acc r]
-                              (merge-with + acc (:defender-losses r {})))
-                            {} incoming)
-        ;; Defender: incoming bombing losses
-        bomb-r      (some-> (:player/incoming-bomb-result player) read-string)
-        bomb-loss   (if bomb-r (sum-vals (dissoc bomb-r :attacker-name)) 0)
-        units-lost  (+ (sum-vals out-losses) (sum-vals in-losses) bomb-loss)
-        ;; Planet deltas: gained from outgoing wins, lost from incoming + breakaway
-        out-pt      (if won-ground? (:planets-transferred battle-result {}) {})
-        sum-wins    (fn [k] (reduce (fn [acc r]
+        in-wins     (fn [k] (reduce (fn [acc r]
                                       (if (and (:attacker-wins? r) (not= (:mode r) :strike))
                                         (merge-with + acc (k r {}))
                                         acc))
                                     {} incoming))
-        in-pt       (sum-wins :planets-transferred)
+        ;; Unit losses — three sources, all as unit-count maps, merged and summed once
+        out-losses  (cond
+                      (nil? battle-result)                     {}
+                      (= (:mode battle-result) :strike)        {:cmd-ships (:cmd-ships-lost battle-result 0)}
+                      :else                                    (:attacker-losses battle-result {}))
+        in-losses   (reduce (fn [acc r] (merge-with + acc (:defender-losses r {})))
+                            {} incoming)
+        bomb-losses (if-let [r (some-> (:player/incoming-bomb-result player) clojure.edn/read-string)]
+                      (dissoc r :attacker-name) {})
+        units-lost  (sum-vals (merge-with + out-losses in-losses bomb-losses))
+        ;; Planet deltas: gained from outgoing ground wins, lost from incoming + breakaway
+        out-pt      (if won-ground? (:planets-transferred battle-result {}) {})
+        in-pt       (in-wins :planets-transferred)
         break-pt    (if (and breakaway-result (:triggered? breakaway-result))
                       {:ore (:ore-lost breakaway-result 0)
                        :erg (:erg-lost breakaway-result 0)
@@ -235,9 +232,9 @@
         ore (- (:ore out-pt 0) (:ore in-pt 0) (:ore break-pt 0))
         erg (- (:erg out-pt 0) (:erg in-pt 0) (:erg break-pt 0))
         mil (- (:mil out-pt 0) (:mil in-pt 0) (:mil break-pt 0))
-        ;; Resource deltas
+        ;; Resource deltas: same pattern as planets
         out-res (if won-ground? (:resources-captured battle-result {}) {})
-        in-res  (sum-wins :resources-captured)
+        in-res  (in-wins :resources-captured)
         credits (- (:credits out-res 0) (:credits in-res 0))
         food    (- (:food out-res 0)    (:food in-res 0))
         fuel    (- (:fuel out-res 0)    (:fuel in-res 0))
