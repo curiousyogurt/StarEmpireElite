@@ -57,7 +57,7 @@
   Composite radio values 'op:player-id' are parsed in apply-espionage.
   attacker-id-str is the current player's id, used for the HTMX warning endpoint.
 
-  [player player-map, attacker-id-str string] -> hiccup"
+  [player player-map, attacker-id-str string, has-agents? boolean] -> hiccup"
   [player attacker-id-str has-agents?]
   (let [target-id-str (str (:xt/id player))
         radio-name    "espionage-action"
@@ -83,15 +83,29 @@
 
 (defn update-espionage-warning
   "Return a phase-warning-div for direct outerHTML swap.
-  Shows when espionage-action param is non-empty, clears otherwise.
+  When a target is selected, shows which operation is queued.
+  When deselected, restores the disabled-reason hint if present.
 
   [ctx ring-ctx] -> hiccup"
   [{:keys [params]}]
-  (let [queued? (seq (:espionage-action params))]
+  (let [espionage-action (:espionage-action params)
+        disabled-hint    (:espionage-disabled-hint params)
+        op               (when (and espionage-action (str/includes? espionage-action ":"))
+                           (first (str/split espionage-action #":" 2)))
+        op-label         (case op
+                           "spy"    "Spy"
+                           "incite" "Incite"
+                           "bomb"   "Bomb"
+                           "defect" "Defect"
+                           nil)]
     (biff/render
-      (ui/phase-warning-div "espionage-warning"
-        (when queued? "\u24d8 Operation queued for Outcomes phase.")
-        {:color "text-yellow-400"}))))
+      (if op-label
+        (ui/phase-warning-div "espionage-warning"
+          (str "\u24d8 " op-label " operation queued for Outcomes phase.")
+          {:color "text-yellow-400"})
+        (ui/phase-warning-div "espionage-warning"
+          disabled-hint
+          {:color "text-game-green-soft"})))))
 
 (defn apply-espionage
   "Parse the chosen operation and target, store them as pending espionage, and advance to outcomes.
@@ -124,11 +138,13 @@
 
   [{:keys [player game db]}] -> hiccup"
   [{:keys [player game db]}]
-  (let [player-id     (:xt/id player)
-        attacker-id   (str player-id)
-        has-agents?   (pos? (:player/agents player))
-        other-players (utils/get-other-players db (:player/game player) player-id)
-        th-cls        "text-green-400 text-[11px] tracking-[0.08em] uppercase"]
+  (let [player-id      (:xt/id player)
+        attacker-id    (str player-id)
+        has-agents?    (pos? (:player/agents player))
+        other-players  (utils/get-other-players db (:player/game player) player-id)
+        disabled-hint  (when (and (seq other-players) (not has-agents?))
+                         "Espionage operations require at least one agent.")
+        th-cls         "text-green-400 text-[11px] tracking-[0.08em] uppercase"]
     (ui/phase-shell player game "ESPIONAGE PHASE"
       (biff/form
        {:action (str "/app/game/" player-id "/apply-espionage")
@@ -137,11 +153,11 @@
        (ui/phase-body player
         (ui/snapshot-section player)
         (if (empty? other-players)
-          [:p.text-sm.text-game-green-soft "There are no other empires to target."]
+          [:p.text-sm.text-game-green-soft "There are no other empires in the galaxy to undertake espionage against."]
           [:div
            (ui/section-label "Choose a Target")
            [:p.text-xs.mb-2.text-game-green-muted
-            "Spy: Reveal military forces. Incite: Reduce stability. Bomb: Covertly destroy uints. Defect: Turn enemy agents."]
+            "Spy: Reveal military forces. Incite: Reduce stability. Bomb: Covertly destroy units. Defect: Turn enemy agents."]
            [:div.overflow-x-auto
             [:table.w-full.text-sm
              {:class "border border-game-border border-collapse"}
@@ -154,10 +170,9 @@
              [:tbody
               (for [target other-players]
                 (target-row target attacker-id has-agents?))]]]]))
-       (when-not has-agents?
-         [:p.text-sm.text-yellow-400.px-3.py-2
-          "\u26a0 You have no agents. You cannot undertake covert operations this turn."])
-       (ui/phase-warning "espionage-warning")
+       (when disabled-hint
+         [:input {:type "hidden" :name "espionage-disabled-hint" :value disabled-hint}])
+       (ui/phase-warning-div "espionage-warning" disabled-hint {:color "text-game-green-soft"})
        (ui/phase-action-bar
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
         (ui/action-bar-button "Cancel Operation"
@@ -166,5 +181,6 @@
            :hx-target  "#espionage-warning"
            :hx-swap    "outerHTML"
            :hx-params  "none"
+           :hx-include "[name=espionage-disabled-hint]"
            :onclick    "document.querySelectorAll('[name=espionage-action]').forEach(function(r){r.checked=false;r.dataset.was='false';});"})
         (ui/submit-button true "Continue to Outcomes"))))))

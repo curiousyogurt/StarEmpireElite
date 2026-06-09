@@ -102,6 +102,7 @@
                   (forces-row "Agents"     agents)
                   (forces-row "Generals"   generals)
                   (forces-row "Transports" transports)
+                  [:hr.border-green-700]
                   (forces-row "Soldiers"   soldiers-total)
                   (if (= soldiers-avail soldiers-total)
                     (forces-row "Deployable" nil {:display "All"})
@@ -113,6 +114,7 @@
                   (forces-row "Cmd Ships"  cmd-ships)
                   (forces-row "Admirals"   admirals)
                   (forces-row "Carriers"   carriers)
+                  [:hr.border-green-700]
                   (forces-row "Fighters"   fighters-total)
                   (if (= fighters-avail fighters-total)
                     (forces-row "Deployable" nil {:display "All"})
@@ -184,11 +186,13 @@
                          "strike" "Strike"
                          nil)]
     (biff/render
-      (ui/phase-warning-div "action-warning"
-        (if mode-label
+      (if mode-label
+        (ui/phase-warning-div "action-warning"
           (str "\u24d8 " mode-label " action queued for Outcomes phase.")
-          disabled-hint)
-        {:color "text-yellow-400"}))))
+          {:color "text-yellow-400"})
+        (ui/phase-warning-div "action-warning"
+          disabled-hint
+          {:color "text-game-green-soft"})))))
 
 (defn apply-action
   "Store the pending attack target and mode (nil if none chosen) and advance to espionage phase.
@@ -233,8 +237,8 @@
         can-strike?    has-cmd?
         disabled-hints (when (seq other-players)
                          (cond-> []
-                           (not can-raid?)   (conj "Invade and Raid actions require deployable soldiers and fighters.")
-                           (not can-strike?) (conj "Strike action requires a command ship.")))
+                           (not can-raid?)   (conj "Invade and Raid operations require deployable soldiers and fighters.")
+                           (not can-strike?) (conj "Strike operations require at least one command ship.")))
         disabled-hint  (when (seq disabled-hints) (str/join " " disabled-hints))
         th-cls         "text-green-400 text-[11px] tracking-[0.08em] uppercase"]
     (ui/phase-shell 
@@ -250,11 +254,11 @@
         (forces-grid player)
         (if (empty? other-players)
           [:p.text-sm.text-game-green-soft
-           "There are no other empires in the galaxy to attack."]
+           "There are no other empires in the galaxy to take action against."]
           [:div
            (ui/section-label "Choose a Target")
            [:p.text-xs.mb-2.text-game-green-muted
-            "Invade: Target entire empire. Raid: Target outer planets. Strike: Missile strike from command ships."]
+            "Invade: Target entire empire. Raid: Target outer planets. Strike: Missiles launched from command ships."]
            [:div.overflow-x-auto
             [:table.w-full.text-sm
              {:class "border border-game-border border-collapse"}
@@ -269,7 +273,7 @@
                 (target-row target ef (:player/cmd-ships player) attacker-id))]]]]))
        (when disabled-hint
          [:input {:type "hidden" :name "action-disabled-hint" :value disabled-hint}])
-       (ui/phase-warning-div "action-warning" disabled-hint {:color "text-yellow-400"})
+       (ui/phase-warning-div "action-warning" disabled-hint {:color "text-game-green-soft"})
        (ui/phase-action-bar
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
         (ui/action-bar-button "Cancel Attack"
