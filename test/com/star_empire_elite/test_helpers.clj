@@ -52,6 +52,15 @@
    :game/defect-transfer-rate      0.1
    :game/defect-transfer-cap       50
 
+   ;; Combat multiplier constants
+   :game/general-mult-rate  0.01
+   :game/general-mult-cap   0.15
+   :game/admiral-mult-rate  0.01
+   :game/admiral-mult-cap   0.15
+   :game/agent-mult-rate    0.005
+   :game/agent-mult-cap     0.10
+   :game/space-carryover    0.15
+
    ;; Combat power constants
    :game/soldier-power             1
    :game/fighter-power             3

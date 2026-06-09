@@ -5,11 +5,14 @@
 ;;;;; are computed here and returned as data maps. Callers (outcomes-handler in app.clj) are
 ;;;;; responsible for persisting results and applying stat changes.
 ;;;;;
-;;;;; Combat model:
+;;;;; Combat model (two-phase):
 ;;;;;  - Effective forces are capped by transport/carrier capacity and general/admiral command limits
-;;;;;  - Each side's power is multiplied by a random factor (±combat-variance) to introduce variance
-;;;;;  - The loser takes losses proportional to the power margin (capped at 75%); winner takes half
-;;;;;  - Attacker captures planets proportional to margin when victorious
+;;;;;  - Combat resolves in two sequential phases: Space then Ground
+;;;;;  - Space phase: fighters, carriers, admirals, cmd-ships vs fighters, admirals, cmd-ships, stations
+;;;;;  - Ground phase: soldiers, transports, generals, agents vs soldiers, generals, agents
+;;;;;  - Space margin carries over as a bonus to the space winner's ground power
+;;;;;  - Ground phase determines the battle winner, captures, and losses
+;;;;;  - Generals/admirals/agents are capped multipliers, not raw power contributors
 ;;;;;
 
 (ns com.star-empire-elite.combat
@@ -35,17 +38,18 @@
    :carriers   (:player/carriers   player)
    :admirals   (:player/admirals   player)
    :cmd-ships  (:player/cmd-ships  player)
-   :stations   0})
+   :stations   0
+   ;; Agents carry no base power and are not tracked by compute-losses.
+   ;; They exist in the force map so the ground multiplier helper can read them.
+   :agents     (:player/agents player)})
 
 (defn effective-defending-forces
-  "Compute effective force counts for a defender. Defenders have no transport cap (soliders and 
-  fighters are are already where the need to be to defend against an attack), and stations are 
+  "Compute effective force counts for a defender. Defenders have no transport cap (soldiers and
+  fighters are already where they need to be to defend against an attack), and stations are
   included.
 
   [player player-map] -> force-map"
   [player]
-  ;; Start with effective-forces for defending player, and modify :soldiers, :fighters calculation,
-  ;; and add defence stations.
   (-> (effective-forces player)
       (assoc :soldiers  (min (:player/soldiers player)
                              (* (:player/generals player) const/soldiers-per-general))
@@ -53,18 +57,62 @@
                              (* (:player/admirals player) const/fighters-per-admiral))
              :stations  (:player/stations player))))
 
+;;;;
+;;;; Phase Partitioning
+;;;;
+
+(defn- space-forces
+  "Select the space-phase subset from a force map.
+
+  [forces force-map] -> force-map"
+  [forces]
+  (select-keys forces [:fighters :carriers :admirals :cmd-ships :stations]))
+
+(defn- ground-forces
+  "Select the ground-phase subset from a force map.
+
+  [forces force-map] -> force-map"
+  [forces]
+  (select-keys forces [:soldiers :transports :generals :agents]))
+
+;;;;
+;;;; Multiplier Helpers
+;;;;
+
+(defn- space-multiplier
+  "Compute the space-phase power multiplier: 1.0 + capped admiral bonus.
+
+  [game game-map, forces force-map] -> double"
+  [game forces]
+  (+ 1.0
+     (min (:game/admiral-mult-cap game)
+          (* (get forces :admirals 0) (:game/admiral-mult-rate game)))))
+
+(defn- ground-multiplier
+  "Compute the ground-phase power multiplier: 1.0 + capped general bonus + capped agent bonus.
+
+  [game game-map, forces force-map] -> double"
+  [game forces]
+  (+ 1.0
+     (min (:game/general-mult-cap game)
+          (* (get forces :generals 0) (:game/general-mult-rate game)))
+     (min (:game/agent-mult-cap game)
+          (* (get forces :agents 0) (:game/agent-mult-rate game)))))
+
+;;;;
+;;;; Base Power
+;;;;
+
 (defn base-power
-  "Sum the raw power of a force set. Stations are counted only for defenders.
+  "Sum the raw power of a force set. Command units (generals, admirals) no longer contribute
+  raw power — they act as capped multipliers instead. Stations are counted only for defenders.
 
   [game game-map, forces force-map, attacker? bool] -> number"
   [game forces attacker?]
-  (+ (* (:soldiers  forces) (:game/soldier-power  game))
-     (* (:fighters  forces) (:game/fighter-power  game))
-     (* (:cmd-ships forces) (:game/cmd-ship-power game))
-     (* (:generals  forces) (:game/general-power  game))
-     (* (:admirals  forces) (:game/admiral-power  game))
-     ;; If attacker, then 0 for stations; otherwise add stations to power
-     (if attacker? 0 (* (:stations forces) (:game/station-power game)))))
+  (+ (* (get forces :soldiers  0) (:game/soldier-power  game))
+     (* (get forces :fighters  0) (:game/fighter-power  game))
+     (* (get forces :cmd-ships 0) (:game/cmd-ship-power game))
+     (if attacker? 0 (* (get forces :stations 0) (:game/station-power game)))))
 
 (defn random-factor
   "Return a random multiplier in [1 - variance, 1 + variance].
@@ -74,6 +122,28 @@
   (+ (- 1.0 const/combat-variance)
      (* (rand) (* 2 const/combat-variance))))
 
+;;;;
+;;;; Phase Resolution
+;;;;
+
+(defn- resolve-phase
+  "Resolve a single combat phase. Computes base-power × multiplier × random-factor for each
+  side and returns the phase result.
+
+  [game game-map, att-forces force-map, def-forces force-map,
+   att-mult double, def-mult double, att-is-attacker? bool] -> phase-result"
+  [game att-forces def-forces att-mult def-mult att-is-attacker?]
+  (let [att-base  (base-power game att-forces att-is-attacker?)
+        def-base  (base-power game def-forces false)
+        att-roll  (* att-base att-mult (random-factor))
+        def-roll  (* def-base def-mult (random-factor))
+        att-wins? (> att-roll def-roll)
+        max-roll  (max att-roll def-roll)
+        margin    (if (zero? max-roll) 0.0 (/ (Math/abs (- att-roll def-roll)) max-roll))]
+    {:att-wins? att-wins?
+     :margin    margin
+     :att-roll  att-roll
+     :def-roll  def-roll}))
 
 ;;;;
 ;;;; Attack Resolution
@@ -108,56 +178,86 @@
      :ore (get taken :ore 0)}))
 
 (defn resolve-combat
-  "Resolve a full combat engagement between attacker and defender. The `mode` parameter
-  (:raid or :invade) determines the defender's effective defense multiplier and the cap
-  on captured planets and resources. Returns a result map containing both sides' force
-  counts, losses, rolls, captured planets, captured resources, and the combat mode.
+  "Resolve a full two-phase combat engagement between attacker and defender.
+  Space resolves first; the space margin carries over to buff the space winner's ground power.
+  Ground determines the battle winner: captures, resources, and losses.
+  The `mode` parameter (:raid or :invade) determines defense/reward multipliers.
   UUIDs stored as strings for safe pr-str round-trip.
+
   [game game-map, attacker player-map, defender player-map, mode keyword] -> result-map"
   [game attacker defender mode]
   (let [att-forces  (effective-forces attacker)
         def-forces  (effective-defending-forces defender)
-        att-power   (base-power game att-forces true)
+
+        ;; Phase partitions
+        att-space   (space-forces att-forces)
+        def-space   (space-forces def-forces)
+        att-ground  (ground-forces att-forces)
+        def-ground  (ground-forces def-forces)
+
+        ;; Space phase
+        att-space-mult (space-multiplier game att-space)
+        def-space-mult (space-multiplier game def-space)
+        space-result   (resolve-phase game att-space def-space att-space-mult def-space-mult true)
+
+        ;; Mode multipliers
         def-mult    (case mode
                       :raid   (:game/raid-defense-multiplier   game)
                       :invade (:game/invade-defense-multiplier game))
-        reward-mult  (case mode
-                       :raid   (:game/raid-reward-multiplier   game)
-                       :invade (:game/invade-reward-multiplier game))
-        planet-mult  (case mode
-                       :raid   (:game/raid-planet-capture-rate game)
-                       :invade (:game/invade-reward-multiplier game))
-        def-power   (* (base-power game def-forces false) def-mult)
-        att-roll    (* att-power (random-factor))
-        def-roll    (* def-power (random-factor))
-        att-wins?   (> att-roll def-roll)
-        max-roll    (max att-roll def-roll)
-        ;; Normalised relative difference (always between 0.0 and 1.0). Lower margin means rolls were
-        ;; nearly identical; higher margin means one side overwhelmed the other.
-        margin      (if (zero? max-roll) 0.0 (/ (Math/abs (- att-roll def-roll)) max-roll))
-        ;; If margin is small, loser-rate is small (survives with most of their forces). Capped at 75%
-        ;; as margin increases.
+
+        ;; Carryover: space margin × space-carryover constant
+        carryover      (* (:margin space-result) (:game/space-carryover game))
+
+        ;; Ground multipliers with space carryover applied to the space winner.
+        ;; Defense multiplier (raid=10%, invade=100%) scales the defender's ground engagement.
+        att-ground-mult (ground-multiplier game att-ground)
+        def-ground-mult (* (ground-multiplier game def-ground) def-mult)
+        att-ground-mult (if (:att-wins? space-result)
+                          (* att-ground-mult (+ 1.0 carryover))
+                          att-ground-mult)
+        def-ground-mult (if (:att-wins? space-result)
+                          def-ground-mult
+                          (* def-ground-mult (+ 1.0 carryover)))
+
+        ;; Ground phase — determines the battle outcome
+        ground-result  (resolve-phase game att-ground def-ground att-ground-mult def-ground-mult true)
+
+        att-wins?      (:att-wins? ground-result)
+        margin         (:margin ground-result)
+        reward-mult (case mode
+                      :raid   (:game/raid-reward-multiplier   game)
+                      :invade (:game/invade-reward-multiplier game))
+        planet-mult (case mode
+                      :raid   (:game/raid-planet-capture-rate game)
+                      :invade (:game/invade-reward-multiplier game))
+
+        ;; Loss model
         loser-rate  (min margin 0.75)
-        ;; Cap winner losses at 50% of loser's losses, ensuring that even in victory, there is some
-        ;; cost to combat.
         winner-rate (/ loser-rate 2.0)
+
+        ;; Planet capture (driven by ground margin)
         def-total-planets (+ (:player/mil-planets  defender)
-                              (:player/erg-planets  defender)
-                              (:player/ore-planets  defender))
-        ;; Use loser-rate (capped at 0.75) as the effective margin for captures, so that captures
-        ;; scale with victory margin but are bounded by the same 75% cap applied to combat losses.
+                             (:player/erg-planets  defender)
+                             (:player/ore-planets  defender))
         planets-count       (if att-wins? (long (* loser-rate planet-mult def-total-planets)) 0)
-        ;; Randomly select planets to be transferred to the attacker.
         planets-transferred (select-planets defender planets-count)
-        ;; Resources captured scale by loser-rate × reward-mult; zero on defeat.
+
+        ;; Resource capture
         resources-mult     (if att-wins? (* loser-rate reward-mult) 0.0)
         credits-captured   (long (* resources-mult (:player/credits defender)))
         food-captured      (long (* resources-mult (:player/food    defender)))
         fuel-captured      (long (* resources-mult (:player/fuel    defender)))
-        ;; The defender only exposes reward-mult of their forces to casualties (they're defending
-        ;; a fraction of their territory). The attacker commits fully against that fraction.
-        ;; For invade reward-mult=1.0 (all defender forces at risk); for raid reward-mult=0.1 (10%).
+
+        ;; Defender engagement scaling for losses
         def-engaged (update-vals def-forces #(long (* reward-mult %)))]
+
+    ;;;;
+    ;;;; TODO: Per-phase loss model
+    ;;;; Currently losses are computed from the ground margin applied to the full force maps.
+    ;;;; A future session will split losses so space units take losses from the space margin
+    ;;;; and ground units from the ground margin.
+    ;;;;
+
     {:attacker-id     (str (:xt/id attacker))
      :attacker-name   (:player/empire-name attacker)
      :defender-id     (str (:xt/id defender))
@@ -180,8 +280,9 @@
                        :stations   (:player/stations   defender)}
      :attacker-forces att-forces
      :defender-forces def-forces
-     :attacker-roll   att-roll
-     :defender-roll   def-roll
+     ;; Top-level roll/margin keys map to ground phase for backward compatibility
+     :attacker-roll   (:att-roll ground-result)
+     :defender-roll   (:def-roll ground-result)
      :attacker-wins?  att-wins?
      :margin          margin
      :attacker-losses (compute-losses att-forces  (if att-wins? winner-rate loser-rate))
@@ -189,7 +290,10 @@
      :planets-transferred planets-transferred
      :resources-captured  {:credits credits-captured
                            :food    food-captured
-                           :fuel    fuel-captured}}))
+                           :fuel    fuel-captured}
+     ;; Phase sub-results for Phase 2 display
+     :space-result  space-result
+     :ground-result ground-result}))
 
 ;;;;
 ;;;; Strike Resolution
@@ -262,7 +366,7 @@
                                             const/espionage-defection-rate)))))})))
 
 (defn resolve-espionage
-  "Resolve an espionage attempt. Agent counts are compared with ±variance random rolls. Returns a 
+  "Resolve an espionage attempt. Agent counts are compared with ±variance random rolls. Returns a
   result map including intel snapshot on success. UUIDs stored as strings for safe pr-str round-trip.
 
   [attacker player-map, defender player-map] -> result-map"
@@ -339,5 +443,3 @@
      :agents-captured  agents-captured
      :agents-defected  (when att-wins?
                          (min cap (long (* rate (:player/agents defender)))))}))
-
-

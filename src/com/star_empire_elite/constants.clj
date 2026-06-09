@@ -57,6 +57,22 @@
 (def combat-variance 0.15) ; ±15% random factor
 
 ;;;;
+;;;; Combat Multipliers
+;;;; Generals, admirals, and agents act as capped additive bonuses on top of a 1.0 base
+;;;; multiplier. Each term is individually capped via min so it plateaus rather than
+;;;; snowballing with empire size. The space-carryover constant controls how much a
+;;;; decisive space victory tilts the subsequent ground fight.
+;;;;
+
+(def general-mult-rate  0.01)  ; +1% ground power per general
+(def general-mult-cap   0.15)  ; max +15% (reached at 15 generals)
+(def admiral-mult-rate  0.01)  ; +1% space power per admiral
+(def admiral-mult-cap   0.15)  ; max +15% (reached at 15 admirals)
+(def agent-mult-rate    0.005) ; +0.5% ground power per agent
+(def agent-mult-cap     0.10)  ; max +10% (reached at 20 agents)
+(def space-carryover    0.15)  ; winning space decisively adds up to +15% to ground power
+
+;;;;
 ;;;; Command / Transport Capacity
 ;;;;
 

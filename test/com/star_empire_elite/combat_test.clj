@@ -107,7 +107,8 @@
       (is (= (:player/generals   strong-attacker) (:generals   forces)))
       (is (= (:player/carriers   strong-attacker) (:carriers   forces)))
       (is (= (:player/admirals   strong-attacker) (:admirals   forces)))
-      (is (= (:player/cmd-ships  strong-attacker) (:cmd-ships  forces))))))
+      (is (= (:player/cmd-ships  strong-attacker) (:cmd-ships  forces)))
+      (is (= (:player/agents     strong-attacker) (:agents     forces))))))
 
 ;;;;
 ;;;; effective-defending-forces Tests
@@ -136,21 +137,19 @@
 ;;;;
 
 (deftest test-base-power-attacker
-  (testing "Attacker power sums units without stations"
+  (testing "Attacker power sums soldiers, fighters, cmd-ships — no generals/admirals"
     (let [forces (combat/effective-forces strong-attacker)
           power  (combat/base-power game forces true)]
-      ;; 1000 soldiers * 1 + 200 fighters * 3 + 1 cmd-ship * 20
-      ;;   + 2 generals * 5 + 1 admiral * 10 = 1000 + 600 + 20 + 10 + 10 = 1640
-      (is (= 1640 power)))))
+      ;; 1000 soldiers * 1 + 200 fighters * 3 + 1 cmd-ship * 20 = 1000 + 600 + 20 = 1620
+      (is (= 1620 power)))))
 
 (deftest test-base-power-defender
-  (testing "Defender power includes stations"
+  (testing "Defender power includes stations but not generals/admirals"
     (let [forces (combat/effective-defending-forces strong-defender)
           power  (combat/base-power game forces false)]
-      ;; 500 soldiers * 1 + 100 fighters * 3 + 0 cmd-ships * 20
-      ;;   + 1 general * 5 + 1 admiral * 10 + 10 stations * 5
-      ;;   = 500 + 300 + 0 + 5 + 10 + 50 = 865
-      (is (= 865 power)))))
+      ;; 500 soldiers * 1 + 100 fighters * 3 + 0 cmd-ships * 20 + 10 stations * 5
+      ;; = 500 + 300 + 0 + 50 = 850
+      (is (= 850 power)))))
 
 (deftest test-base-power-stations-excluded-for-attacker
   (testing "Stations do not contribute to attacker power even if present in force map"
@@ -274,7 +273,8 @@
                  :attacker-forces :defender-forces
                  :attacker-roll :defender-roll :attacker-wins?
                  :margin :attacker-losses :defender-losses
-                 :mode :planets-transferred :resources-captured]]
+                 :mode :planets-transferred :resources-captured
+                 :space-result :ground-result]]
         (is (contains? result k) (str "Missing key: " k))))))
 
 (deftest test-resolve-combat-ids-are-strings
@@ -406,14 +406,13 @@
           :player/fuel         10000}))
 
 (deftest raid-uses-reduced-defense
-  (testing "With :raid mode, an attacker consistently beats a strong defender they would lose to in :invade"
-    ;; A moderate attacker vs a defender whose power is entirely in stations.
-    ;; Under :invade the defender's station power dominates; under :raid it's scaled to 10%.
-    ;; strong-attacker power ≈ 1640; with 3000 stations (power 5 each), invade def_power ≈ 15015
-    ;; (attacker never wins) while raid def_power ≈ 1502 (attacker frequently wins).
+  (testing "With :raid mode, an attacker wins more often due to reduced defender ground engagement"
+    ;; Defender has many soldiers (ground phase). Under :invade, defender engages fully (def-mult=1.0).
+    ;; Under :raid, defender's ground multiplier is scaled to 10% (def-mult=0.1), so attacker wins more.
     (let [station-heavy-defender (assoc large-defender
-                                        :player/stations   3000
-                                        :player/soldiers   0
+                                        :player/stations   0
+                                        :player/soldiers   5000
+                                        :player/generals   5
                                         :player/fighters   0)
           wins-raid   (count (filter :attacker-wins?
                                      (repeatedly 20 #(combat/resolve-combat game strong-attacker station-heavy-defender :raid))))

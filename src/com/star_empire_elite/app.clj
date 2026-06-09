@@ -101,6 +101,13 @@
    :game/defect-defense-multiplier     const/defect-defense-multiplier
    :game/defect-transfer-rate          const/defect-transfer-rate
    :game/defect-transfer-cap           const/defect-transfer-cap
+   :game/general-mult-rate              const/general-mult-rate
+   :game/general-mult-cap               const/general-mult-cap
+   :game/admiral-mult-rate              const/admiral-mult-rate
+   :game/admiral-mult-cap               const/admiral-mult-cap
+   :game/agent-mult-rate                const/agent-mult-rate
+   :game/agent-mult-cap                 const/agent-mult-cap
+   :game/space-carryover                const/space-carryover
    :game/soldier-power                 const/soldier-power
    :game/fighter-power                 const/fighter-power
    :game/cmd-ship-power                const/cmd-ship-power

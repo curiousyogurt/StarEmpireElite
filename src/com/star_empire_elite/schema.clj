@@ -46,6 +46,15 @@
           [:game/defect-transfer-rate      {:optional true} :double]
           [:game/defect-transfer-cap       {:optional true} :int]
 
+          ;; Combat multiplier constants
+          [:game/general-mult-rate  {:optional true} :double]
+          [:game/general-mult-cap   {:optional true} :double]
+          [:game/admiral-mult-rate  {:optional true} :double]
+          [:game/admiral-mult-cap   {:optional true} :double]
+          [:game/agent-mult-rate    {:optional true} :double]
+          [:game/agent-mult-cap     {:optional true} :double]
+          [:game/space-carryover    {:optional true} :double]
+
           ;; Combat power constants
           [:game/soldier-power             :int]
           [:game/fighter-power             :int]
