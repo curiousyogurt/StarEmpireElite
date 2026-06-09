@@ -67,15 +67,15 @@
 
 (deftest test-target-row-renders
   (testing "Returns a hiccup table row"
-    (let [result (#'espionage/target-row test-target "attacker-id")]
+    (let [result (#'espionage/target-row test-target "attacker-id" true)]
       (is (vector? result))
       (is (clojure.string/starts-with? (name (first result)) "tr"))))
 
   (testing "Displays correct total planet count"
     ;; row: [:tr.classes [:td empire-name] [:td total-planets] [:td score] [:td op] ...]
     ;; index 0=:tr, 1=empire-td, 2=planets-td; planets-td is [:td {attrs} 6].
-    (let [planet-td (nth (#'espionage/target-row test-target "attacker-id") 2)]
-      (is (= 6 (last planet-td))))))
+    (let [planet-td (nth (#'espionage/target-row test-target "attacker-id" true) 2)]
+      (is (= "6" (last planet-td))))))
 
 ;;;;
 ;;;; espionage-page Tests

@@ -130,17 +130,16 @@
 ;;;; Recovery:  if roll < max(stability, floor), stability recovers.
 
 (def stability-breakaway-threshold 20)
-(def stability-breakaway-cap       25)  ; stored as %, i.e. 25 = 25%
-(def stability-recovery-amount      5)  ; flat stability points gained on recovery
-(def stability-recovery-floor      50)  ; minimum effective stability for recovery rolls
-
-(def expense-stability-penalty 3)  ; stability points lost per underpaid expense fraction
+(def stability-breakaway-cap       25) ; stored as %, i.e. 25 = 25%
+(def stability-recovery-amount     5)  ; flat stability points gained on recovery
+(def stability-recovery-floor      50) ; minimum effective stability for recovery rolls
+(def expense-stability-penalty     3)  ; stability points lost per underpaid expense fraction
 
 ;;;;
 ;;;; Player Status
 ;;;;
 
-(def player-status-active    0)
+(def player-status-active     0)
 (def player-status-eliminated 1)
 
 ;;;;
@@ -159,8 +158,8 @@
 (def station-upkeep-credits 100)
 (def station-upkeep-fuel    20)
 
-(def agent-upkeep-food 20)
-(def agent-upkeep-fuel 20)
+(def agent-upkeep-food      20)
+(def agent-upkeep-fuel      20)
 
 ;;;;
 ;;;; Building Costs
@@ -181,7 +180,7 @@
 (def erg-planet-cost 20000)
 (def ore-planet-cost 22000)
 
-(def agent-cost    5000)
+(def agent-cost      5000)
 
 ;;;;
 ;;;; Espionage
@@ -236,3 +235,20 @@
 (def fuel-buy  6)
 (def fuel-sell 2)
 
+;;;;
+;;;; Score Weights
+;;;; Points contributed per unit/planet/resource to a player's score.
+
+(def score-population 700)
+(def score-mil-planet 500)
+(def score-erg-planet 300)
+(def score-ore-planet 200)
+(def score-soldier    2)
+(def score-transport  10)
+(def score-general    20)
+(def score-fighter    3)
+(def score-carrier    15)
+(def score-admiral    30)
+(def score-cmd-ship   20)
+(def score-station    5)
+(def score-agent      10)

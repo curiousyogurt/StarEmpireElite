@@ -207,6 +207,33 @@
    :erg-planets (get player :player/erg-planets 0)
    :mil-planets (get player :player/mil-planets 0)})
 
+(defn qualify-snapshot
+  "Re-qualify an unqualified resource map (as returned by player-snapshot) back to
+  :player/* namespaced keys, suitable for merging onto a player entity.
+
+  [snapshot resource-map] -> player-like map"
+  [snapshot]
+  (reduce-kv #(assoc %1 (keyword "player" (name %2)) %3) {} snapshot))
+
+(defn calculate-score
+  "Compute player score: planets (dominant) + military units (power-weighted).
+
+  [player player-map] -> int"
+  [player]
+  (+ (* (get player :player/population   0) const/score-population)
+     (* (get player :player/mil-planets  0) const/score-mil-planet)
+     (* (get player :player/erg-planets  0) const/score-erg-planet)
+     (* (get player :player/ore-planets  0) const/score-ore-planet)
+     (* (get player :player/soldiers     0) const/score-soldier)
+     (* (get player :player/transports   0) const/score-transport)
+     (* (get player :player/fighters     0) const/score-fighter)
+     (* (get player :player/carriers     0) const/score-carrier)
+     (* (get player :player/cmd-ships    0) const/score-cmd-ship)
+     (* (get player :player/stations     0) const/score-station)
+     (* (get player :player/generals     0) const/score-general)
+     (* (get player :player/admirals     0) const/score-admiral)
+     (* (get player :player/agents       0) const/score-agent)))
+
 ;;;;
 ;;;; Other-Player Fetching
 ;;;;

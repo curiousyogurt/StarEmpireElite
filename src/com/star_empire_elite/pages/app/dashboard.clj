@@ -224,7 +224,7 @@
 
      ;; ── Right column: Bars ───────────────────────────────────────────
      [:div.flex.flex-col.gap-3
-      (bar-row "Planets"   plan-pct  plan-fill  (str planets)           false)
+      (bar-row "Planets"   plan-pct  plan-fill  (ui/format-number-str planets) false)
       (bar-row "Stability" stab-pct  stab-fill  (str stability "%")     false)
       (bar-row "Score"     score-pct score-fill (ui/format-number score) true)]
 

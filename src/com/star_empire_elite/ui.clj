@@ -448,10 +448,10 @@
   [player]
   [:div.grid.grid-cols-4
    {:class "border-b border-game-border bg-[linear-gradient(180deg,rgba(20,42,28,0.5),rgba(20,42,28,0.15))]"}
-   (for [[label value] [["CREDITS"     (format-number (:player/credits     player))]
-                        ["ORE PLANETS" (str (:player/ore-planets player))]
-                        ["ERG PLANETS" (str (:player/erg-planets player))]
-                        ["MIL PLANETS" (str (:player/mil-planets player))]]]
+   (for [[label value] [["SCORE"       (format-number (:player/score       player))]
+                        ["ORE PLANETS" (format-number-str (:player/ore-planets player))]
+                        ["ERG PLANETS" (format-number-str (:player/erg-planets player))]
+                        ["MIL PLANETS" (format-number-str (:player/mil-planets player))]]]
      [:div.flex.flex-col.border-r.border-game-divider.last:border-r-0.min-w-0
       {:class "px-[18px] pt-[14px] pb-[16px] gap-[5px]"}
       [:div.uppercase {:class "text-game-green-dim text-[9px] tracking-[0.18em]"} label]
@@ -493,10 +493,11 @@
   (let [z? (fn [k] (zero? (or (k player) 0)))]
     [:div {:class "px-4 pt-[10px] pb-3"}
      (snapshot-manifest-row "EMPIRE"
-       [(snapshot-manifest-item "population" (format-population (:player/population player)) false)
-        (snapshot-manifest-item "stability"  (str (:player/stability player) "%")            false)
-        (snapshot-manifest-item "food"       (format-number (:player/food player))            (z? :player/food))
-        (snapshot-manifest-item "fuel"       (format-number (:player/fuel player))            (z? :player/fuel))]
+       [(snapshot-manifest-item "credits"    (format-number (:player/credits    player))      (z? :player/credits))
+        (snapshot-manifest-item "food"       (format-number (:player/food       player))      (z? :player/food))
+        (snapshot-manifest-item "fuel"       (format-number (:player/fuel       player))      (z? :player/fuel))
+        (snapshot-manifest-item "population" (format-population (:player/population player))  false)
+        (snapshot-manifest-item "stability"  (str (:player/stability player) "%")             false)]
        false)
      (snapshot-manifest-row "GROUND"
        [(snapshot-manifest-item "soldiers"   (format-number (:player/soldiers   player)) (z? :player/soldiers))
@@ -1139,3 +1140,55 @@
         :aside-id  total-id
         :rows      (for [{:keys [label value id]} rows]
                      {:label label :value value :signed? true :id id})})}))
+
+;;;;
+;;;; Target Table Components
+;;;; Shared by action.clj (combat) and espionage.clj (covert ops) target-selection tables.
+;;;;
+
+(defn op-radio-btn
+  "Render a radio button for selecting a target operation. Supports toggle-on-reclick
+  (clicking an already-selected radio deselects it) and fires an HTMX warning update.
+
+  [radio-name str, value str, label str, warning-endpoint str, warning-id str] -> hiccup"
+  [radio-name value label warning-endpoint warning-id]
+  [:label.block.cursor-pointer
+   [:input.peer.sr-only
+    {:type       "radio"
+     :name       radio-name
+     :value      value
+     :hx-post    warning-endpoint
+     :hx-trigger "click"
+     :hx-target  (str "#" warning-id)
+     :hx-swap    "outerHTML"
+     :onclick    (str "var p=this.dataset.was==='true';"
+                      "document.querySelectorAll('[name=" radio-name "]').forEach(function(r){r.dataset.was='false';});"
+                      "if(p){this.checked=false;}else{this.dataset.was='true';}")}]
+   [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
+    {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
+    label]])
+
+(defn disabled-radio-btn
+  "Render a disabled radio button for an unavailable operation.
+
+  [radio-name str, label str] -> hiccup"
+  [radio-name label]
+  [:label
+   [:input.sr-only {:type "radio" :name radio-name :disabled true}]
+   [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.text-game-green-dim.border-game-border.cursor-not-allowed
+    label]])
+
+(defn target-info-tds
+  "Render the Empire name, Planets, and Score cells for a target table row.
+  Returns a vector of 3 [:td ...] elements.
+
+  [player player-map] -> [[:td ...] [:td ...] [:td ...]]"
+  [player]
+  (let [total-planets (+ (:player/mil-planets player 0)
+                         (:player/erg-planets player 0)
+                         (:player/ore-planets player 0))
+        td-cls       "border-r border-game-border py-1 px-3 text-game-green-soft"
+        td-right-cls "border-r border-game-border py-1 px-3 text-game-green-soft text-right"]
+    [[:td {:class td-cls}       (:player/empire-name player)]
+     [:td {:class td-right-cls} (format-number total-planets)]
+     [:td {:class td-right-cls} (format-number (:player/score player))]]))

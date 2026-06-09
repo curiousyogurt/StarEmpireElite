@@ -98,7 +98,7 @@
   [payload map] -> hiccup-fragment"
   [payload]
   (let [lost (+ (:ore-lost payload 0) (:erg-lost payload 0) (:mil-lost payload 0))]
-    [:span (empire-span (:defender-name payload)) " lost " lost " planets to breakaway"]))
+    [:span (empire-span (:defender-name payload)) " lost " (ui/format-number lost) " planets to breakaway"]))
 
 (defn- elimination-summary
   "Verb phrase for elimination events.

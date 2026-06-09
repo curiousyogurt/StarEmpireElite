@@ -125,12 +125,12 @@
   [player income]
   (let [pop-count (ui/format-population (:player/population player))]
     [:div {:class "grid grid-cols-2 md:grid-cols-4 gap-1.5"}
-     (income-card "Ore" (str "x" (:player/ore-planets player))
+     (income-card "Ore" (str "x" (ui/format-number-str (:player/ore-planets player)))
                   {:credits (:ore-credits income)})
-     (income-card "Erg" (str "x" (:player/erg-planets player))
+     (income-card "Erg" (str "x" (ui/format-number-str (:player/erg-planets player)))
                   {:food (:erg-food income)
                    :fuel (:erg-fuel income)})
-     (income-card "Mil" (str "x" (:player/mil-planets player))
+     (income-card "Mil" (str "x" (ui/format-number-str (:player/mil-planets player)))
                   {:soldiers (:mil-soldiers income)
                    :fighters (:mil-fighters income)
                    :stations (:mil-stations income)})
@@ -240,7 +240,15 @@
                     :player/soldiers      (:soldiers after)
                     :player/fighters      (:fighters after)
                     :player/stations      (:stations after)
-                    :player/current-phase 2} ; Next phase
+                    :player/current-phase 2
+                    :player/score         (utils/calculate-score
+                                            (assoc player
+                                              :player/credits  (:credits after)
+                                              :player/food     (:food after)
+                                              :player/fuel     (:fuel after)
+                                              :player/soldiers (:soldiers after)
+                                              :player/fighters (:fighters after)
+                                              :player/stations (:stations after)))} ; Next phase
              day-reset? (assoc :player/current-round 1))])
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/expenses")}}))))

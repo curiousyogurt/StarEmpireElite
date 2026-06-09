@@ -403,7 +403,9 @@
                               :player/ore-planets  (:ore-planets resources-after)
                               :player/erg-planets  (:erg-planets resources-after)
                               :player/mil-planets  (:mil-planets resources-after)
-                              :player/current-phase 4}])
+                              :player/current-phase 4
+                              :player/score        (utils/calculate-score
+                                                     (merge player (utils/qualify-snapshot resources-after)))}])
             {:status 303
              :headers {"location" (str "/app/game/" player-id "/action")}}))))))
 

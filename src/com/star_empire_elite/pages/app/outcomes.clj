@@ -31,7 +31,7 @@
 ;;;;;           ├─ ui/action-bar-link "Pause"
 ;;;;;           └─ ui/submit-button "End the Current Round" | "Continue to Next Turn"
 ;;;;;
-;;;;; 2)  apply-outcomes ← calculate-score, turn/round advancement
+;;;;; 2)  apply-outcomes ← utils/calculate-score, turn/round advancement
 
 (ns com.star-empire-elite.pages.app.outcomes
   (:require [clojure.string :as str]
@@ -39,26 +39,6 @@
             [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
-
-;;;;
-;;;; Score
-;;;;
-
-(defn- calculate-score
-  "Compute player score: planets (dominant) + military (power-weighted) + credits (tiebreaker).
-
-  [player] -> int"
-  [player]
-  (+ (* (:player/mil-planets  player) 500)
-     (* (:player/erg-planets  player) 300)
-     (* (:player/ore-planets  player) 200)
-     (* (:player/soldiers     player) 1)
-     (* (:player/fighters     player) 3)
-     (* (:player/cmd-ships    player) 20)
-     (* (:player/stations     player) 5)
-     (* (:player/generals     player) 50)
-     (* (:player/admirals     player) 100)
-     (quot (max 0 (:player/credits player)) 1000)))
 
 ;;;;
 ;;;; UI Primitives
@@ -498,9 +478,9 @@
         has-recovery?  (and (some? recovery-result) (:triggered? recovery-result))
         summary-text   (cond
                          has-breakaway? (str "empire fractured — "
-                                             (:total-lost breakaway-result) " planets lost")
-                         has-penalty?   (str "−" expense-penalty "%")
-                         has-recovery?  (str "+" (:amount recovery-result) "% recovery")
+                                             (ui/format-number-str (:total-lost breakaway-result)) " planets lost")
+                         has-penalty?   (str "−" (ui/format-number-str expense-penalty) "%")
+                         has-recovery?  (str "+" (ui/format-number-str (:amount recovery-result)) "% recovery")
                          :else          "")]
     (when (or has-penalty? has-breakaway? has-recovery?)
       (collapsible-card
@@ -511,21 +491,21 @@
         [:div.p-3.border-t.border-game-divider
          (when has-penalty?
            [:p.text-xs.mb-2.text-yellow-400
-            (str "Empire stability decreases due to unpaid expenses: −" expense-penalty "%")])
+            (str "Empire stability decreases due to unpaid expenses: −" (ui/format-number-str expense-penalty) "%")])
          (when has-breakaway?
            (let [lost-str (str/join ", "
                             (keep identity
                               [(when (pos? (:ore-lost breakaway-result))
-                                 (str (:ore-lost breakaway-result) " ore planet(s)"))
+                                 (str (ui/format-number-str (:ore-lost breakaway-result)) " ore planet(s)"))
                                (when (pos? (:erg-lost breakaway-result))
-                                 (str (:erg-lost breakaway-result) " energy planet(s)"))
+                                 (str (ui/format-number-str (:erg-lost breakaway-result)) " energy planet(s)"))
                                (when (pos? (:mil-lost breakaway-result))
-                                 (str (:mil-lost breakaway-result) " military planet(s)"))]))]
+                                 (str (ui/format-number-str (:mil-lost breakaway-result)) " military planet(s)"))]))]
              [:p.text-xs.mb-2.text-red-400
               (str "Empire instability prompts revolution. Lost: " lost-str)]))
          (when has-recovery?
            [:p.text-xs.text-green-400
-            (str "Empire stability increases due to paid expenses: +" (:amount recovery-result) "%")])]))))
+            (str "Empire stability increases due to paid expenses: +" (ui/format-number-str (:amount recovery-result)) "%")])]))))
 
 (defn- incoming-card
   "Render a single incoming attack card (combat or strike)."
@@ -633,7 +613,7 @@
                      :player/incoming-bomb-result            nil
                      :player/incoming-defect-agents-lost    nil
                      :player/pending-espionage-op            nil
-                     :player/score                           (calculate-score player)}
+                     :player/score                           (utils/calculate-score player)}
                     (when end-round?
                       {:player/last-round-completed-at now}))])
           {:status 303

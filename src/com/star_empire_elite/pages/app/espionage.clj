@@ -58,37 +58,24 @@
   attacker-id-str is the current player's id, used for the HTMX warning endpoint.
 
   [player player-map, attacker-id-str string] -> hiccup"
-  [player attacker-id-str]
-  (let [total-planets (+ (:player/mil-planets player)
-                         (:player/erg-planets player)
-                         (:player/ore-planets player))
-        target-id-str (str (:xt/id player))
-        td-cls        "border-r border-game-border py-1 px-3 text-game-green-soft"
-        td-right-cls  "border-r border-game-border py-1 px-3 text-game-green-soft text-right"
+  [player attacker-id-str has-agents?]
+  (let [target-id-str (str (:xt/id player))
+        radio-name    "espionage-action"
+        warning-ep    (str "/app/game/" attacker-id-str "/espionage-warning")
+        warning-id    "espionage-warning"
         op-btn        (fn [op label]
-                        [:label.block.cursor-pointer
-                         [:input.peer.sr-only
-                          {:type       "radio"
-                           :name       "espionage-action"
-                           :value      (str op ":" target-id-str)
-                           :hx-post    (str "/app/game/" attacker-id-str "/espionage-warning")
-                           :hx-trigger "click"
-                           :hx-target  "#espionage-warning"
-                           :hx-swap    "outerHTML"
-                           :onclick    (str "var p=this.dataset.was==='true';"
-                                            "document.querySelectorAll('[name=espionage-action]').forEach(function(r){r.dataset.was='false';});"
-                                            "if(p){this.checked=false;}else{this.dataset.was='true';}")}]
-                         [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
-                          {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
-                          label]])]
-    [:tr.bg-game-row.border-b.border-game-divider
-     [:td {:class td-cls}       (:player/empire-name player)]
-     [:td {:class td-right-cls} total-planets]
-     [:td {:class td-right-cls} (:player/score player)]
-     [:td.py-1.px-3 (op-btn "spy"    "Spy")]
-     [:td.py-1.px-3 (op-btn "incite" "Incite")]
-     [:td.py-1.px-3 (op-btn "bomb"   "Bomb")]
-     [:td.py-1.px-3 (op-btn "defect" "Defect")]]))
+                        (if has-agents?
+                          (ui/op-radio-btn radio-name
+                            (str op ":" target-id-str)
+                            label warning-ep warning-id)
+                          (ui/disabled-radio-btn radio-name label)))]
+    (into [:tr.bg-game-row.border-b.border-game-divider]
+      (concat
+        (ui/target-info-tds player)
+        [[:td.py-1.px-3 (op-btn "spy"    "Spy")]
+         [:td.py-1.px-3 (op-btn "incite" "Incite")]
+         [:td.py-1.px-3 (op-btn "bomb"   "Bomb")]
+         [:td.py-1.px-3 (op-btn "defect" "Defect")]]))))
 
 ;;;;
 ;;;; Actions
@@ -123,7 +110,8 @@
                               :xt/id                        player-id
                               :player/current-phase         6
                               :player/pending-espionage     target-uuid
-                              :player/pending-espionage-op  op}])
+                              :player/pending-espionage-op  op
+                              :player/score                 (utils/calculate-score player)}])
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/outcomes")}}))))
 
@@ -138,6 +126,7 @@
   [{:keys [player game db]}]
   (let [player-id     (:xt/id player)
         attacker-id   (str player-id)
+        has-agents?   (pos? (:player/agents player))
         other-players (utils/get-other-players db (:player/game player) player-id)
         th-cls        "text-green-400 text-[11px] tracking-[0.08em] uppercase"]
     (ui/phase-shell player game "ESPIONAGE PHASE"
@@ -147,13 +136,8 @@
         :class  "m-0"}
        (ui/phase-body player
         (ui/snapshot-section player)
-        (cond
-          (zero? (:player/agents player))
-          [:p.text-sm.text-yellow-400
-           "\u26a0 You have no agents. You cannot undertake covert operations this turn."]
-          (empty? other-players)
+        (if (empty? other-players)
           [:p.text-sm.text-game-green-soft "There are no other empires to target."]
-          :else
           [:div
            (ui/section-label "Choose a Target")
            [:p.text-xs.mb-2.text-game-green-muted
@@ -169,7 +153,10 @@
                [:th.px-3.py-1 {:colspan 4 :class th-cls} "Operations"]]]
              [:tbody
               (for [target other-players]
-                (target-row target attacker-id))]]]]))
+                (target-row target attacker-id has-agents?))]]]]))
+       (when-not has-agents?
+         [:p.text-sm.text-yellow-400.px-3.py-2
+          "\u26a0 You have no agents. You cannot undertake covert operations this turn."])
        (ui/phase-warning "espionage-warning")
        (ui/phase-action-bar
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")

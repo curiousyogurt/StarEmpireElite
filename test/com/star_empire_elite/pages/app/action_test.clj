@@ -101,7 +101,7 @@
     ;; index 0=:tr, 1=empire-td, 2=planets-td; planets-td is [:td {attrs} 6].
     (let [result (#'action/target-row test-target {:soldiers 100 :fighters 50} 1 "attacker-id")
           planet-td (nth result 2)]
-      (is (= 6 (last planet-td)))))
+      (is (= "6" (last planet-td)))))
 
   (testing "Renders Invade, Raid, and Strike buttons"
     (let [result (#'action/target-row test-target {:soldiers 100 :fighters 50} 1 "attacker-id")]
@@ -122,12 +122,12 @@
           inputs (filter #(and (map? %) (= "radio" (:type %))) hiccup)]
       (is (every? #(not (:disabled %)) inputs))))
 
-  (testing "Invade disabled, Raid and Strike enabled when attacker has 0 cmd-ships"
+  (testing "Strike disabled when attacker has 0 cmd-ships; Invade and Raid enabled"
     (let [result (#'action/target-row test-target {:soldiers 100 :fighters 50} 0 "attacker-id")
           hiccup (tree-seq coll? seq result)
           inputs (filter #(and (map? %) (= "radio" (:type %))) hiccup)]
-      ;; Invade and Strike disabled (2 of 3)
-      (is (= 2 (count (filter :disabled inputs))))))
+      ;; Only Strike disabled (1 of 3)
+      (is (= 1 (count (filter :disabled inputs))))))
 
   (testing "Invade and Raid disabled when attacker has 0 deployable soldiers"
     (let [result (#'action/target-row test-target {:soldiers 0 :fighters 50} 5 "attacker-id")

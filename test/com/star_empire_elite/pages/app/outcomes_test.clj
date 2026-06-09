@@ -1,6 +1,8 @@
 (ns com.star-empire-elite.pages.app.outcomes-test
   (:require [clojure.test :refer :all]
+            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.pages.app.outcomes :as outcomes]
+            [com.star-empire-elite.utils :as utils]
             [com.star-empire-elite.test-helpers :as helpers]
             [xtdb.api :as xt]
             [com.biffweb :as biff]))
@@ -50,53 +52,35 @@
 ;;;;
 ;;;; calculate-score Tests
 ;;;;
-;;;; calculate-score is private. Access it via the var to verify the scoring formula
-;;;; without going through a full apply-outcomes call.
-;;;;
-
-(def calculate-score #'outcomes/calculate-score)
 
 (deftest test-calculate-score-formula
-  (testing "Planets dominate the score, military and credits are tie-breakers"
-    (let [player {:player/mil-planets  2 :player/erg-planets 1 :player/ore-planets  0
-                  :player/soldiers     10 :player/fighters     5 :player/cmd-ships    1
-                  :player/stations     3  :player/generals     1 :player/admirals     0
-                  :player/credits      3000}
-          ;; 2*500 + 1*300 + 0*200 + 10*1 + 5*3 + 1*20 + 3*5 + 1*50 + 0*100 + floor(3000/1000)
-          ;; = 1000 + 300 + 0 + 10 + 15 + 20 + 15 + 50 + 0 + 3 = 1413
-          expected (+ (* 2 500) (* 1 300) (* 0 200)
-                      (* 10 1) (* 5 3) (* 1 20) (* 3 5) (* 1 50) (* 0 100)
-                      (quot 3000 1000))]
-      (is (= expected (calculate-score player))))))
+  (testing "Planets dominate the score, military units are tie-breakers"
+    (let [player {:player/mil-planets 2  :player/erg-planets 1  :player/ore-planets 0
+                  :player/soldiers    10 :player/transports  4  :player/fighters    5
+                  :player/carriers    2  :player/cmd-ships   1  :player/stations    3
+                  :player/generals    1  :player/admirals    0  :player/agents      6}
+          ;; Uses score weights from constants.clj
+          expected (+ (* 2 const/score-mil-planet) (* 1 const/score-erg-planet) (* 0 const/score-ore-planet)
+                      (* 10 const/score-soldier) (* 4 const/score-transport) (* 5 const/score-fighter)
+                      (* 2 const/score-carrier) (* 1 const/score-cmd-ship) (* 3 const/score-station)
+                      (* 1 const/score-general) (* 0 const/score-admiral) (* 6 const/score-agent))]
+      (is (= expected (utils/calculate-score player))))))
 
 (deftest test-calculate-score-zero-player
   (testing "Returns zero when all values are zero"
     (let [player {:player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0
-                  :player/soldiers 0 :player/fighters 0 :player/cmd-ships 0
-                  :player/stations 0 :player/generals 0 :player/admirals 0
-                  :player/credits 0}]
-      (is (= 0 (calculate-score player))))))
-
-(deftest test-calculate-score-negative-credits-clamped
-  (testing "Negative credits contribute 0 to score (clamped via max 0)"
-    (let [player {:player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0
-                  :player/soldiers 0 :player/fighters 0 :player/cmd-ships 0
-                  :player/stations 0 :player/generals 0 :player/admirals 0
-                  :player/credits -9999}]
-      (is (= 0 (calculate-score player))))))
+                  :player/soldiers 0 :player/transports 0 :player/fighters 0
+                  :player/carriers 0 :player/cmd-ships 0 :player/stations 0
+                  :player/generals 0 :player/admirals 0 :player/agents 0}]
+      (is (= 0 (utils/calculate-score player))))))
 
 (deftest test-calculate-score-planets-dominate
   (testing "A single military planet outweighs hundreds of soldiers"
-    (let [planet-player  {:player/mil-planets 1 :player/erg-planets 0 :player/ore-planets 0
-                          :player/soldiers 0 :player/fighters 0 :player/cmd-ships 0
-                          :player/stations 0 :player/generals 0 :player/admirals 0
-                          :player/credits 0}
-          soldier-player {:player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0
-                          :player/soldiers 499 :player/fighters 0 :player/cmd-ships 0
-                          :player/stations 0 :player/generals 0 :player/admirals 0
-                          :player/credits 0}]
-      ;; 1 mil-planet = 500 points; 499 soldiers = 499 points.
-      (is (> (calculate-score planet-player) (calculate-score soldier-player))))))
+    (let [planet-player  {:player/mil-planets 1}
+          ;; Use just under enough soldiers to match one mil-planet's score.
+          soldier-count  (dec (quot const/score-mil-planet const/score-soldier))
+          soldier-player {:player/soldiers soldier-count}]
+      (is (> (utils/calculate-score planet-player) (utils/calculate-score soldier-player))))))
 
 ;;;;
 ;;;; apply-outcomes Tests
@@ -187,7 +171,7 @@
         (outcomes/apply-outcomes {:path-params {:player-id (str test-player-id)}
                                   :biff/db nil})
         (let [tx (first @tx-atom)
-              expected-score (calculate-score test-player)]
+              expected-score (utils/calculate-score test-player)]
           (is (= expected-score (:player/score tx))))))))
 
 ;;;;

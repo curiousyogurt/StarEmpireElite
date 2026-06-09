@@ -64,7 +64,9 @@
                              (not display) (assoc :value value)
                              warn? (assoc :warn? true)))]
     (if title
-      (assoc-in pill [1 :title] title)
+      (-> pill
+          (assoc-in [1 :title] title)
+          (update-in [1 :class] #(str % " cursor-help")))
       pill)))
 
 (defn- forces-card
@@ -85,41 +87,38 @@
   [player player-map] -> hiccup"
   [player]
   (let [ef             (combat/effective-forces player)
+        agents         (get player :player/agents     0)
         generals       (get player :player/generals   0)
         transports     (get player :player/transports 0)
         soldiers-total (get player :player/soldiers   0)
         soldiers-avail (:soldiers ef)
+        cmd-ships      (get player :player/cmd-ships  0)
         admirals       (get player :player/admirals   0)
         carriers       (get player :player/carriers   0)
         fighters-total (get player :player/fighters   0)
         fighters-avail (:fighters ef)]
     [:div {:class "grid grid-cols-2 gap-1.5"}
      (forces-card "Ground"
+                  (forces-row "Agents"     agents)
                   (forces-row "Generals"   generals)
                   (forces-row "Transports" transports)
                   (forces-row "Soldiers"   soldiers-total)
-                  (cond
-                    (zero? soldiers-avail)
-                    (forces-row "Deployable: " 0 {:warn? true})
-                    (= soldiers-avail soldiers-total)
-                    (forces-row "Deployable: " nil {:display "All"})
-                    :else
-                    (forces-row "ⓘ Deployable: " soldiers-avail
+                  (if (= soldiers-avail soldiers-total)
+                    (forces-row "Deployable" nil {:display "All"})
+                    (forces-row "ⓘ Deployable" soldiers-avail
                                 {:warn? true
-                                 :title "Full deployment of solders requires 100:1 soldiers-to-transports, and 1000:1 soldiers-to-generals"})))
+                                 :title "Full deployment requires 100:1 soldiers-to-transports and 1000:1 soldiers-to-generals"}))
+)
      (forces-card "Fleet"
+                  (forces-row "Cmd Ships"  cmd-ships)
                   (forces-row "Admirals"   admirals)
                   (forces-row "Carriers"   carriers)
                   (forces-row "Fighters"   fighters-total)
-                  (cond
-                    (zero? fighters-avail)
-                    (forces-row "Deployable: " 0 {:warn? true})
-                    (= fighters-avail fighters-total)
-                    (forces-row "Deployable: " nil {:display "All"})
-                    :else
-                    (forces-row "ⓘ Deployable: " fighters-avail
+                  (if (= fighters-avail fighters-total)
+                    (forces-row "Deployable" nil {:display "All"})
+                    (forces-row "ⓘ Deployable" fighters-avail
                                 {:warn? true
-                                 :title "Full deployment of fighters requires 100:1 fighters-to-carriers, and 1000:1 fighters-to-admirals"})))]))
+                                 :title "Full deployment requires 100:1 fighters-to-carriers and 1000:1 fighters-to-admirals"})))]))
 
 ;;;
 ;;; Target rows populate the targets table, one row per other player in the game.
@@ -143,45 +142,26 @@
 
   [player player-map, ef {:soldiers int :fighters int}, cmd-ships int, attacker-id-str string] -> hiccup"
   [player ef cmd-ships attacker-id-str]
-  (let [total-planets (+ (:player/mil-planets player)
-                         (:player/erg-planets player)
-                         (:player/ore-planets player))
-        target-id-str (str (:xt/id player))
-        td-cls        "border-r border-game-border py-1 px-3 text-game-green-soft"
-        td-right-cls  "border-r border-game-border py-1 px-3 text-game-green-soft text-right"
-        action-btn    (fn [mode label]
-                        [:label.block.cursor-pointer
-                         [:input.peer.sr-only
-                          {:type       "radio"
-                           :name       "target-action"
-                           :value      (str target-id-str ":" (name mode))
-                           :hx-post    (str "/app/game/" attacker-id-str "/action-warning")
-                           :hx-trigger "click"
-                           :hx-target  "#action-warning"
-                           :hx-swap    "outerHTML"
-                           :onclick    (str "var p=this.dataset.was==='true';"
-                                            "document.querySelectorAll('[name=target-action]').forEach(function(r){r.dataset.was='false';});"
-                                            "if(p){this.checked=false;}else{this.dataset.was='true';}")}]
-                         [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
-                          {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
-                          label]])
+  (let [target-id-str (str (:xt/id player))
+        radio-name    "target-action"
+        warning-ep    (str "/app/game/" attacker-id-str "/action-warning")
+        warning-id    "action-warning"
+        op-btn        (fn [mode label]
+                        (ui/op-radio-btn radio-name
+                          (str target-id-str ":" (name mode))
+                          label warning-ep warning-id))
         disabled-btn  (fn [label]
-                        [:label
-                         [:input.sr-only {:type "radio" :name "target-action" :disabled true}]
-                         [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.text-game-green-dim.border-game-border.cursor-not-allowed
-                          label]])
+                        (ui/disabled-radio-btn radio-name label))
         has-soldiers? (pos? (:soldiers ef))
         has-fighters? (pos? (:fighters ef))
         has-cmd?      (pos? cmd-ships)
-        can-invade?   (and has-soldiers? has-fighters? has-cmd?)
-        can-raid?     (and has-soldiers? has-fighters?)]
-    [:tr.bg-game-row.border-b.border-game-divider
-     [:td {:class td-cls} (:player/empire-name player)]
-     [:td {:class td-right-cls}  total-planets]
-     [:td {:class td-right-cls}  (:player/score player)]
-     [:td.py-1.px-2 (if can-invade? (action-btn :invade "Invade") (disabled-btn "Invade"))]
-     [:td.py-1.px-2 (if can-raid?   (action-btn :raid   "Raid")   (disabled-btn "Raid"))]
-     [:td.py-1.px-2 (if has-cmd?    (action-btn :strike "Strike") (disabled-btn "Strike"))]]))
+        can-attack?   (and has-soldiers? has-fighters?)]
+    (into [:tr.bg-game-row.border-b.border-game-divider]
+      (concat
+        (ui/target-info-tds player)
+        [[:td.py-1.px-2 (if can-attack? (op-btn :invade "Invade") (disabled-btn "Invade"))]
+         [:td.py-1.px-2 (if can-attack? (op-btn :raid   "Raid")   (disabled-btn "Raid"))]
+         [:td.py-1.px-2 (if has-cmd?    (op-btn :strike "Strike") (disabled-btn "Strike"))]]))))
 
 ;;;;
 ;;;; Actions
@@ -189,14 +169,25 @@
 
 (defn update-action-warning
   "Return a phase-warning-div for direct outerHTML swap.
-  Shows when target-action param is non-empty, clears otherwise.
+  When a target is selected, shows which action is queued.
+  When deselected, restores the disabled-reason hint if present.
 
   [ctx ring-ctx] -> hiccup"
   [{:keys [params]}]
-  (let [queued? (seq (:target-action params))]
+  (let [target-action  (:target-action params)
+        disabled-hint  (:action-disabled-hint params)
+        mode           (when (and target-action (str/includes? target-action ":"))
+                         (second (str/split target-action #":" 2)))
+        mode-label     (case mode
+                         "invade" "Invade"
+                         "raid"   "Raid"
+                         "strike" "Strike"
+                         nil)]
     (biff/render
       (ui/phase-warning-div "action-warning"
-        (when queued? "\u24d8 Attack queued for Outcomes phase.")
+        (if mode-label
+          (str "\u24d8 " mode-label " action queued for Outcomes phase.")
+          disabled-hint)
         {:color "text-yellow-400"}))))
 
 (defn apply-action
@@ -217,7 +208,8 @@
                               :xt/id                     player-id
                               :player/current-phase      5
                               :player/pending-attack      target-uuid
-                              :player/pending-attack-mode mode-kw}])
+                              :player/pending-attack-mode mode-kw
+                              :player/score               (utils/calculate-score player)}])
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/espionage")}}))))
 
@@ -234,6 +226,16 @@
         attacker-id    (str player-id)
         ef             (combat/effective-forces player)
         other-players  (utils/get-other-players db (:player/game player) player-id)
+        has-soldiers?  (pos? (:soldiers ef))
+        has-fighters?  (pos? (:fighters ef))
+        has-cmd?       (pos? (get player :player/cmd-ships 0))
+        can-raid?      (and has-soldiers? has-fighters?)
+        can-strike?    has-cmd?
+        disabled-hints (when (seq other-players)
+                         (cond-> []
+                           (not can-raid?)   (conj "Invade and Raid actions require deployable soldiers and fighters.")
+                           (not can-strike?) (conj "Strike action requires a command ship.")))
+        disabled-hint  (when (seq disabled-hints) (str/join " " disabled-hints))
         th-cls         "text-green-400 text-[11px] tracking-[0.08em] uppercase"]
     (ui/phase-shell 
       player 
@@ -246,9 +248,6 @@
        (ui/phase-body player
         (ui/snapshot-section player)
         (forces-grid player)
-        (when (and (zero? (:soldiers ef)) (zero? (:fighters ef)))
-          [:p.text-sm.text-yellow-400
-           "\u26a0 You have no deployable soldiers or fighters. You cannot undertake invasions or raids this turn."])
         (if (empty? other-players)
           [:p.text-sm.text-game-green-soft
            "There are no other empires in the galaxy to attack."]
@@ -268,7 +267,9 @@
              [:tbody
               (for [target other-players]
                 (target-row target ef (:player/cmd-ships player) attacker-id))]]]]))
-       (ui/phase-warning "action-warning")
+       (when disabled-hint
+         [:input {:type "hidden" :name "action-disabled-hint" :value disabled-hint}])
+       (ui/phase-warning-div "action-warning" disabled-hint {:color "text-yellow-400"})
        (ui/phase-action-bar
         (ui/action-bar-link (str "/app/game/" player-id) "Pause")
         (ui/action-bar-button "Cancel Attack"
@@ -277,5 +278,6 @@
            :hx-target  "#action-warning"
            :hx-swap    "outerHTML"
            :hx-params  "none"
+           :hx-include "[name=action-disabled-hint]"
            :onclick    "document.querySelectorAll('[name=target-action]').forEach(function(r){r.checked=false;r.dataset.was='false';});"})
         (ui/submit-button true "Continue to Espionage"))))))
