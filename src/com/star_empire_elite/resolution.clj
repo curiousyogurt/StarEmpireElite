@@ -463,6 +463,37 @@
                               :player/last-stability-recovery (pr-str result)}])
             [result (assoc player :player/stability new-stability)]))))))
 
+(defn- resolve-capture-penalty
+  "Apply the acquisition stability penalty on first load; return cached result on refresh.
+  Runs after breakaway and recovery so it doesn't affect this turn's breakaway roll —
+  the reduced stability persists into next turn.
+  Returns [penalty updated-player] where penalty is nil if no penalty applies.
+
+  [ctx ring-ctx, player-id uuid, player player-map, battle-result map|nil] -> [int|nil player-map]"
+  [ctx player-id player battle-result]
+  (let [last-penalty (:player/last-capture-stability-penalty player)]
+    (cond
+      (some? last-penalty)
+      [last-penalty player]
+
+      (or (nil? battle-result)
+          (nil? (:attacker-stability-penalty battle-result))
+          (zero? (:attacker-stability-penalty battle-result)))
+      [nil player]
+
+      :else
+      (let [penalty       (:attacker-stability-penalty battle-result)
+            new-stability (max 0 (- (:player/stability player) penalty))]
+        (biff/submit-tx ctx
+          [{:db/doc-type                          :player
+            :db/op                                :update
+            :xt/id                                player-id
+            :player/stability                     new-stability
+            :player/last-capture-stability-penalty penalty}])
+        [penalty (-> player
+                     (assoc :player/stability                      new-stability)
+                     (assoc :player/last-capture-stability-penalty penalty))]))))
+
 ;;;;
 ;;;; Turn Resolution
 ;;;;
@@ -496,9 +527,10 @@
         pending-penalty       (:player/expense-stability-penalty player)
         [recovery-result  p6] (resolve-stability-recovery  ctx player-id p5     game
                                                              pending-penalty breakaway-result)
-        total-planets         (+ (:player/ore-planets p6)
-                                 (:player/erg-planets  p6)
-                                 (:player/mil-planets  p6))
+        [capture-penalty  p7] (resolve-capture-penalty   ctx player-id p6     battle-result)
+        total-planets         (+ (:player/ore-planets p7)
+                                 (:player/erg-planets  p7)
+                                 (:player/mil-planets  p7))
         eliminated?           (zero? total-planets)
 
         ;; Build event metadata shared by all events this resolution
@@ -523,22 +555,23 @@
                          breakaway-result player-id
                          (:player/empire-name player) event-meta))
 
-                 (and eliminated? (not= (:player/status p6) const/player-status-eliminated))
+                 (and eliminated? (not= (:player/status p7) const/player-status-eliminated))
                  (conj (events/event-of-elimination
                          player-id (:player/empire-name player) event-meta)))]
 
-    (when (and eliminated? (not= (:player/status p6) const/player-status-eliminated))
+    (when (and eliminated? (not= (:player/status p7) const/player-status-eliminated))
       (biff/submit-tx ctx [{:db/doc-type   :player
                             :db/op         :update
                             :xt/id         player-id
                             :player/status const/player-status-eliminated}]))
     (events/record-events! ctx events)
-    {:player           p6
+    {:player           p7
      :game             game
      :battle-result    battle-result
      :espionage-result espionage-result
      :pop-growth       pop-growth
      :expense-penalty  expense-penalty
+     :capture-penalty  capture-penalty
      :breakaway-result breakaway-result
      :recovery-result  recovery-result
      :eliminated?      eliminated?}))

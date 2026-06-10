@@ -37,7 +37,7 @@
    ;; Combat mode multipliers
    :game/raid-defense-multiplier   0.1
    :game/raid-reward-multiplier    0.1
-   :game/raid-planet-capture-rate  0.05
+   :game/raid-planet-capture-cap   0.05
    :game/invade-defense-multiplier 1.0
    :game/invade-reward-multiplier  1.0
 
@@ -60,6 +60,14 @@
    :game/agent-mult-rate    0.005
    :game/agent-mult-cap     0.10
    :game/space-carryover    0.15
+
+   ;; Combat losses & capture
+   :game/combat-loss-floor           0.30
+   :game/combat-loser-cap            0.70
+   :game/combat-winner-max           0.30
+   :game/invade-planet-capture-cap   0.25
+   :game/invade-resource-capture-cap 0.50
+   :game/raid-resource-capture-cap   0.10
 
    ;; Combat power constants
    :game/soldier-power             1
@@ -97,6 +105,8 @@
    :game/expense-stability-penalty 0
 
    ;; Stability breakaway and recovery
+   :game/capture-stability-penalty-per-planet 1
+   :game/capture-stability-penalty-cap        10
    :game/stability-breakaway-threshold 20
    :game/stability-breakaway-cap       25
    :game/stability-recovery-amount      5

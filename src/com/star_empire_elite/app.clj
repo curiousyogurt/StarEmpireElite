@@ -91,9 +91,15 @@
    :game/hours-between-rounds          const/hours-between-rounds
    :game/raid-defense-multiplier       const/raid-defense-multiplier
    :game/raid-reward-multiplier        const/raid-reward-multiplier
-   :game/raid-planet-capture-rate      const/raid-planet-capture-rate
    :game/invade-defense-multiplier     const/invade-defense-multiplier
    :game/invade-reward-multiplier      const/invade-reward-multiplier
+   :game/combat-loss-floor             const/combat-loss-floor
+   :game/combat-loser-cap              const/combat-loser-cap
+   :game/combat-winner-max             const/combat-winner-max
+   :game/invade-planet-capture-cap     const/invade-planet-capture-cap
+   :game/invade-resource-capture-cap   const/invade-resource-capture-cap
+   :game/raid-planet-capture-cap       const/raid-planet-capture-cap
+   :game/raid-resource-capture-cap     const/raid-resource-capture-cap
    :game/strike-damage-rate            const/strike-damage-rate
    :game/strike-max-dispatch           const/strike-max-dispatch
    :game/strike-interception-rate      const/strike-interception-rate
@@ -162,6 +168,8 @@
    :game/fuel-buy                      const/fuel-buy
    :game/fuel-sell                     const/fuel-sell
    :game/expense-stability-penalty     const/expense-stability-penalty
+   :game/capture-stability-penalty-per-planet const/capture-stability-penalty-per-planet
+   :game/capture-stability-penalty-cap        const/capture-stability-penalty-cap
    :game/stability-breakaway-threshold const/stability-breakaway-threshold
    :game/stability-breakaway-cap       const/stability-breakaway-cap
    :game/stability-recovery-amount     const/stability-recovery-amount

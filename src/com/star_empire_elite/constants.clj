@@ -34,15 +34,16 @@
 ;;;;
 ;;;; Combat Modes
 ;;;; Raid is a limited engagement that targets a fraction of the defender's empire.
-;;;; Invade is a full-scale assault. Both share the underlying combat resolution
-;;;; (rolls, margin, losses); they differ only in the defender's effective defense
-;;;; multiplier and the cap on captured planets and resources.
+;;;; Invade is a full-scale assault. The engagement multiplier governs both the
+;;;; defender's power participation (roll scaling) and loss exposure (fraction of
+;;;; forces at risk) per phase.
 
-(def raid-defense-multiplier    0.1)  ; defender engages 10% of forces during a raid
-(def raid-reward-multiplier     0.1)  ; raid can capture at most 10% of resources (credits/food/fuel)
-(def raid-planet-capture-rate   0.05) ; raid captures at most 5% of planets (half the resource rate)
+(def raid-defense-multiplier    0.1)  ; defender engages 10% of forces in both space and ground phases
 (def invade-defense-multiplier  1.0)  ; defender engages full forces during an invasion
-(def invade-reward-multiplier   1.0)  ; invade can capture up to full margin of empire/resources
+
+;; Superseded by combat-loss and capture-cap constants below; kept for reference.
+(def raid-reward-multiplier     0.1)
+(def invade-reward-multiplier   1.0)
 
 ;;;;
 ;;;; Combat Power
@@ -55,6 +56,25 @@
 (def general-power   5)
 (def admiral-power   10)
 (def combat-variance 0.15) ; ±15% random factor
+
+;;;;
+;;;; Combat Losses & Capture
+;;;; The loser's loss rate rises with margin (close fight → floor, blowout → cap).
+;;;; The winner's loss rate falls with margin — a decisive victory is cheap for the
+;;;; winner. At margin 0 both curves meet at loss-floor ≈ winner-max: an even fight
+;;;; is a meat grinder for both sides.
+;;;;
+
+(def combat-loss-floor  0.30)  ; both sides lose this fraction in an even fight
+(def combat-loser-cap   0.70)  ; loser's maximum loss rate at a blowout
+(def combat-winner-max  0.30)  ; winner's loss rate at margin 0, falling to ~0 at a blowout
+
+;; Capture caps — per-mode maximum fraction of defender's planets/resources captured.
+;; Actual capture = cap × ground-margin × defender-total, so narrow wins yield little.
+(def invade-planet-capture-cap    0.25)
+(def invade-resource-capture-cap  0.50)
+(def raid-planet-capture-cap      0.05)  ; renamed from raid-planet-capture-rate
+(def raid-resource-capture-cap    0.10)
 
 ;;;;
 ;;;; Combat Multipliers
@@ -144,6 +164,16 @@
 ;;;; Stability
 ;;;; Breakaway: if roll (1–100) > stability + threshold, planets break away.
 ;;;; Recovery:  if roll < max(stability, floor), stability recovers.
+
+;;;;
+;;;; Acquisition Penalty
+;;;; Conquered worlds are restive; annexing territory faster than you can pacify
+;;;; it costs stability. At 1 point/planet this only outpaces the +5 recovery
+;;;; roll for captures of ~6+ planets; smaller conquests are clawed back.
+;;;;
+
+(def capture-stability-penalty-per-planet  1)  ; stability points lost per captured planet
+(def capture-stability-penalty-cap         10) ; max stability points lost per attack
 
 (def stability-breakaway-threshold 20)
 (def stability-breakaway-cap       25) ; stored as %, i.e. 25 = 25%

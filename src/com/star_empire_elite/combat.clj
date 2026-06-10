@@ -149,19 +149,13 @@
 ;;;; Attack Resolution
 ;;;;
 
-(defn- compute-losses
-  "Apply a loss rate to each unit type in a force map, flooring at 0.
+(defn- phase-losses
+  "Apply a loss rate to each unit type in a phase force map, flooring at 0.
+  Works with any subset of unit keys (space or ground phase).
 
-  [forces force-map, rate float] -> losses-map"
+  [forces force-map, rate double] -> losses-map"
   [forces rate]
-  {:soldiers   (max 0 (long (* (:soldiers   forces) rate)))
-   :transports (max 0 (long (* (:transports forces) rate)))
-   :generals   (max 0 (long (* (:generals   forces) rate)))
-   :fighters   (max 0 (long (* (:fighters   forces) rate)))
-   :carriers   (max 0 (long (* (:carriers   forces) rate)))
-   :admirals   (max 0 (long (* (:admirals   forces) rate)))
-   :cmd-ships  (max 0 (long (* (:cmd-ships  forces) rate)))
-   :stations   (max 0 (long (* (:stations   forces) rate)))})
+  (into {} (map (fn [[k v]] [k (max 0 (long (* v rate)))]) forces)))
 
 (defn- select-planets
   "Randomly select n planets from the defender's pool, returning a {:mil n :erg n :ore n} map of how
@@ -180,8 +174,15 @@
 (defn resolve-combat
   "Resolve a full two-phase combat engagement between attacker and defender.
   Space resolves first; the space margin carries over to buff the space winner's ground power.
-  Ground determines the battle winner: captures, resources, and losses.
-  The `mode` parameter (:raid or :invade) determines defense/reward multipliers.
+  Ground determines the battle winner, captures, and losses.
+
+  Loss model (per phase): close fights are bloody for both sides; blowouts are bloody
+  only for the loser. The loser's rate rises with margin; the winner's rate falls.
+  Space units take losses from the space margin; ground units from the ground margin.
+
+  The engagement multiplier (raid=0.1, invade=1.0) scales the defender's power
+  participation AND loss exposure in both phases.
+
   UUIDs stored as strings for safe pr-str round-trip.
 
   [game game-map, attacker player-map, defender player-map, mode keyword] -> result-map"
@@ -189,29 +190,28 @@
   (let [att-forces  (effective-forces attacker)
         def-forces  (effective-defending-forces defender)
 
+        ;; Engagement fraction: governs defender power participation and loss exposure
+        engagement  (case mode
+                      :raid   (:game/raid-defense-multiplier   game)
+                      :invade (:game/invade-defense-multiplier game))
+
         ;; Phase partitions
         att-space   (space-forces att-forces)
         def-space   (space-forces def-forces)
         att-ground  (ground-forces att-forces)
         def-ground  (ground-forces def-forces)
 
-        ;; Space phase
+        ;; Space phase — defender power scaled by engagement
         att-space-mult (space-multiplier game att-space)
-        def-space-mult (space-multiplier game def-space)
+        def-space-mult (* (space-multiplier game def-space) engagement)
         space-result   (resolve-phase game att-space def-space att-space-mult def-space-mult true)
-
-        ;; Mode multipliers
-        def-mult    (case mode
-                      :raid   (:game/raid-defense-multiplier   game)
-                      :invade (:game/invade-defense-multiplier game))
 
         ;; Carryover: space margin × space-carryover constant
         carryover      (* (:margin space-result) (:game/space-carryover game))
 
-        ;; Ground multipliers with space carryover applied to the space winner.
-        ;; Defense multiplier (raid=10%, invade=100%) scales the defender's ground engagement.
+        ;; Ground multipliers with engagement and space carryover
         att-ground-mult (ground-multiplier game att-ground)
-        def-ground-mult (* (ground-multiplier game def-ground) def-mult)
+        def-ground-mult (* (ground-multiplier game def-ground) engagement)
         att-ground-mult (if (:att-wins? space-result)
                           (* att-ground-mult (+ 1.0 carryover))
                           att-ground-mult)
@@ -223,40 +223,61 @@
         ground-result  (resolve-phase game att-ground def-ground att-ground-mult def-ground-mult true)
 
         att-wins?      (:att-wins? ground-result)
-        margin         (:margin ground-result)
-        reward-mult (case mode
-                      :raid   (:game/raid-reward-multiplier   game)
-                      :invade (:game/invade-reward-multiplier game))
-        planet-mult (case mode
-                      :raid   (:game/raid-planet-capture-rate game)
-                      :invade (:game/invade-reward-multiplier game))
+        space-margin   (:margin space-result)
+        ground-margin  (:margin ground-result)
 
-        ;; Loss model
-        loser-rate  (min margin 0.75)
-        winner-rate (/ loser-rate 2.0)
+        ;; Loss curves
+        loss-floor  (or (:game/combat-loss-floor game) const/combat-loss-floor)
+        loser-cap   (or (:game/combat-loser-cap  game) const/combat-loser-cap)
+        winner-max  (or (:game/combat-winner-max game) const/combat-winner-max)
+        loser-rate  (fn [m] (min loser-cap (+ loss-floor (* (- loser-cap loss-floor) m))))
+        winner-rate (fn [m] (* winner-max (- 1.0 m)))
 
-        ;; Planet capture (driven by ground margin)
+        ;; Space-phase losses
+        space-att-wins?    (:att-wins? space-result)
+        att-space-rate     (if space-att-wins? (winner-rate space-margin) (loser-rate space-margin))
+        def-space-rate     (if space-att-wins? (loser-rate space-margin) (winner-rate space-margin))
+        def-space-engaged  (update-vals def-space #(long (* engagement %)))
+        att-space-losses   (phase-losses att-space att-space-rate)
+        def-space-losses   (phase-losses def-space-engaged def-space-rate)
+
+        ;; Ground-phase losses (agents excluded — they don't take combat losses)
+        att-ground-combat  (dissoc att-ground :agents)
+        def-ground-combat  (dissoc def-ground :agents)
+        att-ground-rate    (if att-wins? (winner-rate ground-margin) (loser-rate ground-margin))
+        def-ground-rate    (if att-wins? (loser-rate ground-margin) (winner-rate ground-margin))
+        def-ground-engaged (update-vals def-ground-combat #(long (* engagement %)))
+        att-ground-losses  (phase-losses att-ground-combat att-ground-rate)
+        def-ground-losses  (phase-losses def-ground-engaged def-ground-rate)
+
+        ;; Merged losses across phases
+        attacker-losses (merge att-space-losses att-ground-losses)
+        defender-losses (merge def-space-losses def-ground-losses)
+
+        ;; Capture model — driven off ground margin with per-mode caps
+        planet-cap   (case mode
+                       :raid   (or (:game/raid-planet-capture-cap   game) const/raid-planet-capture-cap)
+                       :invade (or (:game/invade-planet-capture-cap game) const/invade-planet-capture-cap))
+        resource-cap (case mode
+                       :raid   (or (:game/raid-resource-capture-cap   game) const/raid-resource-capture-cap)
+                       :invade (or (:game/invade-resource-capture-cap game) const/invade-resource-capture-cap))
+
         def-total-planets (+ (:player/mil-planets  defender)
                              (:player/erg-planets  defender)
                              (:player/ore-planets  defender))
-        planets-count       (if att-wins? (long (* loser-rate planet-mult def-total-planets)) 0)
+        planets-count       (if att-wins? (long (* planet-cap ground-margin def-total-planets)) 0)
         planets-transferred (select-planets defender planets-count)
 
-        ;; Resource capture
-        resources-mult     (if att-wins? (* loser-rate reward-mult) 0.0)
+        resources-mult     (if att-wins? (* resource-cap ground-margin) 0.0)
         credits-captured   (long (* resources-mult (:player/credits defender)))
         food-captured      (long (* resources-mult (:player/food    defender)))
         fuel-captured      (long (* resources-mult (:player/fuel    defender)))
 
-        ;; Defender engagement scaling for losses
-        def-engaged (update-vals def-forces #(long (* reward-mult %)))]
-
-    ;;;;
-    ;;;; TODO: Per-phase loss model
-    ;;;; Currently losses are computed from the ground margin applied to the full force maps.
-    ;;;; A future session will split losses so space units take losses from the space margin
-    ;;;; and ground units from the ground margin.
-    ;;;;
+        ;; Acquisition penalty: annexing territory costs stability
+        captured-total     (+ (:mil planets-transferred) (:erg planets-transferred) (:ore planets-transferred))
+        penalty-per-planet (or (:game/capture-stability-penalty-per-planet game) const/capture-stability-penalty-per-planet)
+        penalty-cap        (or (:game/capture-stability-penalty-cap game) const/capture-stability-penalty-cap)
+        capture-penalty    (min penalty-cap (* penalty-per-planet captured-total))]
 
     {:attacker-id     (str (:xt/id attacker))
      :attacker-name   (:player/empire-name attacker)
@@ -284,13 +305,15 @@
      :attacker-roll   (:att-roll ground-result)
      :defender-roll   (:def-roll ground-result)
      :attacker-wins?  att-wins?
-     :margin          margin
-     :attacker-losses (compute-losses att-forces  (if att-wins? winner-rate loser-rate))
-     :defender-losses (compute-losses def-engaged (if att-wins? loser-rate winner-rate))
+     :margin          ground-margin
+     :attacker-losses attacker-losses
+     :defender-losses defender-losses
      :planets-transferred planets-transferred
      :resources-captured  {:credits credits-captured
                            :food    food-captured
                            :fuel    fuel-captured}
+     ;; Acquisition penalty (stability cost to attacker for captured planets)
+     :attacker-stability-penalty capture-penalty
      ;; Phase sub-results for display
      :space-result    space-result
      :space-carryover carryover

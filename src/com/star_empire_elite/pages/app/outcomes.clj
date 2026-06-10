@@ -179,7 +179,7 @@
 
   No new DB queries; all data comes from the cached outcomes map."
   [{:keys [player battle-result espionage-result pop-growth
-           expense-penalty breakaway-result recovery-result]}]
+           expense-penalty capture-penalty breakaway-result recovery-result]}]
   (let [sum-vals    (fn [m] (reduce + 0 (vals (or m {}))))
         ;; Helpers
         won-ground? (and battle-result
@@ -220,6 +220,7 @@
         fuel    (- (:fuel out-res 0)    (:fuel in-res 0))
         ;; Stability delta
         stab-loss (+ (or expense-penalty 0)
+                     (or capture-penalty 0)
                      (or (:player/incoming-incite-stability-lost player) 0))
         stab-gain (if (and recovery-result (:triggered? recovery-result))
                     (:amount recovery-result 0) 0)
@@ -305,18 +306,19 @@
   (when (some? space-att-wins?)
     (let [you-won-space? (if you-are-attacker? space-att-wins? (not space-att-wins?))
           pct            (when space-buff (long (* space-buff 100)))
-          significant?   (and pct (>= pct 1))]
+          significant?   (and pct (>= pct 1))
+          buff-text      (if significant?
+                           (str " (" pct "% to ground power)")
+                           " (marginal edge)")]
       [:div.text-xs.py-1.5.px-3.border-t.border-game-divider
        {:class (if you-won-space? "text-green-400" "text-yellow-400")}
-       (if you-won-space?
-         (str "» ORBIT: Your fleet achieved secure orbit"
-              (if significant?
-                (str " (+" pct "% to ground force power)") 
-                " (marginal edge to ground force power)"))
-         (str "» ORBIT: Your fleet failed to achieve secure orbit"
-              (if significant?
-                (str " (-" pct "% to ground force power)") 
-                " (marginal edge against ground force power)")))])))
+       (if you-are-attacker?
+         (if you-won-space?
+           (str "» ORBIT: Your fleet achieved a secure orbit" buff-text)
+           (str "» ORBIT: Your fleet failed to achieve a secure orbit" buff-text))
+         (if you-won-space?
+           (str "» ORBIT: Your fleet prevented the enemy achieving a secure orbit" buff-text)
+           (str "» ORBIT: Your fleet failed to prevent the enemy achieving a secure orbit" buff-text)))])))
 
 (defn- ground-line
   "Render the ground-phase result line for the combat card.
@@ -329,9 +331,13 @@
     (let [you-won-ground? (if you-are-attacker? attacker-wins? (not attacker-wins?))]
       [:div.text-xs.py-1.5.px-3.border-t.border-game-divider
        {:class (if you-won-ground? "text-green-400" "text-yellow-400")}
-       (if you-won-ground?
-         "» GROUND: Your ground forces overcame planetary defences"
-         "» GROUND: Your ground forces failed to overcome planetary defences")])))
+       (if you-are-attacker?
+         (if you-won-ground?
+           "» GROUND: Your ground forces overcame planetary defences"
+           "» GROUND: Your ground forces failed to overcome planetary defences")
+         (if you-won-ground?
+           "» GROUND: Your ground forces prevented the enemy overcoming planetary defences"
+           "» GROUND: Your ground forces failed to prevent the enemy overcoming planetary defences"))])))
 
 (defn- combat-card
   "Render a collapsible combat card with header summary and 3-col symmetric table.
@@ -511,28 +517,35 @@
        "Population held steady this round"])]])
 
 (defn- stability-card
-  "Render a collapsible stability card combining expense penalty, breakaway, and recovery."
-  [{:keys [expense-penalty breakaway-result recovery-result]}]
-  (let [has-penalty?   (and (some? expense-penalty) (pos? expense-penalty))
-        has-breakaway? (and (some? breakaway-result) (:triggered? breakaway-result))
-        has-recovery?  (and (some? recovery-result) (:triggered? recovery-result))
-        summary-text   (cond
-                         has-breakaway? (str "empire fractured — "
-                                             (ui/format-number-str (:total-lost breakaway-result)) " planets lost")
-                         has-penalty?   (str "−" (ui/format-number-str expense-penalty) "%")
-                         has-recovery?  (str "+" (ui/format-number-str (:amount recovery-result)) "% recovery")
-                         :else          "")]
-    (when (or has-penalty? has-breakaway? has-recovery?)
-      (collapsible-card
-        {:badge (ui/mode-badge :stability)
-         :summary [:span.font-bold {:class (if has-breakaway? "text-red-400" "text-yellow-400")}
-                   summary-text]
-         :open?  (or has-penalty? has-breakaway?)}
-        [:div.p-3.border-t.border-game-divider
-         (when has-penalty?
-           [:p.text-xs.mb-2.text-yellow-400
-            (str "Empire stability decreases due to unpaid expenses: −" (ui/format-number-str expense-penalty) "%")])
-         (when has-breakaway?
+  "Render a stability card with a single info line summarising all stability changes this turn.
+  Each non-zero component is rendered as a colored fragment: red for losses, green for gains.
+  Breakaway gets an additional detail line below."
+  [{:keys [expense-penalty capture-penalty incite-penalty breakaway-result recovery-result]}]
+  (let [has-breakaway? (and (some? breakaway-result) (:triggered? breakaway-result))
+        fragments (keep identity
+                    [(when (and (some? expense-penalty) (pos? expense-penalty))
+                       [(str "−" (ui/format-number-str expense-penalty) "% unpaid expenses") "text-red-400"])
+                     (when (and (some? capture-penalty) (pos? capture-penalty))
+                       [(str "−" (ui/format-number-str capture-penalty) "% integrating captured planets") "text-yellow-400"])
+                     (when (and (some? incite-penalty) (pos? incite-penalty))
+                       [(str "−" (ui/format-number-str incite-penalty) "% enemy incited unrest") "text-red-400"])
+                     (when (and (some? recovery-result) (:triggered? recovery-result))
+                       [(str "+" (ui/format-number-str (:amount recovery-result)) "% all expenses covered") "text-green-400"])])]
+    (when (or (seq fragments) has-breakaway?)
+      [:div.rounded-game.bg-game-surface.overflow-hidden
+       {:class "border border-game-border"}
+       [:div.flex.items-center.py-2.px-3.gap-3
+        (ui/mode-badge :stability)
+        [:span.text-sm
+         (if (seq fragments)
+           (interpose
+             [:span.text-game-green-dim "  ·  "]
+             (for [[text cls] fragments]
+               [:span {:class cls} text]))
+           [:span.text-game-green-soft "No stability changes"])]]
+       (when has-breakaway?
+         [:div.py-1.5.px-3.border-t.border-game-divider
+          [:p.text-xs.text-red-400
            (let [lost-str (str/join ", "
                             (keep identity
                               [(when (pos? (:ore-lost breakaway-result))
@@ -541,11 +554,7 @@
                                  (str (ui/format-number-str (:erg-lost breakaway-result)) " energy planet(s)"))
                                (when (pos? (:mil-lost breakaway-result))
                                  (str (ui/format-number-str (:mil-lost breakaway-result)) " military planet(s)"))]))]
-             [:p.text-xs.mb-2.text-red-400
-              (str "Empire instability prompts revolution. Lost: " lost-str)]))
-         (when has-recovery?
-           [:p.text-xs.text-green-400
-            (str "Empire stability increases due to paid expenses: +" (ui/format-number-str (:amount recovery-result)) "%")])]))))
+             (str "Empire instability prompts revolution. Lost: " lost-str))]])])))
 
 (defn- incoming-card
   "Render a single incoming attack card (combat or strike)."
@@ -648,6 +657,7 @@
                      :player/last-expense-stability-penalty  nil
                      :player/last-stability-breakaway        nil
                      :player/last-stability-recovery         nil
+                     :player/last-capture-stability-penalty  nil
                      :player/pending-espionage               nil
                      :player/incoming-attacks                nil
                      :player/incoming-espionage-fails        nil
@@ -674,9 +684,9 @@
   successes and steady-state events.
 
   [{:keys [player game battle-result espionage-result pop-growth expense-penalty
-           breakaway-result recovery-result eliminated?]}] -> hiccup"
+           capture-penalty breakaway-result recovery-result eliminated?]}] -> hiccup"
   [{:keys [player game battle-result espionage-result pop-growth expense-penalty
-           breakaway-result recovery-result eliminated?] :as outcomes}]
+           capture-penalty breakaway-result recovery-result eliminated?] :as outcomes}]
   (let [player-id       (:xt/id player)
         current-turn    (:player/current-turn player)
         turns-per-round (:game/turns-per-round game)
@@ -746,10 +756,10 @@
                              :space-att-wins?     (:att-wins? space-r)
                              :space-buff          (:space-carryover battle-result)
                              :open?               (or (not (:attacker-wins? battle-result))
-                                                      (and space-r (not (:att-wins? space-r)))
-                                                      (non-trivial-losses?
-                                                        (:attacker-counts battle-result)
-                                                        (:attacker-losses battle-result)))})))))
+                                                          (and space-r (not (:att-wins? space-r)))
+                                                          (non-trivial-losses?
+                                                            (:attacker-counts battle-result)
+                                                            (:attacker-losses battle-result)))})))))
 
        ;; Outgoing espionage result
        (when espionage-result
@@ -774,6 +784,8 @@
                         :open?           (not won?)}))))
 
        (stability-card {:expense-penalty  expense-penalty
+                        :capture-penalty  capture-penalty
+                        :incite-penalty   (or (:player/incoming-incite-stability-lost player) 0)
                         :breakaway-result breakaway-result
                         :recovery-result  recovery-result})
 

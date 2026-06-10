@@ -22,6 +22,10 @@
           ;; Expense underpayment penalty
           [:game/expense-stability-penalty    :int]
 
+          ;; Acquisition penalty
+          [:game/capture-stability-penalty-per-planet {:optional true} :int]
+          [:game/capture-stability-penalty-cap        {:optional true} :int]
+
           ;; Stability breakaway and recovery
           [:game/stability-breakaway-threshold :int]
           [:game/stability-breakaway-cap       :int]
@@ -30,10 +34,18 @@
 
           ;; Combat mode multipliers
           [:game/raid-defense-multiplier   {:optional true} :double]
-          [:game/raid-reward-multiplier    {:optional true} :double]
-          [:game/raid-planet-capture-rate  {:optional true} :double]
+          [:game/raid-reward-multiplier    {:optional true} :double]  ; superseded
           [:game/invade-defense-multiplier {:optional true} :double]
-          [:game/invade-reward-multiplier  {:optional true} :double]
+          [:game/invade-reward-multiplier  {:optional true} :double]  ; superseded
+
+          ;; Combat losses & capture
+          [:game/combat-loss-floor           {:optional true} :double]
+          [:game/combat-loser-cap            {:optional true} :double]
+          [:game/combat-winner-max           {:optional true} :double]
+          [:game/invade-planet-capture-cap   {:optional true} :double]
+          [:game/invade-resource-capture-cap {:optional true} :double]
+          [:game/raid-planet-capture-cap     {:optional true} :double]
+          [:game/raid-resource-capture-cap   {:optional true} :double]
 
           ;; Strike operation constants
           [:game/strike-damage-rate       {:optional true} :double]
@@ -177,8 +189,9 @@
             [:player/last-expense-stability-penalty {:optional true} [:maybe :int]]
 
             ;; Stability breakaway and recovery
-            [:player/last-stability-breakaway       {:optional true} [:maybe :string]]
-            [:player/last-stability-recovery        {:optional true} [:maybe :string]]
+            [:player/last-stability-breakaway          {:optional true} [:maybe :string]]
+            [:player/last-stability-recovery           {:optional true} [:maybe :string]]
+            [:player/last-capture-stability-penalty    {:optional true} [:maybe :int]]
 
             ;; Combat
             [:player/pending-attack      {:optional true} [:maybe :player/id]]

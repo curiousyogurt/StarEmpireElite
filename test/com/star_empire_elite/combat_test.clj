@@ -274,7 +274,7 @@
                  :attacker-roll :defender-roll :attacker-wins?
                  :margin :attacker-losses :defender-losses
                  :mode :planets-transferred :resources-captured
-                 :space-result :ground-result]]
+                 :space-result :space-carryover :ground-result]]
         (is (contains? result k) (str "Missing key: " k))))))
 
 (deftest test-resolve-combat-ids-are-strings
@@ -422,13 +422,13 @@
       (is (> wins-raid wins-invade)))))
 
 (deftest raid-caps-planet-capture-at-5-percent
-  (testing "Raid mode never captures more than planet-capture-rate × margin × total planets"
-    ;; large-defender has 100 total planets; max possible capture = floor(0.75 × 0.05 × 100) = 3
+  (testing "Raid mode never captures more than raid-planet-capture-cap × margin × total planets"
+    ;; large-defender has 100 total planets; max possible = floor(0.05 × ~1.0 × 100) = 5
     (dotimes [_ 50]
       (let [result (combat/resolve-combat game massive-attacker large-defender :raid)
             xfer   (:planets-transferred result)
             total  (+ (:mil xfer) (:erg xfer) (:ore xfer))]
-        (is (<= total 4))))))  ; floor(0.75 * 0.1 * 100) = 7, +1 tolerance for floating point
+        (is (<= total 5))))))
 
 (deftest invade-can-capture-up-to-margin-planets
   (testing "Invade mode can capture up to 0.75 × total defender planets"
@@ -440,31 +440,29 @@
       (is (> max-capture 10)))))
 
 (deftest raid-captures-resources-proportionally
-  (testing "Raid mode :resources-captured = min(margin,0.75) × 0.1 × defender's resources (on win)"
-    ;; Use massive attacker so we always win, and resourced-defender with known resources.
-    ;; Captures use loser-rate = min(margin, 0.75), not raw margin.
+  (testing "Raid mode :resources-captured = raid-resource-capture-cap × ground-margin × defender's resources (on win)"
     (dotimes [_ 20]
       (let [result (combat/resolve-combat game massive-attacker resourced-defender :raid)]
         (when (:attacker-wins? result)
-          (let [eff-margin (min (:margin result) 0.75)
-                rc         (:resources-captured result)
-                expect-cr  (long (* eff-margin const/raid-reward-multiplier (:player/credits resourced-defender)))
-                expect-fd  (long (* eff-margin const/raid-reward-multiplier (:player/food    resourced-defender)))
-                expect-fu  (long (* eff-margin const/raid-reward-multiplier (:player/fuel    resourced-defender)))]
+          (let [ground-margin (:margin result)
+                rc            (:resources-captured result)
+                expect-cr     (long (* const/raid-resource-capture-cap ground-margin (:player/credits resourced-defender)))
+                expect-fd     (long (* const/raid-resource-capture-cap ground-margin (:player/food    resourced-defender)))
+                expect-fu     (long (* const/raid-resource-capture-cap ground-margin (:player/fuel    resourced-defender)))]
             (is (= expect-cr (:credits rc)))
             (is (= expect-fd (:food    rc)))
             (is (= expect-fu (:fuel    rc)))))))))
 
 (deftest invade-captures-resources-proportionally
-  (testing "Invade mode :resources-captured = min(margin,0.75) × 1.0 × defender's resources (on win)"
+  (testing "Invade mode :resources-captured = invade-resource-capture-cap × ground-margin × defender's resources (on win)"
     (dotimes [_ 20]
       (let [result (combat/resolve-combat game massive-attacker resourced-defender :invade)]
         (when (:attacker-wins? result)
-          (let [eff-margin (min (:margin result) 0.75)
-                rc         (:resources-captured result)
-                expect-cr  (long (* eff-margin const/invade-reward-multiplier (:player/credits resourced-defender)))
-                expect-fd  (long (* eff-margin const/invade-reward-multiplier (:player/food    resourced-defender)))
-                expect-fu  (long (* eff-margin const/invade-reward-multiplier (:player/fuel    resourced-defender)))]
+          (let [ground-margin (:margin result)
+                rc            (:resources-captured result)
+                expect-cr     (long (* const/invade-resource-capture-cap ground-margin (:player/credits resourced-defender)))
+                expect-fd     (long (* const/invade-resource-capture-cap ground-margin (:player/food    resourced-defender)))
+                expect-fu     (long (* const/invade-resource-capture-cap ground-margin (:player/fuel    resourced-defender)))]
             (is (= expect-cr (:credits rc)))
             (is (= expect-fd (:food    rc)))
             (is (= expect-fu (:fuel    rc)))))))))
@@ -601,3 +599,215 @@
           result   (combat/resolve-strike game attacker strike-defender)]
       (is (not (contains? result :planets-transferred)))
       (is (not (contains? result :resources-captured))))))
+
+;;;;
+;;;; Loss Curve Verification
+;;;;
+
+;;; Fixtures for loss-curve scenarios: extreme asymmetry to force predictable margins.
+
+(def ^:private tiny-attacker
+  (merge helpers/player-defaults
+         {:xt/id              #uuid "00000000-0000-0000-0000-000000000030"
+          :player/empire-name "Tiny Attacker"
+          :player/soldiers    1
+          :player/transports  1
+          :player/generals    1
+          :player/fighters    1
+          :player/carriers    1
+          :player/admirals    1
+          :player/cmd-ships   0
+          :player/agents      1}))
+
+(def ^:private huge-defender
+  (merge helpers/player-defaults
+         {:xt/id              #uuid "00000000-0000-0000-0000-000000000031"
+          :player/empire-name "Huge Defender"
+          :player/soldiers    10000
+          :player/transports  100
+          :player/generals    10
+          :player/fighters    10000
+          :player/carriers    100
+          :player/admirals    10
+          :player/cmd-ships   0
+          :player/stations    100
+          :player/agents      10
+          :player/mil-planets 10
+          :player/erg-planets 10
+          :player/ore-planets 10
+          :player/credits     100000
+          :player/food        100000
+          :player/fuel        100000}))
+
+(deftest blowout-winner-loses-almost-nothing
+  (testing "Huge defender (winner) loses < 5% of engaged forces when margin ≈ 1.0"
+    ;; Tiny attacker vs huge defender: defender wins every phase with near-1.0 margin.
+    ;; Winner rate at margin ~1.0 = winner-max × (1 - 1.0) ≈ 0%. Allow up to 5% for variance.
+    (dotimes [_ 20]
+      (let [result (combat/resolve-combat game tiny-attacker huge-defender :invade)
+            dl     (:defender-losses result)]
+        (when-not (:attacker-wins? result)
+          ;; Check that no unit type lost more than 5% of starting count
+          (doseq [[k starting] {:soldiers   (:player/soldiers huge-defender)
+                                :fighters   (:player/fighters huge-defender)
+                                :stations   (:player/stations huge-defender)
+                                :transports (:player/transports huge-defender)
+                                :generals   (:player/generals huge-defender)
+                                :carriers   (:player/carriers huge-defender)
+                                :admirals   (:player/admirals huge-defender)}]
+            (is (<= (get dl k 0) (long (* 0.05 starting)))
+                (str k " losses too high for blowout winner"))))))))
+
+(deftest blowout-loser-loses-heavily
+  (testing "Tiny attacker (loser) loses ~70% of forces when margin ≈ 1.0"
+    ;; At margin ~1.0, loser-rate = loser-cap (0.70).
+    ;; With 1 unit per type, floor(0.70 * 1) = 0 due to floor. Use slightly larger forces.
+    (let [small-attacker (merge tiny-attacker
+                                {:player/soldiers  100
+                                 :player/transports 10
+                                 :player/generals   5
+                                 :player/fighters   100
+                                 :player/carriers   10
+                                 :player/admirals   5
+                                 :player/cmd-ships  0})]
+      (dotimes [_ 20]
+        (let [result (combat/resolve-combat game small-attacker huge-defender :invade)
+              al     (:attacker-losses result)]
+          (when-not (:attacker-wins? result)
+            ;; Loser should lose at least 25% of soldiers (loser-rate ≈ 0.70, floor rounding)
+            (is (>= (:soldiers al 0) 25) "Loser should lose heavily")))))))
+
+(deftest even-fight-both-sides-lose-around-30-percent
+  (testing "Even fight (margin ≈ 0) — both sides lose ~30%"
+    ;; Use symmetric forces so margin stays near 0 across runs.
+    (let [player-a (merge helpers/player-defaults
+                          {:xt/id              #uuid "00000000-0000-0000-0000-000000000040"
+                           :player/empire-name "Player A"
+                           :player/soldiers    1000
+                           :player/transports  20
+                           :player/generals    2
+                           :player/fighters    1000
+                           :player/carriers    20
+                           :player/admirals    2
+                           :player/cmd-ships   0
+                           :player/agents      5})
+          player-b (merge helpers/player-defaults
+                          {:xt/id              #uuid "00000000-0000-0000-0000-000000000041"
+                           :player/empire-name "Player B"
+                           :player/soldiers    1000
+                           :player/transports  20
+                           :player/generals    2
+                           :player/fighters    1000
+                           :player/carriers    20
+                           :player/admirals    2
+                           :player/cmd-ships   0
+                           :player/stations    0
+                           :player/agents      5
+                           :player/mil-planets 3
+                           :player/erg-planets 3
+                           :player/ore-planets 3
+                           :player/credits     100000
+                           :player/food        100000
+                           :player/fuel        100000})]
+      ;; Over many runs, average ground soldier losses for attacker should be > 15% and < 50%
+      (let [results (repeatedly 50 #(combat/resolve-combat game player-a player-b :invade))
+            att-soldier-loss-pcts (map (fn [r] (/ (double (get-in r [:attacker-losses :soldiers] 0)) 1000.0)) results)
+            mean-pct (/ (reduce + att-soldier-loss-pcts) (count att-soldier-loss-pcts))]
+        (is (> mean-pct 0.15) "Even fight should average > 15% losses")
+        (is (< mean-pct 0.50) "Even fight should average < 50% losses")))))
+
+(deftest invade-captures-capped-at-25-percent-planets
+  (testing "Invade captures at most ~25% of defender's planets (not 75% as before)"
+    ;; massive-attacker vs large-defender (100 planets). Max = floor(0.25 × ~1.0 × 100) = 25
+    (let [results (repeatedly 50 #(combat/resolve-combat game massive-attacker large-defender :invade))
+          max-capture (apply max (map #(let [pt (:planets-transferred %)]
+                                         (+ (:mil pt) (:erg pt) (:ore pt)))
+                                       results))]
+      (is (<= max-capture 25))
+      ;; Should still capture a meaningful number
+      (is (> max-capture 10)))))
+
+(deftest per-phase-independence
+  (testing "Space units take losses from space margin; ground from ground margin"
+    ;; Strong space, weak ground attacker: should win space cheaply but lose ground expensively.
+    (let [space-strong (merge helpers/player-defaults
+                              {:xt/id              #uuid "00000000-0000-0000-0000-000000000050"
+                               :player/empire-name "Space Strong"
+                               :player/soldiers    1       ; weak ground
+                               :player/transports  1
+                               :player/generals    1
+                               :player/fighters    10000   ; strong space
+                               :player/carriers    100
+                               :player/admirals    10
+                               :player/cmd-ships   10
+                               :player/agents      1})
+          ground-strong (merge helpers/player-defaults
+                               {:xt/id              #uuid "00000000-0000-0000-0000-000000000051"
+                                :player/empire-name "Ground Strong"
+                                :player/soldiers    10000  ; strong ground
+                                :player/transports  100
+                                :player/generals    10
+                                :player/fighters    1      ; weak space
+                                :player/carriers    1
+                                :player/admirals    1
+                                :player/cmd-ships   0
+                                :player/stations    1
+                                :player/agents      10
+                                :player/mil-planets 5
+                                :player/erg-planets 5
+                                :player/ore-planets 5})]
+      ;; Run many trials: attacker should win space (high fighter count) but lose ground
+      (let [results (repeatedly 30 #(combat/resolve-combat game space-strong ground-strong :invade))
+            ;; Count runs where attacker won space but lost ground
+            mixed (filter (fn [r]
+                            (and (:att-wins? (:space-result r))
+                                 (not (:attacker-wins? r))))
+                          results)]
+        ;; Most runs should have this pattern
+        (is (> (count mixed) 15) "Space-strong attacker should usually win space but lose ground")
+        ;; In these mixed cases: no planets captured (ground lost)
+        (doseq [r mixed]
+          (let [pt (:planets-transferred r)]
+            (is (= 0 (+ (:mil pt) (:erg pt) (:ore pt)))
+                "No captures when ground phase lost")))))))
+
+(deftest empty-phase-no-errors
+  (testing "Both sides with 0 units in a phase produces no errors and 0 losses"
+    ;; Both have 0 space units (fighters, carriers, admirals, cmd-ships, stations all 0)
+    (let [ground-only-a (merge helpers/player-defaults
+                               {:xt/id              #uuid "00000000-0000-0000-0000-000000000060"
+                                :player/empire-name "Ground Only A"
+                                :player/soldiers    1000
+                                :player/transports  10
+                                :player/generals    2
+                                :player/fighters    0
+                                :player/carriers    0
+                                :player/admirals    0
+                                :player/cmd-ships   0
+                                :player/agents      5})
+          ground-only-b (merge helpers/player-defaults
+                               {:xt/id              #uuid "00000000-0000-0000-0000-000000000061"
+                                :player/empire-name "Ground Only B"
+                                :player/soldiers    1000
+                                :player/transports  10
+                                :player/generals    2
+                                :player/fighters    0
+                                :player/carriers    0
+                                :player/admirals    0
+                                :player/cmd-ships   0
+                                :player/stations    0
+                                :player/agents      5
+                                :player/mil-planets 3
+                                :player/erg-planets 3
+                                :player/ore-planets 3})]
+      (dotimes [_ 10]
+        (let [result (combat/resolve-combat game ground-only-a ground-only-b :invade)]
+          ;; No NaN or errors
+          (is (number? (:margin result)))
+          (is (<= 0.0 (:margin result) 1.0))
+          ;; Space losses should be 0 for all space unit types
+          (let [al (:attacker-losses result)]
+            (is (= 0 (:fighters al 0)))
+            (is (= 0 (:carriers al 0)))
+            (is (= 0 (:admirals al 0)))
+            (is (= 0 (:cmd-ships al 0)))))))))
