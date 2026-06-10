@@ -288,10 +288,11 @@
                               bomb?    (combat/resolve-bomb      player target)
                               defect?  (combat/resolve-defect    game player target)
                               :else    (combat/resolve-espionage player target))
-                att-wins?   (:attacker-wins? result)
-                agents-lost (or (:agents-captured result) 0)
-                stab-dmg    (or (:stability-damage result) 0)]
-            (biff/submit-tx 
+                att-wins?      (:attacker-wins? result)
+                agents-lost    (or (:agents-lost result) 0)
+                agents-captured (or (:agents-captured result) 0)
+                stab-dmg       (or (:stability-damage result) 0)]
+            (biff/submit-tx
               ctx
               (remove nil?
                       [{:db/doc-type :player :db/op :update :xt/id player-id
@@ -299,12 +300,12 @@
                         :player/agents (max 0 (- (:player/agents player) agents-lost))}
                        (when (pos? agents-lost)
                          {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
-                          :player/agents (+ (or (:player/agents target) 0) agents-lost)
+                          :player/agents (+ (or (:player/agents target) 0) agents-captured)
                           :player/incoming-espionage-fails
                           (conj (or (:player/incoming-espionage-fails target) [])
                                 (cond incite? "incite" bomb? "bomb" defect? "defect" :else "spy"))
                           :player/incoming-espionage-agents-gained
-                          (+ (or (:player/incoming-espionage-agents-gained target) 0) agents-lost)})
+                          (+ (or (:player/incoming-espionage-agents-gained target) 0) agents-captured)})
                        (when (and incite? att-wins? (pos? stab-dmg))
                          {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
                           :player/stability (max 0 (- (:player/stability target) stab-dmg))

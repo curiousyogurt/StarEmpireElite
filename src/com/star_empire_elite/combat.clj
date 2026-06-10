@@ -367,27 +367,62 @@
 ;;;; Espionage Resolution
 ;;;;
 
+(def ^:private op-failure-rates
+  {:spy    const/spy-defection-rate
+   :incite const/incite-defection-rate
+   :bomb   const/bomb-defection-rate
+   :defect const/defect-defection-rate})
+
+(defn- effective-defense-agents
+  "Apply the diminishing-returns soft cap to a defender's engaged agent count.
+  Agents defend at face value up to the threshold T; surplus beyond T is raised to
+  an exponent < 1, so each additional agent contributes less than the last.
+
+  effective = agents                        when agents ≤ T
+  effective = T + (agents − T)^exp          when agents > T
+
+  [agents number] -> double"
+  [agents]
+  (let [t   (double const/espionage-defense-threshold)
+        exp const/espionage-defense-exponent]
+    (if (<= agents t)
+      (double agents)
+      (+ t (Math/pow (- agents t) exp)))))
+
 (defn- espionage-roll
   "Compute attacker/defender agent rolls and determine the winner.
-  Returns {:att-roll float, :def-roll float, :att-wins? bool, :agents-captured long|nil}.
-  agents-captured is non-nil only on failure; it is the number of the attacker's agents taken.
-  The optional def-mult scales only the defender's effective agent count (default 1.0).
+  Returns {:att-roll float, :def-roll float, :att-wins? bool,
+           :agents-lost long|nil, :agents-captured long|nil}.
+  Both loss keys are nil on success. On failure:
+    :agents-lost    — agents the attacker loses (always present, all ops).
+    :agents-captured — agents the defender gains (= agents-lost for transfer ops;
+                       0 for bomb, whose failed agents are destroyed, not captured).
+  The optional def-mult scales the defender's agent count before the soft cap is applied.
 
-  [attacker player-map, defender player-map] -> roll-map
-  [attacker player-map, defender player-map, def-mult float] -> roll-map"
-  ([attacker defender] (espionage-roll attacker defender 1.0))
-  ([attacker defender def-mult]
-   (let [att-roll  (* (:player/agents attacker) (random-factor))
-         def-roll  (* (:player/agents defender) def-mult (random-factor))
-         att-wins? (> att-roll def-roll)]
+  [attacker player-map, defender player-map, op keyword] -> roll-map
+  [attacker player-map, defender player-map, op keyword, def-mult float] -> roll-map"
+  ([attacker defender op] (espionage-roll attacker defender op 1.0))
+  ([attacker defender op def-mult]
+   (let [att-agents (:player/agents attacker)
+         def-engaged (effective-defense-agents (* (:player/agents defender) def-mult))
+         att-roll    (* att-agents (random-factor))
+         def-roll    (* def-engaged (random-factor))
+         att-wins?   (> att-roll def-roll)
+         rate        (get op-failure-rates op const/spy-defection-rate)
+         transfer?   (not= op :bomb)]
      {:att-roll        att-roll
       :def-roll        def-roll
       :att-wins?       att-wins?
-      :agents-captured (when-not att-wins?
-                         (min (:player/agents attacker)
+      :agents-lost     (when-not att-wins?
+                         (min att-agents
                               (max const/espionage-defection-min
-                                   (long (* (:player/agents attacker)
-                                            const/espionage-defection-rate)))))})))
+                                   (long (* att-agents rate)))))
+      :agents-captured (when-not att-wins?
+                         (if transfer?
+                           (min att-agents
+                                (max const/espionage-defection-min
+                                     (long (* att-agents rate))))
+                           0))})))
 
 (defn resolve-espionage
   "Resolve an espionage attempt. Agent counts are compared with ±variance random rolls. Returns a
@@ -395,12 +430,13 @@
 
   [attacker player-map, defender player-map] -> result-map"
   [attacker defender]
-  (let [{:keys [att-wins? agents-captured]} (espionage-roll attacker defender)]
+  (let [{:keys [att-wins? agents-lost agents-captured]} (espionage-roll attacker defender :spy)]
     {:op             "spy"
      :attacker-id    (str (:xt/id attacker))
      :defender-id    (str (:xt/id defender))
      :defender-name  (:player/empire-name defender)
      :attacker-wins? att-wins?
+     :agents-lost    agents-lost
      :agents-captured agents-captured
      :intel (when att-wins?
               {:soldiers   (:player/soldiers   defender)
@@ -420,13 +456,14 @@
 
   [attacker player-map, defender player-map] -> result-map"
   [attacker defender]
-  (let [{:keys [att-wins? agents-captured]} (espionage-roll attacker defender)]
+  (let [{:keys [att-wins? agents-lost agents-captured]} (espionage-roll attacker defender :incite)]
     {:op               "incite"
      :attacker-id      (str (:xt/id attacker))
      :defender-id      (str (:xt/id defender))
      :defender-name    (:player/empire-name defender)
      :attacker-wins?   att-wins?
      :stability-damage (when att-wins? const/incite-stability-damage)
+     :agents-lost      agents-lost
      :agents-captured  agents-captured}))
 
 (defn resolve-bomb
@@ -436,7 +473,7 @@
 
   [attacker player-map, defender player-map] -> result-map"
   [attacker defender]
-  (let [{:keys [att-wins? agents-captured]} (espionage-roll attacker defender)]
+  (let [{:keys [att-wins? agents-lost agents-captured]} (espionage-roll attacker defender :bomb)]
     {:op                   "bomb"
      :attacker-id          (str (:xt/id attacker))
      :defender-id          (str (:xt/id defender))
@@ -446,6 +483,7 @@
      :transports           (when att-wins? (long (* (:player/transports defender) const/bomb-damage-rate)))
      :fighters             (when att-wins? (long (* (:player/fighters   defender) const/bomb-damage-rate)))
      :carriers             (when att-wins? (long (* (:player/carriers   defender) const/bomb-damage-rate)))
+     :agents-lost          agents-lost
      :agents-captured      agents-captured}))
 
 (defn resolve-defect
@@ -458,12 +496,13 @@
   (let [def-mult  (:game/defect-defense-multiplier game)
         rate      (:game/defect-transfer-rate      game)
         cap       (:game/defect-transfer-cap       game)
-        {:keys [att-wins? agents-captured]} (espionage-roll attacker defender def-mult)]
+        {:keys [att-wins? agents-lost agents-captured]} (espionage-roll attacker defender :defect def-mult)]
     {:op               "defect"
      :attacker-id      (str (:xt/id attacker))
      :defender-id      (str (:xt/id defender))
      :defender-name    (:player/empire-name defender)
      :attacker-wins?   att-wins?
+     :agents-lost      agents-lost
      :agents-captured  agents-captured
      :agents-defected  (when att-wins?
                          (min cap (long (* rate (:player/agents defender)))))}))

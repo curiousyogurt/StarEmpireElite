@@ -232,8 +232,24 @@
 ;;;; Espionage
 ;;;; Agent defection on a failed covert mission.
 
-(def espionage-defection-rate 0.10)  ; fraction of attacker's agents captured on any failed mission
-(def espionage-defection-min  1)     ; minimum agents captured on any failed mission
+;;;; Per-op failure rates — supersede the old flat espionage-defection-rate.
+;;;; Each op risks a different fraction of the attacker's agent pool on failure.
+;;;; Spy is light recon (low exposure); bomb is a physical operation (high exposure).
+(def spy-defection-rate    0.05)
+(def incite-defection-rate 0.10)
+(def bomb-defection-rate   0.15)
+(def defect-defection-rate 0.12)
+
+(def espionage-defection-min  1)     ; minimum agents lost on any failed mission
+
+;;;; Diminishing returns on defensive agent massing.
+;;;; Agents defend at full value up to the threshold T. Beyond T, the surplus
+;;;; contributes with diminishing returns: effective = T + (surplus)^exp.
+;;;; This is a concave power curve — the first agents past T still help, but each
+;;;; successive agent adds less than the one before. At exp = 0.75 and T = 100,
+;;;; a 1000-agent defender has ~264 effective agents, not 1000.
+(def espionage-defense-threshold 100)
+(def espionage-defense-exponent  0.75)
 
 (def incite-stability-damage  10)    ; stability points lost by the target on a successful incite
 (def bomb-damage-rate         0.10)  ; fraction of soldiers/transports/fighters/carriers destroyed on a successful bomb

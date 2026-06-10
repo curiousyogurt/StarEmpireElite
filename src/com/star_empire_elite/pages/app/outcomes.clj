@@ -226,7 +226,7 @@
                     (:amount recovery-result 0) 0)
         ;; Agents delta
         esp-lost    (if (and espionage-result (not (:attacker-wins? espionage-result)))
-                      (:agents-captured espionage-result 0) 0)
+                      (:agents-lost espionage-result 0) 0)
         esp-gained  (or (:player/incoming-espionage-agents-gained player) 0)
         esp-defect  (if (and espionage-result (:attacker-wins? espionage-result)
                              (= (:op espionage-result) "defect"))
@@ -483,7 +483,8 @@
 
 (defn- bomb-card
   "Render a collapsible bombing raid result card."
-  [{:keys [opp-name attacker-wins? you-are-attacker? soldiers transports fighters carriers open?]}]
+  [{:keys [opp-name attacker-wins? you-are-attacker? soldiers transports fighters carriers
+           agents-lost open?]}]
   (let [units        [["Soldiers"   soldiers]
                       ["Transports" transports]
                       ["Fighters"   fighters]
@@ -497,12 +498,16 @@
        :summary       (result-summary "bombed" opp-name attacker-wins? you-are-attacker?)
        :summary-extra (when summary-text [:span.text-xs.text-game-green-dim (str "— " summary-text)])
        :open?         open?}
-      (when attacker-wins?
+      (if attacker-wins?
         [:div.grid.grid-cols-4.py-1.5.px-3.border-t.border-game-divider
          (for [[label val] units]
            [:div.flex.justify-between.items-center.pr-4
             [:span.text-game-green-muted.text-xs label]
-            [:span.text-game-green-soft (ui/format-number val)]])]))))
+            [:span.text-game-green-soft (ui/format-number val)]])]
+        (when (and you-are-attacker? agents-lost (pos? agents-lost))
+          [:div.py-1.5.px-3.border-t.border-game-divider
+           [:p.text-xs.text-game-green-soft
+            (str agents-lost " agent(s) were lost in the operation.")]])))))
 
 (defn- growth-card [{:keys [pop-growth]}]
   [:div.rounded-game.bg-game-surface.overflow-hidden
@@ -773,12 +778,13 @@
                          :transports        (:transports espionage-result)
                          :fighters          (:fighters   espionage-result)
                          :carriers          (:carriers   espionage-result)
+                         :agents-lost       (:agents-lost espionage-result 0)
                          :open?             (not won?)})
              (spy-card {:opp-name        (:defender-name espionage-result)
                         :won?            won?
                         :op              op
                         :spy             (:intel espionage-result)
-                        :lost            (:agents-captured espionage-result 0)
+                        :lost            (:agents-lost espionage-result 0)
                         :stab            (:stability-damage espionage-result)
                         :agents-defected (:agents-defected espionage-result)
                         :open?           (not won?)}))))
