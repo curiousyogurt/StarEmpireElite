@@ -296,6 +296,43 @@
 ;;; incoming-card dispatches to combat-card or strike-card based on mode.
 ;;;
 
+(defn- orbit-line
+  "Render the space-phase result line for the combat card.
+  Returns nil when space-result data is not available (backward compat).
+
+  [space-att-wins? bool, space-buff double, opp-name str, you-are-attacker? bool] -> hiccup|nil"
+  [space-att-wins? space-buff opp-name you-are-attacker?]
+  (when (some? space-att-wins?)
+    (let [you-won-space? (if you-are-attacker? space-att-wins? (not space-att-wins?))
+          pct            (when space-buff (long (* space-buff 100)))
+          significant?   (and pct (>= pct 1))]
+      [:div.text-xs.py-1.5.px-3.border-t.border-game-divider
+       {:class (if you-won-space? "text-green-400" "text-yellow-400")}
+       (if you-won-space?
+         (str "» ORBIT: Your fleet achieved secure orbit"
+              (if significant?
+                (str " (+" pct "% to ground force power)") 
+                " (marginal edge to ground force power)"))
+         (str "» ORBIT: Your fleet failed to achieve secure orbit"
+              (if significant?
+                (str " (-" pct "% to ground force power)") 
+                " (marginal edge against ground force power)")))])))
+
+(defn- ground-line
+  "Render the ground-phase result line for the combat card.
+  Returns nil when space-result data is not available (backward compat — only show
+  ground line when the two-phase model is active).
+
+  [space-att-wins? bool, attacker-wins? bool, you-are-attacker? bool] -> hiccup|nil"
+  [space-att-wins? attacker-wins? you-are-attacker?]
+  (when (some? space-att-wins?)
+    (let [you-won-ground? (if you-are-attacker? attacker-wins? (not attacker-wins?))]
+      [:div.text-xs.py-1.5.px-3.border-t.border-game-divider
+       {:class (if you-won-ground? "text-green-400" "text-yellow-400")}
+       (if you-won-ground?
+         "» GROUND: Your ground forces overcame planetary defences"
+         "» GROUND: Your ground forces failed to overcome planetary defences")])))
+
 (defn- combat-card
   "Render a collapsible combat card with header summary and 3-col symmetric table.
 
@@ -303,7 +340,8 @@
   :stations-mine? true when you are the defender (you have stations).
   :open? controls the initial expansion state."
   [{:keys [mode opp-name attacker-wins? my-counts my-losses opp-losses
-           stations-mine? resources-taken planets-transferred open?]}]
+           stations-mine? resources-taken planets-transferred
+           space-att-wins? space-buff open?]}]
   (let [dash           [:span.text-game-green-dim "—"]
         make-left      (fn [unit-key defender-only?]
                          (if (and defender-only? (not stations-mine?))
@@ -335,6 +373,8 @@
       {:badge   (ui/mode-badge mode)
        :summary (result-summary verb opp-name attacker-wins? (not stations-mine?))
        :open?   open?}
+      (orbit-line space-att-wins? space-buff opp-name (not stations-mine?))
+      (ground-line space-att-wins? attacker-wins? (not stations-mine?))
       [:div.overflow-x-auto
        [:table.w-full.text-xs.table-fixed
         (combat-table-header opp-name)
@@ -518,16 +558,19 @@
                     :intercepted       (:cmd-ships-lost result)
                     :defender-losses   (:defender-losses result)
                     :open?             true})
-      (combat-card {:mode                (get result :mode :invade)
-                    :opp-name            (:attacker-name result)
-                    :attacker-wins?      (:attacker-wins? result)
-                    :my-counts           (:defender-counts result)
-                    :my-losses           (:defender-losses result)
-                    :opp-losses          (:attacker-losses result)
-                    :stations-mine?      true
-                    :resources-taken     (:resources-captured result)
-                    :planets-transferred (:planets-transferred result)
-                    :open?               true}))))
+      (let [space-r (:space-result result)]
+        (combat-card {:mode                (get result :mode :invade)
+                      :opp-name            (:attacker-name result)
+                      :attacker-wins?      (:attacker-wins? result)
+                      :my-counts           (:defender-counts result)
+                      :my-losses           (:defender-losses result)
+                      :opp-losses          (:attacker-losses result)
+                      :stations-mine?      true
+                      :resources-taken     (:resources-captured result)
+                      :planets-transferred (:planets-transferred result)
+                      :space-att-wins?     (:att-wins? space-r)
+                      :space-buff          (:space-carryover result)
+                      :open?               true})))))
 
 (defn- incoming-espionage-card
   "Render a collapsible card for a successful incoming espionage operation (incite or defect).
@@ -690,19 +733,23 @@
                              :defender-losses (:defender-losses      battle-result)
                              :open?           (and (pos? committed)
                                                    (> (/ (double lost) committed) 0.05))}))
-             (combat-card {:mode                mode
-                           :opp-name            def-name
-                           :attacker-wins?      (:attacker-wins? battle-result)
-                           :my-counts           (:attacker-counts battle-result)
-                           :my-losses           (:attacker-losses battle-result)
-                           :opp-losses          (:defender-losses battle-result)
-                           :stations-mine?      false
-                           :resources-taken     (:resources-captured battle-result)
-                           :planets-transferred (:planets-transferred battle-result)
-                           :open?               (or (not (:attacker-wins? battle-result))
-                                                    (non-trivial-losses?
-                                                      (:attacker-counts battle-result)
-                                                      (:attacker-losses battle-result)))}))))
+             (let [space-r (:space-result battle-result)]
+               (combat-card {:mode                mode
+                             :opp-name            def-name
+                             :attacker-wins?      (:attacker-wins? battle-result)
+                             :my-counts           (:attacker-counts battle-result)
+                             :my-losses           (:attacker-losses battle-result)
+                             :opp-losses          (:defender-losses battle-result)
+                             :stations-mine?      false
+                             :resources-taken     (:resources-captured battle-result)
+                             :planets-transferred (:planets-transferred battle-result)
+                             :space-att-wins?     (:att-wins? space-r)
+                             :space-buff          (:space-carryover battle-result)
+                             :open?               (or (not (:attacker-wins? battle-result))
+                                                      (and space-r (not (:att-wins? space-r)))
+                                                      (non-trivial-losses?
+                                                        (:attacker-counts battle-result)
+                                                        (:attacker-losses battle-result)))})))))
 
        ;; Outgoing espionage result
        (when espionage-result

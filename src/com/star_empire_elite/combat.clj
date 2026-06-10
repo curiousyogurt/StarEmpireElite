@@ -291,9 +291,10 @@
      :resources-captured  {:credits credits-captured
                            :food    food-captured
                            :fuel    fuel-captured}
-     ;; Phase sub-results for Phase 2 display
-     :space-result  space-result
-     :ground-result ground-result}))
+     ;; Phase sub-results for display
+     :space-result    space-result
+     :space-carryover carryover
+     :ground-result   ground-result}))
 
 ;;;;
 ;;;; Strike Resolution
