@@ -1077,7 +1077,7 @@
    (cond
      display  display
      signed? (format-signed-number value)
-     sign    (str sign (format-number value))
+     sign    [:<> sign (format-number value)]
      :else   (format-number value))
    (when unit
      (str " " unit))])
