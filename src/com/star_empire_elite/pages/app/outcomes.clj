@@ -107,11 +107,11 @@
            [:span {:class result-cls} (str " " result-txt)]])))
 
 (defn- gain-cell [n]
-  [:span.text-green-400 (str "+" (ui/format-number n))])
+  [:span.text-green-400 "+" (ui/format-number n)])
 
 (defn- opp-loss-cell [n]
   (if (pos? n)
-    [:span.text-red-400 (str "−" (ui/format-number n))]
+    [:span.text-red-400 "−" (ui/format-number n)]
     [:span.text-game-green-dim "0"]))
 
 (defn- combat-row [left center right]
@@ -358,7 +358,7 @@
                             (let [loss (get my-losses unit-key 0)]
                               (when (pos? loss)
                                 [:span.text-red-400.ml-1.5
-                                 (str "−" (ui/format-number loss))]))]))
+                                 "−" (ui/format-number loss)]))]))
         make-right     (fn [unit-key defender-only?]
                          (if (and defender-only? stations-mine?)
                            dash
@@ -405,7 +405,7 @@
                         [:span.text-game-green-soft (ui/format-number dispatched)]
                         (when (pos? intercepted)
                           [:span.text-red-400.ml-1.5
-                           (str "−" (ui/format-number intercepted))])]
+                           "−" (ui/format-number intercepted)])]
         dl             (or defender-losses {})
         unit-pairs     [["soldiers" (:soldiers dl)] ["transports" (:transports dl)]
                         ["fighters" (:fighters dl)] ["stations"   (:stations   dl)]]
