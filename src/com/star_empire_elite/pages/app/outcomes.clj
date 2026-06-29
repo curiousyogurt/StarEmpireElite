@@ -469,8 +469,11 @@
 
          (and won? (= op "incite"))
          [:p.text-xs.text-game-green-soft
-          (str "Your agents successfully stirred unrest. "
-               "The stability of " opp-name " was reduced by " stab "%.")]
+          (if (and stab (pos? stab))
+            (str "Your agents successfully stirred unrest. "
+                 "The stability of " opp-name " was reduced by " stab "%.")
+            (str "Your agents stirred unrest, but " opp-name
+                 "'s population is already at peak instability. Stability was unaffected."))]
 
          (and won? (= op "defect"))
          [:p.text-xs.text-game-green-soft

@@ -449,10 +449,25 @@
                :cmd-ships  (:player/cmd-ships  defender)
                :agents     (:player/agents     defender)})}))
 
+(defn- incite-damage
+  "Compute the stability damage a successful incite inflicts on a target.
+  Two mechanisms limit the damage:
+    1. Diminishing returns — damage scales with (stability / 100), so a healthy empire
+       takes the full base hit while an already-shaky one barely moves.
+    2. Hard floor — incite alone cannot push stability below incite-stability-floor (70).
+       This keeps incited victims out of the breakaway-danger zone (~80%/turn planet loss
+       at stability 0) and turns incite into sustained pressure rather than a kill.
+
+  [target-stability number] -> long"
+  [target-stability]
+  (let [raw  (* const/incite-stability-damage (/ (double target-stability) 100.0))
+        room (max 0 (- target-stability const/incite-stability-floor))]
+    (long (Math/round (double (min raw room))))))
+
 (defn resolve-incite
   "Resolve an incite operation. Agent counts are compared with ±variance random rolls. On success,
-  the defender's stability is damaged. On failure, agents are captured. UUIDs stored as strings for
-  safe pr-str round-trip.
+  the defender's stability is damaged (diminishing with current stability, floored at 70).
+  On failure, agents are captured. UUIDs stored as strings for safe pr-str round-trip.
 
   [attacker player-map, defender player-map] -> result-map"
   [attacker defender]
@@ -462,7 +477,7 @@
      :defender-id      (str (:xt/id defender))
      :defender-name    (:player/empire-name defender)
      :attacker-wins?   att-wins?
-     :stability-damage (when att-wins? const/incite-stability-damage)
+     :stability-damage (when att-wins? (incite-damage (:player/stability defender)))
      :agents-lost      agents-lost
      :agents-captured  agents-captured}))
 

@@ -251,7 +251,8 @@
 (def espionage-defense-threshold 100)
 (def espionage-defense-exponent  0.75)
 
-(def incite-stability-damage  10)    ; stability points lost by the target on a successful incite
+(def incite-stability-damage  8)     ; base stability damage for a successful incite (diminished by target's current stability)
+(def incite-stability-floor   70)    ; incite cannot reduce stability below this; keeps victims out of breakaway-danger zone
 (def bomb-damage-rate         0.10)  ; fraction of soldiers/transports/fighters/carriers destroyed on a successful bomb
 
 ;;;;
