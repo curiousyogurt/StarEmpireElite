@@ -65,6 +65,7 @@
               :player/current-round          1
               :player/current-phase          1
               :player/turns-used             0
+              :player/rounds-started-today   0
               :player/soldiers               const/starting-soldiers
               :player/transports             const/starting-transports
               :player/fighters               const/starting-fighters

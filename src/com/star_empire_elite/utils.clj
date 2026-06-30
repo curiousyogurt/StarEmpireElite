@@ -90,50 +90,6 @@
               (.set java.util.Calendar/MILLISECOND 0))]
     (>= (.getTime d) (.getTimeInMillis cal))))
 
-(defn- ms-until-midnight
-  "Returns milliseconds until the next UTC midnight."
-  []
-  (let [cal (doto (java.util.Calendar/getInstance (java.util.TimeZone/getTimeZone "UTC"))
-              (.setTime (java.util.Date.))
-              (.set java.util.Calendar/HOUR_OF_DAY 0)
-              (.set java.util.Calendar/MINUTE 0)
-              (.set java.util.Calendar/SECOND 0)
-              (.set java.util.Calendar/MILLISECOND 0)
-              (.add java.util.Calendar/DAY_OF_MONTH 1))]
-    (- (.getTimeInMillis cal) (.getTime (java.util.Date.)))))
-
-(defn day-exhausted?
-  "Returns true if the player has used all rounds-per-day rounds for today's UTC calendar day."
-  [player game]
-  (let [completed      (:player/last-round-completed-at player)
-        current-round  (:player/current-round player)
-        rounds-per-day (:game/rounds-per-day game)]
-    (boolean
-     (and (> current-round rounds-per-day)
-          completed
-          (same-calendar-day? completed)))))
-
-(defn round-cooldown-ms
-  "Returns ms remaining in cooldown if player is blocked from starting a new round, or nil.
-   Two blocking conditions:
-   1. Day exhausted: all rounds-per-day used today → blocked until midnight UTC.
-   2. Between-round cooldown: minimum hours-between-rounds since last completed round."
-  [player game]
-  (let [completed (:player/last-round-completed-at player)]
-    (cond
-      (day-exhausted? player game)
-      (ms-until-midnight)
-
-      (and (= (:player/current-turn player) 1)
-           (= (:player/turns-used player) 0)
-           completed)
-      (let [hours       (or (:game/hours-between-rounds game) 0)
-            cooldown-ms (* hours 60 60 1000)
-            remaining   (- cooldown-ms (- (.getTime (java.util.Date.)) (.getTime completed)))]
-        (when (pos? remaining) remaining))
-
-      :else nil)))
-
 (defn format-cooldown-duration
   "Format a millisecond duration as a human-readable string.
    Examples: 26280000 -> '7h 18m', 900000 -> '15m 0s', 42000 -> '42s'"
@@ -148,32 +104,179 @@
       :else    (str s "s"))))
 
 ;;;;
-;;;; Turn/Round Display
+;;;; Round Status (Pure Core)
 ;;;;
+;;;; All round/turn gating and display logic lives in one pure function, `round-status`,
+;;;; which takes `now` explicitly so it can be tested without wall-clock dependencies.
+;;;; The three public functions (display-turn-round, round-cooldown-ms, day-exhausted?)
+;;;; are thin wrappers that pass (java.util.Date.) to this core.
+;;;;
+
+(defn utc-midnight
+  "Return a Date for the start (00:00:00.000) of the UTC day containing `d`.
+
+  [d Date] -> Date"
+  ^java.util.Date [^java.util.Date d]
+  (let [cal (doto (java.util.Calendar/getInstance (java.util.TimeZone/getTimeZone "UTC"))
+              (.setTime d)
+              (.set java.util.Calendar/HOUR_OF_DAY 0)
+              (.set java.util.Calendar/MINUTE 0)
+              (.set java.util.Calendar/SECOND 0)
+              (.set java.util.Calendar/MILLISECOND 0))]
+    (java.util.Date. (.getTimeInMillis cal))))
+
+(defn- next-utc-midnight
+  "Return a Date for the start of the next UTC day after `now`.
+
+  [now Date] -> Date"
+  ^java.util.Date [^java.util.Date now]
+  (let [cal (doto (java.util.Calendar/getInstance (java.util.TimeZone/getTimeZone "UTC"))
+              (.setTime now)
+              (.set java.util.Calendar/HOUR_OF_DAY 0)
+              (.set java.util.Calendar/MINUTE 0)
+              (.set java.util.Calendar/SECOND 0)
+              (.set java.util.Calendar/MILLISECOND 0)
+              (.add java.util.Calendar/DAY_OF_MONTH 1))]
+    (java.util.Date. (.getTimeInMillis cal))))
+
+(defn- stale-day?
+  "True if `last-turn-at` is non-nil and falls on an earlier UTC calendar day than `now`.
+  Used to decide whether the day's round budget has rolled over.
+
+  [last-turn-at Date|nil, now Date] -> bool"
+  [^java.util.Date last-turn-at ^java.util.Date now]
+  (and (some? last-turn-at)
+       (< (.getTime last-turn-at) (.getTime (utc-midnight now)))))
+
+(defn round-status
+  "Compute the player's round/turn display and gating state from stored fields and wall clock.
+  Pure function — all time-dependent logic is parameterised by `now`.
+
+  Invariants enforced:
+    I1  At most rounds-per-day round-starts per UTC day (budget).
+    I2  A new round may start only when now >= last-turn-at + hours-between-rounds (spacing).
+    I3  Once a round is started (turns-used > 0), every turn in it may be finished,
+        even across UTC midnight (gentle spillover).
+
+  The display derivation never reads the stored current-round; it is derived from
+  effective-starts-today and the player's turns-used/current-turn, which prevents the
+  R0 underflow and stranded-turns-used bugs.
+
+  [rounds-started-today int, turns-used int, current-turn int, current-phase int,
+   last-turn-at Date|nil, rounds-per-day int, turns-per-round int,
+   hours-between-rounds number, now Date] -> status-map
+
+  Returns:
+    {:display-round  int       ; round number to show in the UI
+     :display-turn   int       ; turn number to show in the UI
+     :can-act?       bool      ; true if the player can take a turn right now
+     :state          keyword   ; :active | :spacing | :budget-exhausted
+     :unlock-at      Date|nil} ; when the block lifts (nil when :active)"
+  [rounds-started-today turns-used current-turn current-phase
+   last-turn-at rounds-per-day turns-per-round hours-between-rounds now]
+  (let [;; Effective starts today: resets to 0 when last-turn-at is on a previous UTC day.
+        ;; This is the budget counter — it tracks how many rounds the player has *started*
+        ;; today. Stale means the day rolled over and the budget is fresh.
+        e           (if (stale-day? last-turn-at now)
+                      0
+                      (or rounds-started-today 0))
+        mid-round?  (pos? turns-used)
+        poised?     (zero? turns-used)
+        spacing-ms  (* hours-between-rounds 60 60 1000)
+        ;; can-start? gates round-starts only (poised? = turns-used is 0).
+        ;; Budget must have room AND the spacing cooldown must have elapsed.
+        can-start?  (and poised?
+                        (< e rounds-per-day)
+                        (or (nil? last-turn-at)
+                            (>= (.getTime now)
+                                (+ (.getTime last-turn-at) spacing-ms))))
+        ;; Mid-turn exemption: if the player has already committed to a turn
+        ;; (current-phase > 1, e.g. they're on expenses/exchange/etc.) they
+        ;; must be allowed to finish it regardless of gating.
+        can-act?    (or mid-round? can-start? (> current-phase 1))
+
+        ;; Display derivation — never reads stored current-round.
+        display-turn  (cond
+                        (or mid-round? can-start?) current-turn
+                        (>= e 1)                   turns-per-round
+                        :else                      1)
+        display-round (cond
+                        mid-round?  (max e 1)   ;; floor prevents R0 in spillover
+                        can-start?  (inc e)     ;; about to start the next round
+                        (>= e 1)    e           ;; blocked: stay on completed round
+                        :else       1)          ;; cross-midnight locked
+
+        ;; Unlock time: the later of the spacing gate and the budget gate.
+        ;; midnight reset refreshes the budget but never clears the spacing cooldown.
+        budget-gate (if (>= e rounds-per-day)
+                      (.getTime (next-utc-midnight now))
+                      0)
+        spacing-gate (if last-turn-at
+                       (+ (.getTime last-turn-at) spacing-ms)
+                       0)
+        unlock-ms   (max budget-gate spacing-gate)
+        state       (cond
+                      can-act?              :active
+                      (>= e rounds-per-day) :budget-exhausted
+                      :else                 :spacing)]
+    {:display-round  display-round
+     :display-turn   display-turn
+     :can-act?       can-act?
+     :state          state
+     :unlock-at      (when-not can-act?
+                       (java.util.Date. (long unlock-ms)))}))
+
+(defn- player-round-status
+  "Extract player/game fields and call round-status with the current wall clock.
+  Shared helper for the three public gating/display functions.
+
+  [player player-map, game game-map] -> status-map"
+  [player game]
+  (round-status (or (:player/rounds-started-today player) 0)
+                (or (:player/turns-used player) 0)
+                (or (:player/current-turn player) 1)
+                (or (:player/current-phase player) 1)
+                (:player/last-turn-at player)
+                (or (:game/rounds-per-day game) 2)
+                (or (:game/turns-per-round game) 6)
+                (or (:game/hours-between-rounds game) 0)
+                (java.util.Date.)))
+
+;;;;
+;;;; Round Gating & Display
+;;;; Thin wrappers around round-status for the three public APIs.
+;;;;
+
+(defn day-exhausted?
+  "Returns true if the player has used all rounds-per-day round-starts for today's UTC day.
+
+  [player player-map, game game-map] -> bool"
+  [player game]
+  (= :budget-exhausted (:state (player-round-status player game))))
+
+(defn round-cooldown-ms
+  "Returns ms remaining in cooldown if the player is blocked from starting a new round,
+  or nil if the player can act now. Two blocking conditions:
+    1. Budget exhausted: all rounds-per-day started today → blocked until midnight UTC.
+    2. Spacing: minimum hours-between-rounds since last turn.
+
+  [player player-map, game game-map] -> long|nil"
+  [player game]
+  (let [s (player-round-status player game)]
+    (when-not (:can-act? s)
+      (let [remaining (- (.getTime (:unlock-at s)) (.getTime (java.util.Date.)))]
+        (when (pos? remaining) remaining)))))
 
 (defn display-turn-round
   "Return display values {:turn n :round n} for turn and round indicators.
-  Shows the completed state when a player is waiting between rounds or for the next day,
-  rather than the misleading reset values.
+  Derived from round-status — never reads the stored current-round, which prevents
+  the R0 underflow and stranded-turns-used bugs.
 
-  [player game] -> {:turn int :round int}"
+  [player player-map, game game-map] -> {:turn int :round int}"
   [player game]
-  (let [rounds-per-day  (:game/rounds-per-day game)
-        turns-per-round (:game/turns-per-round game)
-        current-round   (:player/current-round player)
-        current-turn    (:player/current-turn player)
-        turns-used      (:player/turns-used player)
-        last-completed  (:player/last-round-completed-at player)
-        day-complete?   (> current-round rounds-per-day)
-        between-rounds? (and (not day-complete?)
-                             (= current-turn 1)
-                             (= turns-used 0)
-                             (some? last-completed))]
-    {:turn  (if (or day-complete? between-rounds?) turns-per-round current-turn)
-     :round (cond
-              day-complete?   rounds-per-day
-              between-rounds? (dec current-round)
-              :else           current-round)}))
+  (let [s (player-round-status player game)]
+    {:turn  (:display-turn s)
+     :round (:display-round s)}))
 
 ;;;;
 ;;;; Player Resource Snapshot

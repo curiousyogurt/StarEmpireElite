@@ -161,6 +161,8 @@
             [:player/current-round         :int]
             [:player/current-phase         :int]
             [:player/turns-used            :int]
+            [:player/rounds-started-today
+             {:optional true}              :int]
             [:player/last-turn-at
              {:optional true}              inst?]
             [:player/last-round-completed-at

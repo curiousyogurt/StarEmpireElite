@@ -294,9 +294,9 @@
 (def agent-sell 1000)
 
 (def food-buy  6)
-(def food-sell 2)
+(def food-sell 1)
 (def fuel-buy  6)
-(def fuel-sell 2)
+(def fuel-sell 1)
 
 ;;;;
 ;;;; Score Weights

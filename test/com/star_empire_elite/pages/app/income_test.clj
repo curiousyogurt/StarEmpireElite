@@ -204,13 +204,13 @@
 ;;;;
 ;;;; apply-income Day-Reset Tests
 ;;;;
-;;;; When last-round-completed-at is from a previous UTC calendar day and current-round > 1,
-;;;; apply-income resets current-round to 1. This covers both the "used all rounds yesterday"
-;;;; and "skipped round 2" cases. Round 1 and nil last-round-completed-at are never reset.
+;;;; The old day-reset logic (setting current-round=1 on a new UTC day) has been removed.
+;;;; Round display is now derived from rounds-started-today in the pure round-status core.
+;;;; These tests verify that apply-income no longer writes current-round.
 ;;;;
 
-(deftest test-apply-income-resets-round-on-new-day
-  (testing "Sets current-round to 1 when last round was completed on a previous day"
+(deftest test-apply-income-no-reset-on-new-day
+  (testing "Does not write current-round even when last round was completed on a previous day"
     (let [player  (assoc test-player :player/current-round           2
                                      :player/last-round-completed-at past-date)
           tx-atom (atom nil)]
@@ -218,7 +218,7 @@
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
         (let [result (income/apply-income {:path-params {:player-id (str test-player-id)}
                                             :biff/db     nil})]
-          (is (= 1 (:player/current-round (first @tx-atom))))
+          (is (nil? (:player/current-round (first @tx-atom))))
           (is (= 303 (:status result)))
           (is (= (str "/app/game/" test-player-id "/expenses")
                  (get-in result [:headers "location"]))))))))

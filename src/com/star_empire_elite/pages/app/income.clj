@@ -215,41 +215,33 @@
 
 (defn apply-income
   "Apply planet income to the player and advance to the expenses phase.
-  Resets current-round to 1 when last-round-completed-at is from a previous UTC calendar day,
-  covering both the all-rounds-used and skipped-round cases.
 
   [ctx ring-ctx] -> ring-response (303 redirect to expenses)"
   [ctx]
   (utils/with-player-and-game [player game player-id] ctx
     (if-let [redirect (utils/validate-phase player 1 player-id)]
       redirect
-      (let [income         (calculate-income player game)
-            after          (calculate-resources-after-income player income)
-            last-completed (:player/last-round-completed-at player)
-            day-reset?     (and (> (:player/current-round player) 1)
-                                last-completed
-                                (not (utils/same-calendar-day? last-completed)))]
-        ;; Write to the db
+      (let [income (calculate-income player game)
+            after  (calculate-resources-after-income player income)]
         (biff/submit-tx ctx
-          [(cond-> {:db/doc-type          :player
-                    :db/op                :update
-                    :xt/id                player-id
-                    :player/credits       (:credits after)
-                    :player/food          (:food after)
-                    :player/fuel          (:fuel after)
-                    :player/soldiers      (:soldiers after)
-                    :player/fighters      (:fighters after)
-                    :player/stations      (:stations after)
-                    :player/current-phase 2
-                    :player/score         (utils/calculate-score
-                                            (assoc player
-                                              :player/credits  (:credits after)
-                                              :player/food     (:food after)
-                                              :player/fuel     (:fuel after)
-                                              :player/soldiers (:soldiers after)
-                                              :player/fighters (:fighters after)
-                                              :player/stations (:stations after)))} ; Next phase
-             day-reset? (assoc :player/current-round 1))])
+          [{:db/doc-type          :player
+            :db/op                :update
+            :xt/id                player-id
+            :player/credits       (:credits after)
+            :player/food          (:food after)
+            :player/fuel          (:fuel after)
+            :player/soldiers      (:soldiers after)
+            :player/fighters      (:fighters after)
+            :player/stations      (:stations after)
+            :player/current-phase 2
+            :player/score         (utils/calculate-score
+                                    (assoc player
+                                      :player/credits  (:credits after)
+                                      :player/food     (:food after)
+                                      :player/fuel     (:fuel after)
+                                      :player/soldiers (:soldiers after)
+                                      :player/fighters (:fighters after)
+                                      :player/stations (:stations after)))}])
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/expenses")}}))))
 

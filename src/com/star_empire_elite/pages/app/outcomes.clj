@@ -649,7 +649,18 @@
               next-round      (if end-round?
                                 (inc (:player/current-round player))
                                 (:player/current-round player))
-              reset-used      (if end-round? 0 turns-used)]
+              reset-used      (if end-round? 0 turns-used)
+              ;; Reset-then-increment for rounds-started-today:
+              ;; If last-turn-at is from a previous UTC day, the budget resets to 0.
+              ;; Then, if the player just started a round (old turns-used was 0),
+              ;; increment by 1 to consume a start from today's budget.
+              old-last-turn  (:player/last-turn-at player)
+              stale?         (and (some? old-last-turn)
+                                  (< (.getTime ^java.util.Date old-last-turn)
+                                     (.getTime (utils/utc-midnight now))))
+              base-starts    (if stale? 0 (or (:player/rounds-started-today player) 0))
+              round-start?   (zero? (:player/turns-used player))
+              new-starts     (if round-start? (inc base-starts) base-starts)]
           (biff/submit-tx ctx
             [(merge {:db/doc-type                            :player
                      :db/op                                  :update
@@ -659,6 +670,7 @@
                      :player/turns-used                      reset-used
                      :player/current-phase                   1
                      :player/last-turn-at                    now
+                     :player/rounds-started-today            new-starts
                      :player/last-battle-result              nil
                      :player/last-espionage-result           nil
                      :player/last-population-growth          nil

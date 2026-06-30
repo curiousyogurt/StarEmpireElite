@@ -11,21 +11,25 @@
 (def test-player-id #uuid "00000000-0000-0000-0000-000000000002")
 
 ;; Minimal game map for display tests — only the turn/round fields are needed
-(defn make-game [turns-per-round rounds-per-day]
-  {:xt/id test-game-id
-   :game/turns-per-round turns-per-round
-   :game/rounds-per-day  rounds-per-day})
+(defn make-game
+  ([turns-per-round rounds-per-day]
+   (make-game turns-per-round rounds-per-day 0))
+  ([turns-per-round rounds-per-day hours-between-rounds]
+   {:xt/id test-game-id
+    :game/turns-per-round      turns-per-round
+    :game/rounds-per-day       rounds-per-day
+    :game/hours-between-rounds hours-between-rounds}))
 
 ;; Minimal player map for display tests
 (defn make-player
-  ([current-turn current-round]
+  ([current-turn rounds-started-today]
    {:xt/id test-player-id
-    :player/current-turn  current-turn
-    :player/current-round current-round})
-  ([current-turn current-round turns-used last-completed]
-   (assoc (make-player current-turn current-round)
-          :player/turns-used               turns-used
-          :player/last-round-completed-at  last-completed)))
+    :player/current-turn          current-turn
+    :player/rounds-started-today  rounds-started-today})
+  ([current-turn rounds-started-today turns-used last-turn-at]
+   (assoc (make-player current-turn rounds-started-today)
+          :player/turns-used  turns-used
+          :player/last-turn-at last-turn-at)))
 
 ;;
 ;; format-turn-round
@@ -36,60 +40,65 @@
 
 (deftest test-format-turn-round-mid-round
   (testing "In the middle of a round, shows actual turn and round"
+    ;; rounds-started-today=0, can-start?=true → display Round inc(0)=1, Turn 1
     (is (= "Turn 1/2 | Round 1/1"
            (dashboard/format-turn-round
-            (make-player 1 1)
+            (make-player 1 0 0 nil)
             (make-game 2 1))))))
 
 (deftest test-format-turn-round-last-turn
   (testing "On the last turn of a round, shows the max turn number"
+    ;; rounds-started-today=1, turns-used=1 → mid-round, display Round max(1,1)=1, Turn 2
     (is (= "Turn 2/2 | Round 1/1"
            (dashboard/format-turn-round
-            (make-player 2 1)
+            (make-player 2 1 1 (java.util.Date.))
             (make-game 2 1))))))
 
 (deftest test-format-turn-round-day-complete
   (testing "After all turns and rounds are used (day complete), shows max/max"
-    ;; With 2 turns-per-round and 1 round-per-day, after completing everything:
-    ;; current-turn rolls to 1 and current-round increments to 2 (> max of 1).
+    ;; rounds-started-today=1 (>= rounds-per-day=1) → budget-exhausted
+    ;; display: turns-per-round=2, e=1
     (is (= "Turn 2/2 | Round 1/1"
            (dashboard/format-turn-round
-            (make-player 1 2)   ; rolled over: turn=1, round=2
+            (make-player 1 1 0 (java.util.Date.))
             (make-game 2 1))))))
 
 (deftest test-format-turn-round-multi-round-in-progress
   (testing "Multi-round game mid-day shows current round correctly"
+    ;; rounds-started-today=1, turns-used=0, can-start?=true → Round inc(1)=2
     (is (= "Turn 1/3 | Round 2/4"
            (dashboard/format-turn-round
-            (make-player 1 2)
+            (make-player 1 1 0 (java.util.Date.))
             (make-game 3 4))))))
 
 (deftest test-format-turn-round-multi-round-day-complete
   (testing "Multi-round game day-complete caps both values at max"
-    ;; 3 turns-per-round, 4 rounds-per-day. After last round, current-round=5.
+    ;; rounds-started-today=4 (>= rounds-per-day=4) → budget-exhausted
+    ;; display: turns-per-round=3, e=4
     (is (= "Turn 3/3 | Round 4/4"
            (dashboard/format-turn-round
-            (make-player 1 5)   ; rolled over: turn=1, round=5 (> max 4)
+            (make-player 1 4 0 (java.util.Date.))
             (make-game 3 4))))))
 
 (def some-timestamp (java.util.Date.))
 
 ;; Standard game fixture using real constants — tests that model actual game state
 ;; should use this so they stay correct if constants change.
-(def standard-game (make-game const/turns-per-round const/rounds-per-day))
+(def standard-game (make-game const/turns-per-round const/rounds-per-day 2))
 
 (deftest test-format-turn-round-between-rounds
   (testing "After completing a round, shows completed round state until next round starts"
-    ;; Counters have reset (turn=1, round=2, turns-used=0) but no turns taken in round 2 yet.
+    ;; rounds-started-today=1, turns-used=0, last-turn-at=just-now, hours-between-rounds=2
+    ;; → spacing gate blocks, display shows completed round 1 at max turn
     (is (= (str "Turn " const/turns-per-round "/" const/turns-per-round
                 " | Round 1/" const/rounds-per-day)
            (dashboard/format-turn-round
-            (make-player 1 2 0 some-timestamp)
+            (make-player 1 1 0 some-timestamp)
             standard-game)))))
 
 (deftest test-format-turn-round-new-round-started
   (testing "After taking the first turn of a new round, shows the new round"
-    ;; turns-used=1 means a turn has been submitted in round 2.
+    ;; rounds-started-today=2, turns-used=1 → mid-round, display Round max(2,1)=2
     (is (= (str "Turn 2/" const/turns-per-round
                 " | Round 2/" const/rounds-per-day)
            (dashboard/format-turn-round
@@ -98,11 +107,11 @@
 
 (deftest test-format-turn-round-game-start
   (testing "At game start (no turns taken, no completed round) shows turn 1 round 1"
-    ;; last-round-completed-at is nil — game hasn't started yet.
+    ;; rounds-started-today=0, last-turn-at=nil → can-start?=true, Round inc(0)=1
     (is (= (str "Turn 1/" const/turns-per-round
                 " | Round 1/" const/rounds-per-day)
            (dashboard/format-turn-round
-            (make-player 1 1 0 nil)
+            (make-player 1 0 0 nil)
             standard-game)))))
 
 ;;
@@ -113,10 +122,11 @@
 ;;
 
 (def ^:private minimal-game
-  {:xt/id                test-game-id
-   :game/name            "Galactic Conquest"
-   :game/turns-per-round 4
-   :game/rounds-per-day  3})
+  {:xt/id                     test-game-id
+   :game/name                 "Galactic Conquest"
+   :game/turns-per-round      4
+   :game/rounds-per-day       3
+   :game/hours-between-rounds 0})
 
 (def ^:private minimal-player
   {:xt/id                     test-player-id
@@ -124,9 +134,9 @@
    :player/rank               2
    :player/score              12000
    :player/current-turn       2
-   :player/current-round      1
+   :player/rounds-started-today 1
    :player/turns-used         1
-   :player/last-round-completed-at nil
+   :player/last-turn-at       nil
    :player/credits            10000
    :player/food               5000
    :player/fuel               3000
