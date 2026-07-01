@@ -77,29 +77,41 @@
    :fuel-sell        (:game/fuel-sell       game)})
 
 (def sell-asset-rows
-  [{:label "Soldiers"          :abbrev "Soldiers"         :field "soldiers-sold"     
+  [{:group "Ground Forces"
+    :label "Soldiers"          :abbrev "Soldiers"         :field "soldiers-sold"
     :qty-key :soldiers-sold    :cost-key :soldier-sell    :player-key :player/soldiers}
-   {:label "Transports"        :abbrev "Transports"       :field "transports-sold"   
+   {:group "Ground Forces"
+    :label "Transports"        :abbrev "Transports"       :field "transports-sold"
     :qty-key :transports-sold  :cost-key :transport-sell  :player-key :player/transports}
-   {:label "Generals"          :abbrev "Generals"         :field "generals-sold"     
+   {:group "Ground Forces"
+    :label "Generals"          :abbrev "Generals"         :field "generals-sold"
     :qty-key :generals-sold    :cost-key :general-sell    :player-key :player/generals}
-   {:label "Fighters"          :abbrev "Fighters"         :field "fighters-sold"     
-    :qty-key :fighters-sold    :cost-key :fighter-sell    :player-key :player/fighters}
-   {:label "Carriers"          :abbrev "Carriers"         :field "carriers-sold"     
-    :qty-key :carriers-sold    :cost-key :carrier-sell    :player-key :player/carriers}
-   {:label "Admirals"          :abbrev "Admirals"         :field "admirals-sold"     
-    :qty-key :admirals-sold    :cost-key :admiral-sell    :player-key :player/admirals}
-   {:label "Defence Stations"  :abbrev "Def Stns"         :field "stations-sold"     
-    :qty-key :stations-sold    :cost-key :station-sell    :player-key :player/stations}
-   {:label "Command Ships"     :abbrev "Cmd Ships"        :field "cmd-ships-sold"    
-    :qty-key :cmd-ships-sold   :cost-key :cmd-ship-sell   :player-key :player/cmd-ships}
-   {:label "Agents"            :abbrev "Agents"           :field "agents-sold"       
+   {:group "Ground Forces"
+    :label "Agents"            :abbrev "Agents"           :field "agents-sold"
     :qty-key :agents-sold      :cost-key :agent-sell      :player-key :player/agents}
-   {:label "Military Planets"  :abbrev "Mil Plts"         :field "mil-planets-sold"  
+   {:group "Space Forces"
+    :label "Fighters"          :abbrev "Fighters"         :field "fighters-sold"
+    :qty-key :fighters-sold    :cost-key :fighter-sell    :player-key :player/fighters}
+   {:group "Space Forces"
+    :label "Carriers"          :abbrev "Carriers"         :field "carriers-sold"
+    :qty-key :carriers-sold    :cost-key :carrier-sell    :player-key :player/carriers}
+   {:group "Space Forces"
+    :label "Admirals"          :abbrev "Admirals"         :field "admirals-sold"
+    :qty-key :admirals-sold    :cost-key :admiral-sell    :player-key :player/admirals}
+   {:group "Space Forces"
+    :label "Defence Stations"  :abbrev "Def Stns"         :field "stations-sold"
+    :qty-key :stations-sold    :cost-key :station-sell    :player-key :player/stations}
+   {:group "Space Forces"
+    :label "Command Ships"     :abbrev "Cmd Ships"        :field "cmd-ships-sold"
+    :qty-key :cmd-ships-sold   :cost-key :cmd-ship-sell   :player-key :player/cmd-ships}
+   {:group "Planets"
+    :label "Military Planets"  :abbrev "Mil Plts"         :field "mil-planets-sold"
     :qty-key :mil-planets-sold :cost-key :mil-planet-sell :player-key :player/mil-planets}
-   {:label "Energy Planets"    :abbrev "Erg Plts"         :field "erg-planets-sold"  
+   {:group "Planets"
+    :label "Energy Planets"    :abbrev "Erg Plts"         :field "erg-planets-sold"
     :qty-key :erg-planets-sold :cost-key :erg-planet-sell :player-key :player/erg-planets}
-   {:label "Ore Planets"       :abbrev "Ore Plts"         :field "ore-planets-sold"  
+   {:group "Planets"
+    :label "Ore Planets"       :abbrev "Ore Plts"         :field "ore-planets-sold"
     :qty-key :ore-planets-sold :cost-key :ore-planet-sell :player-key :player/ore-planets}])
 
 (def sell-resource-rows
@@ -616,10 +628,13 @@
            [:div.overflow-hidden.rounded-game.bg-game-surface
             {:class "border border-game-border"}
             (ui/purchase-table-header "Rate" "Sell" "Credits")
-            (for [row sell-asset-rows]
-              (exchange-row (:label row) (:abbrev row) (:field row)
-                            (get costs (:cost-key row)) 0
-                            (get player (:player-key row)) player-id exchange-hx-include))]]
+            (for [group (partition-by :group sell-asset-rows)]
+              (list
+                (ui/table-group-header (:group (first group)))
+                (for [row group]
+                  (exchange-row (:label row) (:abbrev row) (:field row)
+                                (get costs (:cost-key row)) 0
+                                (get player (:player-key row)) player-id exchange-hx-include))))]]
           ;; Resources to sell
           (ui/section-label "Sell Resources")
           [:div

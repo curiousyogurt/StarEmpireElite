@@ -52,29 +52,41 @@
 ;;;;
 
 (def purchase-rows
-  [{:label "Soldiers"         :abbrev "Soldiers"  
+  [{:group "Ground Forces"
+    :label "Soldiers"         :abbrev "Soldiers"
     :qty-key :soldiers        :cost-key :game/soldier-cost}
-   {:label "Transports"       :abbrev "Transport" 
+   {:group "Ground Forces"
+    :label "Transports"       :abbrev "Transport"
     :qty-key :transports      :cost-key :game/transport-cost}
-   {:label "Generals"         :abbrev "Generals"  
+   {:group "Ground Forces"
+    :label "Generals"         :abbrev "Generals"
     :qty-key :generals        :cost-key :game/general-cost}
-   {:label "Fighters"         :abbrev "Fighters" 
-    :qty-key :fighters        :cost-key :game/fighter-cost}
-   {:label "Carriers"         :abbrev "Carriers" 
-    :qty-key :carriers        :cost-key :game/carrier-cost}
-   {:label "Admirals"         :abbrev "Admirals" 
-    :qty-key :admirals        :cost-key :game/admiral-cost}
-   {:label "Defence Stations" :abbrev "Def Stns" 
-    :qty-key :stations        :cost-key :game/station-cost}
-   {:label "Command Ships"    :abbrev "Cmd Ships"
-    :qty-key :cmd-ships       :cost-key :game/cmd-ship-cost}
-   {:label "Agents"           :abbrev "Agents"   
+   {:group "Ground Forces"
+    :label "Agents"           :abbrev "Agents"
     :qty-key :agents          :cost-key :game/agent-cost}
-   {:label "Ore Planets"      :abbrev "Ore Plts" 
+   {:group "Space Forces"
+    :label "Fighters"         :abbrev "Fighters"
+    :qty-key :fighters        :cost-key :game/fighter-cost}
+   {:group "Space Forces"
+    :label "Carriers"         :abbrev "Carriers"
+    :qty-key :carriers        :cost-key :game/carrier-cost}
+   {:group "Space Forces"
+    :label "Admirals"         :abbrev "Admirals"
+    :qty-key :admirals        :cost-key :game/admiral-cost}
+   {:group "Space Forces"
+    :label "Defence Stations" :abbrev "Def Stns"
+    :qty-key :stations        :cost-key :game/station-cost}
+   {:group "Space Forces"
+    :label "Command Ships"    :abbrev "Cmd Ships"
+    :qty-key :cmd-ships       :cost-key :game/cmd-ship-cost}
+   {:group "Planets"
+    :label "Ore Planets"      :abbrev "Ore Plts"
     :qty-key :ore-planets     :cost-key :game/ore-planet-cost}
-   {:label "Energy Planets"   :abbrev "Erg Plts" 
+   {:group "Planets"
+    :label "Energy Planets"   :abbrev "Erg Plts"
     :qty-key :erg-planets     :cost-key :game/erg-planet-cost}
-   {:label "Military Planets" :abbrev "Mil Plts" 
+   {:group "Planets"
+    :label "Military Planets" :abbrev "Mil Plts"
     :qty-key :mil-planets     :cost-key :game/mil-planet-cost}])
 
 (def building-hx-include
@@ -323,19 +335,24 @@
          "—")]]]))
 
 (defn- build-table
-  "Render the full build orders table with header and all purchase rows.
+  "Render the full build orders table with header and all purchase rows,
+  grouped by :group with a subheading row at the top of each group.
 
   [player player-map, game game-map, quantities purchase-quantities, max-quantities map] -> hiccup"
   [player game quantities max-quantities]
-  (let [player-id (:xt/id player)]
+  (let [player-id (:xt/id player)
+        groups    (partition-by :group purchase-rows)]
     [:div.overflow-hidden.rounded-game.bg-game-surface
      {:class "border border-game-border"}
      (ui/purchase-table-header "Each" "Build" "Cost" {:action-btn-placeholder "max"})
-     (for [row purchase-rows
-           :let [qty-key      (:qty-key row)
-                 purchase-qty (get quantities qty-key 0)
-                 max-qty      (get max-quantities qty-key 0)]]
-       (build-row row purchase-qty max-qty game player-id))]))
+     (for [group groups]
+       (list
+         (ui/table-group-header (:group (first group)))
+         (for [row group
+               :let [qty-key      (:qty-key row)
+                     purchase-qty (get quantities qty-key 0)
+                     max-qty      (get max-quantities qty-key 0)]]
+           (build-row row purchase-qty max-qty game player-id))))]))
 
 ;;;
 ;;; Credit Impact shows the before/after effect of the build order on credits

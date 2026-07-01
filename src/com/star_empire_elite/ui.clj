@@ -501,8 +501,8 @@
        false)
      (snapshot-manifest-row "GROUND"
        [(snapshot-manifest-item "soldiers"   (format-number (:player/soldiers   player)) (z? :player/soldiers))
-        (snapshot-manifest-item "generals"   (format-number (:player/generals   player)) (z? :player/generals))
         (snapshot-manifest-item "transports" (format-number (:player/transports player)) (z? :player/transports))
+        (snapshot-manifest-item "generals"   (format-number (:player/generals   player)) (z? :player/generals))
         (snapshot-manifest-item "agents"     (format-number (:player/agents     player)) (z? :player/agents))]
        false)
      (snapshot-manifest-row "FLEET"
@@ -667,6 +667,16 @@
         (th-span "Item" th-item-cls nil) (th-r "Before") (th-r "Change") (th-r "After")]
        [:div {:class (str "hidden md:grid " row-prefix "-row-desktop " header-class)}
         (th-span "Item" th-item-cls nil) [:span] (th-r "Before") (th-r "Change") (th-r "After")]])))
+
+(defn table-group-header
+  "Render a full-width subheading row inside a purchase/sell table to label a group of items.
+  Spans all columns naturally (no grid layout).
+
+  [label str] -> hiccup"
+  [label]
+  [:div {:class "px-3 py-[3px] bg-game-surface border-b border-game-divider"}
+   [:span {:class "text-[10px] uppercase tracking-[0.14em] text-game-green-muted opacity-60"}
+    label]])
 
 (defn purchase-table-header
   "Render the column-label row for exchange and building purchase/sell tables.
