@@ -79,9 +79,7 @@
            [:td {:class td-cls} (:rank player)]
            [:td {:class td-cls} (:player/empire-name player)]
            [:td {:class td-right-cls}
-            (ui/format-number (+ (:player/mil-planets player)
-                                 (:player/erg-planets player)
-                                 (:player/ore-planets player)))]
+            (ui/format-number (utils/total-planets player))]
            [:td {:class td-right-cls} (ui/format-number (:player/score player))]])]]]]))
 
 ;;;;

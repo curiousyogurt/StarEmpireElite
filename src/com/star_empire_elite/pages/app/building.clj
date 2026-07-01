@@ -108,19 +108,16 @@
 
   [player player-map, quantities purchase-quantities, game game-map] -> {:soldiers int, :transports int, ...}"
   [player quantities game]
-  (let [credits (:player/credits player)]
+  (let [credits (:player/credits player)
+        selected-total-cost (total-cost quantities game)]
     (into {}
           (for [row purchase-rows
                 :let [qty-key            (:qty-key row)
                       cost-per-unit      (get game (:cost-key row))
-                      other-cost         (reduce
-                                           +
-                                           (for [other-row purchase-rows
-                                                 :when (not= (:qty-key other-row) qty-key)]
-                                             (* (get quantities (:qty-key other-row) 0)
-                                                (get game (:cost-key other-row)))))
+                      current-cost       (* (get quantities qty-key 0) cost-per-unit)
+                      other-cost         (- selected-total-cost current-cost)
                       remaining-for-this (- credits other-cost)
-                      max-qty            (quot remaining-for-this cost-per-unit)]]
+                      max-qty            (max 0 (quot remaining-for-this cost-per-unit))]]
             [qty-key max-qty]))))
 
 (defn calculate-resources-after-purchases

@@ -33,6 +33,14 @@
       0
       (min (parse-long trimmed) max-input-value))))
 
+(defn parse-choice-value
+  "Split a UI choice value of the form 'left:right'. Returns nil for blank or malformed values.
+
+  [value string] -> [string string] | nil"
+  [value]
+  (when (and (string? value) (clojure.string/includes? value ":"))
+    (clojure.string/split value #":" 2)))
+
 ;;;;
 ;;;; Flash Messages
 ;;;;
@@ -309,6 +317,15 @@
    :ore-planets (get player :player/ore-planets 0)
    :erg-planets (get player :player/erg-planets 0)
    :mil-planets (get player :player/mil-planets 0)})
+
+(defn total-planets
+  "Return a player's total planets across ore, energy, and military classes.
+
+  [player player-map] -> int"
+  [player]
+  (+ (get player :player/ore-planets 0)
+     (get player :player/erg-planets 0)
+     (get player :player/mil-planets 0)))
 
 (defn qualify-snapshot
   "Re-qualify an unqualified resource map (as returned by player-snapshot) back to

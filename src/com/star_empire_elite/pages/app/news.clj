@@ -9,10 +9,9 @@
 
 (ns com.star-empire-elite.pages.app.news
   (:require [clojure.edn :as edn]
-            [com.biffweb :as biff :refer [q]]
-            [com.star-empire-elite.ui :as ui]
-            [com.star-empire-elite.utils :as utils])
-  (:import (java.time Instant LocalDate ZoneId)
+            [com.biffweb :refer [q]]
+            [com.star-empire-elite.ui :as ui])
+  (:import (java.time LocalDate ZoneId)
            (java.time.temporal ChronoUnit)))
 
 ;;;;
@@ -38,6 +37,7 @@
                        false))]
     (->> (seq all-events)
          (filter visible?)
+         (map #(assoc % :event/payload-data (edn/read-string (:event/payload %))))
          (sort-by :event/at #(compare %2 %1)))))
 
 ;;;;
@@ -112,7 +112,7 @@
 
   [event map, player-id uuid] -> hiccup-fragment"
   [event player-id]
-  (let [payload (edn/read-string (:event/payload event))
+  (let [payload (:event/payload-data event)
         kind    (:event/kind event)
         vis     (:event/visibility event)]
     (case kind

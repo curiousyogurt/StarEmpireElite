@@ -1178,17 +1178,42 @@
    [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.text-game-green-dim.border-game-border.cursor-not-allowed
     label]])
 
+(defn selection-warning-div
+  "Render a queued-operation warning based on a composite selection value.
+
+  [warning-id str, selected-value str, disabled-hint str|nil,
+   segment-idx int, labels map, noun str] -> hiccup"
+  [warning-id selected-value disabled-hint segment-idx labels noun]
+  (let [label (some-> selected-value
+                      utils/parse-choice-value
+                      (nth segment-idx nil)
+                      labels)]
+    (phase-warning-div
+      warning-id
+      (if label
+        (str "\u24d8 " label " " noun " queued for Outcomes phase.")
+        disabled-hint)
+      {:color (if label "text-yellow-400" "text-game-green-soft")})))
+
 (defn target-info-tds
   "Render the Empire name, Planets, and Score cells for a target table row.
   Returns a vector of 3 [:td ...] elements.
 
   [player player-map] -> [[:td ...] [:td ...] [:td ...]]"
   [player]
-  (let [total-planets (+ (:player/mil-planets player 0)
-                         (:player/erg-planets player 0)
-                         (:player/ore-planets player 0))
-        td-cls       "border-r border-game-border py-1 px-3 text-game-green-soft"
+  (let [td-cls       "border-r border-game-border py-1 px-3 text-game-green-soft"
         td-right-cls "border-r border-game-border py-1 px-3 text-game-green-soft text-right"]
     [[:td {:class td-cls}       (:player/empire-name player)]
-     [:td {:class td-right-cls} (format-number total-planets)]
+     [:td {:class td-right-cls} (format-number (utils/total-planets player))]
      [:td {:class td-right-cls} (format-number (:player/score player))]]))
+
+(defn target-operation-row
+  "Render a target table row using shared empire/planet/score cells plus operation cells.
+
+  [player player-map, operations seq-of-hiccup, cell-class str] -> hiccup"
+  [player operations cell-class]
+  (into [:tr.bg-game-row.border-b.border-game-divider]
+        (concat
+          (target-info-tds player)
+          (for [op operations]
+            [:td {:class cell-class} op]))))

@@ -26,6 +26,24 @@
     (str "Turn " turn "/" (:game/turns-per-round game)
          " | Round " round "/" (:game/rounds-per-day game))))
 
+(defn- rank-from-scores [player-score scores]
+  (inc (count (filter #(> % player-score) scores))))
+
+(defn- grouped-user-game-rows
+  "Fetch all player rows for every game the user has joined in one query, grouped by the user's
+  player id. This avoids per-game follow-up queries when rendering the dashboard."
+  [db uid]
+  (->> (q db
+          '{:find [(pull owner [*])
+                   (pull game [*])
+                   (pull member [:player/score :player/ore-planets :player/erg-planets :player/mil-planets])]
+            :in [user-id]
+            :where [[owner :player/user user-id]
+                    [owner :player/game game]
+                    [member :player/game game]]}
+          uid)
+       (group-by (fn [[owner _ _]] (:xt/id owner)))))
+
 ;;;;
 ;;;; Data Fetching
 ;;;;
@@ -37,33 +55,19 @@
   [db xtdb-db, uid uuid] -> [{:player player-map, :game game-map,
                                :total-players int, :leader-score int, :leader-planets int}]"
   [db uid]
-  (let [players (filter #(not= (:player/status %) const/player-status-eliminated)
-                        (q db
-                           '{:find (pull player [*])
-                             :in [user-id]
-                             :where [[player :player/user user-id]]}
-                           uid))]
-    (for [player players]
-      (let [game          (xt/entity db (:player/game player))
-            game-players  (q db
-                             '{:find (pull p [:player/score :player/ore-planets
-                                              :player/erg-planets :player/mil-planets])
-                               :in [game-id]
-                               :where [[p :player/game game-id]]}
-                             (:player/game player))
-            game-scores   (map #(get % :player/score 0) game-players)
-            game-planets  (map #(+ (get % :player/ore-planets 0)
-                                   (get % :player/erg-planets 0)
-                                   (get % :player/mil-planets 0))
-                               game-players)
-            player-score  (get player :player/score 0)
-            rank          (inc (count (filter #(> % player-score) game-scores)))
-            total-players (count game-players)]
-        {:player         (assoc player :player/rank rank)
-         :game           game
-         :total-players  total-players
-         :leader-score   (if (seq game-scores) (apply max game-scores) 0)
-         :leader-planets (if (seq game-planets) (apply max game-planets) 0)}))))
+  (for [[_ rows] (grouped-user-game-rows db uid)
+        :let [[player game _] (first rows)]
+        :when (not= (:player/status player) const/player-status-eliminated)
+        :let [game-players  (map #(nth % 2) rows)
+              game-scores   (map #(get % :player/score 0) game-players)
+              game-planets  (map utils/total-planets game-players)
+              player-score  (get player :player/score 0)
+              total-players (count game-players)]]
+    {:player         (assoc player :player/rank (rank-from-scores player-score game-scores))
+     :game           game
+     :total-players  total-players
+     :leader-score   (if (seq game-scores) (apply max game-scores) 0)
+     :leader-planets (if (seq game-planets) (apply max game-planets) 0)}))
 
 (defn get-available-games
   "Fetch all games the current user has NOT joined, with player count for each.
@@ -77,15 +81,14 @@
                            (not-join [game user-id]
                              [player :player/game game]
                              [player :player/user user-id])]}
-                 uid)]
+                 uid)
+        player-counts (frequencies
+                        (q db
+                           '{:find [game-id]
+                             :where [[player :player/game game-id]]}))]
     (for [game games]
-      (let [player-count (count (q db
-                                   '{:find [player]
-                                     :in [game-id]
-                                     :where [[player :player/game game-id]]}
-                                   (:xt/id game)))]
-        {:game game
-         :player-count player-count}))))
+      {:game game
+       :player-count (get player-counts (:xt/id game) 0)})))
 
 ;;;;
 ;;;; UI Components
@@ -156,9 +159,7 @@
         rank           (get player :player/rank 1)
         score          (get player :player/score 0)
         stability      (get player :player/stability 100)
-        planets        (+ (get player :player/ore-planets 0)
-                          (get player :player/erg-planets 0)
-                          (get player :player/mil-planets 0))
+        planets        (utils/total-planets player)
         ;; Default missing leaderboard values to own stats (100% bars) for graceful degradation
         total-players  (or total-players 1)
         leader-score   (or leader-score (max 1 score))

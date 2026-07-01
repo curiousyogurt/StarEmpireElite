@@ -69,13 +69,13 @@
                             (str op ":" target-id-str)
                             label warning-ep warning-id)
                           (ui/disabled-radio-btn radio-name label)))]
-    (into [:tr.bg-game-row.border-b.border-game-divider]
-      (concat
-        (ui/target-info-tds player)
-        [[:td.py-1.px-3 (op-btn "spy"    "Spy")]
-         [:td.py-1.px-3 (op-btn "incite" "Incite")]
-         [:td.py-1.px-3 (op-btn "bomb"   "Bomb")]
-         [:td.py-1.px-3 (op-btn "defect" "Defect")]]))))
+    (ui/target-operation-row
+      player
+      [(op-btn "spy" "Spy")
+       (op-btn "incite" "Incite")
+       (op-btn "bomb" "Bomb")
+       (op-btn "defect" "Defect")]
+      "py-1 px-3")))
 
 ;;;;
 ;;;; Actions
@@ -88,24 +88,17 @@
 
   [ctx ring-ctx] -> hiccup"
   [{:keys [params]}]
-  (let [espionage-action (:espionage-action params)
-        disabled-hint    (:espionage-disabled-hint params)
-        op               (when (and espionage-action (str/includes? espionage-action ":"))
-                           (first (str/split espionage-action #":" 2)))
-        op-label         (case op
-                           "spy"    "Spy"
-                           "incite" "Incite"
-                           "bomb"   "Bomb"
-                           "defect" "Defect"
-                           nil)]
-    (biff/render
-      (if op-label
-        (ui/phase-warning-div "espionage-warning"
-          (str "\u24d8 " op-label " operation queued for Outcomes phase.")
-          {:color "text-yellow-400"})
-        (ui/phase-warning-div "espionage-warning"
-          disabled-hint
-          {:color "text-game-green-soft"})))))
+  (biff/render
+    (ui/selection-warning-div
+      "espionage-warning"
+      (:espionage-action params)
+      (:espionage-disabled-hint params)
+      0
+      {"spy" "Spy"
+       "incite" "Incite"
+       "bomb" "Bomb"
+       "defect" "Defect"}
+      "operation")))
 
 (defn apply-espionage
   "Parse the chosen operation and target, store them as pending espionage, and advance to outcomes.
@@ -116,8 +109,7 @@
     (if-let [redirect (utils/validate-phase player 5 player-id)]
       redirect
       (let [espionage-action (:espionage-action params)
-            [op target-id-str] (when (and espionage-action (str/includes? espionage-action ":"))
-                                 (str/split espionage-action #":" 2))
+            [op target-id-str] (utils/parse-choice-value espionage-action)
             target-uuid (when target-id-str (parse-uuid target-id-str))]
         (biff/submit-tx ctx [{:db/doc-type                  :player
                               :db/op                        :update

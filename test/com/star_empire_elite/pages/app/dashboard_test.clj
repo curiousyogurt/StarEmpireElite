@@ -202,6 +202,32 @@
       (is (clojure.string/includes? tree (str "/app/game/" test-player-id))))))
 
 ;;
+;; get-user-games
+;;
+
+(deftest test-get-user-games-builds-leaderboard-stats-from-grouped-rows
+  (testing "Ranks the player and derives leader totals from grouped query rows"
+    (let [owner          (assoc minimal-player
+                                :player/game test-game-id
+                                :player/status :active)
+          opponent       {:xt/id #uuid "00000000-0000-0000-0000-000000000003"
+                          :player/score 18000
+                          :player/ore-planets 2
+                          :player/erg-planets 2
+                          :player/mil-planets 1}
+          expected-game  minimal-game]
+      (with-redefs [dashboard/grouped-user-game-rows
+                    (fn [_ _]
+                      {(:xt/id owner) [[owner expected-game owner]
+                                       [owner expected-game opponent]]})]
+        (is (= [{:player         (assoc owner :player/rank 2)
+                 :game           expected-game
+                 :total-players  2
+                 :leader-score   18000
+                 :leader-planets 6}]
+               (vec (dashboard/get-user-games nil #uuid "00000000-0000-0000-0000-000000000099"))))))))
+
+;;
 ;; available-game-card
 ;;
 ;; available-game-card renders a card for games the user hasn't joined yet.

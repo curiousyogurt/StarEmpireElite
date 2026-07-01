@@ -34,7 +34,6 @@
   (:require [clojure.string :as str]
             [com.biffweb :as biff]
             [com.star-empire-elite.combat :as combat]
-            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
 
@@ -158,12 +157,12 @@
         has-fighters? (pos? (:fighters ef))
         has-cmd?      (pos? cmd-ships)
         can-attack?   (and has-soldiers? has-fighters?)]
-    (into [:tr.bg-game-row.border-b.border-game-divider]
-      (concat
-        (ui/target-info-tds player)
-        [[:td.py-1.px-2 (if can-attack? (op-btn :invade "Invade") (disabled-btn "Invade"))]
-         [:td.py-1.px-2 (if can-attack? (op-btn :raid   "Raid")   (disabled-btn "Raid"))]
-         [:td.py-1.px-2 (if has-cmd?    (op-btn :strike "Strike") (disabled-btn "Strike"))]]))))
+    (ui/target-operation-row
+      player
+      [(if can-attack? (op-btn :invade "Invade") (disabled-btn "Invade"))
+       (if can-attack? (op-btn :raid "Raid") (disabled-btn "Raid"))
+       (if has-cmd? (op-btn :strike "Strike") (disabled-btn "Strike"))]
+      "py-1 px-2")))
 
 ;;;;
 ;;;; Actions
@@ -176,23 +175,16 @@
 
   [ctx ring-ctx] -> hiccup"
   [{:keys [params]}]
-  (let [target-action  (:target-action params)
-        disabled-hint  (:action-disabled-hint params)
-        mode           (when (and target-action (str/includes? target-action ":"))
-                         (second (str/split target-action #":" 2)))
-        mode-label     (case mode
-                         "invade" "Invade"
-                         "raid"   "Raid"
-                         "strike" "Strike"
-                         nil)]
-    (biff/render
-      (if mode-label
-        (ui/phase-warning-div "action-warning"
-          (str "\u24d8 " mode-label " action queued for Outcomes phase.")
-          {:color "text-yellow-400"})
-        (ui/phase-warning-div "action-warning"
-          disabled-hint
-          {:color "text-game-green-soft"})))))
+  (biff/render
+    (ui/selection-warning-div
+      "action-warning"
+      (:target-action params)
+      (:action-disabled-hint params)
+      1
+      {"invade" "Invade"
+       "raid" "Raid"
+       "strike" "Strike"}
+      "action")))
 
 (defn apply-action
   "Store the pending attack target and mode (nil if none chosen) and advance to espionage phase.
@@ -203,8 +195,7 @@
     (if-let [redirect (utils/validate-phase player 4 player-id)]
       redirect
       (let [target-action (:target-action params)
-            [target-id mode-str] (when (and target-action (str/includes? target-action ":"))
-                                   (str/split target-action #":" 2))
+            [target-id mode-str] (utils/parse-choice-value target-action)
             target-uuid   (when target-id (parse-uuid target-id))
             mode-kw       (when mode-str (keyword mode-str))]
         (biff/submit-tx ctx [{:db/doc-type               :player
