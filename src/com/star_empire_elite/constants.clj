@@ -216,7 +216,7 @@
 (def general-cost    11000)
 
 (def fighter-cost    1500)
-(def carrier-cost    15000)
+(def carrier-cost    7000)
 (def admiral-cost    15000)
 
 (def station-cost    2000)
