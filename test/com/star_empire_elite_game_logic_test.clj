@@ -46,7 +46,6 @@
                    :game/strike-interception-cap   const/strike-interception-cap
                    :game/defect-defense-multiplier const/defect-defense-multiplier
                    :game/defect-transfer-rate      const/defect-transfer-rate
-                   :game/defect-transfer-cap       const/defect-transfer-cap
                    :game/ore-planet-credits const/ore-planet-credits
                    :game/erg-planet-food const/erg-planet-food
                    :game/erg-planet-fuel const/erg-planet-fuel

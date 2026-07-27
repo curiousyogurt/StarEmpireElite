@@ -29,6 +29,7 @@
             [com.star-empire-elite.pages.app.outcomes   :as outcomes]
             [com.star-empire-elite.pages.app.eliminated :as eliminated]
             [com.star-empire-elite.pages.app.news       :as news]
+            [com.star-empire-elite.pages.app.guide      :as guide]
             ;; Game functions
             [com.star-empire-elite.constants            :as const]
             [com.star-empire-elite.resolution           :as resolution]
@@ -107,7 +108,6 @@
    :game/strike-interception-cap       const/strike-interception-cap
    :game/defect-defense-multiplier     const/defect-defense-multiplier
    :game/defect-transfer-rate          const/defect-transfer-rate
-   :game/defect-transfer-cap           const/defect-transfer-cap
    :game/general-mult-rate              const/general-mult-rate
    :game/general-mult-cap               const/general-mult-cap
    :game/admiral-mult-rate              const/admiral-mult-rate
@@ -441,6 +441,16 @@
     (news/news-page player game (:biff/db ctx))))
 
 ;;;;
+;;;; Guide
+;;;;
+
+(defn guide-handler
+  "Game reference guide — documents all mechanics with live constants from the game entity."
+  [ctx]
+  (utils/with-player-and-game [player game player-id] ctx
+    (guide/guide-page player game)))
+
+;;;;
 ;;;; Alerts
 ;;;;
 
@@ -493,5 +503,6 @@
     ["/game/:player-id/eliminated"         {:get  eliminated/eliminated-page}]
     ["/game/:player-id/rejoin"             {:post eliminated/rejoin}]
     ["/game/:player-id/news"               {:get  news-handler}]
+    ["/game/:player-id/guide"              {:get  guide-handler}]
     ["/game/:player-id/alerts"             {:get  alerts-handler}]]})
 

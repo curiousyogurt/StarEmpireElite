@@ -510,7 +510,6 @@
   [game attacker defender]
   (let [def-mult  (:game/defect-defense-multiplier game)
         rate      (:game/defect-transfer-rate      game)
-        cap       (:game/defect-transfer-cap       game)
         {:keys [att-wins? agents-lost agents-captured]} (espionage-roll attacker defender :defect def-mult)]
     {:op               "defect"
      :attacker-id      (str (:xt/id attacker))
@@ -519,5 +518,8 @@
      :attacker-wins?   att-wins?
      :agents-lost      agents-lost
      :agents-captured  agents-captured
+     ;; Transfer up to rate% of defender's agents, but no more than rate% of attacker's agents.
+     ;; A large spy network is required to absorb a large defection.
      :agents-defected  (when att-wins?
-                         (min cap (long (* rate (:player/agents defender)))))}))
+                         (long (* rate (min (:player/agents defender)
+                                           (:player/agents attacker)))))}))

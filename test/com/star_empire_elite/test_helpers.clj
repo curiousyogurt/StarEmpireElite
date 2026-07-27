@@ -50,7 +50,6 @@
    ;; Defect operation constants
    :game/defect-defense-multiplier 0.1
    :game/defect-transfer-rate      0.1
-   :game/defect-transfer-cap       50
 
    ;; Combat multiplier constants
    :game/general-mult-rate  0.01

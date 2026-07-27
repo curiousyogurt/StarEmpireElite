@@ -87,7 +87,6 @@
             ;; Defect operation constants
             :game/defect-defense-multiplier const/defect-defense-multiplier
             :game/defect-transfer-rate      const/defect-transfer-rate
-            :game/defect-transfer-cap       const/defect-transfer-cap
             ;; All the required income generation constants
             :game/ore-planet-credits const/ore-planet-credits
             :game/erg-planet-food const/erg-planet-food

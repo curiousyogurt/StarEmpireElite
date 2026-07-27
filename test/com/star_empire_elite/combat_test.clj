@@ -226,20 +226,21 @@
                                         (repeatedly runs #(combat/resolve-espionage small-attacker mid-defender))))]
       (is (> wins-defect wins-spy)))))
 
-(deftest defect-transfers-up-to-cap
-  (testing "Successful defect transfers 10% of defender's agents, capped at defect-transfer-cap"
-    (let [attacker      (assoc strong-attacker :player/agents 100000)
-          ;; 200 agents → 10% = 20, under cap
-          small-def     (assoc strong-defender :player/agents 200)
-          ;; 1000 agents → 10% = 100, over cap of 50
-          large-def     (assoc strong-defender :player/agents 1000)]
-      ;; Run until we get a win for each defender size
-      (let [small-result (first (filter :attacker-wins?
-                                         (repeatedly 100 #(combat/resolve-defect game attacker small-def))))
-            large-result (first (filter :attacker-wins?
-                                         (repeatedly 100 #(combat/resolve-defect game attacker large-def))))]
-        (is (= 20 (:agents-defected small-result)))   ; floor(0.10 * 200) = 20, under cap
-        (is (= 50 (:agents-defected large-result))))))) ; min(50, floor(0.10 * 1000)) = 50, capped
+(deftest defect-transfers-up-to-attacker-limit
+  (testing "Successful defect transfers rate% of the smaller of defender's and attacker's agents"
+    (let [;; Attacker has 100 agents: limits transfer to floor(0.10 * 100) = 10
+          small-att     (assoc strong-attacker :player/agents 100)
+          ;; Attacker has 1000 agents: defender is the limit at floor(0.10 * 200) = 20
+          large-att     (assoc strong-attacker :player/agents 1000)
+          defender      (assoc strong-defender :player/agents 200)]
+      (let [small-att-result (first (filter :attacker-wins?
+                                            (repeatedly 100 #(combat/resolve-defect game small-att defender))))
+            large-att-result (first (filter :attacker-wins?
+                                            (repeatedly 100 #(combat/resolve-defect game large-att defender))))]
+        ;; Attacker (100) < Defender (200), so attacker is the bottleneck: floor(0.10 * 100) = 10
+        (is (= 10 (:agents-defected small-att-result)))
+        ;; Attacker (1000) > Defender (200), so defender is the bottleneck: floor(0.10 * 200) = 20
+        (is (= 20 (:agents-defected large-att-result)))))))
 
 (deftest defect-captures-agents-on-failure
   (testing "Failed defect returns agents-captured > 0 and agents-defected = nil"

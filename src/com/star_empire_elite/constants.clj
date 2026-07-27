@@ -269,8 +269,7 @@
 ;;;; Targets the defender's agent pool — success flips a fraction of their agents to the attacker.
 
 (def defect-defense-multiplier 0.10) ; only 10% of defender's agents defend against defection
-(def defect-transfer-rate      0.10) ; fraction of defender's agents that defect on success
-(def defect-transfer-cap       50)   ; maximum agents transferred per successful defect
+(def defect-transfer-rate      0.10) ; fraction of defender's and attacker's agents used to compute transfer
 
 ;;;;
 ;;;; Exchange Rates
