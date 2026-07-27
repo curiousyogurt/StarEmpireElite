@@ -18,9 +18,10 @@
 ;;; Parse user numeric input safely, treating empty/nil/negative as 0. This is used across all phases 
 ;;; that accept user input (expenses, exchange, building).
 (def ^:private max-input-value
-  "Maximum value accepted from user input. Caps at 1 billion to prevent long overflow when
-  quantities are multiplied by per-unit costs in building and exchange calculations."
-  1000000000)
+  "Maximum value accepted from user input. Caps at 1 quadrillion to prevent long overflow when
+  quantities are multiplied by per-unit costs in building and exchange calculations.
+  Clojure longs handle up to ~9.2e18; 1e15 leaves ample headroom for multiplication."
+  1000000000000000)
 
 (defn parse-numeric-input
   "Parse user input to a non-negative integer, stripping non-numeric chars and treating empty/nil as
@@ -28,7 +29,7 @@
   [val]
   (let [s (str val)
         cleaned (clojure.string/replace s #"[^0-9]" "")
-        trimmed (subs cleaned 0 (min (count cleaned) 10))]
+        trimmed (subs cleaned 0 (min (count cleaned) 16))]
     (if (empty? trimmed)
       0
       (min (parse-long trimmed) max-input-value))))
