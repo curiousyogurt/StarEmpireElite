@@ -75,117 +75,105 @@
      [:h2.font-bold.text-green-400 {:class "text-lg mb-5"}
       "From " [:em "The Sumerian Game"] " to " [:em "Star Empire Elite"]]
 
-     (p "When people talk about the history of strategy games, they usually begin in the wrong place. "
-        "They begin with the commercial successes of the 1990s, or with the better-known computer titles "
-        "that helped define the modern genre. But the lineage is older than that, and also, I think, more "
-        "conceptually interesting. One of the earliest ancestors of the empire-management game was "
-        [:em "The Sumerian Game"] ", an educational simulation developed in the 1960s. That origin matters. "
-        "The form did not begin as spectacle. It began as a model of stewardship. The player was asked to "
-        "govern: to allocate grain, manage land, respond to uncertainty, and bear responsibility for the "
-        "consequences. Long before the genre acquired its familiar space settings, military abstractions, "
-        "and competitive multiplayer worlds, it was already organized around a surprisingly durable question: "
-        "what does it mean to rule a system whose variables cannot be perfectly controlled?")
+     (p "When people write about the history of strategy games, they tend to start too late: with the "
+        "commercial successes of the 1990s, or with whichever computer titles helped define the modern "
+        "genre. The lineage is older than that, and to my mind more interesting. One of the earliest "
+        "ancestors of the empire game was " [:em "The Sumerian Game"] ", an educational simulation from the "
+        "1960s, and the circumstances of that origin are worth noticing. The form began not as spectacle but "
+        "as an exercise in stewardship: the player was asked to govern, to allocate grain and manage land, "
+        "to respond to bad harvests and worse luck, and to answer for the consequences. Long before anyone "
+        "gave the genre its spaceships and its multiplayer rivalries, it was already organized around the "
+        "question that still animates it: what does it mean to rule a system whose variables you cannot "
+        "fully control?")
 
-     (p "That question sits very near the centre of the empire game as such. What "
-        [:em "The Sumerian Game"] " established was not simply a historical first, but a structure. The player "
-        "governs a polity rather than inhabiting an avatar. Time advances in turns. Resources are scarce. "
-        "Decisions have delayed effects. Randomness intervenes. Sometimes prudent choices fail, and sometimes "
-        "a disaster arrives that cannot be prevented, only endured. That is already the shape of later "
-        "strategy games. More importantly, it is a distinctly computational shape: a world described in terms "
-        "of state, update, constraint, and consequence. The pleasure of the form lies not in motion or "
-        "reaction, but in judgment under conditions of incomplete knowledge.")
+     (p "What " [:em "The Sumerian Game"] " established was less a historical first than a structure, and "
+        "the structure has proved remarkably stable. The player governs a polity rather than inhabiting an "
+        "avatar; time advances in turns; resources are scarce; decisions take effect on a delay, and chance "
+        "intervenes whenever it likes. Prudent choices sometimes fail. Some disasters cannot be prevented, "
+        "only endured. Anyone who has played a later strategy game will recognize all of this, and it is "
+        "striking how computational the shape is: a world described in terms of state, update, constraint, "
+        "and consequence. The pleasure lies in judgment under incomplete knowledge, which is why the form "
+        "never needed motion or reaction to hold anyone's attention.")
 
-     (p [:em "Hamurabi"] " was a simplified descendant of " [:em "The Sumerian Game"]
-        ", with much of the educational framing stripped, and a decision loop exposed in austere form. "
-        "The player buys and sells land, allocates grain, decides how much to plant, and waits to see what "
-        "the next turn will bring. In one sense, this is a reduction. In another, it is a clarification. It "
-        "reveals that the enduring appeal of these games does not depend on elaborate presentation. What "
-        "matters is the logic of constrained rule: the sense that one is balancing subsistence, growth, and "
-        "risk inside a system that is legible enough to reason about, but not so transparent as to become "
-        "trivial. If there is a fundamental pleasure in the genre, it lies there.")
+     (p [:em "Hamurabi"] ", its best-known descendant, stripped away most of the educational framing and "
+        "left the decision loop standing in austere form. You buy and sell land, allocate grain, decide how "
+        "much to plant, and wait to see what the year brings. Call that a reduction if you like; I would "
+        "call it a clarification. What it showed is that the appeal of these games owes nothing to "
+        "presentation. What matters is the logic of constrained rule: balancing subsistence, growth, and "
+        "risk inside a system legible enough to reason about but never so transparent as to be trivial. If "
+        "the genre has a fundamental pleasure, that is where it lives.")
 
-     (p "The BBS era transformed that pleasure by introducing other people. Once empire games became "
-        "multiplayer, the problem changed. The player was no longer managing scarcity in relation to an "
-        "impersonal simulation alone, but rather in the presence of rivals. That shift was decisive. "
-        "A single-player empire game asks whether one can govern well. A multiplayer empire game asks whether "
-        "one can govern well in a world populated by competitors, opportunists, allies, and enemies. The old "
-        "economic logic remained, but its meaning changed. Resources became not just necessities but "
-        "instruments of leverage. Populations, fleets, planets, and infrastructure were now embedded in a "
-        "social field. Diplomacy, betrayal, retaliation, reputation, deterrence: all of these entered the "
-        "genre not as ornament, but as a consequence of the fact that rule had become shared and contested.")
+     (p "The BBS era complicated that pleasure by adding other people. Once empire games went multiplayer, "
+        "the problem itself changed: scarcity was no longer something you managed against an impersonal "
+        "simulation but something you managed among rivals. A single-player empire game asks whether you "
+        "can govern well. A multiplayer one asks whether you can govern well in the company of competitors, "
+        "opportunists, allies, and enemies, which is a different question. The old economic logic survived, "
+        "but its meaning shifted. Resources became leverage. Fleets, planets, and populations now sat inside "
+        "a social field, and diplomacy, betrayal, retaliation, reputation, and deterrence entered the genre "
+        "not as decoration but because rule had become shared and contested.")
 
-     (p "This is the context in which " [:em "Space Empire Elite"] " becomes important. It marks one of those "
-        "moments in game history when an existing structure is not merely copied but reinterpreted through a "
-        "new medium. The older ruler-simulation model survives, but it is reworked for the asynchronous "
-        "social world of the bulletin board system. Because players connected one at a time, these games "
-        "unfolded in turns spread across hours or days. That technical limitation produced a distinctive kind "
-        "of political time. The empire did not exist only during a session. It persisted. One returned to it. "
-        "Other players acted in one's absence. Plans ripened slowly; damage accumulated; grudges had time "
-        "to harden. The result was a form of strategy game in which social memory mattered. The empire was "
-        "no longer just a structure of resources; it was a position in an ongoing world.")
+     (p "This is where " [:em "Space Empire Elite"] " matters. It took the old ruler-simulation and "
+        "rethought it for the bulletin board. Players connected one at a time, so the game unfolded in "
+        "turns spread across hours or days, and that technical limitation produced something genuinely new: "
+        "a kind of political time. The empire did not exist only while you were logged in. It persisted; "
+        "you returned to it; other players acted in your absence. Plans ripened slowly, damage accumulated, "
+        "grudges had time to harden. Social memory started to matter, and an empire stopped being merely a "
+        "stock of resources; it was a position in an ongoing world.")
 
-     (p "What " [:em "Space Empire Elite"] " helped crystallize, then, was the idea that empire games could "
-        "become social systems. The player did not simply optimize production, but inhabited a strategic order. "
-        "That made the genre richer. It pushed the game away from the dream of perfect control and toward "
-        "something more interesting: a world in which rational planning remained necessary, but never "
-        "sufficient. One needed resources, certainly. But one also needed to anticipate rivals, "
-        "gauge intentions, manage exposure, and decide when to expand and when to remain quiet. In that "
-        "respect, these games approach politics more closely than many later strategy titles do. They are not "
-        "only about building. They are about flourishing among others who are building too.")
+     (p "What crystallized here was the idea that an empire game could be a social system. You were not "
+        "optimizing production so much as inhabiting a strategic order, one in which rational planning "
+        "remained necessary but was never sufficient. Resources, certainly, but also the ability to "
+        "anticipate rivals, gauge intentions, manage exposure, and judge when to expand and when to keep "
+        "quiet. In this respect the BBS games come closer to politics than many later strategy titles do. "
+        "They are about flourishing among others who are trying to flourish too.")
 
      (p "From there, the line through " [:em "Space Dynasty"] " and " [:em "Solar Realms Elite"]
-        " is not difficult to see. These games extended and elaborated the form. They preserved the central "
-        "logic of economic and military management, but they did so in increasingly expansive and socially "
-        "complex settings. " [:em "Space Dynasty"] " helped carry the genre into the PC BBS world, widening "
-        "its reach while preserving its core premise. " [:em "Solar Realms Elite"] " developed the tradition "
-        "still further, showing just how much could be built atop the old foundation: larger empires, more "
-        "intricate systems, more varied forms of conflict, and a deeper sense of competitive struggle. By "
-        "this point the genre was an ecology, not a single line of descent. The family resemblance is "
-        "unmistakable. The names, interfaces, and settings changed. The underlying problem did not.")
+        " is easy enough to trace. Both preserved the central logic of economic and military management "
+        "while elaborating everything around it. " [:em "Space Dynasty"] " carried the genre into the PC "
+        "BBS scene and widened its reach; " [:em "Solar Realms Elite"] " showed how much could be built on "
+        "the old foundation: larger empires, more intricate systems, more varied conflict, a sharper sense "
+        "of competitive struggle. By this point the genre was an ecology rather than a single line of "
+        "descent, though the family resemblance is unmistakable. Names, interfaces, and settings changed; "
+        "the underlying problem did not.")
 
-     (p "That continuity is worth dwelling on. Ancient Mesopotamia becomes interstellar space. Grain becomes "
-        "food, fuel, or credits. Land becomes planets. Famine becomes collapse, invasion, or economic "
-        "overextension. Yet the formal structure remains recognisable " [:em "across decades."] " The ruler "
-        "must allocate scarce resources in time. Growth creates vulnerability as well as strength. Security "
-        "requires investment, but investment imposes costs. Expansion is attractive, but it can outrun the "
-        "economy that sustains it. The system is dynamic, partly knowable, and resistant to total mastery. "
-        "These are not incidental design features. They are the essence of the form.")
+     (p "The continuity deserves a moment's attention. Mesopotamia becomes interstellar space; grain "
+        "becomes food, fuel, or credits; land becomes planets; famine becomes collapse or invasion or "
+        "overextension. Yet across six decades the formal structure stays recognisable. The ruler allocates "
+        "scarce resources in time. Growth creates vulnerability along with strength. Security requires "
+        "investment, and investment imposes costs. Expansion tempts, and can outrun the economy that "
+        "sustains it. None of this is incidental. It is the form.")
 
-     (p [:em "TradeWars"] " belongs to this wider history as well. It differs in emphasis, of course, but "
-        "that is the point. By the BBS era, space-economic strategy games had become a substantial design "
-        "family. Some titles leaned more heavily into trade, some into conquest, some into territorial "
-        "control, some into diplomacy. What united them was not a single mechanic, but a shared conception of "
-        "play: a player inhabits a persistent strategic world, manages resources under constraint, and seeks "
-        "advantage in the presence of competing actors. In that sense, the empire game had become one of the "
-        "most compelling ways computers could model not merely actions, but systems.")
+     (p [:em "TradeWars"] " belongs to this history too, and its differences are part of the point. By the "
+        "BBS era, space-economic strategy had become a whole design family: some titles leaned into trade, "
+        "some into conquest or territory or diplomacy. What united them was a conception of play rather "
+        "than any particular mechanic: a persistent strategic world, resources managed under constraint, "
+        "advantage sought in the presence of competing actors. The empire game had become one of the more "
+        "compelling ways a computer could model a system rather than an action.")
 
-     (p "That is why " [:em "Star Empire Elite"] " should be understood as more than a nostalgic exercise. "
-        "To call it retro is not wrong, exactly, but it is insufficient. The deeper interest of such a "
-        "project lies in the fact that it revives a historically important and conceptually rich form. From "
-        [:em "The Sumerian Game"] " it inherits the premise that governance itself can be made playable. From "
-        [:em "Hamurabi"] " it inherits the elegance of stripped-down numerical consequence. From the BBS "
-        "empire tradition it inherits the recognition that systems become more interesting when they are "
-        "inhabited by other minds: when scarcity, growth, and force are all mediated by rivalry, negotiation, "
-        "and uncertainty about human intent. In that sense, " [:em "Star Empire Elite"] " is not merely "
-        "reproducing an old aesthetic. Rather, it takes up an interesting discussion about what games can be.")
+     (p "All of which is why I resist calling " [:em "Star Empire Elite"] " a nostalgic exercise. Retro is "
+        "not wrong as a description, but it stops short. The project revives a form that is historically "
+        "important and conceptually rich: from " [:em "The Sumerian Game"] " it inherits the premise that "
+        "governance can be made playable; from " [:em "Hamurabi"] ", the elegance of bare numerical "
+        "consequence; from the BBS tradition, the recognition that systems grow more interesting when other "
+        "minds inhabit them; and from the BBS era wat happens when scarcity, growth, and force are all mediated" 
+        "by rivalry. " [:em "Star Empire Elite"] " is not reproducing an aesthetic. It is rejoining an "
+        "argument about what games can be.")
 
-     (p "And that discussion, in essence, is that some of the deepest pleasures of computer games lie not in "
-        "speed or spectacle, but in the experience of acting within a structured world whose rules can be "
-        "studied but never fully mastered. Empire games are compelling because they establish a problem that is at "
-        "once mathematical and political. They ask the player to think in terms of quantities, rates, "
-        "constraints, and feedback loops; but also to confront the limits of planning in a world "
-        "shared with others. They are games about administration and prudence; about growth and fragility; about "
-        "dependence on systems that uncertainty built into the equation.")
+     (p "The argument, roughly, is that the deepest pleasures of computer games have little to do with "
+        "speed or spectacle. They lie in acting within a structured world whose rules can be studied but "
+        "never mastered. Empire games pose a problem that is mathematical and political at once: they ask "
+        "you to think in quantities, rates, constraints, and feedback loops, and at the same time to face "
+        "the limits of planning in a world you share with others. They are games about administration and "
+        "prudence, growth and fragility, and about depending on systems with uncertainty built into them.")
 
-     (p "That is the long thread that runs from " [:em "The Sumerian Game"] " to " [:em "Star Empire Elite"]
-        ". Across sixty years, different platforms and communities have rediscovered the same insight: that "
-        "rule itself can be a form of play. Not rule as fantasy omnipotence, but rule as a sequence of "
-        "difficult decisions made under pressure, with incomplete information, and with consequences that "
-        "cannot be fully contained. In that respect, " [:em "Star Empire Elite"] " stands in a much older "
-        "tradition than its surface might suggest. Its true ancestors are not only the BBS door games that "
-        "directly precede it, but the earliest simulations that recognized that to govern a world, even a "
-        "small and abstract one, is to grapple with a web of tradeoffs. What makes the form durable is "
-        "that it forcefully brings that setting to the table.")]))
+     (p "That is the thread running from " [:em "The Sumerian Game"] " to " [:em "Star Empire Elite"]
+        ". For sixty years, on platform after platform, people have rediscovered the same insight: rule "
+        "itself can be play. Not rule as omnipotence, but rule as a sequence of hard decisions made under "
+        "pressure, with incomplete information, with consequences that cannot be fully contained. "
+        [:em "Star Empire Elite"] " stands in an older tradition than its surface suggests. Its ancestors "
+        "are not just the door games that immediately precede it, but the earliest simulations to grasp "
+        "that governing a world, however small and abstract, means grappling with tradeoffs. The form "
+        "endures because it turns that predicament into play.")]))
 
 (defn design-content []
   [:<>

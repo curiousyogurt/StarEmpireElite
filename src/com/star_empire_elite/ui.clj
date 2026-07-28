@@ -303,9 +303,9 @@
   (base
     ctx
     [:.flex-grow]
-    [:div.min-h-screen.flex.flex-col.items-center.justify-center.mx-auto.text-green-400.font-mono.p-4.rounded-lg.bg-black.bg-opacity-10
+    [:div.min-h-screen.flex.flex-col.items-center.justify-center.mx-auto.text-green-400.font-mono.p-4.bg-black.bg-opacity-10
      (merge
-       {:class "m-2 w-full sm:m-4 md:m-10 md:w-11/12 border border-game-green-border"}
+       {:class "m-2 w-full sm:m-4 md:m-10 md:w-11/12"}
        (when (bound? #'csrf/*anti-forgery-token*)
          {:hx-headers (cheshire/generate-string
                         {:x-csrf-token csrf/*anti-forgery-token*})}))
