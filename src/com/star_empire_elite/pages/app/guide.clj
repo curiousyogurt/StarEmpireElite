@@ -40,6 +40,14 @@
   [x]
   (str (Math/round (* 100.0 x)) "%"))
 
+(defn- pct1
+  "Format a fraction as a percentage string with one decimal place, e.g. 0.001 -> \"0.1%\".
+  Use instead of pct when the value may be less than 0.5% and rounding to 0% would mislead.
+
+  [x number] -> str"
+  [x]
+  (format "%.1f%%" (* 100.0 x)))
+
 (defn- guide-table
   "Render a compact data table styled to match the terminal aesthetic.
   headers is a seq of column-header strings; rows is a seq of seqs of hiccup or strings.
@@ -87,7 +95,8 @@
 ;;;;
 
 (defn- toc []
-  (let [entries [["overview"          "Overview"]
+  (let [entries [["quick-start"        "Quick Start"]
+                 ["overview"          "Overview"]
                  ["starting-empire"   "Starting Empire"]
                  ["income"            "Income"]
                  ["expenses"          "Expenses"]
@@ -110,6 +119,24 @@
            entries)]]))
 
 ;;;;
+;;;; Quick Start
+;;;;
+
+(defn- quick-start-section []
+  (section "quick-start" "QUICK START" "the short version"
+    [:ul.text-sm.leading-relaxed.mb-2.list-none.pl-0
+     {:class "text-game-green-soft space-y-1"}
+     (for [item ["You own planets. Planets produce credits, food, fuel, soldiers, fighters, and defence stations each turn."
+                 "Spend credits to build military units. Soldiers fight on the ground, fighters fight in space."
+                 "Attack other players to capture their planets and steal their resources."
+                 "Keep your empire stable. If stability drops too low, planets break away on their own."
+                 "The player with the highest score (not the largest number of planets) wins."]]
+       [:li [:span.text-green-400.mr-2 "•"] item])]
+    (prose
+      "Everything below explains the details. You don't need to read it all on day one — "
+      "just play a few turns and come back when something surprises you.")))
+
+;;;;
 ;;;; Overview
 ;;;;
 
@@ -130,7 +157,10 @@
       ["4" "Building"  "Purchase new units, ships, stations, and planets"]
       ["5" "Action"    "Raid, invade, or strike an enemy empire — or pass"]
       ["6" "Espionage" "Assign agents to spy on, destabilise, bomb, or infiltrate a rival"]])
-    (prose "After all six phases, Outcomes resolves combat results and advances the game state.")))
+    (prose "After all six phases, Outcomes resolves combat results and advances the game state.")
+    (prose
+      "The " [:span.italic "highlighted values"] " throughout this guide are specific to this game — "
+      "different games may use different settings.")))
 
 ;;;;
 ;;;; Starting Empire
@@ -172,13 +202,7 @@
      [["Each ore planet"    (v (ui/format-number (g game :game/ore-planet-credits const/ore-planet-credits))) "—"   "—"   "—"  "—"  "—"]
       ["Each erg planet"    "—"    (v (ui/format-number (g game :game/erg-planet-food const/erg-planet-food)))   (v (ui/format-number (g game :game/erg-planet-fuel const/erg-planet-fuel)))   "—"  "—"  "—"]
       ["Each mil planet"    "—"    "—"    "—"   (v (g game :game/mil-planet-soldiers const/mil-planet-soldiers))  (v (g game :game/mil-planet-fighters const/mil-planet-fighters))  (v (g game :game/mil-planet-stations const/mil-planet-stations))]
-      ["Per million pop."   (v (ui/format-number (g game :game/population-tax-credits const/population-tax-credits))) "—" "—" "—" "—" "—"]])
-    (prose
-      "Population also consumes "
-      (v (ui/format-number (g game :game/population-upkeep-food const/population-upkeep-food)))
-      " food and "
-      (v (ui/format-number (g game :game/population-upkeep-fuel const/population-upkeep-fuel)))
-      " fuel per million per turn (see Population and Expenses).")))
+      ["Per million pop."   (v (ui/format-number (g game :game/population-tax-credits const/population-tax-credits))) "—" "—" "—" "—" "—"]])))
 
 ;;;;
 ;;;; Expenses
@@ -378,7 +402,7 @@
       " of each defender military unit type (soldiers, transports, fighters, carriers, stations).")
     (prose
       "Defenders intercept with stations. Each station adds "
-      (v (pct (g game :game/strike-interception-rate const/strike-interception-rate)))
+      (v (pct1 (g game :game/strike-interception-rate const/strike-interception-rate)))
       " interception chance per attacking command ship, up to a cap of "
       (v (pct (g game :game/strike-interception-cap const/strike-interception-cap)))
       " per ship. Intercepted ships deal no damage.")))
@@ -467,6 +491,7 @@
     [:div.flex.flex-col
      {:class "py-2.5 px-3.5"}
      (toc)
+     (quick-start-section)
      (overview-section game)
      (starting-empire-section)
      (income-section game)

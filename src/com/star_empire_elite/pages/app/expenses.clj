@@ -92,6 +92,18 @@
    :fuel    (+ (:fighters-fuel    required) (:stations-fuel    required)
                (:agents-fuel      required) (:population-fuel  required))})
 
+(defn clamp-payments-to-required
+  "Cap each payment to the required total for that resource. Overpaying is silently
+  treated as paying exactly the required amount — no resources are lost to excess.
+
+  [required-totals {:credits int, :food int, :fuel int},
+   payments        {:credits-pay int, :food-pay int, :fuel-pay int}]
+  -> payments-map with each value clamped to its required total"
+  [required-totals payments]
+  {:credits-pay (min (:credits-pay payments) (:credits required-totals))
+   :food-pay    (min (:food-pay    payments) (:food    required-totals))
+   :fuel-pay    (min (:fuel-pay    payments) (:fuel    required-totals))})
+
 (defn calculate-resources-after-expenses
   "Calculate player resources after deducting total expense payments.
 
@@ -337,6 +349,8 @@
       (let [payments        (parse-expense-quantities params)
             required        (calculate-expenses player game)
             required-totals (calculate-expense-totals required)
+            ;; Silently cap payments so overpaying doesn't drain extra resources
+            payments        (clamp-payments-to-required required-totals payments)
             resources-after (calculate-resources-after-expenses player payments)
             penalty         (calculate-expense-stability-penalty required-totals payments game)]
         (if-not (valid-expenses? resources-after)

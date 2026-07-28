@@ -134,6 +134,31 @@
     (is (false? (expenses/valid-expenses? {:credits 100  :food -1  :fuel 0})))
     (is (false? (expenses/valid-expenses? {:credits 100  :food 100 :fuel -1})))))
 
+(deftest test-clamp-payments-to-required
+  (testing "Payments at exactly required are unchanged"
+    (let [required {:credits 100 :food 50 :fuel 30}
+          payments {:credits-pay 100 :food-pay 50 :fuel-pay 30}]
+      (is (= payments (expenses/clamp-payments-to-required required payments)))))
+  (testing "Payments over required are clamped down to required"
+    (let [required {:credits 100 :food 50 :fuel 30}
+          payments {:credits-pay 200 :food-pay 99 :fuel-pay 1000}]
+      (is (= {:credits-pay 100 :food-pay 50 :fuel-pay 30}
+             (expenses/clamp-payments-to-required required payments)))))
+  (testing "Payments under required are not changed (underpaying is allowed but penalised)"
+    (let [required {:credits 100 :food 50 :fuel 30}
+          payments {:credits-pay 50 :food-pay 10 :fuel-pay 0}]
+      (is (= payments (expenses/clamp-payments-to-required required payments)))))
+  (testing "Each resource is clamped independently"
+    (let [required {:credits 100 :food 50 :fuel 30}
+          payments {:credits-pay 150 :food-pay 50 :fuel-pay 20}]
+      (is (= {:credits-pay 100 :food-pay 50 :fuel-pay 20}
+             (expenses/clamp-payments-to-required required payments)))))
+  (testing "Required of zero clamps any payment to zero"
+    (let [required {:credits 0 :food 0 :fuel 0}
+          payments {:credits-pay 500 :food-pay 200 :fuel-pay 100}]
+      (is (= {:credits-pay 0 :food-pay 0 :fuel-pay 0}
+             (expenses/clamp-payments-to-required required payments))))))
+
 ;;
 ;; Happy path and error/edge-case tests for apply-expenses
 ;;
@@ -190,6 +215,41 @@
           (is (= (:player/food tx) expected-food))
           (is (= (:player/fuel tx) expected-fuel))
           (is (= (:player/current-phase tx) 3)))))))
+
+;; Overpayment: submitting more than required must not drain extra resources
+(deftest test-apply-expenses-overpayment-is-clamped
+  (testing "Paying more than required deducts only the required amount"
+    ;; Minimise required expenses by zeroing everything except 1 ore-planet:
+    ;;   credits: 1 × 75 = 75, food: 1 × 1 = 1, fuel: 0
+    ;; Submitting 200 credits / 50 food / 10 fuel should clamp to 75 / 1 / 0.
+    (let [simple-player (assoc test-player
+                               :player/ore-planets 1
+                               :player/erg-planets 0
+                               :player/mil-planets 0
+                               :player/soldiers    0
+                               :player/fighters    0
+                               :player/stations    0
+                               :player/agents      0
+                               :player/population  0
+                               :player/credits     1000
+                               :player/food        800
+                               :player/fuel        200)
+          params    {:credits-pay "200" :food-pay "50" :fuel-pay "10"}
+          tx-called (atom nil)]
+      (with-redefs [xt/entity      (helpers/fake-entity [simple-player test-game])
+                    biff/submit-tx (fn [_ tx] (reset! tx-called tx) :fake-tx)]
+        (let [ctx    {:path-params {:player-id (str test-player-id)}
+                      :params params
+                      :biff/db nil}
+              result (expenses/apply-expenses ctx)
+              tx     (first @tx-called)]
+          (is (= 303 (:status result)))
+          (is (= (str "/app/game/" test-player-id "/building")
+                 (get-in result [:headers "location"])))
+          ;; Only required amounts are deducted, not the submitted overpayment
+          (is (= (- 1000 75) (:player/credits tx)))  ; required 75, not submitted 200
+          (is (= (- 800  1)  (:player/food    tx)))  ; required  1, not submitted  50
+          (is (= (- 200  0)  (:player/fuel    tx)))))))) ; required  0, not submitted  10
 
 ;; Edge case: inputs are blank or missing (should treat as zero)
 (deftest test-apply-expenses-missing-params
