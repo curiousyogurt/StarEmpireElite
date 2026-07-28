@@ -556,7 +556,7 @@
           player
           (ui/flash-notice flash)
           (ui/snapshot-section player)
-          (ui/section-label "Projected Resources" "‣ Next Turn + Building")
+          (ui/section-label "Projected Resources" "‣ Next Turn + Build Orders")
           (projection-grid player game zero-quantities)
           (ui/section-label "Build Orders")
           [:div
