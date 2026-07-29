@@ -179,7 +179,7 @@
 
   No new DB queries; all data comes from the cached outcomes map."
   [{:keys [player battle-result espionage-result pop-growth
-           expense-penalty capture-penalty breakaway-result recovery-result]}]
+           expense-penalty capture-penalty breakaway-result recovery-result fate-result]}]
   (let [sum-vals    (fn [m] (reduce + 0 (vals (or m {}))))
         ;; Helpers
         won-ground? (and battle-result
@@ -231,12 +231,21 @@
         esp-defect  (if (and espionage-result (:attacker-wins? espionage-result)
                              (= (:op espionage-result) "defect"))
                       (:agents-defected espionage-result 0) 0)
-        in-defected (or (:player/incoming-defect-agents-lost player) 0)]
-    {:units-lost units-lost
+        in-defected (or (:player/incoming-defect-agents-lost player) 0)
+        ;; Fate effect deltas: map :player/* keys onto summary fields.
+        ;; Unit keys (solar flare) are absolute losses; resources/population are signed.
+        fate-effect (or (:effect fate-result) {})
+        unit-keys   #{:player/soldiers :player/transports :player/fighters :player/carriers}
+        fate-units  (reduce (fn [acc [k v]] (if (unit-keys k) (+ acc (Math/abs (long v))) acc))
+                            0 fate-effect)
+        fate-food   (get fate-effect :player/food       0)
+        fate-credits(get fate-effect :player/credits    0)
+        fate-pop    (get fate-effect :player/population 0)]
+    {:units-lost (+ units-lost fate-units)
      :ore ore :erg erg :mil mil
-     :credits credits :food food :fuel fuel
+     :credits (+ credits fate-credits) :food (+ food fate-food) :fuel fuel
      :stability (- stab-gain stab-loss)
-     :population (or pop-growth 0)
+     :population (+ (or pop-growth 0) fate-pop)
      :agents (+ (- esp-lost) esp-gained esp-defect (- in-defected))}))
 
 (defn- delta-pill
@@ -265,10 +274,13 @@
                  (delta-pill "FOOD"      (:food      summary))
                  (delta-pill "FUEL"      (:fuel      summary))
                  (delta-pill "STABILITY" (:stability summary) "%")
-                 (when (pos? (:population summary))
-                   [:span.inline-flex.items-center.gap-1
-                    [:span.text-game-green-muted "POP"]
-                    [:span.text-green-400 (str "+" (ui/format-population (:population summary)))]])
+                 (let [pop (:population summary)]
+                   (when-not (zero? pop)
+                     [:span.inline-flex.items-center.gap-1
+                      [:span.text-game-green-muted "POP"]
+                      [:span {:class (if (neg? pop) "text-red-400" "text-green-400")}
+                       (str (if (pos? pop) "+" "–") (ui/format-population (Math/abs pop)))]]))
+
                  (delta-pill "AGENTS" (:agents summary))])]
     (when (seq pills)
       [:div.flex.flex-wrap.gap-x-5.gap-y-1.text-xs.tracking-wide.py-2.px-3.rounded
@@ -512,6 +524,57 @@
            [:p.text-xs.text-game-green-soft
             (str agents-lost " agent(s) were lost in the operation.")]])))))
 
+(defn- fate-card
+  "Render a collapsible card for a fate event (disaster or boon).
+  Defaults open for disasters (player needs to see bad news); collapsed for boons.
+  Returns nil when the total effect is zero (e.g. disaster on empty holdings).
+
+  [fate-result map] -> hiccup | nil"
+  [fate-result]
+  (let [polarity  (:polarity fate-result)
+        label     (:label    fate-result)
+        effect    (:effect   fate-result)
+        disaster? (= polarity :disaster)
+        ;; Sum absolute deltas for the summary line; label the resource.
+        total     (reduce (fn [acc [_k v]] (+ acc (Math/abs (long v)))) 0 effect)]
+    ;; A zero-total fate (e.g. disaster on empty holdings) is not worth showing.
+    (when (pos? total)
+      (let [res-name (case (ffirst effect)
+                       :player/food       "food"
+                       :player/credits    "credits"
+                       :player/population "population"
+                       "units")
+            summary  (if disaster?
+                       [:span.text-red-400
+                        label " — lost " (ui/format-number total) " " res-name]
+                       [:span.text-green-400
+                        label " — gained " (ui/format-number total) " " res-name])]
+        ;; Solar Flare hits multiple unit types — expand to show the per-unit breakdown.
+        ;; All other fates have one target, so the detail would just repeat the summary.
+        (if (> (count effect) 1)
+          (collapsible-card
+            {:badge   (ui/mode-badge polarity)
+             :summary summary
+             :open?   disaster?}
+            [:div.py-1.5.px-3.border-t.border-game-divider
+             [:div.grid.gap-x-4.gap-y-0.5
+              {:class "grid-cols-2"}
+              (for [[k delta] effect
+                    :when (not (zero? delta))]
+                (let [res (name k)  ; strip :player/ namespace for display
+                      cls (if disaster? "text-red-400" "text-green-400")]
+                  [:div.flex.justify-between.items-center
+                   [:span.text-game-green-muted.text-xs res]
+                   [:span {:class cls}
+                    (if disaster?
+                      (str "−" (ui/format-number-str (Math/abs (long delta))))
+                      (str "+" (ui/format-number-str delta)))]]))]])
+          [:div.rounded-game.bg-game-surface.overflow-hidden
+           {:class "border border-game-border"}
+           [:div.flex.items-center.py-2.px-3.gap-3
+            (ui/mode-badge polarity)
+            [:span.text-sm.flex-1 summary]]])))))
+
 (defn- growth-card [{:keys [pop-growth]}]
   [:div.rounded-game.bg-game-surface.overflow-hidden
    {:class "border border-game-border"}
@@ -678,6 +741,7 @@
                      :player/last-stability-breakaway        nil
                      :player/last-stability-recovery         nil
                      :player/last-capture-stability-penalty  nil
+                     :player/last-fate-result                nil
                      :player/pending-espionage               nil
                      :player/incoming-attacks                nil
                      :player/incoming-espionage-fails        nil
@@ -700,13 +764,13 @@
   "Show turn results with a summary strip, collapsible event cards, and the advance button.
 
   Cards use native <details>/<summary> for collapse. Smart defaults expand events
-  that matter (incoming attacks, defeats, non-trivial losses) and collapse routine
-  successes and steady-state events.
+  that matter (incoming attacks, defeats, non-trivial losses, disasters) and collapse
+  routine successes and steady-state events.
 
   [{:keys [player game battle-result espionage-result pop-growth expense-penalty
-           capture-penalty breakaway-result recovery-result eliminated?]}] -> hiccup"
+           capture-penalty breakaway-result recovery-result fate-result eliminated?]}] -> hiccup"
   [{:keys [player game battle-result espionage-result pop-growth expense-penalty
-           capture-penalty breakaway-result recovery-result eliminated?] :as outcomes}]
+           capture-penalty breakaway-result recovery-result fate-result eliminated?] :as outcomes}]
   (let [player-id       (:xt/id player)
         current-turn    (:player/current-turn player)
         turns-per-round (:game/turns-per-round game)
@@ -809,6 +873,9 @@
                         :incite-penalty   (or (:player/incoming-incite-stability-lost player) 0)
                         :breakaway-result breakaway-result
                         :recovery-result  recovery-result})
+
+       (when fate-result
+         (fate-card fate-result))
 
        (when eliminated?
          [:div.rounded-game.bg-game-surface.border.border-red-400.p-3

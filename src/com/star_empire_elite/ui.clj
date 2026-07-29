@@ -367,7 +367,7 @@
 
 (defn mode-badge
   "Render a colored badge pill: ACTION (red), ESPIONAGE (amber), GROWTH (green),
-  STABILITY (yellow), or EVENT (gray). Used across outcomes, alerts, and news.
+  STABILITY (yellow), EVENT (gray), or FATE (violet). Used across outcomes, alerts, and news.
 
   [mode keyword] -> hiccup"
   [mode]
@@ -377,6 +377,8 @@
                      :growth                      ["GROWTH"    "border-[#4ade80] text-[#4ade80]"]
                      (:breakaway :elimination
                       :event)                     ["EVENT"     "border-[#9ca3af] text-[#9ca3af]"]
+                     ;; Both polarities share one badge; summary text and color carry the good/bad signal.
+                     (:disaster :boon)            ["FATE"      "border-[#a78bfa] text-[#a78bfa]"]
                                                   ["ACTION"    "border-[#f87171] text-[#f87171]"])]
     [:span {:class (str "border px-[7px] py-[2px] text-[11px] tracking-[0.12em] " cls)}
      text]))

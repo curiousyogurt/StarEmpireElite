@@ -95,32 +95,89 @@
 (defn- breakaway-summary
   "Verb phrase for breakaway events.
 
-  [payload map] -> hiccup-fragment"
-  [payload]
-  (let [lost (+ (:ore-lost payload 0) (:erg-lost payload 0) (:mil-lost payload 0))]
-    [:span (empire-span (:defender-name payload)) " lost " (ui/format-number lost) " planets to breakaway"]))
+  Shows 'You' when the viewing player is the subject; empire name otherwise.
+
+  [payload map, empire-name string, mine? boolean] -> hiccup-fragment"
+  [payload empire-name mine?]
+  (let [lost (+ (:ore-lost payload 0) (:erg-lost payload 0) (:mil-lost payload 0))
+        subj (if mine? "You" (empire-span empire-name))]
+    [:span subj " lost " (ui/format-number lost) " planets to breakaway"]))
 
 (defn- elimination-summary
   "Verb phrase for elimination events.
 
-  [payload map] -> hiccup-fragment"
-  [payload]
-  [:span (empire-span (:defender-name payload)) " was eliminated"])
+  Shows 'You' when the viewing player is the subject; empire name otherwise.
+
+  [empire-name string, mine? boolean] -> hiccup-fragment"
+  [empire-name mine?]
+  (let [subj (if mine? "You" (empire-span empire-name))]
+    [:span subj " were eliminated"]))
+
+(defn- fate-summary
+  "Verb phrase for disaster/boon events.
+
+  For single-target fates (drought, pirate raid, plague, bumper harvest, gold rush,
+  foreign aid, migration wave) we show the one delta. For multi-target solar flare
+  we sum the absolute losses across all targets.
+
+  [payload map, empire-name string] -> hiccup-fragment"
+  [payload empire-name]
+  (let [name     empire-name
+        label    (:label payload)
+        polarity (:polarity payload)
+        effect   (:effect payload)
+        ;; Sum absolute deltas across all targets for a single display number.
+        total    (reduce (fn [acc [_k v]] (+ acc (Math/abs (long v)))) 0 effect)
+        ;; Pick the resource label from the first (and usually only) target key.
+        res-name (case (ffirst effect)
+                   :player/food       "food"
+                   :player/credits    "credits"
+                   :player/population "population"
+                   ;; Solar flare hits multiple unit types — label them collectively.
+                   "units")]
+    (if (= polarity :disaster)
+      [:span {:class "text-red-400"}
+       (empire-span name) " suffered a " label
+       " — lost " (ui/format-number total) " " res-name]
+      [:span {:class "text-green-400"}
+       (empire-span name) " enjoyed a " label
+       " — gained " (ui/format-number total) " " res-name])))
 
 (defn- event-summary
   "Dispatch to the appropriate summary renderer for an event.
 
   [event map, player-id uuid] -> hiccup-fragment"
   [event player-id]
-  (let [payload (:event/payload-data event)
-        kind    (:event/kind event)
-        vis     (:event/visibility event)]
+  (let [payload      (:event/payload-data event)
+        kind         (:event/kind event)
+        vis          (:event/visibility event)
+        def-name     (:event/defender-name event)
+        ;; Is the viewing player the subject (defender) of this event?
+        mine?        (= player-id (:event/defender event))]
     (case kind
       (:invade :raid :strike) (combat-summary payload kind player-id)
       (:spy :incite :bomb :defect) (espionage-summary payload kind player-id vis)
-      :breakaway (breakaway-summary payload)
-      :elimination (elimination-summary payload)
+      :breakaway   (breakaway-summary payload def-name mine?)
+      :elimination (elimination-summary def-name mine?)
+      (:disaster :boon) (fate-summary payload def-name)
       [:span "Unknown event"])))
+
+;;;;
+;;;; Event Visibility
+;;;;
+
+(defn- show-event?
+  "Return false for events that carry no meaningful information (e.g. a fate
+  event whose effect totals to zero because the player had nothing to lose/gain).
+
+  [event event-map] -> boolean"
+  [event]
+  (let [kind    (:event/kind event)
+        payload (:event/payload-data event)]
+    (if (#{:disaster :boon} kind)
+      (let [effect (:effect payload)]
+        (pos? (reduce (fn [acc [_k v]] (+ acc (Math/abs (long v)))) 0 effect)))
+      true)))
 
 ;;;;
 ;;;; Day Grouping
@@ -160,11 +217,12 @@
   (let [player-id (:xt/id player)
         events    (visible-events db (:xt/id game) player-id)
         today     (LocalDate/now (ZoneId/systemDefault))
-        ;; Group by local date, keeping only events within 5 days
+        ;; Group by local date, keeping only events within 5 days that have content to show.
         dated     (keep (fn [evt]
-                          (let [d (event-local-date evt)
-                                l (day-label d today)]
-                            (when l [l evt])))
+                          (when (show-event? evt)
+                            (let [d (event-local-date evt)
+                                  l (day-label d today)]
+                              (when l [l evt]))))
                         events)
         grouped   (partition-by first dated)]
     (ui/phase-shell player game "NEWS"

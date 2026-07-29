@@ -129,7 +129,11 @@
           [:game/food-buy                :int]
           [:game/food-sell               :int]
           [:game/fuel-buy                :int]
-          [:game/fuel-sell               :int]]
+          [:game/fuel-sell               :int]
+
+          ;; Fate system
+          [:game/fate-probability {:optional true} :double]
+          [:game/fate-rank-tilt   {:optional true} :double]]
 
    :player/id :uuid
    :player [:map {:closed true}
@@ -193,6 +197,9 @@
             [:player/last-stability-breakaway          {:optional true} [:maybe :string]]
             [:player/last-stability-recovery           {:optional true} [:maybe :string]]
             [:player/last-capture-stability-penalty    {:optional true} [:maybe :int]]
+
+            ;; Fate (disaster / boon) — cached edn string, nil until resolved each turn
+            [:player/last-fate-result {:optional true} [:maybe :string]]
 
             ;; Combat
             [:player/pending-attack      {:optional true} [:maybe :player/id]]

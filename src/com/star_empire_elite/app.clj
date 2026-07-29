@@ -174,7 +174,9 @@
    :game/stability-breakaway-threshold const/stability-breakaway-threshold
    :game/stability-breakaway-cap       const/stability-breakaway-cap
    :game/stability-recovery-amount     const/stability-recovery-amount
-   :game/stability-recovery-floor      const/stability-recovery-floor})
+   :game/stability-recovery-floor      const/stability-recovery-floor
+   :game/fate-probability              const/fate-probability
+   :game/fate-rank-tilt                const/fate-rank-tilt})
 
 (defn create-game-page
   "Show the create-game form (admin only). Redirects non-admins to /app.

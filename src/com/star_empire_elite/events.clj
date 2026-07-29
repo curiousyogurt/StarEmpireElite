@@ -103,6 +103,23 @@
           :event/defender-name empire-name
           :event/payload       (pr-str result)}))
 
+(defn event-of-fate
+  "Construct a :public event from a fate roll result (disaster or boon).
+  :event/kind is :disaster or :boon, taken from (:polarity result).
+
+  Only call when roll-fate returned a non-nil result — a no-event turn produces
+  no event document.
+
+  [result fate-result-map, player-id uuid, empire-name string,
+   meta {:keys [game-id turn round at]}] -> event-map"
+  [result player-id empire-name meta]
+  (merge (base-event meta (:polarity result) :public)
+         {:event/attacker      nil
+          :event/attacker-name nil
+          :event/defender      player-id
+          :event/defender-name empire-name
+          :event/payload       (pr-str result)}))
+
 (defn event-of-elimination
   "Construct a :public event when a player is eliminated (zero planets).
 

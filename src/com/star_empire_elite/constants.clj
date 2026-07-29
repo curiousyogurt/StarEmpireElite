@@ -298,6 +298,31 @@
 (def fuel-sell 1)
 
 ;;;;
+;;;; Fate
+;;;; Probability and rank-tilt for disaster/boon events resolved at outcomes.
+;;;; lo/hi are multipliers applied to a basis (holdings or one turn's production).
+
+(def fate-probability         0.95)  ; chance of a fate event each turn
+(def fate-rank-tilt           0.4)   ; how much rank shifts disaster probability (leader ≈ 0.70, trailer ≈ 0.30)
+
+(def fate-drought-lo          0.75)  ; drought: fraction of one turn's food production lost
+(def fate-drought-hi          1.25)
+(def fate-pirate-raid-lo      0.10)  ; pirate raid: fraction of credit holdings stolen
+(def fate-pirate-raid-hi      0.20)
+(def fate-solar-flare-lo      0.08)  ; solar flare: fraction of each unit type destroyed
+(def fate-solar-flare-hi      0.15)
+(def fate-plague-lo           0.05)  ; plague: fraction of population lost
+(def fate-plague-hi           0.12)
+(def fate-bumper-harvest-lo   0.75)  ; bumper harvest: fraction of one turn's food production gained
+(def fate-bumper-harvest-hi   1.25)
+(def fate-gold-rush-lo        0.50)  ; gold rush: fraction of one turn's credit production gained
+(def fate-gold-rush-hi        1.00)
+(def fate-foreign-aid-lo      0.40)  ; foreign aid: fraction of one turn's credit production gained
+(def fate-foreign-aid-hi      0.80)
+(def fate-migration-wave-lo   0.05)  ; migration wave: fraction of current population gained
+(def fate-migration-wave-hi   0.10)
+
+;;;;
 ;;;; Score Weights
 ;;;; Points contributed per unit/planet/resource to a player's score.
 

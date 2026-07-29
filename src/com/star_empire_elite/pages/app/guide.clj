@@ -107,6 +107,7 @@
                  ["combat"            "Combat"]
                  ["strikes"           "Strikes"]
                  ["espionage"         "Espionage"]
+                 ["fate"              "Fate"]
                  ["scoring"           "Scoring"]]]
     [:div.mb-6
      (ui/section-label "CONTENTS")
@@ -133,7 +134,7 @@
                  "The player with the highest score (not the largest number of planets) wins."]]
        [:li [:span.text-green-400.mr-2 "•"] item])]
     (prose
-      "Everything below explains the details. You don't need to read it all on day one — "
+      "Everything below explains the details. You don't need to read it all on day one; "
       "just play a few turns and come back when something surprises you.")))
 
 ;;;;
@@ -155,12 +156,12 @@
       ["2" "Expenses"  "Pay upkeep for your military and infrastructure"]
       ["3" "Exchange"  "Buy or sell resources and units on the open market"]
       ["4" "Building"  "Purchase new units, ships, stations, and planets"]
-      ["5" "Action"    "Raid, invade, or strike an enemy empire — or pass"]
+      ["5" "Action"    "Raid, invade, or strike an enemy empire"]
       ["6" "Espionage" "Assign agents to spy on, destabilise, bomb, or infiltrate a rival"]])
     (prose "After all six phases, Outcomes resolves combat results and advances the game state.")
     (prose
-      "The " [:span.italic "highlighted values"] " throughout this guide are specific to this game — "
-      "different games may use different settings.")))
+      "The " [:span.italic "highlighted values"] " throughout this guide are specific to this galaxy: "
+      "different galaxies may use different settings.")))
 
 ;;;;
 ;;;; Starting Empire
@@ -196,7 +197,7 @@
   (section "income" "INCOME" "resources generated automatically each turn"
     (prose
       "At the start of each turn your planets and population pay into your stockpiles. "
-      "You cannot influence the amounts — income is automatic.")
+      "You cannot influence the amounts; income is automatic.")
     (guide-table
      ["Source"              "Credits"                                          "Food"                                          "Fuel"                                          "Soldiers"                                      "Fighters"                                      "Stations"]
      [["Each ore planet"    (v (ui/format-number (g game :game/ore-planet-credits const/ore-planet-credits))) "—"   "—"   "—"  "—"  "—"]
@@ -213,7 +214,7 @@
     (prose
       "After income, you must pay upkeep. You set what fraction you actually pay (0–100%). "
       "Paying less than full upkeep costs " (v (g game :game/expense-stability-penalty const/expense-stability-penalty))
-      " stability per underpaid fraction — so skipping upkeep is dangerous (see Stability).")
+      " stability per underpaid fraction; so skipping upkeep is dangerous (see Stability).")
     (guide-table
      ["Unit / Asset"  "Credits / turn"  "Food / turn"  "Fuel / turn"]
      [["Each planet"    (v (ui/format-number (g game :game/planet-upkeep-credits const/planet-upkeep-credits)))   (v (ui/format-number (g game :game/planet-upkeep-food const/planet-upkeep-food)))   "—"]
@@ -254,7 +255,7 @@
   (section "exchange" "EXCHANGE" "buy and sell resources and assets"
     (prose
       "The exchange lets you convert between credits and other resources. "
-      "Sell prices are always lower than buy prices — there is no arbitrage.")
+      "Sell prices are always lower than buy prices; there is no arbitrage.")
     (guide-table
      ["Asset"          "Buy (credits)"  "Sell (credits)"]
      [["Soldier"       "—"              (v (g game :game/soldier-sell   const/soldier-sell))]
@@ -303,7 +304,7 @@
       "At the end of each round, the game rolls d100. "
       "If the roll exceeds your stability plus "
       (v (g game :game/stability-breakaway-threshold const/stability-breakaway-threshold))
-      ", one or more planets break away — up to "
+      ", one or more planets break away, up to "
       (v (str (g game :game/stability-breakaway-cap const/stability-breakaway-cap) "%"))
       " of your total planet count.")
     (prose
@@ -321,7 +322,7 @@
     (prose
       "Stability cannot be incited below "
       (v (str (g game :game/incite-stability-floor const/incite-stability-floor) "%"))
-      " by espionage alone — that floor keeps rivals from using agents to trigger a breakaway cascade. "
+      " by espionage alone. This floor keeps rivals from using agents to trigger a breakaway cascade. "
       "But cumulative combat losses and unpaid expenses can push you there.")))
 
 ;;;;
@@ -349,7 +350,7 @@
     (ui/section-label "LEADERSHIP MULTIPLIERS" "additive bonus on top of base 1.0")
     (prose
       "Generals, admirals, and agents each add a percentage bonus to their respective phase. "
-      "Each bonus is individually capped — building beyond the cap gives no further advantage.")
+      "Each bonus is individually capped; building beyond the cap gives no further advantage.")
     (guide-table
      ["Leader / Unit"  "Phase"   "Bonus per unit"                                                        "Cap"]
      [["General"        "Ground" (v (pct (g game :game/general-mult-rate const/general-mult-rate)))       (v (pct (g game :game/general-mult-cap const/general-mult-cap)))]
@@ -377,7 +378,7 @@
     (prose
       "Raids hit only a fraction of the defender's forces, limiting risk and reward. "
       "Invasions are all-in: the defender commits everything, but so does the attacker. "
-      "Actual planets and resources captured scale with the ground combat margin — "
+      "Actual planets and resources captured scale with the ground combat margin; "
       "a narrow win takes far less than the cap.")
 
     (ui/section-label "COMBAT LOSSES")
@@ -395,7 +396,7 @@
 (defn- strikes-section [game]
   (section "strikes" "STRIKES" "standoff attacks using command ships"
     (prose
-      "A strike is a ranged attack — no ground combat, no planet capture. "
+      "A strike is a ranged attack: no ground combat, no planet capture. "
       "You dispatch up to " (v (g game :game/strike-max-dispatch const/strike-max-dispatch))
       " command ships. Each ship destroys "
       (v (pct (g game :game/strike-damage-rate const/strike-damage-rate)))
@@ -441,7 +442,7 @@
       "diminishing returns (effective = "
       (v const/espionage-defense-threshold)
       " + surplus^" (v const/espionage-defense-exponent) "). "
-      "At 1,000 defending agents the effective count is roughly 364 — not 1,000.")
+      "At 1,000 defending agents the effective count is roughly 364, not 1,000.")
 
     (ui/section-label "DEFECT — SPECIAL RULE")
     (prose
@@ -450,8 +451,67 @@
       " of their agents to defense. This makes Defect viable against agent-heavy empires. "
       "On success, you receive "
       (v (pct (g game :game/defect-transfer-rate const/defect-transfer-rate)))
-      " of the smaller of your agent count and the defender's — "
+      " of the smaller of your agent count and the defender's; "
       "a big spy network is required to absorb a big defection.")))
+
+;;;;
+;;;; Fate
+;;;;
+
+(defn- fate-row
+  "One row in the fate table: event name, what it affects, and its lo–hi multiplier range.
+  basis-label is a short phrase like \"one turn's food production\" or \"current population\".
+
+  [label str, affects str, basis-label str, lo number, hi number] -> [hiccup hiccup hiccup]"
+  [label affects basis-label lo hi]
+  [label affects [:span (v (pct lo)) "–" (v (pct hi)) " of " basis-label]])
+
+(defn- fate-section [game]
+  (let [;; Shared cell and sub-header styles, inlined because this is the only table
+        ;; that needs disaster/boon group rows interspersed with data rows.
+        cell-cls    "text-game-green-soft pr-4 border-b border-game-border border-opacity-40"
+        sub-hdr-cls "text-game-green-dim text-[11px] tracking-[0.08em] uppercase pt-3 pb-1"
+        data-rows   (fn [rows]
+                      (map-indexed
+                       (fn [i row]
+                         (into [:tr {:class (if (even? i) "bg-transparent" "bg-game-green-deep bg-opacity-20")}]
+                               (map #(vector :td.py-1 {:class cell-cls} %) row)))
+                       rows))]
+    (section "fate" "FATE" "random disasters and boons resolved at outcomes"
+      (prose
+        "At the end of each turn, fate may intervene. There is a "
+        (v (pct (g game :game/fate-probability const/fate-probability)))
+        " chance that your empire is struck by a disaster or granted a boon. "
+        "The result is applied immediately and appears in your Outcomes summary.")
+      (prose
+        "Which you receive (disaster or boon) depends on your standing. "
+        "Leaders draw disasters more often; trailers draw boons more often. "
+        "The tilt is not absolute: even the top-ranked empire has roughly a "
+        (v "30%") " chance of a boon, and the last-place empire still faces roughly a "
+        (v "30%") " chance of disaster.")
+      ;; Single table keeps Event / Affects / Magnitude columns aligned across both groups.
+      [:table.w-full.text-sm.font-mono
+       {:class "border-collapse mt-1 mb-3"}
+       [:thead
+        [:tr
+         (for [h ["Event" "Affects" "Magnitude"]]
+           [:th.text-left.pb-1
+            {:class "text-game-green-muted text-[11px] tracking-[0.08em] uppercase pr-4 border-b border-game-border"}
+            h])]]
+       [:tbody
+        [:tr [:td {:colspan 3 :class sub-hdr-cls} "Disasters"]]
+        (data-rows
+         [(fate-row "Drought"     "Food"       "one turn's food production" const/fate-drought-lo       const/fate-drought-hi)
+          (fate-row "Pirate Raid" "Credits"    "current credit holdings"    const/fate-pirate-raid-lo   const/fate-pirate-raid-hi)
+          (fate-row "Solar Flare" "Units"      "each unit type's holdings"  const/fate-solar-flare-lo   const/fate-solar-flare-hi)
+          (fate-row "Plague"      "Population" "current population"         const/fate-plague-lo        const/fate-plague-hi)])
+        [:tr [:td {:colspan 3 :class sub-hdr-cls} "Boons"]]
+        (data-rows
+         [(fate-row "Bumper Harvest" "Food"       "one turn's food production"    const/fate-bumper-harvest-lo  const/fate-bumper-harvest-hi)
+          (fate-row "Gold Rush"      "Credits"    "one turn's credit production"  const/fate-gold-rush-lo       const/fate-gold-rush-hi)
+          (fate-row "Foreign Aid"    "Credits"    "one turn's credit production"  const/fate-foreign-aid-lo     const/fate-foreign-aid-hi)
+          (fate-row "Migration Wave" "Population" "current population"            const/fate-migration-wave-lo  const/fate-migration-wave-hi)])]]
+      (prose "Fate events are visible to all players in the News feed. "))))
 
 ;;;;
 ;;;; Scoring
@@ -483,7 +543,7 @@
 ;;;;
 
 (defn guide-page
-  "Render the game guide — a single scrollable reference page with live game constants.
+  "Render the game guide: a single scrollable reference page with live game constants.
 
   [player player-map, game game-map] -> hiccup"
   [player game]
@@ -503,6 +563,7 @@
      (combat-section game)
      (strikes-section game)
      (espionage-section game)
+     (fate-section game)
      (scoring-section)]
     (ui/phase-action-bar
       (ui/action-bar-link (str "/app/game/" (:xt/id player)) "Back to Game"))))

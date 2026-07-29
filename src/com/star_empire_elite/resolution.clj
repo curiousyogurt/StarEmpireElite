@@ -14,6 +14,7 @@
             [com.star-empire-elite.combat     :as combat]
             [com.star-empire-elite.constants  :as const]
             [com.star-empire-elite.events     :as events]
+            [com.star-empire-elite.fate       :as fate]
             [com.star-empire-elite.utils      :as utils]
             [xtdb.api                         :as xt]))
 
@@ -495,6 +496,59 @@
                      (assoc :player/stability                      new-stability)
                      (assoc :player/last-capture-stability-penalty penalty))]))))
 
+(defn- resolve-fate
+  "Roll for a fate event on first load; return cached result on refresh.
+  Skips entirely for an eliminated or zero-planet player — they have nothing to lose or gain.
+  Passes rand as the rng so the roll is non-deterministic in production.
+  Returns [result updated-player] where result is nil if no event triggered."
+  [ctx player-id player game total-planets]
+  (let [cached (some-> (:player/last-fate-result player) clojure.core/read-string)]
+    (cond
+      ;; Cache hit — result already applied on a prior page load.
+      (some? (:player/last-fate-result player))
+      [cached player]
+
+      ;; Skip for eliminated or zero-planet players.
+      (zero? total-planets)
+      [nil player]
+
+      :else
+      (let [db     (:biff/db ctx)
+            others (utils/get-other-players db (:player/game player) player-id)
+            ;; active = this player + non-eliminated others in the same game.
+            active (cons player others)
+            result (fate/roll-fate player game active rand)]
+        (if (nil? result)
+          ;; No event — cache nil so refreshes skip the roll.
+          (do (biff/submit-tx ctx
+                [{:db/doc-type              :player
+                  :db/op                    :update
+                  :xt/id                    player-id
+                  :player/last-fate-result  (pr-str nil)}])
+              [nil player])
+          ;; Event triggered — apply each delta, clamp to zero, update player.
+          (let [effect      (:effect result)
+                total-planets-now total-planets
+                new-player
+                (reduce (fn [p [k delta]]
+                          (let [cur (get p k 0)
+                                raw (max 0 (+ cur delta))
+                                ;; Migration wave: clamp population to planet capacity.
+                                new (if (= k :player/population)
+                                      (min raw (* total-planets-now const/pop-capacity-per-planet))
+                                      raw)]
+                            (assoc p k (long new))))
+                        player
+                        effect)
+                updates (into {:db/doc-type             :player
+                               :db/op                   :update
+                               :xt/id                   player-id
+                               :player/last-fate-result (pr-str result)}
+                              (for [[k _] effect]
+                                [k (get new-player k)]))]
+            (biff/submit-tx ctx [updates])
+            [result new-player]))))))
+
 ;;;;
 ;;;; Turn Resolution
 ;;;;
@@ -517,6 +571,7 @@
         combat-cached?    (some? (:player/last-battle-result player))
         espionage-cached? (some? (:player/last-espionage-result player))
         breakaway-cached? (some? (:player/last-stability-breakaway player))
+        fate-cached?      (some? (:player/last-fate-result player))
 
         [battle-result    p1] (resolve-combat              ctx player-id player game)
         [espionage-result p2] (resolve-espionage           ctx player-id p1     game)
@@ -532,6 +587,8 @@
         total-planets         (+ (:player/ore-planets p7)
                                  (:player/erg-planets  p7)
                                  (:player/mil-planets  p7))
+        ;; Fate resolves after all other steps; skipped for zero-planet (eliminated) players.
+        [fate-result      p8] (resolve-fate ctx player-id p7 game total-planets)
         eliminated?           (zero? total-planets)
 
         ;; Build event metadata shared by all events this resolution
@@ -556,17 +613,26 @@
                          breakaway-result player-id
                          (:player/empire-name player) event-meta))
 
-                 (and eliminated? (not= (:player/status p7) const/player-status-eliminated))
+                 ;; Only record a fate event when the effect is non-zero.
+                 ;; A zero-delta roll (e.g. empty holdings) produces no news.
+                 (and fate-result (not fate-cached?)
+                      (pos? (reduce (fn [acc [_k v]] (+ acc (Math/abs (long v)))) 0
+                                    (:effect fate-result))))
+                 (conj (events/event-of-fate
+                         fate-result player-id
+                         (:player/empire-name player) event-meta))
+
+                 (and eliminated? (not= (:player/status p8) const/player-status-eliminated))
                  (conj (events/event-of-elimination
                          player-id (:player/empire-name player) event-meta)))]
 
-    (when (and eliminated? (not= (:player/status p7) const/player-status-eliminated))
+    (when (and eliminated? (not= (:player/status p8) const/player-status-eliminated))
       (biff/submit-tx ctx [{:db/doc-type   :player
                             :db/op         :update
                             :xt/id         player-id
                             :player/status const/player-status-eliminated}]))
     (events/record-events! ctx events)
-    {:player           p7
+    {:player           p8
      :game             game
      :battle-result    battle-result
      :espionage-result espionage-result
@@ -575,4 +641,5 @@
      :capture-penalty  capture-penalty
      :breakaway-result breakaway-result
      :recovery-result  recovery-result
+     :fate-result      fate-result
      :eliminated?      eliminated?}))
