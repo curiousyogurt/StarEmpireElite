@@ -453,6 +453,28 @@
     (guide/guide-page player game)))
 
 ;;;;
+;;;; Cooldown polling fragment
+;;;;
+
+(defn cooldown-handler
+  "HTMX polling fragment — returns the cooldown bar widget for the game overview action bar.
+  Polled every 30s; when cooldown clears, returns the Play link so polling stops naturally.
+
+  [ctx ring-ctx] -> ring-response (200 with HTML fragment)"
+  [{:keys [biff/db path-params] :as ctx}]
+  (let [player-id     (java.util.UUID/fromString (:player-id path-params))
+        player        (xt/entity db player-id)
+        game          (xt/entity db (:player/game player))
+        mid-turn?     (> (:player/current-phase player) 1)
+        cooldown-ms   (when-not mid-turn? (utils/round-cooldown-ms player game))
+        day-exhausted? (utils/day-exhausted? player game)
+        phase-url     (game/get-phase-url player-id (:player/current-phase player))]
+    {:status  200
+     :headers {"content-type" "text/html"}
+     :body    (rum/render-static-markup
+                (game/cooldown-bar player-id cooldown-ms day-exhausted? phase-url))}))
+
+;;;;
 ;;;; Alerts
 ;;;;
 
@@ -506,5 +528,6 @@
     ["/game/:player-id/rejoin"             {:post eliminated/rejoin}]
     ["/game/:player-id/news"               {:get  news-handler}]
     ["/game/:player-id/guide"              {:get  guide-handler}]
-    ["/game/:player-id/alerts"             {:get  alerts-handler}]]})
+    ["/game/:player-id/alerts"             {:get  alerts-handler}]
+    ["/game/:player-id/cooldown"           {:get  cooldown-handler}]]})
 

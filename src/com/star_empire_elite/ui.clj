@@ -849,17 +849,19 @@
         "Full details available in Outcomes phase."]])))
 
 (defn incoming-alert
-  "Render the HTMX polling container that updates the alert banner in place every 10 seconds.
+  "Render the HTMX polling container that updates the alert banner in place.
   The player uses the inline refresh link to reload the page when ready.
+  poll-interval defaults to \"every 10s\"; pass a slower value on idle pages.
 
-  [player player-map] -> hiccup"
-  [player]
-  (let [player-id (:xt/id player)]
-    [:div#incoming-alert
-     {:hx-get     (str "/app/game/" player-id "/alerts")
-      :hx-trigger "every 10s"
-      :hx-swap    "innerHTML"}
-     (incoming-alert-content player)]))
+  [player player-map, poll-interval str (optional)] -> hiccup"
+  ([player] (incoming-alert player "every 10s"))
+  ([player poll-interval]
+   (let [player-id (:xt/id player)]
+     [:div#incoming-alert
+      {:hx-get     (str "/app/game/" player-id "/alerts")
+       :hx-trigger poll-interval
+       :hx-swap    "innerHTML"}
+      (incoming-alert-content player)])))
 
 ;;;;
 ;;;; Phase Page Layout Helpers

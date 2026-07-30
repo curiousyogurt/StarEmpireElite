@@ -86,6 +86,29 @@
 ;;;; Page
 ;;;;
 
+(defn cooldown-bar
+  "Render the action-bar cooldown widget for the game overview. When in cooldown, returns a
+  polling div that refreshes itself every 30 seconds via HTMX; when cooldown has cleared,
+  returns the Play link so the player can start their next round immediately.
+
+  Uses outerHTML swap so the element replaces itself entirely — when the cooldown expires
+  the Play link takes over and polling stops automatically.
+
+  [player-id uuid, cooldown-ms int-or-nil, day-exhausted? bool, phase-url str] -> hiccup"
+  [player-id cooldown-ms day-exhausted? phase-url]
+  (if cooldown-ms
+    ;; Cooldown active: polling div that updates its own text every 30s.
+    [:div#cooldown-bar
+     {:class       "py-[5px] px-3.5 border border-yellow-700 text-yellow-400 rounded-sm text-sm font-mono tracking-wider"
+      :hx-get      (str "/app/game/" player-id "/cooldown")
+      :hx-trigger  "every 60s"
+      :hx-swap     "outerHTML"}
+     (if day-exhausted?
+       (str "Rounds reset in " (utils/format-cooldown-duration cooldown-ms))
+       (str "Next round opens in " (utils/format-cooldown-duration cooldown-ms)))]
+    ;; Cooldown over: replace with the Play button (no HTMX, polling stops).
+    (ui/action-bar-primary-link phase-url "Play")))
+
 (defn game-view
   "Render the game overview page. Returns 404 when the player entity does not exist.
   Shows a cooldown countdown when the player is waiting for the next round or day.
@@ -101,18 +124,13 @@
       (ui/phase-shell player game "GAME OVERVIEW"
         [:div.flex.flex-col.gap-2
          {:class "py-2.5 px-3.5"}
-         (ui/incoming-alert player)
+         (ui/incoming-alert player "every 60s")
          (ui/snapshot-section player)
          (players-table {:players players})]
         (ui/phase-action-bar
           (ui/action-bar-link "/app" "Back to Games")
           (ui/action-bar-link (str "/app/game/" (:xt/id player) "/news") "News")
           (ui/action-bar-link (str "/app/game/" (:xt/id player) "/guide") "?")
-          (if cooldown-ms
-            [:div {:class "py-[5px] px-3.5 border border-yellow-700 text-yellow-400 rounded-sm text-sm font-mono tracking-wider"}
-             (if (utils/day-exhausted? player game)
-               (str "Rounds reset in " (utils/format-cooldown-duration cooldown-ms))
-               (str "Next round opens in " (utils/format-cooldown-duration cooldown-ms)))]
-            (ui/action-bar-primary-link
-              (get-phase-url (:xt/id player) (:player/current-phase player))
-              "Play")))))))
+          (cooldown-bar (:xt/id player) cooldown-ms
+                        (utils/day-exhausted? player game)
+                        (get-phase-url (:xt/id player) (:player/current-phase player))))))))
