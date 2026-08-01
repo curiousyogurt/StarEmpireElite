@@ -238,7 +238,10 @@
              (for [[_ evt] group]
                [:div.flex.items-center.gap-2.text-sm
                 {:class "py-[3px] px-2 bg-game-row rounded-sm"}
-                (event-badge (:event/kind evt))
+                ;; Fixed-width column so all badge labels (ACTION through ESPIONAGE)
+                ;; align the description text to the same left edge.
+                [:div {:class "w-[100px] flex-shrink-0"}
+                 (event-badge (:event/kind evt))]
                 [:span.text-game-green-soft.flex-1 (event-summary evt player-id)]])]]))]
       (ui/phase-action-bar
         (ui/action-bar-link (str "/app/game/" (:xt/id player)) "Back to Game")))))
