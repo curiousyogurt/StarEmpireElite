@@ -120,11 +120,11 @@
   /* Responsive grid for building phase purchase table (5 columns: Item, Each, Max, Build, Cost) */
   .building-purchase-grid {
     display: grid;
-    grid-template-columns: 1.4fr 0.6fr 0.7fr 1.2fr 0.8fr;
+    grid-template-columns: 1.15fr 0.6fr 0.7fr 1.2fr 1.05fr;
   }
   @media (min-width: 768px) {
     .building-purchase-grid {
-      grid-template-columns: 2fr 0.8fr 1fr 1.2fr 1fr;
+      grid-template-columns: 1.7fr 0.8fr 1fr 1.2fr 1.3fr;
     }
   }
 

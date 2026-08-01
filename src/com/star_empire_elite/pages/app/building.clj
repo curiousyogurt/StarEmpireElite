@@ -6,13 +6,13 @@
 ;;;;; building only costs credits (though projections need to track other classes of resources).
 ;;;;;
 ;;;;; This phase uses htmx for dynamic validation, showing players in real-time whether they can
-;;;;; afford their selected purchases before submitting, as well as making projections into the next 
+;;;;; afford their selected purchases before submitting, as well as making projections into the next
 ;;;;; turn, since purchases made in this phase affect income and expenses in the following phase.
 ;;;;;
 
 ;;;;; Logical Structure:
 ;;;;;
-;;;;; 1)  building-page ← calculate-max-quantities
+;;;;; 1)  building-page ← calculate-max-quantities, calculate-fit-quantities
 ;;;;;     └─ ui/phase-shell
 ;;;;;        ├─ biff/form
 ;;;;;        │  ├─ ui/phase-body
@@ -34,7 +34,7 @@
 ;;;;;
 ;;;;; 2)  calculate-building-oob ← parse-purchase-quantities, calculate-purchase-cost,
 ;;;;;                               calculate-resources-after-purchases, valid-purchase?,
-;;;;;                               calculate-max-quantities  (HTMX OOB handler)
+;;;;;                               calculate-max-quantities, calculate-fit-quantities  (HTMX OOB handler)
 ;;;;;
 ;;;;; 3)  apply-building ← parse-purchase-quantities, calculate-purchase-cost,
 ;;;;;                       calculate-resources-after-purchases, valid-purchase?
@@ -42,6 +42,7 @@
 (ns com.star-empire-elite.pages.app.building
   (:require [clojure.string :as str]
             [com.biffweb :as biff]
+            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]
             [com.star-empire-elite.pages.app.expenses :as expenses]))
@@ -57,10 +58,12 @@
     :qty-key :soldiers        :cost-key :game/soldier-cost}
    {:group "Ground Forces"
     :label "Transports"       :abbrev "Transport"
-    :qty-key :transports      :cost-key :game/transport-cost}
+    :qty-key :transports      :cost-key :game/transport-cost
+    :fit-tooltip "Buy transport shortfall to carry all soldiers"}
    {:group "Ground Forces"
     :label "Generals"         :abbrev "Generals"
-    :qty-key :generals        :cost-key :game/general-cost}
+    :qty-key :generals        :cost-key :game/general-cost
+    :fit-tooltip "Buy general shortfall to command all soldiers"}
    {:group "Ground Forces"
     :label "Agents"           :abbrev "Agents"
     :qty-key :agents          :cost-key :game/agent-cost}
@@ -69,10 +72,12 @@
     :qty-key :fighters        :cost-key :game/fighter-cost}
    {:group "Space Forces"
     :label "Carriers"         :abbrev "Carriers"
-    :qty-key :carriers        :cost-key :game/carrier-cost}
+    :qty-key :carriers        :cost-key :game/carrier-cost
+    :fit-tooltip "Buy carrier shortfall to carry all fighters"}
    {:group "Space Forces"
     :label "Admirals"         :abbrev "Admirals"
-    :qty-key :admirals        :cost-key :game/admiral-cost}
+    :qty-key :admirals        :cost-key :game/admiral-cost
+    :fit-tooltip "Buy admiral shortfall to command all fighters"}
    {:group "Space Forces"
     :label "Defence Stations" :abbrev "Def Stns"
     :qty-key :stations        :cost-key :game/station-cost}
@@ -132,6 +137,48 @@
                       max-qty            (max 0 (quot remaining-for-this cost-per-unit))]]
             [qty-key max-qty]))))
 
+(defn calculate-fit-quantities
+  "Calculate the clamped 'fit' quantity for each capacity unit: the number of
+   additional units needed so that all soldiers/fighters (current + pending
+   purchases) are carried and commanded, limited by what the player can afford.
+
+   fit = clamp(ceil(projected-covered-units / capacity) - owned-capacity-units,
+               0, max-qty)
+
+   Notes on the formula:
+   - projected-covered-units includes the player's CURRENT soldiers/fighters PLUS
+     whatever quantity is pending in this form's soldiers/fighters input, so the
+     natural workflow ('max soldiers, then fit transports') gives a live answer.
+   - We subtract only OWNED capacity units, not pending ones, because the button
+     REPLACES the input value rather than adding to it (same semantics as max).
+   - max-qty comes from calculate-max-quantities, which already accounts for
+     credits committed to all OTHER rows but not this row's own input — exactly
+     right for a replace-style button.
+
+   [player player-map, quantities purchase-quantities, max-quantities map]
+   -> {:transports int, :generals int, :carriers int, :admirals int}"
+  [player quantities max-quantities]
+  (let [proj-soldiers (+ (:player/soldiers player) (get quantities :soldiers 0))
+        proj-fighters (+ (:player/fighters player) (get quantities :fighters 0))
+        ;; Integer ceiling division: (ceil a/b) = (a + b - 1) / b using integer division.
+        ;; Plain (quot soldiers capacity) would under-buy: e.g. 101 soldiers needs 2 transports
+        ;; (capacity 100), but quot gives 1 — leaving 1 soldier uncarried. Ceiling ensures full coverage.
+        ceil-div      (fn [n d] (if (zero? n) 0 (quot (+ n d -1) d)))
+        ;; Clamp: never buy a negative quantity, never exceed what credits allow.
+        clamp         (fn [v max-v] (max 0 (min v max-v)))]
+    {:transports (clamp (- (ceil-div proj-soldiers const/soldiers-per-transport)
+                           (:player/transports player))
+                        (get max-quantities :transports 0))
+     :generals   (clamp (- (ceil-div proj-soldiers const/soldiers-per-general)
+                           (:player/generals player))
+                        (get max-quantities :generals 0))
+     :carriers   (clamp (- (ceil-div proj-fighters const/fighters-per-carrier)
+                           (:player/carriers player))
+                        (get max-quantities :carriers 0))
+     :admirals   (clamp (- (ceil-div proj-fighters const/fighters-per-admiral)
+                           (:player/admirals player))
+                        (get max-quantities :admirals 0))}))
+
 (defn calculate-resources-after-purchases
   "Calculate player resources after executing purchases.
 
@@ -158,9 +205,9 @@
 ;;;;
 
 ;;;
-;;; The Projection Grid shows next-turn resource projections for Credits, Food, and Fuel, each in a 
-;;; card.  Each card has a signed total aside and pill rows showing Current, Planets, Military, and 
-;;; a fourth source (Taxes or Population).  Dynamic rows update via HTMX OOB as the player adjusts 
+;;; The Projection Grid shows next-turn resource projections for Credits, Food, and Fuel, each in a
+;;; card.  Each card has a signed total aside and pill rows showing Current, Planets, Military, and
+;;; a fourth source (Taxes or Population).  Dynamic rows update via HTMX OOB as the player adjusts
 ;;; purchase inputs.
 ;;;
 ;;; Projection Grid:
@@ -196,8 +243,8 @@
     body]])
 
 (defn- projection-grid
-  "Render the projection grid: three cards (Credits, Food, Fuel) in a 3-column grid, each showing 
-  next-turn projections accounting for proposed purchases. Credits 'Current' row reflects credits 
+  "Render the projection grid: three cards (Credits, Food, Fuel) in a 3-column grid, each showing
+  next-turn projections accounting for proposed purchases. Credits 'Current' row reflects credits
   after the proposed build cost is deducted.
 
   [player player-map, game game-map, quantities purchase-quantities] -> hiccup"
@@ -265,9 +312,10 @@
                       (projection-row "Population" pop-fuel))]))
 
 ;;;
-;;; The Build Table shows purchasable units and planets with per-unit cost, max affordable quantity, 
-;;; a numeric input, and line cost.  A "max" button beside each input fills in the maximum affordable 
-;;; quantity.
+;;; The Build Table shows purchasable units and planets with per-unit cost, max affordable quantity,
+;;; a numeric input, and line cost.  A "max" button beside each input fills in the maximum affordable
+;;; quantity.  Capacity rows (transports, generals, carriers, admirals) also carry a hidden fit-qty
+;;; span that the Phase 3 "fit" button reads.
 ;;;
 ;;; Build Table:
 ;;; - build-row:   one row for a single purchasable item
@@ -276,9 +324,11 @@
 
 (defn- build-row
   "Render one purchase row with item name, unit cost, max affordable, build input, and line cost.
+  For capacity rows (those with a :fit-tooltip in their spec), also renders a hidden span carrying
+  the fit quantity so the fit button can read it without a round-trip.
 
-  [row map, purchase-qty int, max-qty int, game game-map, player-id uuid] -> hiccup"
-  [row purchase-qty max-qty game player-id]
+  [row map, purchase-qty int, max-qty int, fit-qty int-or-nil, game game-map, player-id uuid] -> hiccup"
+  [row purchase-qty max-qty fit-qty game player-id]
   (let [cost-per-unit (get game (:cost-key row))
         item-cost     (* cost-per-unit purchase-qty)
         cost-id       (str "cost-" (name (:qty-key row)))
@@ -303,11 +353,9 @@
               :data-value (str (if (neg? max-qty) 0 max-qty))}
        (ui/format-number (if (neg? max-qty) 0 max-qty))]]
 
-     ;; Build input + max button
+     ;; Build input + max button. relative so the fit button (absolute) anchors to this group.
      [:div.flex.items-center.justify-center.min-w-0
-
-      [:div.flex.items-center.gap-1.translate-x-4.min-w-0
-
+      [:div.flex.items-center.gap-1.translate-x-4.min-w-0.relative
        [:div.min-w-0
         {:class "w-[min(120px,100%)]"}
         (ui/numeric-input (name (:qty-key row)) purchase-qty player-id
@@ -317,14 +365,31 @@
                                          :border-color "#2d6644"
                                          :padding-top "1px"
                                          :padding-bottom "1px"}})]
-
        [:button.text-xs.shrink-0.border.border-game-green-border.bg-transparent.text-game-green-muted.py-px.px-1.rounded-sm.cursor-pointer.whitespace-nowrap
         {:type "button"
          :onclick (str "var s=document.getElementById('" max-qty-id "');"
                        "var i=document.querySelector('[name=\"" (name (:qty-key row)) "\"]');"
                        "if(s&&i){i.value=s.dataset.value||'0';"
                                  "i.dispatchEvent(new Event('input',{bubbles:true}));}")}
-        "max"]]]
+        "max"]
+       ;; fit button (capacity rows only) — hangs off the right of the input+max group.
+       ;; Reads the pre-calculated fit value from the hidden #fit-qty-<key> span.
+       (when (some? fit-qty)
+         (let [fit-qty-id (str "fit-qty-" (name (:qty-key row)))]
+           [:button
+            {:type "button"
+             :title (:fit-tooltip row)
+             :onclick (str "var s=document.getElementById('" fit-qty-id "');"
+                           "var i=document.querySelector('[name=\"" (name (:qty-key row)) "\"]');"
+                           "if(s&&i){i.value=s.dataset.value||'0';"
+                                     "i.dispatchEvent(new Event('input',{bubbles:true}));}")
+             :class "absolute top-1/2 -translate-y-1/2 left-[calc(100%+4px)] border border-game-green-border bg-transparent text-game-green-muted text-xs py-px px-1 rounded-sm cursor-pointer whitespace-nowrap"}
+            "sf"         ; button label
+           ]             ; closes [:button
+         )               ; closes (let [fit-qty-id ...]
+       )                 ; closes (when
+      ]                  ; closes [:div.flex...relative  (inner flex)
+     ]                   ; closes [:div.flex...justify-center  (outer flex)
 
      ;; Line cost
      [:div.text-base.text-right
@@ -332,14 +397,21 @@
       [:span {:id cost-id}
        (if (pos? item-cost)
          (ui/format-number item-cost)
-         "—")]]]))
+         "—")]]
+
+     ;; Hidden fit-qty span (capacity rows only — display:none, takes no grid space).
+     ;; The fit button reads data-value from here; kept as the last grid child.
+     (when (some? fit-qty)
+       [:span.hidden {:id (str "fit-qty-" (name (:qty-key row)))
+                      :data-value (str fit-qty)}])]))
 
 (defn- build-table
   "Render the full build orders table with header and all purchase rows,
   grouped by :group with a subheading row at the top of each group.
 
-  [player player-map, game game-map, quantities purchase-quantities, max-quantities map] -> hiccup"
-  [player game quantities max-quantities]
+  [player player-map, game game-map, quantities purchase-quantities,
+   max-quantities map, fit-quantities map] -> hiccup"
+  [player game quantities max-quantities fit-quantities]
   (let [player-id (:xt/id player)
         groups    (partition-by :group purchase-rows)]
     [:div.overflow-hidden.rounded-game.bg-game-surface
@@ -351,8 +423,11 @@
          (for [row group
                :let [qty-key      (:qty-key row)
                      purchase-qty (get quantities qty-key 0)
-                     max-qty      (get max-quantities qty-key 0)]]
-           (build-row row purchase-qty max-qty game player-id))))]))
+                     max-qty      (get max-quantities qty-key 0)
+                     ;; nil for rows without :fit-tooltip; non-nil triggers hidden span in build-row
+                     fit-qty      (when (:fit-tooltip row)
+                                    (get fit-quantities qty-key))]]
+           (build-row row purchase-qty max-qty fit-qty game player-id))))]))
 
 ;;;
 ;;; Credit Impact shows the before/after effect of the build order on credits
@@ -425,7 +500,8 @@
 
 (defn calculate-building-oob
   "Provide HTMX out-of-band updates as user changes purchase inputs.
-  Updates the max quantities, item costs, credit deduction bar, after-credits, and submit button.
+  Updates the max quantities, fit quantities, item costs, credit deduction bar,
+  after-credits, and submit button.
 
   [ctx ring-ctx] -> hiccup (via biff/render)"
   [{:keys [path-params params biff/db] :as ctx}]
@@ -435,6 +511,7 @@
           resources-after (calculate-resources-after-purchases player quantities cost-info)
           affordable?     (valid-purchase? resources-after)
           max-quantities  (calculate-max-quantities player quantities game)
+          fit-quantities  (calculate-fit-quantities player quantities max-quantities)
           total           (:total-cost cost-info)
           credits-after   (:credits resources-after)
           after-cls       (str "font-bold " (if (neg? credits-after) "text-red-400" "text-green-400"))
@@ -520,6 +597,13 @@
                    :data-value (str (if (neg? max-qty) 0 max-qty))
                    :class (if (or (zero? max-qty) (neg? max-qty)) "text-game-green-dark" "text-game-green-soft")}
             (ui/format-number (if (neg? max-qty) 0 max-qty))])
+         ;; OOB: fit quantities for capacity rows (transports, generals, carriers, admirals).
+         ;; Kept hidden — the Phase 3 fit button reads data-value from these.
+         (for [[item-key fit-qty] fit-quantities]
+           [:span.hidden {:id (str "fit-qty-" (name item-key))
+                          :hx-swap-oob "true"
+                          :key (str "fit-" item-key)
+                          :data-value (str fit-qty)}])
          ;; OOB: item line costs
          (for [[item-key cost] item-costs]
            [:span {:id (str "cost-" (name item-key))
@@ -545,10 +629,11 @@
   [{:keys [player game flash]}]
   (let [player-id        (:xt/id player)
         zero-quantities  (into {} (map (fn [row] [(:qty-key row) 0]) purchase-rows))
-        max-quantities   (calculate-max-quantities player zero-quantities game)]
-    (ui/phase-shell 
-      player 
-      game 
+        max-quantities   (calculate-max-quantities player zero-quantities game)
+        fit-quantities   (calculate-fit-quantities player zero-quantities max-quantities)]
+    (ui/phase-shell
+      player
+      game
       "Building Phase"
       (biff/form
         {:action (str "/app/game/" player-id "/apply-building") :method "post" :class  "m-0"}
@@ -560,7 +645,7 @@
           (projection-grid player game zero-quantities)
           (ui/section-label "Build Orders")
           [:div
-           (build-table player game zero-quantities max-quantities)]
+           (build-table player game zero-quantities max-quantities fit-quantities)]
           (ui/section-label "Impact")
           [:div
            [:div.overflow-hidden.rounded-game.bg-game-surface

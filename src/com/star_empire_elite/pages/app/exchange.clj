@@ -357,7 +357,7 @@
                        (str "var i=document.querySelector('[name=\"" field-key "\"]');"
                             "if(i){i.value='" (long v) "';"
                                    "i.dispatchEvent(new Event('input',{bubbles:true}));}"))
-        btn-cls      "absolute top-1/2 -translate-y-1/2 border border-game-green-border bg-game-green-done text-game-green-muted font-mono text-[11px] py-px px-1 rounded-sm cursor-pointer whitespace-nowrap"
+        btn-cls      "absolute top-1/2 -translate-y-1/2 border border-game-green-border bg-game-green-done text-game-green-muted text-xs py-px px-1 rounded-sm cursor-pointer whitespace-nowrap"
         input-node   (ui/numeric-input field-key current-quantity player-id "/calculate-exchange" hx-include
                                        {:input-class "text-xs lg:text-sm text-right min-w-0"
                                         :input-style {:color "#7ab88a"
