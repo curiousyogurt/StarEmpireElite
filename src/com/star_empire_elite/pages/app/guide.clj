@@ -95,20 +95,20 @@
 ;;;;
 
 (defn- toc []
-  (let [entries [["quick-start"        "Quick Start"]
-                 ["overview"          "Overview"]
-                 ["starting-empire"   "Starting Empire"]
-                 ["income"            "Income"]
-                 ["expenses"          "Expenses"]
-                 ["building"          "Building"]
-                 ["exchange"          "Exchange"]
-                 ["population"        "Population"]
-                 ["stability"         "Stability"]
-                 ["combat"            "Combat"]
-                 ["strikes"           "Strikes"]
-                 ["espionage"         "Espionage"]
-                 ["fate"              "Fate"]
-                 ["scoring"           "Scoring"]]]
+  (let [entries [["quick-start"     "Quick Start"]
+                 ["overview"        "Overview"]
+                 ["starting-empire" "Starting Empire"]
+                 ["income"          "Income"]
+                 ["expenses"        "Expenses"]
+                 ["exchange"        "Exchange"]
+                 ["building"        "Building"]
+                 ["combat"          "Combat"]
+                 ["strikes"         "Strikes"]
+                 ["espionage"       "Espionage"]
+                 ["population"      "Population"]
+                 ["stability"       "Stability"]
+                 ["fate"            "Fate"]
+                 ["scoring"         "Scoring"]]]
     [:div.mb-6
      (ui/section-label "CONTENTS")
      [:div.flex.flex-col.gap-0.5
@@ -231,7 +231,12 @@
 
 (defn- building-section [game]
   (section "building" "BUILDING" "one-time purchase costs"
-    (prose "Spend credits during the Building phase to grow your empire.")
+    (prose "Spend credits during the Building phase to purchase units and grow your empire.")
+    (prose
+      "The Projected Resources panel estimates your credits, food, and fuel at the "
+      "start of next turn, after income and expenses are applied to whatever you build. "
+      "It is an estimate that does not account for the outcomes of actions, espionage, "
+      "or population growth this turn, because those numbers aren't determined yet.")
     (guide-table
      ["Unit / Asset"  "Purchase Cost"]
      [["Soldier"       (v (ui/format-number (g game :game/soldier-cost   const/soldier-cost)))]
