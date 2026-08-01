@@ -276,6 +276,18 @@
       (let [remaining (- (.getTime (:unlock-at s)) (.getTime (java.util.Date.)))]
         (when (pos? remaining) remaining)))))
 
+(defn game-ended?
+  "Returns true when the game's scheduled end time has passed.
+  Takes `now` as an argument so the function stays pure and testable.
+
+  Guards against legacy game entities that predate the :game/scheduled-end-at field
+  (returns false rather than throwing a NullPointerException).
+
+  [game game-map, now inst] -> boolean"
+  [game now]
+  (let [end (:game/scheduled-end-at game)]
+    (boolean (and end (>= (.getTime now) (.getTime end))))))
+
 (defn display-turn-round
   "Return display values {:turn n :round n} for turn and round indicators.
   Derived from round-status — never reads the stored current-round, which prevents

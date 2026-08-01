@@ -243,6 +243,28 @@
   [:div.absolute.inset-0.pointer-events-none.z-10
    {:class "bg-[repeating-linear-gradient(to_bottom,transparent_0px,transparent_2px,rgba(0,0,0,0.07)_2px,rgba(0,0,0,0.07)_3px)]"}])
 
+(defn- day-segment
+  "Render the 'Day X/N' subtitle fragment with urgency colouring.
+  Yellow when 2 days remain; red when 1 or fewer days remain.
+
+  [game game-map] -> hiccup"
+  [game]
+  (let [day-ms      (* 24 60 60 1000)
+        now-ms      (.getTime (java.util.Date.))
+        ;; Day 1 is the day of creation; increment by 1 so the counter
+        ;; starts at 1 rather than 0.
+        current-day (inc (quot (- now-ms (.getTime (:game/created-at game))) day-ms))
+        total-days  (quot (- (.getTime (:game/scheduled-end-at game))
+                             (.getTime (:game/created-at game)))
+                          day-ms)
+        days-left   (- total-days current-day)
+        color       (cond
+                      (<= days-left 1) "text-red-400"
+                      (= days-left 2)  "text-yellow-400"
+                      :else            "text-game-green-soft")]
+    [:span {:class color}
+     (str "Day " current-day "/" total-days)]))
+
 (defn phase-topbar
   "Render the terminal-shell topbar with empire name, turn/round subtitle, and phase stepper.
 
@@ -257,7 +279,8 @@
        (:player/empire-name player)]
       [:div.text-sm.mt-px
        {:class "text-game-green-soft"}
-       (str phase-label " · Turn " turn "/" (:game/turns-per-round game)
+       phase-label " · " (day-segment game)
+       (str " · Turn " turn "/" (:game/turns-per-round game)
             " · Round " round "/" (:game/rounds-per-day game))]]
      (phase-stepper (:player/current-phase player))]))
 

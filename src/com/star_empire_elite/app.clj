@@ -220,14 +220,14 @@
       (let [game-id   (java.util.UUID/randomUUID)
             game-name (clojure.string/trim (or (:game-name params) ""))
             now       (java.util.Date.)
-            end-date  (java.util.Date. (+ (.getTime now) (* 30 24 60 60 1000)))]
+            end-date  (java.util.Date. (+ (.getTime now) (* const/game-duration-days 24 60 60 1000)))]
         (biff/submit-tx ctx
           [(merge {:db/doc-type           :game
                    :xt/id                 game-id
                    :game/name             game-name
                    :game/created-at       now
                    :game/scheduled-end-at end-date
-                   :game/status           0}
+                   :game/status           const/game-status-active}
                   game-defaults)])
         {:status 303
          :headers {"location" (str "/app/join-game/" game-id)}}))))
@@ -336,6 +336,7 @@
 ;;;;
 ;;;; The handler body uses `or` to short-circuit through checks in order:
 ;;;;  - validate-phase: redirects to the correct phase if the player isn't on this one
+;;;;  - game-ended check (income only): redirects to the overview when the game is over
 ;;;;  - cooldown check (income only): shows the waiting screen between rounds
 ;;;;  - the page function: renders the phase UI
 ;;;;
@@ -364,11 +365,14 @@
         {:href (str "/app/game/" (:xt/id player))} "Back to Overview"]])))
 
 (defn income-handler
-  "Phase 1 — income. Checks for a round cooldown before rendering; if the player
-  must wait before starting the next round, shows the waiting screen instead."
+  "Phase 1 — income. Checks game-over and round cooldown before rendering; redirects to
+  the game overview when the scheduled end has passed, or shows the waiting screen when
+  the player must wait before starting the next round."
   [ctx]
   (utils/with-player-and-game [player game player-id] ctx
     (or (utils/validate-phase player 1 player-id)
+        (when (utils/game-ended? game (java.util.Date.))
+          {:status 303 :headers {"location" (str "/app/game/" player-id)}})
         (when-let [remaining-ms (utils/round-cooldown-ms player game)]
           (cooldown-page {:player player :game game :remaining-ms remaining-ms}))
         (income/income-page {:player player :game game}))))

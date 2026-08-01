@@ -30,6 +30,7 @@
 (def turns-per-round      6)
 (def rounds-per-day       2)
 (def hours-between-rounds 2)
+(def game-duration-days   30)
 
 ;;;;
 ;;;; Combat Modes
@@ -187,6 +188,16 @@
 
 (def player-status-active     0)
 (def player-status-eliminated 1)
+
+;;;;
+;;;; Game Status
+;;;; game-status-ended is not yet used by any enforcement logic (game-over state is derived
+;;;; from :game/scheduled-end-at). It exists so create-game stops using a bare 0 and the
+;;;; vocabulary is in place for a future admin "end game" feature.
+;;;;
+
+(def game-status-active       0)
+(def game-status-ended        1)
 
 ;;;;
 ;;;; Upkeep / Expenses
