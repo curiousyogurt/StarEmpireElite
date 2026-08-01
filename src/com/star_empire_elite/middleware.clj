@@ -2,21 +2,29 @@
   (:require [com.biffweb :as biff]
             [muuntaja.middleware :as muuntaja]
             [ring.middleware.anti-forgery :as csrf]
-            [ring.middleware.defaults :as rd]))
+            [ring.middleware.defaults :as rd]
+            [xtdb.api :as xt]))
 
 (defn wrap-redirect-signed-in [handler]
-  (fn [{:keys [session] :as ctx}]
-    (if (some? (:uid session))
+  (fn [{:keys [session biff/db] :as ctx}]
+    ;; Only treat the session as valid if the user entity still exists in the DB.
+    ;; After a DB wipe the cookie UID is stale — clear it so the sign-in page works.
+    (if (and (some? (:uid session))
+             (some? (xt/entity db (:uid session))))
       {:status 303
        :headers {"location" "/app"}}
-      (handler ctx))))
+      (handler (update ctx :session dissoc :uid)))))
 
 (defn wrap-signed-in [handler]
-  (fn [{:keys [session] :as ctx}]
-    (if (some? (:uid session))
+  (fn [{:keys [session biff/db] :as ctx}]
+    ;; Verify the user entity exists, not just that the cookie has a UID.
+    ;; A stale UID (e.g. after a DB reset) would cause nil user lookups downstream.
+    (if (and (some? (:uid session))
+             (some? (xt/entity db (:uid session))))
       (handler ctx)
       {:status 303
-       :headers {"location" "/signin?error=not-signed-in"}})))
+       :headers {"location" "/signin?error=not-signed-in"}
+       :session (dissoc session :uid)})))
 
 ;; Stick this function somewhere in your middleware stack below if you want to
 ;; inspect what things look like before/after certain middleware fns run.

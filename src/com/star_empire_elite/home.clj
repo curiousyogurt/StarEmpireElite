@@ -165,20 +165,21 @@
        {:name         "email"
         :type         "email"
         :autocomplete "email"
-        :placeholder  "commander@galaxy.com"
+        :placeholder  "commander@bennington.edu"
         :class        input-cls}]]
 
-     (when-some [error (:error params)]
-       [:p.text-xs.text-red-400.mb-3
-        (case error
-          "recaptcha"     (str "You failed the recaptcha test. Try again, "
-                               "and make sure you aren't blocking scripts from Google.")
-          "invalid-email" "You must have a Bennington College email address to play. If you believe you should have access, contact the game administrator."
-          "send-failed"   (str "We weren't able to send an email to that address. "
-                               "If the problem persists, try another address.")
-          "invalid-link"  "Invalid or expired link. Sign in to get a new link."
-          "not-signed-in" "You must be signed in to view that page."
-          "There was an error.")])
+     (when-some [msg (case (:error params)
+                       "recaptcha"     (str "You failed the recaptcha test. Try again, "
+                                            "and make sure you aren't blocking scripts from Google.")
+                       "invalid-email" "You must have a Bennington College email address to play. If you believe you should have access, contact the game administrator."
+                       "send-failed"   (str "We weren't able to send an email to that address. "
+                                            "If the problem persists, try another address.")
+                       "invalid-link"  "Invalid or expired link. Sign in to get a new link."
+                       ;; not-signed-in: stale session redirect — show no error, just the form
+                       "not-signed-in" nil
+                       nil             nil
+                       "There was an error.")]
+       [:p.text-xs.text-red-400.mb-3 msg])
 
      [:button.g-recaptcha
       (merge {:type "submit" :class submit-cls}

@@ -130,7 +130,7 @@
         (ui/phase-action-bar
           (ui/action-bar-link "/app" "Back to Games")
           (ui/action-bar-link (str "/app/game/" (:xt/id player) "/news") "News")
-          (ui/action-bar-link (str "/app/game/" (:xt/id player) "/guide") "?")
+          (ui/action-bar-link (str "/app/game/" (:xt/id player) "/guide") "Guide")
           (cooldown-bar (:xt/id player) cooldown-ms
                         (utils/day-exhausted? player game)
                         (get-phase-url (:xt/id player) (:player/current-phase player))))))))
