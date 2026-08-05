@@ -37,11 +37,11 @@
     (is (= 100 (utils/parse-numeric-input 100)))))
 
 (deftest test-parse-numeric-input-overflow-protection
-  (testing "Very large inputs are capped at 1 billion to prevent long overflow"
-    (is (= 1000000000 (utils/parse-numeric-input "99999999999999999999999")))
-    (is (= 1000000000 (utils/parse-numeric-input "1000000001")))
-    (is (= 1000000000 (utils/parse-numeric-input 1000000000)))
-    (is (= 999999999  (utils/parse-numeric-input "999999999")))))
+  (testing "Inputs beyond 16 digits are trimmed; result is capped at max-input-value (1 quadrillion)"
+    (is (= 1000000000000000 (utils/parse-numeric-input "99999999999999999999999")))
+    (is (= 1000000001        (utils/parse-numeric-input "1000000001")))
+    (is (= 1000000000        (utils/parse-numeric-input 1000000000)))
+    (is (= 999999999         (utils/parse-numeric-input "999999999")))))
 
 ;;;;
 ;;;; validate-phase Tests
@@ -95,7 +95,7 @@
     (let [player {:player/rounds-started-today 4
                   :player/turns-used           0
                   :player/last-turn-at         (java.util.Date.)}
-          game   {:game/rounds-per-day 4 :game/hours-between-rounds 0}]
+          game   {:game/rounds-per-day 4 :game/minutes-between-rounds 0}]
       (is (true? (utils/day-exhausted? player game))))))
 
 (deftest test-day-exhausted-round-not-exceeded
@@ -103,7 +103,7 @@
     (let [player {:player/rounds-started-today 2
                   :player/turns-used           0
                   :player/last-turn-at         (java.util.Date.)}
-          game   {:game/rounds-per-day 4 :game/hours-between-rounds 0}]
+          game   {:game/rounds-per-day 4 :game/minutes-between-rounds 0}]
       (is (false? (utils/day-exhausted? player game))))))
 
 (deftest test-day-exhausted-no-completed-at
@@ -111,7 +111,7 @@
     (let [player {:player/rounds-started-today 0
                   :player/turns-used           0
                   :player/last-turn-at         nil}
-          game   {:game/rounds-per-day 4 :game/hours-between-rounds 0}]
+          game   {:game/rounds-per-day 4 :game/minutes-between-rounds 0}]
       (is (false? (utils/day-exhausted? player game))))))
 
 (deftest test-day-exhausted-completed-yesterday
@@ -120,7 +120,7 @@
           player    {:player/rounds-started-today 4
                      :player/turns-used           0
                      :player/last-turn-at         yesterday}
-          game      {:game/rounds-per-day 4 :game/hours-between-rounds 0}]
+          game      {:game/rounds-per-day 4 :game/minutes-between-rounds 0}]
       (is (false? (utils/day-exhausted? player game))))))
 
 ;;;;
@@ -133,7 +133,7 @@
                   :player/current-turn         3
                   :player/turns-used           2
                   :player/last-turn-at         (java.util.Date.)}
-          game   {:game/rounds-per-day 4 :game/hours-between-rounds 2}]
+          game   {:game/rounds-per-day 4 :game/minutes-between-rounds 120}]
       (is (nil? (utils/round-cooldown-ms player game))))))
 
 (deftest test-round-cooldown-nil-no-completed
@@ -142,7 +142,7 @@
                   :player/current-turn         1
                   :player/turns-used           0
                   :player/last-turn-at         nil}
-          game   {:game/rounds-per-day 4 :game/hours-between-rounds 2}]
+          game   {:game/rounds-per-day 4 :game/minutes-between-rounds 120}]
       (is (nil? (utils/round-cooldown-ms player game))))))
 
 (deftest test-round-cooldown-between-rounds-active
@@ -152,7 +152,7 @@
                     :player/current-turn         1
                     :player/turns-used           0
                     :player/last-turn-at         just-now}
-          game     {:game/rounds-per-day 4 :game/hours-between-rounds 24}]
+          game     {:game/rounds-per-day 4 :game/minutes-between-rounds 1440}]
       (is (pos? (utils/round-cooldown-ms player game))))))
 
 (deftest test-round-cooldown-between-rounds-expired
@@ -162,17 +162,17 @@
                     :player/current-turn         1
                     :player/turns-used           0
                     :player/last-turn-at         long-ago}
-          game     {:game/rounds-per-day 4 :game/hours-between-rounds 24}]
+          game     {:game/rounds-per-day 4 :game/minutes-between-rounds 1440}]
       (is (nil? (utils/round-cooldown-ms player game))))))
 
 (deftest test-round-cooldown-zero-hour-cooldown
-  (testing "Returns nil when hours-between-rounds is 0 regardless of when last completed"
+  (testing "Returns nil when minutes-between-rounds is 0 regardless of when last completed"
     (let [just-now (java.util.Date.)
           player   {:player/rounds-started-today 1
                     :player/current-turn         1
                     :player/turns-used           0
                     :player/last-turn-at         just-now}
-          game     {:game/rounds-per-day 4 :game/hours-between-rounds 0}]
+          game     {:game/rounds-per-day 4 :game/minutes-between-rounds 0}]
       (is (nil? (utils/round-cooldown-ms player game))))))
 
 (deftest test-round-cooldown-day-exhausted
@@ -181,7 +181,7 @@
                   :player/current-turn         1
                   :player/turns-used           0
                   :player/last-turn-at         (java.util.Date.)}
-          game   {:game/rounds-per-day 4 :game/hours-between-rounds 0}]
+          game   {:game/rounds-per-day 4 :game/minutes-between-rounds 0}]
       (is (pos? (utils/round-cooldown-ms player game))))))
 
 ;;;;
@@ -205,7 +205,7 @@
 ;;;;
 ;;;; round-status Tests
 ;;;;
-;;;; Constants for all tests: rounds-per-day=2, turns-per-round=6, hours-between-rounds=2.
+;;;; Constants for all tests: rounds-per-day=2, turns-per-round=6, minutes-between-rounds=120.
 ;;;; The pure round-status function is private; access via #'utils/round-status.
 ;;;;
 
@@ -255,15 +255,15 @@
       (is (= :active (:state s))))))
 
 (deftest test-rs-4-finished-round-spacing-not-elapsed
-  (testing "Case 4: Finished round 1, spacing not elapsed (30m < 2h)"
+  (testing "Case 4: Finished round 1, spacing not elapsed (30m < 120m)"
     (let [now (make-date 0 12 30)
           lta (make-date 0 12 0)
-          s   (rs 1 0 1 1 lta 2 6 2 now)]
+          s   (rs 1 0 1 1 lta 2 6 120 now)]
       (is (= 1 (:display-round s)))
       (is (= 6 (:display-turn  s)))
       (is (false? (:can-act? s)))
       (is (= :spacing (:state s)))
-      ;; unlock-at should be last-turn-at + 2h = 14:00
+      ;; unlock-at should be last-turn-at + 120m = 14:00
       (is (= (.getTime (make-date 0 14 0)) (.getTime (:unlock-at s)))))))
 
 (deftest test-rs-5-finished-round-spacing-elapsed
@@ -303,8 +303,8 @@
   (testing "Case 8: Dump attempt — spilled round just finished, spacing blocks"
     (let [now (make-date 1 0 3)
           lta (make-date 1 0 2)
-          ;; E=0 (fresh day), poised (turns-used=0), but spacing: 00:02+2h = 02:02
-          s   (rs 0 0 1 1 lta 2 6 2 now)]
+          ;; E=0 (fresh day), poised (turns-used=0), but spacing: 00:02+120m = 02:02
+          s   (rs 0 0 1 1 lta 2 6 120 now)]
       (is (= 1 (:display-round s)))
       (is (= 1 (:display-turn  s)))
       (is (false? (:can-act? s)))
@@ -316,13 +316,13 @@
   (testing "Case 9: Finished round 1 at 23:00, midnight passes, spacing still blocks"
     (let [now (make-date 1 0 10)
           lta (make-date 0 23 0)
-          ;; E resets to 0 (stale), budget has room, but spacing: 23:00+2h = 01:00
-          s   (rs 1 0 1 1 lta 2 6 2 now)]
+          ;; E resets to 0 (stale), budget has room, but spacing: 23:00+120m = 01:00
+          s   (rs 1 0 1 1 lta 2 6 120 now)]
       (is (= 1 (:display-round s)))
       (is (= 1 (:display-turn  s)))
       (is (false? (:can-act? s)))
       (is (= :spacing (:state s)))
-      ;; unlock-at = max(0, 23:00+2h) = 01:00 on day 1
+      ;; unlock-at = max(0, 23:00+120m) = 01:00 on day 1
       (is (= (.getTime (make-date 1 1 0)) (.getTime (:unlock-at s)))))))
 
 (deftest test-rs-10-lapsed-player-returns
@@ -386,13 +386,13 @@
       (is (= :budget-exhausted (:state s3))))))
 
 (deftest test-rs-property-i2-spacing
-  (testing "I2: Consecutive round-starts are never closer than hours-between-rounds"
-    ;; Finish round 1 at 10:00. Try to start round 2 at 11:00 (< 2h) and 12:01 (> 2h).
+  (testing "I2: Consecutive round-starts are never closer than minutes-between-rounds"
+    ;; Finish round 1 at 10:00. Try to start round 2 at 11:00 (< 120m) and 12:01 (> 120m).
     (let [lta     (make-date 0 10 0)
           too-soon (make-date 0 11 0)
           ok-time  (make-date 0 12 1)
-          s-soon  (rs 1 0 1 1 lta 2 6 2 too-soon)
-          s-ok    (rs 1 0 1 1 lta 2 6 2 ok-time)]
+          s-soon  (rs 1 0 1 1 lta 2 6 120 too-soon)
+          s-ok    (rs 1 0 1 1 lta 2 6 120 ok-time)]
       (is (false? (:can-act? s-soon)) "Must block before spacing elapses")
       (is (= :spacing (:state s-soon)))
       (is (true?  (:can-act? s-ok))   "Must allow after spacing elapses"))))
@@ -413,7 +413,7 @@
 ;;;;
 
 (def ^:private test-game-2r-4t {:game/rounds-per-day 2 :game/turns-per-round 4
-                                :game/hours-between-rounds 2})
+                                :game/minutes-between-rounds 120})
 
 (deftest test-display-turn-round-mid-round
   (testing "Returns current turn and round when actively in a round"
@@ -425,7 +425,7 @@
 
 (deftest test-display-turn-round-between-rounds
   (testing "Shows the COMPLETED round state when waiting between rounds"
-    ;; rounds-started-today=1, turns-used=0, last-turn-at=just now, spacing=2h
+    ;; rounds-started-today=1, turns-used=0, last-turn-at=just now, spacing=120m
     ;; → spacing gate blocks. Display: Turn 4/4 | Round 1/2.
     (let [ts     (java.util.Date.)
           player {:player/rounds-started-today 1 :player/current-turn 1

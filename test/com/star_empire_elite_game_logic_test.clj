@@ -28,7 +28,7 @@
                    :game/status 0
                    :game/turns-per-round 6
                    :game/rounds-per-day 4
-                   :game/hours-between-rounds 2
+                   :game/minutes-between-rounds 120
                    ;; Combat power constants
                    :game/soldier-power const/soldier-power
                    :game/fighter-power const/fighter-power

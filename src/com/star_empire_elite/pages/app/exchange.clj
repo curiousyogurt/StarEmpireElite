@@ -105,14 +105,14 @@
     :label "Command Ships"     :abbrev "Cmd Ships"        :field "cmd-ships-sold"
     :qty-key :cmd-ships-sold   :cost-key :cmd-ship-sell   :player-key :player/cmd-ships}
    {:group "Planets"
-    :label "Military Planets"  :abbrev "Mil Plts"         :field "mil-planets-sold"
-    :qty-key :mil-planets-sold :cost-key :mil-planet-sell :player-key :player/mil-planets}
+    :label "Ore Planets"       :abbrev "Ore Plts"         :field "ore-planets-sold"
+    :qty-key :ore-planets-sold :cost-key :ore-planet-sell :player-key :player/ore-planets}
    {:group "Planets"
     :label "Energy Planets"    :abbrev "Erg Plts"         :field "erg-planets-sold"
     :qty-key :erg-planets-sold :cost-key :erg-planet-sell :player-key :player/erg-planets}
    {:group "Planets"
-    :label "Ore Planets"       :abbrev "Ore Plts"         :field "ore-planets-sold"
-    :qty-key :ore-planets-sold :cost-key :ore-planet-sell :player-key :player/ore-planets}])
+    :label "Military Planets"  :abbrev "Mil Plts"         :field "mil-planets-sold"
+    :qty-key :mil-planets-sold :cost-key :mil-planet-sell :player-key :player/mil-planets}])
 
 (def sell-resource-rows
   [{:label "Food"        :abbrev "Food"           :field "food-sold"  :qty-key :food-sold 

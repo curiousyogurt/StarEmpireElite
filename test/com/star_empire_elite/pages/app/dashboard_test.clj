@@ -14,11 +14,11 @@
 (defn make-game
   ([turns-per-round rounds-per-day]
    (make-game turns-per-round rounds-per-day 0))
-  ([turns-per-round rounds-per-day hours-between-rounds]
+  ([turns-per-round rounds-per-day minutes-between-rounds]
    {:xt/id test-game-id
-    :game/turns-per-round      turns-per-round
-    :game/rounds-per-day       rounds-per-day
-    :game/hours-between-rounds hours-between-rounds}))
+    :game/turns-per-round        turns-per-round
+    :game/rounds-per-day         rounds-per-day
+    :game/minutes-between-rounds minutes-between-rounds}))
 
 ;; Minimal player map for display tests
 (defn make-player
@@ -84,11 +84,11 @@
 
 ;; Standard game fixture using real constants — tests that model actual game state
 ;; should use this so they stay correct if constants change.
-(def standard-game (make-game const/turns-per-round const/rounds-per-day 2))
+(def standard-game (make-game const/turns-per-round const/rounds-per-day const/minutes-between-rounds))
 
 (deftest test-format-turn-round-between-rounds
   (testing "After completing a round, shows completed round state until next round starts"
-    ;; rounds-started-today=1, turns-used=0, last-turn-at=just-now, hours-between-rounds=2
+    ;; rounds-started-today=1, turns-used=0, last-turn-at=just-now, minutes-between-rounds=120
     ;; → spacing gate blocks, display shows completed round 1 at max turn
     (is (= (str "Turn " const/turns-per-round "/" const/turns-per-round
                 " | Round 1/" const/rounds-per-day)

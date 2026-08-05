@@ -129,19 +129,24 @@
         ;; Sum absolute deltas across all targets for a single display number.
         total    (reduce (fn [acc [_k v]] (+ acc (Math/abs (long v)))) 0 effect)
         ;; Pick the resource label from the first (and usually only) target key.
-        res-name (case (ffirst effect)
-                   :player/food       "food"
-                   :player/credits    "credits"
-                   :player/population "population"
-                   ;; Solar flare hits multiple unit types — label them collectively.
-                   "units")]
+        first-key (ffirst effect)
+        res-name  (case first-key
+                    :player/food       "food"
+                    :player/credits    "credits"
+                    :player/population "population"
+                    ;; Solar flare hits multiple unit types — label them collectively.
+                    "units")
+        ;; Population is stored in millions; use format-population so "4" → "4M".
+        formatted (if (= first-key :player/population)
+                    (ui/format-population total)
+                    (ui/format-number total))]
     (if (= polarity :disaster)
       [:span {:class "text-red-400"}
        (empire-span name) " suffered a " label
-       " — lost " (ui/format-number total) " " res-name]
+       " — lost " formatted " " res-name]
       [:span {:class "text-green-400"}
        (empire-span name) " enjoyed a " label
-       " — gained " (ui/format-number total) " " res-name])))
+       " — gained " formatted " " res-name])))
 
 (defn- event-summary
   "Dispatch to the appropriate summary renderer for an event.

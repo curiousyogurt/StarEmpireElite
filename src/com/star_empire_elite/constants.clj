@@ -29,8 +29,8 @@
 
 (def turns-per-round      6)
 (def rounds-per-day       2)
-(def hours-between-rounds 2)
-(def game-duration-days   30)
+(def minutes-between-rounds 120)
+(def game-duration-days   6)
 
 ;;;;
 ;;;; Combat Modes
@@ -313,7 +313,7 @@
 ;;;; Probability and rank-tilt for disaster/boon events resolved at outcomes.
 ;;;; lo/hi are multipliers applied to a basis (holdings or one turn's production).
 
-(def fate-probability         0.95)  ; chance of a fate event each turn
+(def fate-probability         0.15)  ; chance of a fate event each turn
 (def fate-rank-tilt           0.4)   ; how much rank shifts disaster probability (leader ≈ 0.70, trailer ≈ 0.30)
 
 (def fate-drought-lo          0.75)  ; drought: fraction of one turn's food production lost

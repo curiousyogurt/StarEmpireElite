@@ -55,7 +55,9 @@
    :game/population-upkeep-fuel 0
    :game/expense-stability-penalty 0
    :game/turns-per-round        6
-   :game/rounds-per-day         2})
+   :game/rounds-per-day         2
+   :game/created-at             (java.util.Date. 0)
+   :game/scheduled-end-at       (java.util.Date. (* 7 24 60 60 1000))})
 
 (def test-player
   {:xt/id               test-player-id

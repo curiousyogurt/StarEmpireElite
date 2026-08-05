@@ -90,7 +90,7 @@
   affect games already in progress."
   {:game/turns-per-round               const/turns-per-round
    :game/rounds-per-day                const/rounds-per-day
-   :game/hours-between-rounds          const/hours-between-rounds
+   :game/minutes-between-rounds        const/minutes-between-rounds
    :game/raid-defense-multiplier       const/raid-defense-multiplier
    :game/raid-reward-multiplier        const/raid-reward-multiplier
    :game/invade-defense-multiplier     const/invade-defense-multiplier
@@ -360,7 +360,7 @@
          (utils/format-cooldown-duration remaining-ms)]
         [:p.text-sm (if day-exhausted? "Time remaining until midnight UTC" "Time remaining before next round")]
         (when-not day-exhausted?
-          [:p.text-xs.mt-2 (str "Minimum " (:game/hours-between-rounds game) " hours between rounds.")])]
+          [:p.text-xs.mt-2 (str "Minimum " (:game/minutes-between-rounds game) " minutes between rounds.")])]
        [:a.border.border-green-400.px-6.py-2.hover:bg-green-400.hover:bg-opacity-10.transition-colors
         {:href (str "/app/game/" (:xt/id player))} "Back to Overview"]])))
 

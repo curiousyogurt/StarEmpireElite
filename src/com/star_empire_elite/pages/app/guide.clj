@@ -148,7 +148,7 @@
       "Each round consists of " (v (g game :game/turns-per-round const/turns-per-round))
       " turns. There are " (v (g game :game/rounds-per-day const/rounds-per-day))
       " rounds per day, opening every "
-      (v (g game :game/hours-between-rounds const/hours-between-rounds)) " hours.")
+      (v (g game :game/minutes-between-rounds const/minutes-between-rounds)) " minutes.")
     (prose "Each turn you work through six sequential phases:")
     (guide-table
      ["#" "Phase" "What you decide"]

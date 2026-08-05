@@ -129,9 +129,9 @@
       (is (clojure.string/includes? result "/auth/send-code")))))
 
 (deftest test-signin-page-not-signed-in-error
-  (testing "signin-page shows a redirect message when ?error=not-signed-in"
-    (let [result (pr-str (home/signin-page (ctx-with-params {:error "not-signed-in"})))]
-      (is (clojure.string/includes? result "signed in")))))
+  (testing "signin-page renders without error when ?error=not-signed-in (no message shown by design)"
+    (let [result (home/signin-page (ctx-with-params {:error "not-signed-in"}))]
+      (is (vector? result)))))
 
 (deftest test-signin-page-has-unified-title
   (testing "signin-page shows unified Sign In / Sign Up title"

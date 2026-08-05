@@ -17,7 +17,7 @@
           [:game/status                    :int]
           [:game/turns-per-round           :int]
           [:game/rounds-per-day            :int]
-          [:game/hours-between-rounds      :int]
+          [:game/minutes-between-rounds    :int]
 
           ;; Expense underpayment penalty
           [:game/expense-stability-penalty    :int]

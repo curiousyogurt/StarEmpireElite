@@ -163,7 +163,7 @@
 
   Invariants enforced:
     I1  At most rounds-per-day round-starts per UTC day (budget).
-    I2  A new round may start only when now >= last-turn-at + hours-between-rounds (spacing).
+    I2  A new round may start only when now >= last-turn-at + minutes-between-rounds (spacing).
     I3  Once a round is started (turns-used > 0), every turn in it may be finished,
         even across UTC midnight (gentle spillover).
 
@@ -173,7 +173,7 @@
 
   [rounds-started-today int, turns-used int, current-turn int, current-phase int,
    last-turn-at Date|nil, rounds-per-day int, turns-per-round int,
-   hours-between-rounds number, now Date] -> status-map
+   minutes-between-rounds number, now Date] -> status-map
 
   Returns:
     {:display-round  int       ; round number to show in the UI
@@ -182,7 +182,7 @@
      :state          keyword   ; :active | :spacing | :budget-exhausted
      :unlock-at      Date|nil} ; when the block lifts (nil when :active)"
   [rounds-started-today turns-used current-turn current-phase
-   last-turn-at rounds-per-day turns-per-round hours-between-rounds now]
+   last-turn-at rounds-per-day turns-per-round minutes-between-rounds now]
   (let [;; Effective starts today: resets to 0 when last-turn-at is on a previous UTC day.
         ;; This is the budget counter — it tracks how many rounds the player has *started*
         ;; today. Stale means the day rolled over and the budget is fresh.
@@ -191,7 +191,7 @@
                       (or rounds-started-today 0))
         mid-round?  (pos? turns-used)
         poised?     (zero? turns-used)
-        spacing-ms  (* hours-between-rounds 60 60 1000)
+        spacing-ms  (* minutes-between-rounds 60 1000)
         ;; can-start? gates round-starts only (poised? = turns-used is 0).
         ;; Budget must have room AND the spacing cooldown must have elapsed.
         can-start?  (and poised?
@@ -248,7 +248,7 @@
                 (:player/last-turn-at player)
                 (or (:game/rounds-per-day game) 2)
                 (or (:game/turns-per-round game) 6)
-                (or (:game/hours-between-rounds game) 0)
+                (or (:game/minutes-between-rounds game) 0)
                 (java.util.Date.)))
 
 ;;;;
@@ -267,7 +267,7 @@
   "Returns ms remaining in cooldown if the player is blocked from starting a new round,
   or nil if the player can act now. Two blocking conditions:
     1. Budget exhausted: all rounds-per-day started today → blocked until midnight UTC.
-    2. Spacing: minimum hours-between-rounds since last turn.
+    2. Spacing: minimum minutes-between-rounds since last turn.
 
   [player player-map, game game-map] -> long|nil"
   [player game]

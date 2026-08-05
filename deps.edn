@@ -23,6 +23,7 @@
          :exec-fn cognitect.test-runner.api/test}
   :prod {:jvm-opts ["-XX:-OmitStackTraceInFastThrow"
                     "-XX:+CrashOnOutOfMemoryError"
+                    "-XX:+UseZGC"
                     "-Xms256m"
                     "-Xmx512m"
                     "-Dbiff.env.BIFF_PROFILE=prod"]
