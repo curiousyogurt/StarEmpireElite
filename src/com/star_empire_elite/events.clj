@@ -71,21 +71,24 @@
    meta {:keys [game-id turn round at]}]
   -> [attacker-event defender-event]"
   [result attacker-name meta]
-  (let [kind          (keyword (:op result))
-        attacker-base (merge (base-event meta kind :attacker-only)
-                             {:event/attacker      (->uuid (:attacker-id result))
-                              :event/attacker-name attacker-name
-                              :event/defender      (->uuid (:defender-id result))
-                              :event/defender-name (:defender-name result)
-                              :event/payload       (pr-str result)})
-        redacted      (dissoc result :attacker-id)
-        defender-base (merge (base-event meta kind :defender-only)
-                             {:event/attacker      nil
-                              :event/attacker-name nil
-                              :event/defender      (->uuid (:defender-id result))
-                              :event/defender-name (:defender-name result)
-                              :event/payload       (pr-str redacted)})]
-    [attacker-base defender-base]))
+  ;; Successful spy is silent — the attacker gained intel covertly, so no news entry.
+  (if (and (= (:op result) "spy") (:attacker-wins? result))
+    []
+    (let [kind          (keyword (:op result))
+          attacker-base (merge (base-event meta kind :attacker-only)
+                               {:event/attacker      (->uuid (:attacker-id result))
+                                :event/attacker-name attacker-name
+                                :event/defender      (->uuid (:defender-id result))
+                                :event/defender-name (:defender-name result)
+                                :event/payload       (pr-str result)})
+          redacted      (dissoc result :attacker-id)
+          defender-base (merge (base-event meta kind :defender-only)
+                               {:event/attacker      nil
+                                :event/attacker-name nil
+                                :event/defender      (->uuid (:defender-id result))
+                                :event/defender-name (:defender-name result)
+                                :event/payload       (pr-str redacted)})]
+      [attacker-base defender-base])))
 
 (defn event-of-breakaway
   "Construct a :public event from a stability breakaway result.

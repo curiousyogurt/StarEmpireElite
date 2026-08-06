@@ -129,24 +129,14 @@
    :intel          nil})
 
 (deftest test-event-of-espionage-result-spy
-  (let [[att def-evt] (events/event-of-espionage-result spy-result "Ironwall" meta-ctx)]
-    (testing "attacker event"
-      (is (= :spy            (:event/kind att)))
-      (is (= :attacker-only  (:event/visibility att)))
-      (is (= attacker-id     (:event/attacker att)))
-      (is (= "Ironwall"      (:event/attacker-name att)))
-      (is (= defender-id     (:event/defender att)))
-      (is (= "Crimson Hand"  (:event/defender-name att)))
-      (is (= spy-result      (read-string (:event/payload att)))))
-    (testing "defender event has attacker redacted"
-      (is (= :spy            (:event/kind def-evt)))
-      (is (= :defender-only  (:event/visibility def-evt)))
-      (is (nil?              (:event/attacker def-evt)))
-      (is (nil?              (:event/attacker-name def-evt)))
-      (is (= defender-id     (:event/defender def-evt)))
-      (let [payload (read-string (:event/payload def-evt))]
-        (is (nil? (:attacker-id payload)) "attacker-id redacted from defender payload")
-        (is (= "Crimson Hand" (:defender-name payload)))))))
+  (testing "successful spy produces no events (covert)"
+    (is (= [] (events/event-of-espionage-result spy-result "Ironwall" meta-ctx))))
+  (testing "failed spy produces attacker + defender events"
+    (let [[att def-evt] (events/event-of-espionage-result failed-spy-result "Ironwall" meta-ctx)]
+      (is (= :spy           (:event/kind att)))
+      (is (= :attacker-only (:event/visibility att)))
+      (is (= :spy           (:event/kind def-evt)))
+      (is (= :defender-only (:event/visibility def-evt))))))
 
 (deftest test-event-of-espionage-result-incite
   (let [[att _] (events/event-of-espionage-result incite-result "Ironwall" meta-ctx)]
@@ -221,7 +211,7 @@
 
 (deftest test-all-events-carry-meta-fields
   (let [events [(events/event-of-battle-result raid-result meta-ctx)
-                (first (events/event-of-espionage-result spy-result "Ironwall" meta-ctx))
+                (first (events/event-of-espionage-result failed-spy-result "Ironwall" meta-ctx))
                 (events/event-of-breakaway breakaway-result defender-id "Crimson Hand" meta-ctx)
                 (events/event-of-elimination defender-id "Crimson Hand" meta-ctx)]]
     (doseq [evt events]

@@ -68,7 +68,8 @@
                       :invade (if won? "invaded" "attempted to invade")
                       :raid   (if won? "raided" "attempted to raid")
                       :strike "launched a missile strike against")
-        outcome     (if won? " (SUCCESS)" " (FAILURE)")]
+        outcome     (when-not (= kind :strike)
+                      (if won? " (SUCCESS)" " (FAILURE)"))]
     (cond
       attacker? [:span "You " verb " " (empire-span def-name) outcome]
       defender? [:span (empire-span att-name) " " verb " you" outcome]
@@ -141,11 +142,9 @@
                     (ui/format-population total)
                     (ui/format-number total))]
     (if (= polarity :disaster)
-      [:span {:class "text-red-400"}
-       (empire-span name) " suffered a " label
+      [:span (empire-span name) " suffered a " label
        " — lost " formatted " " res-name]
-      [:span {:class "text-green-400"}
-       (empire-span name) " enjoyed a " label
+      [:span (empire-span name) " enjoyed a " label
        " — gained " formatted " " res-name])))
 
 (defn- event-summary
