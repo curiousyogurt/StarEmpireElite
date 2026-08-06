@@ -177,7 +177,10 @@
         [:feMerge
          [:feMergeNode {:in "blur"}]
          [:feMergeNode {:in "SourceGraphic"}]]]]
-      [:line {:x1 0 :y1 ly :x2 100 :y2 ly :stroke "#152a1e" :stroke-width "0.8"}]
+      ;; non-scaling-stroke keeps stroke widths in screen pixels under preserveAspectRatio="none",
+      ;; preventing the Y-axis squish from making horizontal lines sub-pixel invisible on mobile.
+      [:line {:x1 0 :y1 ly :x2 100 :y2 ly :stroke "#152a1e" :stroke-width "0.8"
+              :vector-effect "non-scaling-stroke"}]
       (when has-arrow?
         (let [[tip-x base-x line-x2]
               (if (= direction :gain)
@@ -189,7 +192,8 @@
                  (+ x-after (* 2.55 arrow-w))])]
           (list
             [:line {:x1 x-before :y1 ly :x2 line-x2 :y2 ly
-                    :stroke "#4ade80" :stroke-width "1.2"
+                    :stroke "#4ade80" :stroke-width "1.5"
+                    :vector-effect "non-scaling-stroke"
                     :filter (str "url(#" filter-id ")")}]
             [:polygon {:points (str tip-x "," ly " "
                                     base-x "," (- ly arrow-h) " "
@@ -197,7 +201,8 @@
                        :fill "#4ade80"
                        :filter (str "url(#" filter-id ")")}])))
       (for [x [0 25 50 75 100]]
-        [:line {:x1 x :y1 (+ ly 1) :x2 x :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"}])]
+        [:line {:x1 x :y1 (+ ly 1) :x2 x :y2 (+ ly 3) :stroke "#2a4a38" :stroke-width "0.6"
+                :vector-effect "non-scaling-stroke"}])]
      [:div.text-xs.text-gray-400.relative.mb-2
       {:class "h-[1em]"}
       [:span.absolute.left-0 "0"]
