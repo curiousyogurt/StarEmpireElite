@@ -98,6 +98,7 @@
    :game/combat-loss-floor             const/combat-loss-floor
    :game/combat-loser-cap              const/combat-loser-cap
    :game/combat-winner-max             const/combat-winner-max
+   :game/cmd-ship-loss-mult            const/cmd-ship-loss-mult
    :game/invade-planet-capture-cap     const/invade-planet-capture-cap
    :game/invade-resource-capture-cap   const/invade-resource-capture-cap
    :game/raid-planet-capture-cap       const/raid-planet-capture-cap
@@ -106,6 +107,7 @@
    :game/strike-max-dispatch           const/strike-max-dispatch
    :game/strike-interception-rate      const/strike-interception-rate
    :game/strike-interception-cap       const/strike-interception-cap
+   :game/strike-agent-mult             const/strike-agent-mult
    :game/defect-defense-multiplier     const/defect-defense-multiplier
    :game/defect-transfer-rate          const/defect-transfer-rate
    :game/general-mult-rate              const/general-mult-rate
@@ -114,6 +116,8 @@
    :game/admiral-mult-cap               const/admiral-mult-cap
    :game/agent-mult-rate                const/agent-mult-rate
    :game/agent-mult-cap                 const/agent-mult-cap
+   :game/cmd-ship-mult-rate             const/cmd-ship-mult-rate
+   :game/cmd-ship-mult-cap              const/cmd-ship-mult-cap
    :game/space-carryover                const/space-carryover
    :game/soldier-power                 const/soldier-power
    :game/fighter-power                 const/fighter-power

@@ -42,6 +42,7 @@
           [:game/combat-loss-floor           {:optional true} :double]
           [:game/combat-loser-cap            {:optional true} :double]
           [:game/combat-winner-max           {:optional true} :double]
+          [:game/cmd-ship-loss-mult          {:optional true} :double]
           [:game/invade-planet-capture-cap   {:optional true} :double]
           [:game/invade-resource-capture-cap {:optional true} :double]
           [:game/raid-planet-capture-cap     {:optional true} :double]
@@ -52,6 +53,7 @@
           [:game/strike-max-dispatch      {:optional true} :int]
           [:game/strike-interception-rate {:optional true} :double]
           [:game/strike-interception-cap  {:optional true} :double]
+          [:game/strike-agent-mult        {:optional true} :double]
 
           ;; Defect operation constants
           [:game/defect-defense-multiplier {:optional true} :double]
@@ -64,6 +66,8 @@
           [:game/admiral-mult-cap   {:optional true} :double]
           [:game/agent-mult-rate    {:optional true} :double]
           [:game/agent-mult-cap     {:optional true} :double]
+          [:game/cmd-ship-mult-rate {:optional true} :double]
+          [:game/cmd-ship-mult-cap  {:optional true} :double]
           [:game/space-carryover    {:optional true} :double]
 
           ;; Combat power constants

@@ -354,13 +354,16 @@
 
     (ui/section-label "LEADERSHIP MULTIPLIERS" "additive bonus on top of base 1.0")
     (prose
-      "Generals, admirals, and agents each add a percentage bonus to their respective phase. "
-      "Each bonus is individually capped; building beyond the cap gives no further advantage.")
+      "Generals, admirals, agents, and command ships each add a percentage bonus to their "
+      "respective phase. For command ships this stacks on top of the direct unit power they "
+      "also contribute (see Unit Power above). Each bonus is individually capped; building "
+      "beyond the cap gives no further advantage.")
     (guide-table
      ["Leader / Unit"  "Phase"   "Bonus per unit"                                                        "Cap"]
      [["General"        "Ground" (v (pct (g game :game/general-mult-rate const/general-mult-rate)))       (v (pct (g game :game/general-mult-cap const/general-mult-cap)))]
       ["Admiral"        "Space"  (v (pct (g game :game/admiral-mult-rate const/admiral-mult-rate)))       (v (pct (g game :game/admiral-mult-cap const/admiral-mult-cap)))]
-      ["Agent"          "Ground" (v (pct (g game :game/agent-mult-rate   const/agent-mult-rate)))         (v (pct (g game :game/agent-mult-cap   const/agent-mult-cap)))]])
+      ["Agent"          "Ground" (v (pct (g game :game/agent-mult-rate   const/agent-mult-rate)))         (v (pct (g game :game/agent-mult-cap   const/agent-mult-cap)))]
+      ["Command ship"   "Space"  (v (pct (g game :game/cmd-ship-mult-rate const/cmd-ship-mult-rate)))     (v (pct (g game :game/cmd-ship-mult-cap const/cmd-ship-mult-cap)))]])
     (prose
       "A decisive space victory carries over into the ground phase: winning space by a large margin "
       "adds up to " (v (pct (g game :game/space-carryover const/space-carryover)))
@@ -392,7 +395,12 @@
       "In an even fight both sides lose ~" (v (pct (g game :game/combat-loss-floor const/combat-loss-floor)))
       " of their forces. As the margin grows, the loser's losses climb toward "
       (v (pct (g game :game/combat-loser-cap const/combat-loser-cap)))
-      " while the winner's losses fall toward zero.")))
+      " while the winner's losses fall toward zero.")
+    (prose
+      "Command ships are the exception: being the most expensive unit in the game and held "
+      "in far smaller numbers, they take only "
+      (v (pct (g game :game/cmd-ship-loss-mult const/cmd-ship-loss-mult)))
+      " of the normal loss rate.")))
 
 ;;;;
 ;;;; Strikes
@@ -405,7 +413,12 @@
       "You dispatch up to " (v (g game :game/strike-max-dispatch const/strike-max-dispatch))
       " command ships. Each ship destroys "
       (v (pct (g game :game/strike-damage-rate const/strike-damage-rate)))
-      " of each defender military unit type (soldiers, transports, fighters, carriers, stations).")
+      " of each defender military unit type (soldiers, transports, generals, fighters, carriers, admirals, stations).")
+    (prose
+      "Agents are dug in and dispersed, so a strike destroys them at only "
+      (v (pct (g game :game/strike-agent-mult const/strike-agent-mult)))
+      " of the normal rate. A strike is the only military action that can touch agents at all — "
+      "invasions and raids never do (see Espionage for how agents are normally lost).")
     (prose
       "Defenders intercept with stations. Each station adds "
       (v (pct1 (g game :game/strike-interception-rate const/strike-interception-rate)))

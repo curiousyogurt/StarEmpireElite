@@ -52,7 +52,7 @@
 
 (def soldier-power   1)
 (def fighter-power   3)
-(def cmd-ship-power  20)
+(def cmd-ship-power  10)  ; also grants a capped space-power multiplier — see cmd-ship-mult-rate/cap
 (def station-power   5)  ; defender only
 (def general-power   5)
 (def admiral-power   10)
@@ -69,6 +69,12 @@
 (def combat-loss-floor  0.30)  ; both sides lose this fraction in an even fight
 (def combat-loser-cap   0.70)  ; loser's maximum loss rate at a blowout
 (def combat-winner-max  0.30)  ; winner's loss rate at margin 0, falling to ~0 at a blowout
+
+;; Command ships cost far more than any other unit (see cmd-ship-cost) and are held in
+;; small numbers, so the flat combat-loss-floor/loser-cap rates above would be
+;; disproportionately punishing. This multiplier scales their loss rate down relative
+;; to the rest of the space-phase force.
+(def cmd-ship-loss-mult 0.35)  ; cmd-ship loss rate = phase rate x this multiplier
 
 ;; Capture caps — per-mode maximum fraction of defender's planets/resources captured.
 ;; Actual capture = cap × ground-margin × defender-total, so narrow wins yield little.
@@ -91,6 +97,8 @@
 (def admiral-mult-cap   0.15)  ; max +15% (reached at 15 admirals)
 (def agent-mult-rate    0.005) ; +0.5% ground power per agent
 (def agent-mult-cap     0.10)  ; max +10% (reached at 20 agents)
+(def cmd-ship-mult-rate 0.02)  ; +2% space power per cmd-ship
+(def cmd-ship-mult-cap  0.30)  ; max +30% (reached at 15 cmd-ships)
 (def space-carryover    0.15)  ; winning space decisively adds up to +15% to ground power
 
 ;;;;
@@ -274,6 +282,9 @@
 (def strike-max-dispatch      15)    ; max cmd-ships dispatched per strike; rest stay in reserve
 (def strike-interception-rate 0.001) ; per-station contribution to interception chance per cmd-ship
 (def strike-interception-cap  0.20)  ; maximum per-cmd-ship interception chance regardless of stations
+;; Agents are dug in and dispersed, unlike massed soldiers/fighters, so a strike destroys
+;; them at only a fraction of the rate it destroys other unit types.
+(def strike-agent-mult        0.35)  ; agent loss rate = damage-rate x this multiplier
 
 ;;;;
 ;;;; Defect Operation

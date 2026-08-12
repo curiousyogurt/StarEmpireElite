@@ -420,7 +420,8 @@
                            "−" (ui/format-number intercepted)])]
         dl             (or defender-losses {})
         unit-pairs     [["soldiers" (:soldiers dl)] ["transports" (:transports dl)]
-                        ["fighters" (:fighters dl)] ["stations"   (:stations   dl)]]
+                        ["fighters" (:fighters dl)] ["stations"   (:stations   dl)]
+                        ["agents"   (:agents   dl)]]
         summary-text   (let [destroyed (destroyed-units-text unit-pairs)]
                          (if stations-mine?
                            destroyed
@@ -435,7 +436,8 @@
                         ["fighters"   dash (opp-loss-cell (:fighters   dl))]
                         ["carriers"   dash (opp-loss-cell (:carriers   dl))]
                         ["admirals"   dash (opp-loss-cell (:admirals   dl))]
-                        ["def stns"   dash (opp-loss-cell (:stations   dl))]]]
+                        ["def stns"   dash (opp-loss-cell (:stations   dl))]
+                        ["agents"     dash (opp-loss-cell (:agents     dl))]]]
     (collapsible-card
       {:badge         (ui/mode-badge :strike)
        :summary       (if stations-mine?

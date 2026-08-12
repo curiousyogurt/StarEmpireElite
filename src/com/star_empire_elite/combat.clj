@@ -80,13 +80,17 @@
 ;;;;
 
 (defn- space-multiplier
-  "Compute the space-phase power multiplier: 1.0 + capped admiral bonus.
+  "Compute the space-phase power multiplier: 1.0 + capped admiral bonus + capped cmd-ship bonus.
+  Cmd-ships also contribute raw power via base-power — this is their command-coordination
+  bonus on top of that, capped so it plateaus rather than snowballing with fleet size.
 
   [game game-map, forces force-map] -> double"
   [game forces]
   (+ 1.0
      (min (:game/admiral-mult-cap game)
-          (* (get forces :admirals 0) (:game/admiral-mult-rate game)))))
+          (* (get forces :admirals 0) (:game/admiral-mult-rate game)))
+     (min (:game/cmd-ship-mult-cap game)
+          (* (get forces :cmd-ships 0) (:game/cmd-ship-mult-rate game)))))
 
 (defn- ground-multiplier
   "Compute the ground-phase power multiplier: 1.0 + capped general bonus + capped agent bonus.
@@ -156,6 +160,15 @@
   [forces force-map, rate double] -> losses-map"
   [forces rate]
   (into {} (map (fn [[k v]] [k (max 0 (long (* v rate)))]) forces)))
+
+(defn- cmd-ship-losses
+  "Apply the dampened cmd-ship loss rate (phase rate x cmd-ship-loss-mult), flooring at 0.
+  Command ships cost far more than any other unit and are held in small numbers, so they
+  are exempted from the flat per-phase rate the rest of the space force takes.
+
+  [forces force-map, rate double, mult double] -> long"
+  [forces rate mult]
+  (max 0 (long (* (get forces :cmd-ships 0) rate mult))))
 
 (defn- select-planets
   "Randomly select n planets from the defender's pool, returning a {:mil n :erg n :ore n} map of how
@@ -232,14 +245,18 @@
         winner-max  (or (:game/combat-winner-max game) const/combat-winner-max)
         loser-rate  (fn [m] (min loser-cap (+ loss-floor (* (- loser-cap loss-floor) m))))
         winner-rate (fn [m] (* winner-max (- 1.0 m)))
+        cmd-ship-mult (or (:game/cmd-ship-loss-mult game) const/cmd-ship-loss-mult)
 
-        ;; Space-phase losses
+        ;; Space-phase losses. Cmd-ships still count toward space power/margin above,
+        ;; but take a dampened share of the phase's loss rate (see cmd-ship-losses).
         space-att-wins?    (:att-wins? space-result)
         att-space-rate     (if space-att-wins? (winner-rate space-margin) (loser-rate space-margin))
         def-space-rate     (if space-att-wins? (loser-rate space-margin) (winner-rate space-margin))
         def-space-engaged  (update-vals def-space #(long (* engagement %)))
-        att-space-losses   (phase-losses att-space att-space-rate)
-        def-space-losses   (phase-losses def-space-engaged def-space-rate)
+        att-space-losses   (assoc (phase-losses att-space att-space-rate)
+                                  :cmd-ships (cmd-ship-losses att-space att-space-rate cmd-ship-mult))
+        def-space-losses   (assoc (phase-losses def-space-engaged def-space-rate)
+                                  :cmd-ships (cmd-ship-losses def-space-engaged def-space-rate cmd-ship-mult))
 
         ;; Ground-phase losses (agents excluded — they don't take combat losses)
         att-ground-combat  (dissoc att-ground :agents)
@@ -326,14 +343,16 @@
 (defn resolve-strike
   "Resolve a standoff strike: the attacker dispatches up to strike-max-dispatch cmd-ships, each
   destroying strike-damage-rate of the defender's non-station military. Dispatched ships may be
-  intercepted independently by the defender's stations. No planet capture or resource theft.
-  UUIDs stored as strings for safe pr-str round-trip.
+  intercepted independently by the defender's stations. Agents are dug in and dispersed, so they
+  take losses at only strike-agent-mult of the normal damage rate. No planet capture or resource
+  theft. UUIDs stored as strings for safe pr-str round-trip.
   [game game-map, attacker player-map, defender player-map] -> result-map"
   [game attacker defender]
   (let [damage-rate-per-ship (:game/strike-damage-rate       game)
         max-dispatch         (:game/strike-max-dispatch      game)
         interception-rate    (:game/strike-interception-rate game)
         interception-cap     (:game/strike-interception-cap  game)
+        agent-mult           (:game/strike-agent-mult        game)
         committed            (:player/cmd-ships attacker)
         dispatched           (min max-dispatch committed)
         intercept-chance     (min interception-cap (* (:player/stations defender) interception-rate))
@@ -353,14 +372,15 @@
      :damage-rate         damage-rate
      :defender-losses     (if (zero? committed)
                             {:soldiers 0 :transports 0 :generals 0
-                             :fighters 0 :carriers 0  :admirals 0 :stations 0}
+                             :fighters 0 :carriers 0  :admirals 0 :stations 0 :agents 0}
                             {:soldiers   (long (* damage-rate (:player/soldiers   defender)))
                              :transports (long (* damage-rate (:player/transports defender)))
                              :generals   (long (* damage-rate (:player/generals   defender)))
                              :fighters   (long (* damage-rate (:player/fighters   defender)))
                              :carriers   (long (* damage-rate (:player/carriers   defender)))
                              :admirals   (long (* damage-rate (:player/admirals   defender)))
-                             :stations   (long (* damage-rate (:player/stations   defender)))})}))
+                             :stations   (long (* damage-rate (:player/stations   defender)))
+                             :agents     (long (* damage-rate agent-mult (:player/agents defender)))})}))
 
 
 ;;;;

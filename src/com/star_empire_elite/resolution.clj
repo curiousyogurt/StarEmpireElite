@@ -123,7 +123,8 @@
                   def-fighters   (max 0 (- (:player/fighters   defender) (:fighters   dl)))
                   def-carriers   (max 0 (- (:player/carriers   defender) (:carriers   dl)))
                   def-admirals   (max 0 (- (:player/admirals   defender) (:admirals   dl)))
-                  def-stations   (max 0 (- (:player/stations   defender) (:stations   dl)))]
+                  def-stations   (max 0 (- (:player/stations   defender) (:stations   dl)))
+                  def-agents     (max 0 (- (:player/agents     defender) (:agents     dl)))]
               (biff/submit-tx
                 ctx
                 [{:db/doc-type :player :db/op :update :xt/id player-id
@@ -139,13 +140,15 @@
                   :player/carriers   def-carriers
                   :player/admirals   def-admirals
                   :player/stations   def-stations
+                  :player/agents     def-agents
                   :player/score      (utils/calculate-score
                                        (assoc defender
                                          :player/soldiers   def-soldiers
                                          :player/generals   def-generals
                                          :player/fighters   def-fighters
                                          :player/admirals   def-admirals
-                                         :player/stations   def-stations))
+                                         :player/stations   def-stations
+                                         :player/agents     def-agents))
                   :player/incoming-attacks
                   (conj (or (:player/incoming-attacks defender) []) (pr-str result))}])
               [result (assoc player :player/cmd-ships att-cmd-ships)])
