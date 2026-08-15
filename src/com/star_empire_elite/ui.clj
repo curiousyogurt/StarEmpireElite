@@ -403,10 +403,9 @@
   [mode]
   (let [[text cls] (case mode
                      (:bomb :spy :incite :defect) ["ESPIONAGE" "border-[#fbbf24] text-[#fbbf24]"]
-                     :stability                   ["STABILITY" "border-[#facc15] text-[#facc15]"]
+                     (:stability :breakaway)      ["STABILITY" "border-[#facc15] text-[#facc15]"]
                      :growth                      ["GROWTH"    "border-[#4ade80] text-[#4ade80]"]
-                     (:breakaway :elimination
-                      :event)                     ["EVENT"     "border-[#9ca3af] text-[#9ca3af]"]
+                     (:elimination :event)        ["EVENT"     "border-[#9ca3af] text-[#9ca3af]"]
                      ;; Both polarities share one badge; summary text and color carry the good/bad signal.
                      (:disaster :boon)            ["FATE"      "border-[#a78bfa] text-[#a78bfa]"]
                                                   ["ACTION"    "border-[#f87171] text-[#f87171]"])]
