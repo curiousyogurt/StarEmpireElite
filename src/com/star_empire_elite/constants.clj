@@ -27,10 +27,10 @@
 ;;;; Turn Structure
 ;;;;
 
-(def turns-per-round      6)
-(def rounds-per-day       2)
+(def turns-per-round        6)
+(def rounds-per-day         2)
 (def minutes-between-rounds 120)
-(def game-duration-days   6)
+(def game-duration-days     7)
 
 ;;;;
 ;;;; Combat Modes
