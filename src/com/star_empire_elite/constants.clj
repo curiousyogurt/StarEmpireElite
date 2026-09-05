@@ -324,25 +324,34 @@
 ;;;; Probability and rank-tilt for disaster/boon events resolved at outcomes.
 ;;;; lo/hi are multipliers applied to a basis (holdings or one turn's production).
 
-(def fate-probability         0.15)  ; chance of a fate event each turn
+(def fate-probability         0.95)  ; chance of a fate event each turn
 (def fate-rank-tilt           0.4)   ; how much rank shifts disaster probability (leader ≈ 0.70, trailer ≈ 0.30)
 
 (def fate-drought-lo          0.75)  ; drought: fraction of one turn's food production lost
 (def fate-drought-hi          1.25)
-(def fate-pirate-raid-lo      0.10)  ; pirate raid: fraction of credit holdings stolen
-(def fate-pirate-raid-hi      0.20)
+(def fate-pirate-raid-lo      0.25)  ; pirate raid: fraction of one turn's credit production lost
+(def fate-pirate-raid-hi      0.50)
 (def fate-solar-flare-lo      0.08)  ; solar flare: fraction of each unit type destroyed
 (def fate-solar-flare-hi      0.15)
 (def fate-plague-lo           0.05)  ; plague: fraction of population lost
 (def fate-plague-hi           0.12)
+(def fate-reactor-breach-lo   0.25)  ; reactor breach: fraction of one turn's fuel production lost
+(def fate-reactor-breach-hi   0.50)
 (def fate-bumper-harvest-lo   0.75)  ; bumper harvest: fraction of one turn's food production gained
 (def fate-bumper-harvest-hi   1.25)
 (def fate-gold-rush-lo        0.50)  ; gold rush: fraction of one turn's credit production gained
 (def fate-gold-rush-hi        1.00)
-(def fate-foreign-aid-lo      0.40)  ; foreign aid: fraction of one turn's credit production gained
-(def fate-foreign-aid-hi      0.80)
+(def fate-lottery-win-lo      0.40)  ; lottery win: fraction of one turn's credit production gained
+(def fate-lottery-win-hi      0.80)
 (def fate-migration-wave-lo   0.05)  ; migration wave: fraction of current population gained
 (def fate-migration-wave-hi   0.10)
+(def fate-reactor-surge-lo    0.50)  ; reactor surge: fraction of one turn's fuel production gained
+(def fate-reactor-surge-hi    1.00)
+
+;; A credit/food/fuel disaster is sized to production, but can only collect what's currently held.
+;; Whatever it couldn't collect (because the player already spent it down) spills into a
+;; stability penalty instead of being forgiven — this is the max spill, at 100% uncollected.
+(def fate-uncollected-stability-penalty 10)
 
 ;;;;
 ;;;; Score Weights

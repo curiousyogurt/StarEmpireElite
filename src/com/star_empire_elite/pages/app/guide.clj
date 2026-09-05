@@ -519,16 +519,23 @@
        [:tbody
         [:tr [:td {:colspan 3 :class sub-hdr-cls} "Disasters"]]
         (data-rows
-         [(fate-row "Drought"     "Food"       "one turn's food production" const/fate-drought-lo       const/fate-drought-hi)
-          (fate-row "Pirate Raid" "Credits"    "current credit holdings"    const/fate-pirate-raid-lo   const/fate-pirate-raid-hi)
-          (fate-row "Solar Flare" "Units"      "each unit type's holdings"  const/fate-solar-flare-lo   const/fate-solar-flare-hi)
-          (fate-row "Plague"      "Population" "current population"         const/fate-plague-lo        const/fate-plague-hi)])
+         [(fate-row "Drought"        "Food"       "one turn's food production"   const/fate-drought-lo        const/fate-drought-hi)
+          (fate-row "Pirate Raid"    "Credits"    "one turn's credit production" const/fate-pirate-raid-lo    const/fate-pirate-raid-hi)
+          (fate-row "Reactor Breach" "Fuel"       "one turn's fuel production"   const/fate-reactor-breach-lo const/fate-reactor-breach-hi)
+          (fate-row "Solar Flare"    "Units"      "each unit type's holdings"    const/fate-solar-flare-lo    const/fate-solar-flare-hi)
+          (fate-row "Plague"         "Population" "current population"           const/fate-plague-lo         const/fate-plague-hi)])
         [:tr [:td {:colspan 3 :class sub-hdr-cls} "Boons"]]
         (data-rows
          [(fate-row "Bumper Harvest" "Food"       "one turn's food production"    const/fate-bumper-harvest-lo  const/fate-bumper-harvest-hi)
           (fate-row "Gold Rush"      "Credits"    "one turn's credit production"  const/fate-gold-rush-lo       const/fate-gold-rush-hi)
-          (fate-row "Foreign Aid"    "Credits"    "one turn's credit production"  const/fate-foreign-aid-lo     const/fate-foreign-aid-hi)
+          (fate-row "Lottery Win"    "Credits"    "one turn's credit production"  const/fate-lottery-win-lo     const/fate-lottery-win-hi)
+          (fate-row "Reactor Surge"  "Fuel"       "one turn's fuel production"    const/fate-reactor-surge-lo   const/fate-reactor-surge-hi)
           (fate-row "Migration Wave" "Population" "current population"            const/fate-migration-wave-lo  const/fate-migration-wave-hi)])]]
+      (prose
+        "Drought, Pirate Raid, and Reactor Breach can never take more food, credits, or fuel "
+        "than you actually have. But spending down before Outcomes doesn't dodge the disaster — "
+        "whatever portion couldn't be collected instead costs you stability, up to "
+        (v (str (long const/fate-uncollected-stability-penalty) "%")) ".")
       (prose "Fate events are visible to all players in the News feed. "))))
 
 ;;;;

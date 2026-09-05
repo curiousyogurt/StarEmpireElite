@@ -531,8 +531,9 @@
               [nil player])
           ;; Event triggered — apply each delta, clamp to zero, update player.
           (let [effect      (:effect result)
+                spill       (:stability-spill result 0)
                 total-planets-now total-planets
-                new-player
+                resourced-player
                 (reduce (fn [p [k delta]]
                           (let [cur (get p k 0)
                                 raw (max 0 (+ cur delta))
@@ -543,12 +544,18 @@
                             (assoc p k (long new))))
                         player
                         effect)
+                ;; Whatever the disaster couldn't collect (already spent down) costs stability
+                ;; instead of being forgiven — see fate/entry-stability-spill.
+                new-player
+                (if (pos? spill)
+                  (update resourced-player :player/stability #(max 0 (- (or % 0) spill)))
+                  resourced-player)
                 updates (into {:db/doc-type             :player
                                :db/op                   :update
                                :xt/id                   player-id
                                :player/last-fate-result (pr-str result)}
-                              (for [[k _] effect]
-                                [k (get new-player k)]))]
+                              (cond-> (for [[k _] effect] [k (get new-player k)])
+                                (pos? spill) (conj [:player/stability (:player/stability new-player)])))]
             (biff/submit-tx ctx [updates])
             [result new-player]))))))
 
@@ -616,11 +623,12 @@
                          breakaway-result player-id
                          (:player/empire-name player) event-meta))
 
-                 ;; Only record a fate event when the effect is non-zero.
-                 ;; A zero-delta roll (e.g. empty holdings) produces no news.
+                 ;; Only record a fate event when the effect is non-zero, or when a dodged
+                 ;; disaster still spilled into a stability penalty.
                  (and fate-result (not fate-cached?)
-                      (pos? (reduce (fn [acc [_k v]] (+ acc (Math/abs (long v)))) 0
-                                    (:effect fate-result))))
+                      (or (pos? (reduce (fn [acc [_k v]] (+ acc (Math/abs (long v)))) 0
+                                        (:effect fate-result)))
+                          (pos? (:stability-spill fate-result 0))))
                  (conj (events/event-of-fate
                          fate-result player-id
                          (:player/empire-name player) event-meta))

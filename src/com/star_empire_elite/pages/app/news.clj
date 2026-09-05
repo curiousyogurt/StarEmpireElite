@@ -117,9 +117,9 @@
 (defn- fate-summary
   "Verb phrase for disaster/boon events.
 
-  For single-target fates (drought, pirate raid, plague, bumper harvest, gold rush,
-  foreign aid, migration wave) we show the one delta. For multi-target solar flare
-  we sum the absolute losses across all targets.
+  For single-target fates (drought, pirate raid, reactor breach, plague, bumper harvest,
+  gold rush, lottery win, reactor surge, migration wave) we show the one delta. For
+  multi-target solar flare we sum the absolute losses across all targets.
 
   [payload map, empire-name string] -> hiccup-fragment"
   [payload empire-name]
@@ -134,6 +134,7 @@
         res-name  (case first-key
                     :player/food       "food"
                     :player/credits    "credits"
+                    :player/fuel       "fuel"
                     :player/population "population"
                     ;; Solar flare hits multiple unit types — label them collectively.
                     "units")

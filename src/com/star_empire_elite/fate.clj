@@ -37,7 +37,7 @@
     :label    "Pirate Raid"
     :polarity :disaster
     :targets  [:player/credits]
-    :basis    :holdings
+    :basis    :production
     :lo       const/fate-pirate-raid-lo
     :hi       const/fate-pirate-raid-hi}
    {:type     :solar-flare
@@ -54,6 +54,13 @@
     :basis    :holdings
     :lo       const/fate-plague-lo
     :hi       const/fate-plague-hi}
+   {:type     :reactor-breach
+    :label    "Reactor Breach"
+    :polarity :disaster
+    :targets  [:player/fuel]
+    :basis    :production
+    :lo       const/fate-reactor-breach-lo
+    :hi       const/fate-reactor-breach-hi}
    {:type     :bumper-harvest
     :label    "Bumper Harvest"
     :polarity :boon
@@ -68,20 +75,27 @@
     :basis    :production
     :lo       const/fate-gold-rush-lo
     :hi       const/fate-gold-rush-hi}
-   {:type     :foreign-aid
-    :label    "Foreign Aid"
+   {:type     :lottery-win
+    :label    "Lottery Win"
     :polarity :boon
     :targets  [:player/credits]
     :basis    :production
-    :lo       const/fate-foreign-aid-lo
-    :hi       const/fate-foreign-aid-hi}
+    :lo       const/fate-lottery-win-lo
+    :hi       const/fate-lottery-win-hi}
    {:type     :migration-wave
     :label    "Migration Wave"
     :polarity :boon
     :targets  [:player/population]
     :basis    :holdings
     :lo       const/fate-migration-wave-lo
-    :hi       const/fate-migration-wave-hi}])
+    :hi       const/fate-migration-wave-hi}
+   {:type     :reactor-surge
+    :label    "Reactor Surge"
+    :polarity :boon
+    :targets  [:player/fuel]
+    :basis    :production
+    :lo       const/fate-reactor-surge-lo
+    :hi       const/fate-reactor-surge-hi}])
 
 ;;;;
 ;;;; Pure Helpers
@@ -112,7 +126,8 @@
 
 (defn- production-basis
   "Compute one turn's production for the given resource key, mirroring the arithmetic
-  in income/calculate-income. Only :player/food and :player/credits have production bases.
+  in income/calculate-income. Only :player/food, :player/credits, and :player/fuel have
+  production bases.
 
   [target-key keyword, player player-map, game game-map] -> number"
   [target-key player game]
@@ -123,6 +138,9 @@
     :player/credits
     (+ (* (:player/ore-planets player 0) (:game/ore-planet-credits game 0))
        (* (:player/population  player 0) (:game/population-tax-credits game 0)))
+
+    :player/fuel
+    (* (:player/erg-planets player 0) (:game/erg-planet-fuel game 0))
 
     ;; Fallback: unreachable for valid catalog entries, but safe.
     0))
@@ -138,6 +156,33 @@
     (case polarity
       :disaster (- (min raw (long holding)))
       :boon     (+ raw))))
+
+;;; Credits, food, and fuel are the resources a player can spend down to ~0 before Outcomes
+;;; resolves (via Expenses/Exchange/Building), which is exactly what entry-delta's holding
+;;; cap above would otherwise let them dodge a disaster with. For those keys only, any
+;;; portion of the disaster that couldn't be collected (because the holding was too low)
+;;; spills into a stability penalty instead of simply being forgiven.
+(def ^:private spillable-keys #{:player/credits :player/food :player/fuel})
+
+(defn- entry-stability-spill
+  "Compute the stability penalty for the portion of a credit/food/fuel disaster that couldn't be
+  collected because the player had already spent the resource down.
+  Zero for boons, for non-spillable targets, and when the disaster is fully collectable.
+  Scales linearly from 0 (fully paid) to fate-uncollected-stability-penalty (fully dodged).
+
+  [polarity keyword, target-key keyword, basis number, mult double, holding number] -> long"
+  [polarity target-key basis mult holding]
+  (if (or (not= polarity :disaster)
+          (not (spillable-keys target-key))
+          (<= basis 0))
+    0
+    (let [raw       (Math/round ^double (* mult (double basis)))
+          collected (min raw (long holding))
+          shortfall (- raw collected)]
+      (if (or (zero? shortfall) (zero? raw))
+        0
+        (Math/round ^double (* (/ (double shortfall) (double raw))
+                                const/fate-uncollected-stability-penalty))))))
 
 ;;;;
 ;;;; Main Roll
@@ -156,8 +201,9 @@
     4. Draw polarity: :disaster if draw < p-disaster, else :boon.
     5. Pick a catalog entry uniformly from entries of that polarity.
     6. Draw a multiplier uniformly from [lo, hi].
-    7. Compute a signed delta per target key (holdings- or production-based).
-    8. Return {:type :polarity :label :effect}.
+    7. Compute a signed delta per target key (holdings- or production-based), plus any
+       stability spill for credit/food/fuel targets the player couldn't fully pay.
+    8. Return {:type :polarity :label :effect :stability-spill}.
 
   [player player-map, game game-map, active [player-map], rng fn] -> result-map | nil"
   [player game active rng]
@@ -174,16 +220,21 @@
           entry      (nth entries (int (* (rng) (count entries))))
           ;; Step 6 — multiplier drawn uniformly from [lo, hi].
           mult       (+ (:lo entry) (* (rng) (- (:hi entry) (:lo entry))))
-          ;; Step 7 — compute one signed delta per target key.
+          ;; Step 7 — compute one signed delta (and any stability spill) per target key.
+          bases      (into {}
+                       (for [k (:targets entry)]
+                         [k (if (= (:basis entry) :production)
+                              (production-basis k player game)
+                              (get player k 0))]))
           effect     (into {}
                        (for [k (:targets entry)]
-                         (let [basis (if (= (:basis entry) :production)
-                                       (production-basis k player game)
-                                       (get player k 0))
-                               delta (entry-delta polarity basis mult (get player k 0))]
-                           [k delta])))]
+                         [k (entry-delta polarity (get bases k) mult (get player k 0))]))
+          spill      (reduce + 0
+                       (for [k (:targets entry)]
+                         (entry-stability-spill polarity k (get bases k) mult (get player k 0))))]
       ;; Step 8 — assemble result map.
-      {:type     (:type entry)
-       :polarity polarity
-       :label    (:label entry)
-       :effect   effect})))
+      {:type            (:type entry)
+       :polarity        polarity
+       :label           (:label entry)
+       :effect          effect
+       :stability-spill spill})))

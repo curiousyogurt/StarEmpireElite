@@ -240,10 +240,11 @@
                             0 fate-effect)
         fate-food   (get fate-effect :player/food       0)
         fate-credits(get fate-effect :player/credits    0)
+        fate-fuel   (get fate-effect :player/fuel       0)
         fate-pop    (get fate-effect :player/population 0)]
     {:units-lost (+ units-lost fate-units)
      :ore ore :erg erg :mil mil
-     :credits (+ credits fate-credits) :food (+ food fate-food) :fuel fuel
+     :credits (+ credits fate-credits) :food (+ food fate-food) :fuel (+ fuel fate-fuel)
      :stability (- stab-gain stab-loss)
      :population (+ (or pop-growth 0) fate-pop)
      :agents (+ (- esp-lost) esp-gained esp-defect (- in-defected))}))
@@ -279,7 +280,7 @@
                      [:span.inline-flex.items-center.gap-1
                       [:span.text-game-green-muted "POP"]
                       [:span {:class (if (neg? pop) "text-red-400" "text-green-400")}
-                       (str (if (pos? pop) "+" "–") (ui/format-population (Math/abs pop)))]]))
+                       (str (if (pos? pop) "+" "–") (ui/format-population (Math/abs pop)) "M")]]))
 
                  (delta-pill "AGENTS" (:agents summary))])]
     (when (seq pills)
@@ -529,26 +530,45 @@
 (defn- fate-card
   "Render a collapsible card for a fate event (disaster or boon).
   Defaults open for disasters (player needs to see bad news); collapsed for boons.
-  Returns nil when the total effect is zero (e.g. disaster on empty holdings).
+  Returns nil when there's nothing to show — a boon with no resource moved, or a disaster
+  that neither collected any resource nor spilled into stability.
 
   [fate-result map] -> hiccup | nil"
   [fate-result]
   (let [polarity  (:polarity fate-result)
         label     (:label    fate-result)
         effect    (:effect   fate-result)
+        spill     (:stability-spill fate-result 0)
         disaster? (= polarity :disaster)
         ;; Sum absolute deltas for the summary line; label the resource.
         total     (reduce (fn [acc [_k v]] (+ acc (Math/abs (long v)))) 0 effect)]
-    ;; A zero-total fate (e.g. disaster on empty holdings) is not worth showing.
-    (when (pos? total)
+    (when (or (pos? total) (pos? spill))
       (let [res-name (case (ffirst effect)
                        :player/food       "food"
                        :player/credits    "credits"
+                       :player/fuel       "fuel"
                        :player/population "population"
                        "units")
-            summary  (if disaster?
+            ;; A disaster the player already spent down still costs them — in stability
+            ;; instead of the resource, which is already gone.
+            summary  (cond
+                       (and disaster? (zero? total))
+                       [:span.text-red-400
+                        label " — vault empty, cost " (ui/format-number spill) "% stability instead"]
+
+                       ;; Partially dodged: some of the resource was there to take, but not
+                       ;; enough to cover the full raid — the shortfall spills into stability
+                       ;; too. Same event, described cause → effect, not a second penalty.
+                       (and disaster? (pos? spill))
+                       [:span.text-red-400
+                        label " — lost " (ui/format-number total) " " res-name
+                        " — the rest cost " (ui/format-number spill) "% stability"]
+
+                       disaster?
                        [:span.text-red-400
                         label " — lost " (ui/format-number total) " " res-name]
+
+                       :else
                        [:span.text-green-400
                         label " — gained " (ui/format-number total) " " res-name])]
         ;; Solar Flare hits multiple unit types — expand to show the per-unit breakdown.
@@ -593,7 +613,7 @@
   "Render a stability card with a single info line summarising all stability changes this turn.
   Each non-zero component is rendered as a colored fragment: red for losses, green for gains.
   Breakaway gets an additional detail line below."
-  [{:keys [expense-penalty capture-penalty incite-penalty breakaway-result recovery-result]}]
+  [{:keys [expense-penalty capture-penalty incite-penalty fate-spill breakaway-result recovery-result]}]
   (let [has-breakaway? (and (some? breakaway-result) (:triggered? breakaway-result))
         fragments (keep identity
                     [(when (and (some? expense-penalty) (pos? expense-penalty))
@@ -602,6 +622,8 @@
                        [(str "−" (ui/format-number-str capture-penalty) "% integrating captured planets") "text-yellow-400"])
                      (when (and (some? incite-penalty) (pos? incite-penalty))
                        [(str "−" (ui/format-number-str incite-penalty) "% enemy incited unrest") "text-red-400"])
+                     (when (and (some? fate-spill) (pos? fate-spill))
+                       [(str "−" (ui/format-number-str fate-spill) "% unabsorbed disaster") "text-red-400"])
                      (when (and (some? recovery-result) (:triggered? recovery-result))
                        [(str "+" (ui/format-number-str (:amount recovery-result)) "% all expenses covered") "text-green-400"])])]
     (when (or (seq fragments) has-breakaway?)
@@ -873,6 +895,7 @@
        (stability-card {:expense-penalty  expense-penalty
                         :capture-penalty  capture-penalty
                         :incite-penalty   (or (:player/incoming-incite-stability-lost player) 0)
+                        :fate-spill       (:stability-spill fate-result 0)
                         :breakaway-result breakaway-result
                         :recovery-result  recovery-result})
 

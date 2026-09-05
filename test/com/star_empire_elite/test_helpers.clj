@@ -46,6 +46,7 @@
    :game/strike-max-dispatch       15
    :game/strike-interception-rate  0.001
    :game/strike-interception-cap   0.20
+   :game/strike-agent-mult         0.35
 
    ;; Defect operation constants
    :game/defect-defense-multiplier 0.1
@@ -56,6 +57,8 @@
    :game/general-mult-cap   0.15
    :game/admiral-mult-rate  0.01
    :game/admiral-mult-cap   0.15
+   :game/cmd-ship-mult-rate 0.02
+   :game/cmd-ship-mult-cap  0.30
    :game/agent-mult-rate    0.005
    :game/agent-mult-cap     0.10
    :game/space-carryover    0.15

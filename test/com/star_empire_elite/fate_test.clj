@@ -24,6 +24,7 @@
   {:game/fate-probability       0.15
    :game/fate-rank-tilt         0.4
    :game/erg-planet-food        3000
+   :game/erg-planet-fuel        4000
    :game/ore-planet-credits     10000
    :game/population-tax-credits 2000})
 
@@ -32,6 +33,7 @@
   {:player/score       100
    :player/credits     50000
    :player/food        20000
+   :player/fuel        15000
    :player/population  6
    :player/soldiers    200
    :player/transports  5
@@ -72,9 +74,9 @@
 ;;; 3. Zero-holdings disaster yields delta of zero — the player cannot lose what they don't have.
 ;;;
 (deftest test-zero-holdings-disaster-yields-zero-delta
-  ;; Force solar-flare (disaster entry index 2 of 4) on a player with no military units.
+  ;; Force solar-flare (disaster entry index 2 of 5) on a player with no military units.
   ;; Solo active list → r = 0.5, p-disaster = 0.5.
-  ;; rng: 0.05 (gate), 0.10 (< 0.5 → disaster), 0.50 (int(0.5*4)=2 → solar-flare), 0.50 (mult)
+  ;; rng: 0.05 (gate), 0.10 (< 0.5 → disaster), 0.50 (int(0.5*5)=2 → solar-flare), 0.50 (mult)
   (let [broke  (assoc test-player
                   :player/soldiers   0
                   :player/transports 0
@@ -91,10 +93,10 @@
 ;;; 4. Disaster delta magnitude never exceeds the player's current holdings.
 ;;;
 (deftest test-disaster-never-exceeds-holdings
-  ;; Sweep all four disaster catalog entries by varying the entry-pick draw.
+  ;; Sweep all disaster catalog entries by varying the entry-pick draw.
   ;; rng: 0.05 (gate), 0.10 (disaster), frac (entry pick), 0.99 (mult near max).
   (let [disasters (filterv #(= :disaster (:polarity %)) fate/fate-catalog)
-        n         (count disasters)]  ; should be 4
+        n         (count disasters)]  ; should be 5
     (doseq [i (range n)]
       (let [frac   (/ (double i) n)
             rng    (seq-rng [0.05 0.10 frac 0.99])
@@ -110,7 +112,7 @@
 (deftest test-boon-delta-is-positive
   ;; Solo player → r=0.5, p-disaster=0.5.
   ;; rng: 0.05 (gate), 0.51 (≥ 0.50 → boon), 0.50 (entry pick), 0.50 (mult)
-  ;; Boon entry index 2 of 4 = foreign-aid (:player/credits, :production).
+  ;; Boon entry index int(0.5*5)=2 of 5 = lottery-win (:player/credits, :production).
   (let [rng    (seq-rng [0.05 0.51 0.50 0.50])
         result (fate/roll-fate test-player test-game [test-player] rng)]
     (is (= :boon (:polarity result)))
@@ -141,4 +143,88 @@
     (let [rng    (seq-rng [0.05 0.80 0.30 0.00])
           result (fate/roll-fate test-player test-game [test-player] rng)]
       (is (= :gold-rush (:type result)))
-      (is (= 11000 (get-in result [:effect :player/credits]))))))
+      (is (= 11000 (get-in result [:effect :player/credits])))))
+
+  (testing "pirate-raid credits delta now scales off credit production, not holdings"
+    ;; Force pirate-raid (disaster entry #1 of [drought pirate-raid solar-flare plague]):
+    ;; pick draw int(0.30*4)=1.
+    ;; rng: 0.05 (gate), 0.10 (< 0.5 → disaster), 0.30 (entry #1 = pirate-raid), 0.00 (mult)
+    ;; mult = 0.25 + 0.0*(0.50-0.25) = 0.25
+    ;; delta = round(0.25 × 22000) = 5500 — if this were still holdings-basis (50000 credits)
+    ;; the delta would instead be 12500, so this pins the basis switch.
+    (let [rng    (seq-rng [0.05 0.10 0.30 0.00])
+          result (fate/roll-fate test-player test-game [test-player] rng)]
+      (is (= :pirate-raid (:type result)))
+      (is (= -5500 (get-in result [:effect :player/credits])))
+      (is (zero? (:stability-spill result)) "fully collectable — no spill"))))
+
+;;;
+;;; 7. Stability spill: a credit/food disaster the player can't fully pay spills the
+;;;    uncollectable fraction into stability instead of being forgiven.
+;;;
+(deftest test-stability-spill
+  ;; All three cases force drought (disaster entry #0): rng 0.05 (gate), 0.10 (disaster),
+  ;; 0.10 (entry #0 = drought), 1.00 (mult = 0.75 + 1.0*(1.25-0.75) = 1.25).
+  ;; raw = round(1.25 × food-production 6000) = 7500 in every case; only food holding varies.
+  (let [rng #(seq-rng [0.05 0.10 0.10 1.00])]
+    (testing "fully collectable (holding 20000 ≥ raw 7500) — no spill"
+      (let [result (fate/roll-fate test-player test-game [test-player] (rng))]
+        (is (= :drought (:type result)))
+        (is (= -7500 (get-in result [:effect :player/food])))
+        (is (zero? (:stability-spill result)))))
+
+    (testing "fully uncollectable (holding 0) — spill maxes at fate-uncollected-stability-penalty"
+      (let [broke  (assoc test-player :player/food 0)
+            result (fate/roll-fate broke test-game [broke] (rng))]
+        (is (zero? (get-in result [:effect :player/food])) "nothing to take")
+        (is (= 10 (:stability-spill result)))))
+
+    (testing "partially collectable (holding 3000 of 7500) — spill scales proportionally"
+      (let [partial (assoc test-player :player/food 3000)
+            result  (fate/roll-fate partial test-game [partial] (rng))]
+        (is (= -3000 (get-in result [:effect :player/food])) "takes what's there")
+        (is (= 6 (:stability-spill result)) "60% uncollected × 10 = 6")))))
+
+;;;
+;;; 8. Reactor Breach: fuel disaster is production-basis and spills into stability
+;;;    just like Drought/Pirate Raid — fuel is spendable via Exchange, so it needed
+;;;    the same exploit-closure treatment.
+;;;    fuel production = 2 erg-planets × 4000 = 8000
+;;;
+(deftest test-reactor-breach
+  ;; Force reactor-breach (disaster entry #4 of 5): pick draw int(0.85*5)=4.
+  ;; rng: 0.05 (gate), 0.10 (disaster), 0.85 (entry #4 = reactor-breach), mult draw.
+  (testing "fully collectable — no spill"
+    ;; mult = 0.25 + 0.0*(0.50-0.25) = 0.25; raw = round(0.25 × 8000) = 2000
+    (let [rng    (seq-rng [0.05 0.10 0.85 0.00])
+          result (fate/roll-fate test-player test-game [test-player] rng)]
+      (is (= :reactor-breach (:type result)))
+      (is (= -2000 (get-in result [:effect :player/fuel])))
+      (is (zero? (:stability-spill result)))))
+
+  (testing "fully uncollectable (holding 0) — spill maxes at fate-uncollected-stability-penalty"
+    ;; mult = 0.25 + 1.0*(0.50-0.25) = 0.50; raw = round(0.50 × 8000) = 4000
+    (let [broke  (assoc test-player :player/fuel 0)
+          rng    (seq-rng [0.05 0.10 0.85 1.00])
+          result (fate/roll-fate broke test-game [broke] rng)]
+      (is (zero? (get-in result [:effect :player/fuel])) "nothing to take")
+      (is (= 10 (:stability-spill result)))))
+
+  (testing "partially collectable (holding 1000 of 4000) — spill scales proportionally"
+    (let [partial (assoc test-player :player/fuel 1000)
+          rng     (seq-rng [0.05 0.10 0.85 1.00])
+          result  (fate/roll-fate partial test-game [partial] rng)]
+      (is (= -1000 (get-in result [:effect :player/fuel])) "takes what's there")
+      (is (= 8 (:stability-spill result)) "75% uncollected × 10 = 7.5, rounds to 8"))))
+
+;;;
+;;; 9. Reactor Surge: fuel boon, production-basis, mirrors Reactor Breach's target resource.
+;;;
+(deftest test-reactor-surge
+  ;; Force reactor-surge (boon entry #4 of 5): pick draw int(0.85*5)=4.
+  ;; rng: 0.05 (gate), 0.80 (boon), 0.85 (entry #4 = reactor-surge), 0.00 (mult)
+  ;; mult = 0.50 + 0.0*(1.00-0.50) = 0.50; delta = round(0.50 × 8000) = 4000
+  (let [rng    (seq-rng [0.05 0.80 0.85 0.00])
+        result (fate/roll-fate test-player test-game [test-player] rng)]
+    (is (= :reactor-surge (:type result)))
+    (is (= 4000 (get-in result [:effect :player/fuel])))))
