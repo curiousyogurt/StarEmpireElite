@@ -324,9 +324,8 @@
 ;;;; Probability and rank-tilt for disaster/boon events resolved at outcomes.
 ;;;; lo/hi are multipliers applied to a basis (holdings or one turn's production).
 
-(def fate-probability         0.95)  ; chance of a fate event each turn
-(def fate-rank-tilt           0.4)   ; how much rank shifts disaster probability (leader ≈ 0.70, trailer ≈ 0.30)
-
+(def fate-probability         0.15)  ; chance of a fate event each turn
+(def fate-rank-tilt           0.4)   ; how much rank shifts disaster probability
 (def fate-drought-lo          0.75)  ; drought: fraction of one turn's food production lost
 (def fate-drought-hi          1.25)
 (def fate-pirate-raid-lo      0.25)  ; pirate raid: fraction of one turn's credit production lost
