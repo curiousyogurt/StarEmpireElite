@@ -752,7 +752,7 @@
                      :player/incoming-bomb-result            nil
                      :player/incoming-defect-agents-lost    nil
                      :player/pending-espionage-op            nil
-                     :player/score                           (utils/calculate-score player)}
+                     :player/score                           (utils/calculate-score game player)}
                     (when end-round?
                       {:player/last-round-completed-at now}))])
           {:status 303

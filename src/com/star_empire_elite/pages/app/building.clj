@@ -155,10 +155,14 @@
      credits committed to all OTHER rows but not this row's own input — exactly
      right for a replace-style button.
 
-   [player player-map, quantities purchase-quantities, max-quantities map]
+   [player player-map, quantities purchase-quantities, max-quantities map, game game-map]
    -> {:transports int, :generals int, :carriers int, :admirals int}"
-  [player quantities max-quantities]
-  (let [proj-soldiers (+ (:player/soldiers player) (get quantities :soldiers 0))
+  [player quantities max-quantities game]
+  (let [soldiers-per-transport (or (:game/soldiers-per-transport game) const/soldiers-per-transport)
+        soldiers-per-general   (or (:game/soldiers-per-general   game) const/soldiers-per-general)
+        fighters-per-carrier   (or (:game/fighters-per-carrier   game) const/fighters-per-carrier)
+        fighters-per-admiral   (or (:game/fighters-per-admiral   game) const/fighters-per-admiral)
+        proj-soldiers (+ (:player/soldiers player) (get quantities :soldiers 0))
         proj-fighters (+ (:player/fighters player) (get quantities :fighters 0))
         ;; Integer ceiling division: (ceil a/b) = (a + b - 1) / b using integer division.
         ;; Plain (quot soldiers capacity) would under-buy: e.g. 101 soldiers needs 2 transports
@@ -166,16 +170,16 @@
         ceil-div      (fn [n d] (if (zero? n) 0 (quot (+ n d -1) d)))
         ;; Clamp: never buy a negative quantity, never exceed what credits allow.
         clamp         (fn [v max-v] (max 0 (min v max-v)))]
-    {:transports (clamp (- (ceil-div proj-soldiers const/soldiers-per-transport)
+    {:transports (clamp (- (ceil-div proj-soldiers soldiers-per-transport)
                            (:player/transports player))
                         (get max-quantities :transports 0))
-     :generals   (clamp (- (ceil-div proj-soldiers const/soldiers-per-general)
+     :generals   (clamp (- (ceil-div proj-soldiers soldiers-per-general)
                            (:player/generals player))
                         (get max-quantities :generals 0))
-     :carriers   (clamp (- (ceil-div proj-fighters const/fighters-per-carrier)
+     :carriers   (clamp (- (ceil-div proj-fighters fighters-per-carrier)
                            (:player/carriers player))
                         (get max-quantities :carriers 0))
-     :admirals   (clamp (- (ceil-div proj-fighters const/fighters-per-admiral)
+     :admirals   (clamp (- (ceil-div proj-fighters fighters-per-admiral)
                            (:player/admirals player))
                         (get max-quantities :admirals 0))}))
 
@@ -494,7 +498,7 @@
                               :player/mil-planets  (:mil-planets resources-after)
                               :player/current-phase 4
                               :player/score        (utils/calculate-score
-                                                     (merge player (utils/qualify-snapshot resources-after)))}])
+                                                     game (merge player (utils/qualify-snapshot resources-after)))}])
             {:status 303
              :headers {"location" (str "/app/game/" player-id "/action")}}))))))
 
@@ -511,7 +515,7 @@
           resources-after (calculate-resources-after-purchases player quantities cost-info)
           affordable?     (valid-purchase? resources-after)
           max-quantities  (calculate-max-quantities player quantities game)
-          fit-quantities  (calculate-fit-quantities player quantities max-quantities)
+          fit-quantities  (calculate-fit-quantities player quantities max-quantities game)
           total           (:total-cost cost-info)
           credits-after   (:credits resources-after)
           after-cls       (str "font-bold " (if (neg? credits-after) "text-red-400" "text-green-400"))
@@ -630,7 +634,7 @@
   (let [player-id        (:xt/id player)
         zero-quantities  (into {} (map (fn [row] [(:qty-key row) 0]) purchase-rows))
         max-quantities   (calculate-max-quantities player zero-quantities game)
-        fit-quantities   (calculate-fit-quantities player zero-quantities max-quantities)]
+        fit-quantities   (calculate-fit-quantities player zero-quantities max-quantities game)]
     (ui/phase-shell
       player
       game

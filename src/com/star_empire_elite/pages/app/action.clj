@@ -83,9 +83,9 @@
 (defn- forces-grid
   "Render Ground and Fleet deployable-forces cards in a 2-column grid.
 
-  [player player-map] -> hiccup"
-  [player]
-  (let [ef             (combat/effective-forces player)
+  [game game-map, player player-map] -> hiccup"
+  [game player]
+  (let [ef             (combat/effective-forces game player)
         agents         (get player :player/agents     0)
         generals       (get player :player/generals   0)
         transports     (get player :player/transports 0)
@@ -204,7 +204,7 @@
                               :player/current-phase      5
                               :player/pending-attack      target-uuid
                               :player/pending-attack-mode mode-kw
-                              :player/score               (utils/calculate-score player)}])
+                              :player/score               (utils/calculate-score game player)}])
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/espionage")}}))))
 
@@ -219,7 +219,7 @@
   [{:keys [player game db]}]
   (let [player-id      (:xt/id player)
         attacker-id    (str player-id)
-        ef             (combat/effective-forces player)
+        ef             (combat/effective-forces game player)
         other-players  (utils/get-other-players db (:player/game player) player-id)
         has-soldiers?  (pos? (:soldiers ef))
         has-fighters?  (pos? (:fighters ef))
@@ -242,7 +242,7 @@
         :class  "m-0"}
        (ui/phase-body player
         (ui/snapshot-section player)
-        (forces-grid player)
+        (forces-grid game player)
         (if (empty? other-players)
           [:p.text-sm.text-game-green-soft
            "There are no other empires in the galaxy to take action against."]

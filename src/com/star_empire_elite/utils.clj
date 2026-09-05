@@ -17,10 +17,11 @@
 
 ;;; Parse user numeric input safely, treating empty/nil/negative as 0. This is used across all phases 
 ;;; that accept user input (expenses, exchange, building).
-(def ^:private max-input-value
+(def max-input-value
   "Maximum value accepted from user input. Caps at 1 quadrillion to prevent long overflow when
   quantities are multiplied by per-unit costs in building and exchange calculations.
-  Clojure longs handle up to ~9.2e18; 1e15 leaves ample headroom for multiplication."
+  Clojure longs handle up to ~9.2e18; 1e15 leaves ample headroom for multiplication.
+  Public so game-config can reuse it as the upper bound for money/count constant fields."
   1000000000000000)
 
 (defn parse-numeric-input
@@ -368,23 +369,24 @@
   (reduce-kv #(assoc %1 (keyword "player" (name %2)) %3) {} snapshot))
 
 (defn calculate-score
-  "Compute player score: planets (dominant) + military units (power-weighted).
+  "Compute player score: planets (dominant) + military units (power-weighted). Falls back to
+  constants.clj when a game predates score weights being snapshotted (schema-optional).
 
-  [player player-map] -> int"
-  [player]
-  (+ (* (get player :player/population   0) const/score-population)
-     (* (get player :player/mil-planets  0) const/score-mil-planet)
-     (* (get player :player/erg-planets  0) const/score-erg-planet)
-     (* (get player :player/ore-planets  0) const/score-ore-planet)
-     (* (get player :player/soldiers     0) const/score-soldier)
-     (* (get player :player/transports   0) const/score-transport)
-     (* (get player :player/fighters     0) const/score-fighter)
-     (* (get player :player/carriers     0) const/score-carrier)
-     (* (get player :player/cmd-ships    0) const/score-cmd-ship)
-     (* (get player :player/stations     0) const/score-station)
-     (* (get player :player/generals     0) const/score-general)
-     (* (get player :player/admirals     0) const/score-admiral)
-     (* (get player :player/agents       0) const/score-agent)))
+  [game game-map, player player-map] -> int"
+  [game player]
+  (+ (* (get player :player/population   0) (or (:game/score-population game) const/score-population))
+     (* (get player :player/mil-planets  0) (or (:game/score-mil-planet game) const/score-mil-planet))
+     (* (get player :player/erg-planets  0) (or (:game/score-erg-planet game) const/score-erg-planet))
+     (* (get player :player/ore-planets  0) (or (:game/score-ore-planet game) const/score-ore-planet))
+     (* (get player :player/soldiers     0) (or (:game/score-soldier   game) const/score-soldier))
+     (* (get player :player/transports   0) (or (:game/score-transport game) const/score-transport))
+     (* (get player :player/fighters     0) (or (:game/score-fighter   game) const/score-fighter))
+     (* (get player :player/carriers     0) (or (:game/score-carrier   game) const/score-carrier))
+     (* (get player :player/cmd-ships    0) (or (:game/score-cmd-ship  game) const/score-cmd-ship))
+     (* (get player :player/stations     0) (or (:game/score-station  game) const/score-station))
+     (* (get player :player/generals     0) (or (:game/score-general  game) const/score-general))
+     (* (get player :player/admirals     0) (or (:game/score-admiral  game) const/score-admiral))
+     (* (get player :player/agents       0) (or (:game/score-agent    game) const/score-agent))))
 
 ;;;;
 ;;;; Other-Player Fetching

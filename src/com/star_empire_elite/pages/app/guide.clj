@@ -167,27 +167,27 @@
 ;;;; Starting Empire
 ;;;;
 
-(defn- starting-empire-section []
+(defn- starting-empire-section [game]
   (section "starting-empire" "STARTING EMPIRE" "values every new player begins with"
     (guide-table
      ["Resource / Unit" "Starting Amount"]
-     [["Credits"         (v (ui/format-number const/starting-credits))]
-      ["Food"            (v (ui/format-number const/starting-food))]
-      ["Fuel"            (v (ui/format-number const/starting-fuel))]
-      ["Population"      (v (str const/starting-population "M"))]
-      ["Stability"       (v (str const/starting-stability "%"))]
-      ["Erg planets"     (v const/starting-erg-planets)]
-      ["Ore planets"     (v const/starting-ore-planets)]
-      ["Mil planets"     (v const/starting-mil-planets)]
-      ["Soldiers"        (v (ui/format-number const/starting-soldiers))]
-      ["Transports"      (v const/starting-transports)]
-      ["Generals"        (v const/starting-generals)]
-      ["Fighters"        (v const/starting-fighters)]
-      ["Carriers"        (v const/starting-carriers)]
-      ["Admirals"        (v const/starting-admirals)]
-      ["Stations"        (v const/starting-stations)]
-      ["Command ships"   (v const/starting-cmd-ships)]
-      ["Agents"          (v const/starting-agents)]])))
+     [["Credits"         (v (ui/format-number (g game :game/starting-credits const/starting-credits)))]
+      ["Food"            (v (ui/format-number (g game :game/starting-food const/starting-food)))]
+      ["Fuel"            (v (ui/format-number (g game :game/starting-fuel const/starting-fuel)))]
+      ["Population"      (v (str (g game :game/starting-population const/starting-population) "M"))]
+      ["Stability"       (v (str (g game :game/starting-stability const/starting-stability) "%"))]
+      ["Erg planets"     (v (g game :game/starting-erg-planets const/starting-erg-planets))]
+      ["Ore planets"     (v (g game :game/starting-ore-planets const/starting-ore-planets))]
+      ["Mil planets"     (v (g game :game/starting-mil-planets const/starting-mil-planets))]
+      ["Soldiers"        (v (ui/format-number (g game :game/starting-soldiers const/starting-soldiers)))]
+      ["Transports"      (v (g game :game/starting-transports const/starting-transports))]
+      ["Generals"        (v (g game :game/starting-generals const/starting-generals))]
+      ["Fighters"        (v (g game :game/starting-fighters const/starting-fighters))]
+      ["Carriers"        (v (g game :game/starting-carriers const/starting-carriers))]
+      ["Admirals"        (v (g game :game/starting-admirals const/starting-admirals))]
+      ["Stations"        (v (g game :game/starting-stations const/starting-stations))]
+      ["Command ships"   (v (g game :game/starting-cmd-ships const/starting-cmd-ships))]
+      ["Agents"          (v (g game :game/starting-agents const/starting-agents))]])))
 
 ;;;;
 ;;;; Income
@@ -282,20 +282,22 @@
 ;;;; Population
 ;;;;
 
-(defn- population-section []
+(defn- population-section [game]
   (section "population" "POPULATION" "stored in millions"
     (prose
       "At the end of each round, population grows. Growth is additive: "
-      (v (pct const/pop-growth-rate)) " of current population "
-      "plus " (v (str (* const/pop-growth-per-planet 1000) "k")) " per planet you own, "
+      (v (pct (g game :game/pop-growth-rate const/pop-growth-rate))) " of current population "
+      "plus " (v (str (* (g game :game/pop-growth-per-planet const/pop-growth-per-planet) 1000) "k")) " per planet you own, "
       "scaled by a random factor between "
-      (v (pct const/pop-random-min)) " and " (v (pct const/pop-random-max)) ".")
+      (v (pct (g game :game/pop-random-min const/pop-random-min))) " and "
+      (v (pct (g game :game/pop-random-max const/pop-random-max))) ".")
     (prose
-      "Population is capped at " (v (str (int const/pop-capacity-per-planet) "M")) " per planet. "
-      "Population pays " (v (ui/format-number const/population-tax-credits))
+      "Population is capped at "
+      (v (str (int (g game :game/pop-capacity-per-planet const/pop-capacity-per-planet)) "M")) " per planet. "
+      "Population pays " (v (ui/format-number (g game :game/population-tax-credits const/population-tax-credits)))
       " credits per million per turn, but also consumes "
-      (v (ui/format-number const/population-upkeep-food)) " food and "
-      (v (ui/format-number const/population-upkeep-fuel)) " fuel per million per turn. "
+      (v (ui/format-number (g game :game/population-upkeep-food const/population-upkeep-food))) " food and "
+      (v (ui/format-number (g game :game/population-upkeep-fuel const/population-upkeep-fuel))) " fuel per million per turn. "
       "A large population is powerful but expensive to feed.")))
 
 ;;;;
@@ -322,7 +324,7 @@
      ["Event"                            "Stability Change"]
      [["Planets captured from you"       (v (str "-" (g game :game/capture-stability-penalty-per-planet const/capture-stability-penalty-per-planet) " per planet (cap " (g game :game/capture-stability-penalty-cap const/capture-stability-penalty-cap) ")"))]
       ["Underpaying expenses"            (v (str "-" (g game :game/expense-stability-penalty const/expense-stability-penalty) " per underpaid fraction"))]
-      ["Successful incite operation"     "−up to 8 pts (see Espionage)"]
+      ["Successful incite operation"     (v (str "−up to " (g game :game/incite-stability-damage const/incite-stability-damage) " pts (see Espionage)"))]
       ["Recovery roll succeeds"          (v (str "+" (g game :game/stability-recovery-amount const/stability-recovery-amount) " pts"))]])
     (prose
       "Stability cannot be incited below "
@@ -443,24 +445,29 @@
     (ui/section-label "OPERATIONS")
     (guide-table
      ["Operation"  "On Success"                                                       "Agents lost on failure (min 1)"]
-     [["Spy"       "Full military snapshot of target (units, agents)"                (v (pct const/spy-defection-rate))]
-      ["Incite"    (str "Reduce target stability up to " const/incite-stability-damage " pts (floor " const/incite-stability-floor "%)")  (v (pct const/incite-defection-rate))]
-      ["Bomb"      (str "Destroy " (pct const/bomb-damage-rate) " of soldiers, transports, fighters, carriers") (v (pct const/bomb-defection-rate))]
-      ["Defect"    (str "Turn " (pct const/defect-transfer-rate) " of defender's agents (or yours, whichever is fewer)") (v (pct const/defect-defection-rate))]])
+     [["Spy"       "Full military snapshot of target (units, agents)"                (v (pct (g game :game/spy-defection-rate const/spy-defection-rate)))]
+      ["Incite"    (str "Reduce target stability up to " (g game :game/incite-stability-damage const/incite-stability-damage) " pts (floor " (g game :game/incite-stability-floor const/incite-stability-floor) "%)")  (v (pct (g game :game/incite-defection-rate const/incite-defection-rate)))]
+      ["Bomb"      (str "Destroy " (pct (g game :game/bomb-damage-rate const/bomb-damage-rate)) " of soldiers, transports, fighters, carriers") (v (pct (g game :game/bomb-defection-rate const/bomb-defection-rate)))]
+      ["Defect"    (str "Turn " (pct (g game :game/defect-transfer-rate const/defect-transfer-rate)) " of defender's agents (or yours, whichever is fewer)") (v (pct (g game :game/defect-defection-rate const/defect-defection-rate)))]])
 
     (prose
       "Failed bomb agents are destroyed outright. Failed spy/incite/defect agents "
       "defect to the defender.")
 
     (ui/section-label "DEFENSE — DIMINISHING RETURNS")
-    (prose
-      "Defenders do not benefit linearly from hoarding agents. Up to "
-      (v const/espionage-defense-threshold)
-      " agents defend at full strength. Beyond that, surplus agents contribute with "
-      "diminishing returns (effective = "
-      (v const/espionage-defense-threshold)
-      " + surplus^" (v const/espionage-defense-exponent) "). "
-      "At 1,000 defending agents the effective count is roughly 364, not 1,000.")
+    (let [threshold (g game :game/espionage-defense-threshold const/espionage-defense-threshold)
+          exponent  (g game :game/espionage-defense-exponent const/espionage-defense-exponent)
+          ;; Mirrors combat/effective-defense-agents' formula, for a live worked example
+          ;; instead of a number that would drift once these fields became per-game editable.
+          worked    (long (Math/round (+ threshold (Math/pow (- 1000 threshold) exponent))))]
+      (prose
+        "Defenders do not benefit linearly from hoarding agents. Up to "
+        (v threshold)
+        " agents defend at full strength. Beyond that, surplus agents contribute with "
+        "diminishing returns (effective = "
+        (v threshold)
+        " + surplus^" (v exponent) "). "
+        "At 1,000 defending agents the effective count is roughly " (v worked) ", not 1,000."))
 
     (ui/section-label "DEFECT — SPECIAL RULE")
     (prose
@@ -501,12 +508,17 @@
         (v (pct (g game :game/fate-probability const/fate-probability)))
         " chance that your empire is struck by a disaster or granted a boon. "
         "The result is applied immediately and appears in your Outcomes summary.")
-      (prose
-        "Which you receive (disaster or boon) depends on your standing. "
-        "Leaders draw disasters more often; trailers draw boons more often. "
-        "The tilt is not absolute: even the top-ranked empire has roughly a "
-        (v "30%") " chance of a boon, and the last-place empire still faces roughly a "
-        (v "30%") " chance of disaster.")
+      (let [tilt (g game :game/fate-rank-tilt const/fate-rank-tilt)
+            ;; Mirrors roll-fate's p-disaster formula at the r=1 (leader) and r=0 (trailer)
+            ;; extremes — both work out to the same (1 - tilt) / 2, which is why the guide
+            ;; quotes one number for both cases.
+            extreme-pct (pct (/ (- 1.0 tilt) 2.0))]
+        (prose
+          "Which you receive (disaster or boon) depends on your standing. "
+          "Leaders draw disasters more often; trailers draw boons more often. "
+          "The tilt is not absolute: even the top-ranked empire has roughly a "
+          (v extreme-pct) " chance of a boon, and the last-place empire still faces roughly a "
+          (v extreme-pct) " chance of disaster."))
       ;; Single table keeps Event / Affects / Magnitude columns aligned across both groups.
       [:table.w-full.text-sm.font-mono
        {:class "border-collapse mt-1 mb-3"}
@@ -519,49 +531,49 @@
        [:tbody
         [:tr [:td {:colspan 3 :class sub-hdr-cls} "Disasters"]]
         (data-rows
-         [(fate-row "Drought"        "Food"       "one turn's food production"   const/fate-drought-lo        const/fate-drought-hi)
-          (fate-row "Pirate Raid"    "Credits"    "one turn's credit production" const/fate-pirate-raid-lo    const/fate-pirate-raid-hi)
-          (fate-row "Reactor Breach" "Fuel"       "one turn's fuel production"   const/fate-reactor-breach-lo const/fate-reactor-breach-hi)
-          (fate-row "Solar Flare"    "Units"      "each unit type's holdings"    const/fate-solar-flare-lo    const/fate-solar-flare-hi)
-          (fate-row "Plague"         "Population" "current population"           const/fate-plague-lo         const/fate-plague-hi)])
+         [(fate-row "Drought"        "Food"       "one turn's food production"   (g game :game/fate-drought-lo        const/fate-drought-lo)        (g game :game/fate-drought-hi        const/fate-drought-hi))
+          (fate-row "Pirate Raid"    "Credits"    "one turn's credit production" (g game :game/fate-pirate-raid-lo    const/fate-pirate-raid-lo)    (g game :game/fate-pirate-raid-hi    const/fate-pirate-raid-hi))
+          (fate-row "Reactor Breach" "Fuel"       "one turn's fuel production"   (g game :game/fate-reactor-breach-lo const/fate-reactor-breach-lo) (g game :game/fate-reactor-breach-hi const/fate-reactor-breach-hi))
+          (fate-row "Solar Flare"    "Units"      "each unit type's holdings"    (g game :game/fate-solar-flare-lo    const/fate-solar-flare-lo)    (g game :game/fate-solar-flare-hi    const/fate-solar-flare-hi))
+          (fate-row "Plague"         "Population" "current population"           (g game :game/fate-plague-lo         const/fate-plague-lo)         (g game :game/fate-plague-hi         const/fate-plague-hi))])
         [:tr [:td {:colspan 3 :class sub-hdr-cls} "Boons"]]
         (data-rows
-         [(fate-row "Bumper Harvest" "Food"       "one turn's food production"    const/fate-bumper-harvest-lo  const/fate-bumper-harvest-hi)
-          (fate-row "Gold Rush"      "Credits"    "one turn's credit production"  const/fate-gold-rush-lo       const/fate-gold-rush-hi)
-          (fate-row "Lottery Win"    "Credits"    "one turn's credit production"  const/fate-lottery-win-lo     const/fate-lottery-win-hi)
-          (fate-row "Reactor Surge"  "Fuel"       "one turn's fuel production"    const/fate-reactor-surge-lo   const/fate-reactor-surge-hi)
-          (fate-row "Migration Wave" "Population" "current population"            const/fate-migration-wave-lo  const/fate-migration-wave-hi)])]]
+         [(fate-row "Bumper Harvest" "Food"       "one turn's food production"    (g game :game/fate-bumper-harvest-lo const/fate-bumper-harvest-lo) (g game :game/fate-bumper-harvest-hi const/fate-bumper-harvest-hi))
+          (fate-row "Gold Rush"      "Credits"    "one turn's credit production"  (g game :game/fate-gold-rush-lo      const/fate-gold-rush-lo)      (g game :game/fate-gold-rush-hi      const/fate-gold-rush-hi))
+          (fate-row "Lottery Win"    "Credits"    "one turn's credit production"  (g game :game/fate-lottery-win-lo    const/fate-lottery-win-lo)    (g game :game/fate-lottery-win-hi    const/fate-lottery-win-hi))
+          (fate-row "Reactor Surge"  "Fuel"       "one turn's fuel production"    (g game :game/fate-reactor-surge-lo  const/fate-reactor-surge-lo)  (g game :game/fate-reactor-surge-hi  const/fate-reactor-surge-hi))
+          (fate-row "Migration Wave" "Population" "current population"            (g game :game/fate-migration-wave-lo const/fate-migration-wave-lo) (g game :game/fate-migration-wave-hi const/fate-migration-wave-hi))])]]
       (prose
         "Drought, Pirate Raid, and Reactor Breach can never take more food, credits, or fuel "
         "than you actually have. But spending down before Outcomes doesn't dodge the disaster — "
         "whatever portion couldn't be collected instead costs you stability, up to "
-        (v (str (long const/fate-uncollected-stability-penalty) "%")) ".")
+        (v (str (long (g game :game/fate-uncollected-stability-penalty const/fate-uncollected-stability-penalty)) "%")) ".")
       (prose "Fate events are visible to all players in the News feed. "))))
 
 ;;;;
 ;;;; Scoring
 ;;;;
 
-(defn- scoring-section []
+(defn- scoring-section [game]
   (section "scoring" "SCORING" "how your empire score is calculated"
     (prose
       "Your score is the sum of all assets multiplied by their point weights. "
       "It updates each turn and determines leaderboard rank.")
     (guide-table
      ["Asset"         "Points"]
-     [["Population"   (v (str const/score-population " / million"))]
-      ["Mil planet"   (v const/score-mil-planet)]
-      ["Erg planet"   (v const/score-erg-planet)]
-      ["Ore planet"   (v const/score-ore-planet)]
-      ["Soldier"      (v const/score-soldier)]
-      ["Transport"    (v const/score-transport)]
-      ["General"      (v const/score-general)]
-      ["Fighter"      (v const/score-fighter)]
-      ["Carrier"      (v const/score-carrier)]
-      ["Admiral"      (v const/score-admiral)]
-      ["Command ship" (v const/score-cmd-ship)]
-      ["Station"      (v const/score-station)]
-      ["Agent"        (v const/score-agent)]])))
+     [["Population"   (v (str (g game :game/score-population const/score-population) " / million"))]
+      ["Mil planet"   (v (g game :game/score-mil-planet const/score-mil-planet))]
+      ["Erg planet"   (v (g game :game/score-erg-planet const/score-erg-planet))]
+      ["Ore planet"   (v (g game :game/score-ore-planet const/score-ore-planet))]
+      ["Soldier"      (v (g game :game/score-soldier const/score-soldier))]
+      ["Transport"    (v (g game :game/score-transport const/score-transport))]
+      ["General"      (v (g game :game/score-general const/score-general))]
+      ["Fighter"      (v (g game :game/score-fighter const/score-fighter))]
+      ["Carrier"      (v (g game :game/score-carrier const/score-carrier))]
+      ["Admiral"      (v (g game :game/score-admiral const/score-admiral))]
+      ["Command ship" (v (g game :game/score-cmd-ship const/score-cmd-ship))]
+      ["Station"      (v (g game :game/score-station const/score-station))]
+      ["Agent"        (v (g game :game/score-agent const/score-agent))]])))
 
 ;;;;
 ;;;; Public Page
@@ -578,17 +590,17 @@
      (toc)
      (quick-start-section)
      (overview-section game)
-     (starting-empire-section)
+     (starting-empire-section game)
      (income-section game)
      (expenses-section game)
      (building-section game)
      (exchange-section game)
-     (population-section)
+     (population-section game)
      (stability-section game)
      (combat-section game)
      (strikes-section game)
      (espionage-section game)
      (fate-section game)
-     (scoring-section)]
+     (scoring-section game)]
     (ui/phase-action-bar
       (ui/action-bar-link (str "/app/game/" (:xt/id player)) "Back to Game"))))

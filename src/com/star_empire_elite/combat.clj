@@ -23,39 +23,46 @@
 ;;;;
 
 (defn effective-forces
-  "Compute effective force counts, capped by transport and general capacity.
+  "Compute effective force counts, capped by transport and general capacity. Falls back to the
+  global constant when a game predates these fields being snapshotted (schema-optional).
 
-  [player player-map] -> force-map"
-  [player]
-  {:soldiers   (min (:player/soldiers player)
-                    (* (:player/transports player) const/soldiers-per-transport)
-                    (* (:player/generals   player) const/soldiers-per-general))
-   :fighters   (min (:player/fighters player)
-                    (* (:player/carriers player) const/fighters-per-carrier)
-                    (* (:player/admirals player) const/fighters-per-admiral))
-   :transports (:player/transports player)
-   :generals   (:player/generals   player)
-   :carriers   (:player/carriers   player)
-   :admirals   (:player/admirals   player)
-   :cmd-ships  (:player/cmd-ships  player)
-   :stations   0
-   ;; Agents carry no base power and are not tracked by compute-losses.
-   ;; They exist in the force map so the ground multiplier helper can read them.
-   :agents     (:player/agents player)})
+  [game game-map, player player-map] -> force-map"
+  [game player]
+  (let [soldiers-per-transport (or (:game/soldiers-per-transport game) const/soldiers-per-transport)
+        soldiers-per-general   (or (:game/soldiers-per-general   game) const/soldiers-per-general)
+        fighters-per-carrier   (or (:game/fighters-per-carrier   game) const/fighters-per-carrier)
+        fighters-per-admiral   (or (:game/fighters-per-admiral   game) const/fighters-per-admiral)]
+    {:soldiers   (min (:player/soldiers player)
+                      (* (:player/transports player) soldiers-per-transport)
+                      (* (:player/generals   player) soldiers-per-general))
+     :fighters   (min (:player/fighters player)
+                      (* (:player/carriers player) fighters-per-carrier)
+                      (* (:player/admirals player) fighters-per-admiral))
+     :transports (:player/transports player)
+     :generals   (:player/generals   player)
+     :carriers   (:player/carriers   player)
+     :admirals   (:player/admirals   player)
+     :cmd-ships  (:player/cmd-ships  player)
+     :stations   0
+     ;; Agents carry no base power and are not tracked by compute-losses.
+     ;; They exist in the force map so the ground multiplier helper can read them.
+     :agents     (:player/agents player)}))
 
 (defn effective-defending-forces
   "Compute effective force counts for a defender. Defenders have no transport cap (soldiers and
   fighters are already where they need to be to defend against an attack), and stations are
   included.
 
-  [player player-map] -> force-map"
-  [player]
-  (-> (effective-forces player)
-      (assoc :soldiers  (min (:player/soldiers player)
-                             (* (:player/generals player) const/soldiers-per-general))
-             :fighters  (min (:player/fighters player)
-                             (* (:player/admirals player) const/fighters-per-admiral))
-             :stations  (:player/stations player))))
+  [game game-map, player player-map] -> force-map"
+  [game player]
+  (let [soldiers-per-general (or (:game/soldiers-per-general game) const/soldiers-per-general)
+        fighters-per-admiral (or (:game/fighters-per-admiral game) const/fighters-per-admiral)]
+    (-> (effective-forces game player)
+        (assoc :soldiers  (min (:player/soldiers player)
+                               (* (:player/generals player) soldiers-per-general))
+               :fighters  (min (:player/fighters player)
+                               (* (:player/admirals player) fighters-per-admiral))
+               :stations  (:player/stations player)))))
 
 ;;;;
 ;;;; Phase Partitioning
@@ -119,12 +126,16 @@
      (if attacker? 0 (* (get forces :stations 0) (:game/station-power game)))))
 
 (defn random-factor
-  "Return a random multiplier in [1 - variance, 1 + variance].
+  "Return a random multiplier in [1 - variance, 1 + variance]. Defaults to the global
+  combat-variance constant — callers that don't yet thread a per-game variance through
+  (e.g. espionage-roll) keep working unchanged until they do.
 
-  [] -> float"
-  []
-  (+ (- 1.0 const/combat-variance)
-     (* (rand) (* 2 const/combat-variance))))
+  ([] -> float)
+  ([variance double] -> float)"
+  ([] (random-factor const/combat-variance))
+  ([variance]
+   (+ (- 1.0 variance)
+      (* (rand) (* 2 variance)))))
 
 ;;;;
 ;;;; Phase Resolution
@@ -137,10 +148,11 @@
   [game game-map, att-forces force-map, def-forces force-map,
    att-mult double, def-mult double, att-is-attacker? bool] -> phase-result"
   [game att-forces def-forces att-mult def-mult att-is-attacker?]
-  (let [att-base  (base-power game att-forces att-is-attacker?)
+  (let [variance  (or (:game/combat-variance game) const/combat-variance)
+        att-base  (base-power game att-forces att-is-attacker?)
         def-base  (base-power game def-forces false)
-        att-roll  (* att-base att-mult (random-factor))
-        def-roll  (* def-base def-mult (random-factor))
+        att-roll  (* att-base att-mult (random-factor variance))
+        def-roll  (* def-base def-mult (random-factor variance))
         att-wins? (> att-roll def-roll)
         max-roll  (max att-roll def-roll)
         margin    (if (zero? max-roll) 0.0 (/ (Math/abs (- att-roll def-roll)) max-roll))]
@@ -200,8 +212,8 @@
 
   [game game-map, attacker player-map, defender player-map, mode keyword] -> result-map"
   [game attacker defender mode]
-  (let [att-forces  (effective-forces attacker)
-        def-forces  (effective-defending-forces defender)
+  (let [att-forces  (effective-forces game attacker)
+        def-forces  (effective-defending-forces game defender)
 
         ;; Engagement fraction: governs defender power participation and loss exposure
         engagement  (case mode
@@ -387,11 +399,17 @@
 ;;;; Espionage Resolution
 ;;;;
 
-(def ^:private op-failure-rates
-  {:spy    const/spy-defection-rate
-   :incite const/incite-defection-rate
-   :bomb   const/bomb-defection-rate
-   :defect const/defect-defection-rate})
+(defn- op-failure-rate
+  "Look up an espionage op's agent-defection rate from the game entity, falling back to
+  constants.clj when a game predates these fields being snapshotted.
+
+  [game game-map, op keyword] -> double"
+  [game op]
+  (case op
+    :spy    (or (:game/spy-defection-rate    game) const/spy-defection-rate)
+    :incite (or (:game/incite-defection-rate game) const/incite-defection-rate)
+    :bomb   (or (:game/bomb-defection-rate   game) const/bomb-defection-rate)
+    :defect (or (:game/defect-defection-rate game) const/defect-defection-rate)))
 
 (defn- effective-defense-agents
   "Apply the diminishing-returns soft cap to a defender's engaged agent count.
@@ -401,10 +419,10 @@
   effective = agents                        when agents ≤ T
   effective = T + (agents − T)^exp          when agents > T
 
-  [agents number] -> double"
-  [agents]
-  (let [t   (double const/espionage-defense-threshold)
-        exp const/espionage-defense-exponent]
+  [game game-map, agents number] -> double"
+  [game agents]
+  (let [t   (double (or (:game/espionage-defense-threshold game) const/espionage-defense-threshold))
+        exp (or (:game/espionage-defense-exponent game) const/espionage-defense-exponent)]
     (if (<= agents t)
       (double agents)
       (+ t (Math/pow (- agents t) exp)))))
@@ -419,28 +437,30 @@
                        0 for bomb, whose failed agents are destroyed, not captured).
   The optional def-mult scales the defender's agent count before the soft cap is applied.
 
-  [attacker player-map, defender player-map, op keyword] -> roll-map
-  [attacker player-map, defender player-map, op keyword, def-mult float] -> roll-map"
-  ([attacker defender op] (espionage-roll attacker defender op 1.0))
-  ([attacker defender op def-mult]
-   (let [att-agents (:player/agents attacker)
-         def-engaged (effective-defense-agents (* (:player/agents defender) def-mult))
-         att-roll    (* att-agents (random-factor))
-         def-roll    (* def-engaged (random-factor))
+  [game game-map, attacker player-map, defender player-map, op keyword] -> roll-map
+  [game game-map, attacker player-map, defender player-map, op keyword, def-mult float] -> roll-map"
+  ([game attacker defender op] (espionage-roll game attacker defender op 1.0))
+  ([game attacker defender op def-mult]
+   (let [variance    (or (:game/combat-variance game) const/combat-variance)
+         defection-min (or (:game/espionage-defection-min game) const/espionage-defection-min)
+         att-agents  (:player/agents attacker)
+         def-engaged (effective-defense-agents game (* (:player/agents defender) def-mult))
+         att-roll    (* att-agents (random-factor variance))
+         def-roll    (* def-engaged (random-factor variance))
          att-wins?   (> att-roll def-roll)
-         rate        (get op-failure-rates op const/spy-defection-rate)
+         rate        (op-failure-rate game op)
          transfer?   (not= op :bomb)]
      {:att-roll        att-roll
       :def-roll        def-roll
       :att-wins?       att-wins?
       :agents-lost     (when-not att-wins?
                          (min att-agents
-                              (max const/espionage-defection-min
+                              (max defection-min
                                    (long (* att-agents rate)))))
       :agents-captured (when-not att-wins?
                          (if transfer?
                            (min att-agents
-                                (max const/espionage-defection-min
+                                (max defection-min
                                      (long (* att-agents rate))))
                            0))})))
 
@@ -448,9 +468,9 @@
   "Resolve an espionage attempt. Agent counts are compared with ±variance random rolls. Returns a
   result map including intel snapshot on success. UUIDs stored as strings for safe pr-str round-trip.
 
-  [attacker player-map, defender player-map] -> result-map"
-  [attacker defender]
-  (let [{:keys [att-wins? agents-lost agents-captured]} (espionage-roll attacker defender :spy)]
+  [game game-map, attacker player-map, defender player-map] -> result-map"
+  [game attacker defender]
+  (let [{:keys [att-wins? agents-lost agents-captured]} (espionage-roll game attacker defender :spy)]
     {:op             "spy"
      :attacker-id    (str (:xt/id attacker))
      :defender-id    (str (:xt/id defender))
@@ -478,10 +498,12 @@
        This keeps incited victims out of the breakaway-danger zone (~80%/turn planet loss
        at stability 0) and turns incite into sustained pressure rather than a kill.
 
-  [target-stability number] -> long"
-  [target-stability]
-  (let [raw  (* const/incite-stability-damage (/ (double target-stability) 100.0))
-        room (max 0 (- target-stability const/incite-stability-floor))]
+  [game game-map, target-stability number] -> long"
+  [game target-stability]
+  (let [damage (or (:game/incite-stability-damage game) const/incite-stability-damage)
+        floor  (or (:game/incite-stability-floor  game) const/incite-stability-floor)
+        raw    (* damage (/ (double target-stability) 100.0))
+        room   (max 0 (- target-stability floor))]
     (long (Math/round (double (min raw room))))))
 
 (defn resolve-incite
@@ -489,15 +511,15 @@
   the defender's stability is damaged (diminishing with current stability, floored at 70).
   On failure, agents are captured. UUIDs stored as strings for safe pr-str round-trip.
 
-  [attacker player-map, defender player-map] -> result-map"
-  [attacker defender]
-  (let [{:keys [att-wins? agents-lost agents-captured]} (espionage-roll attacker defender :incite)]
+  [game game-map, attacker player-map, defender player-map] -> result-map"
+  [game attacker defender]
+  (let [{:keys [att-wins? agents-lost agents-captured]} (espionage-roll game attacker defender :incite)]
     {:op               "incite"
      :attacker-id      (str (:xt/id attacker))
      :defender-id      (str (:xt/id defender))
      :defender-name    (:player/empire-name defender)
      :attacker-wins?   att-wins?
-     :stability-damage (when att-wins? (incite-damage (:player/stability defender)))
+     :stability-damage (when att-wins? (incite-damage game (:player/stability defender)))
      :agents-lost      agents-lost
      :agents-captured  agents-captured}))
 
@@ -506,18 +528,19 @@
   On success, a fixed percentage of soldiers, transports, fighters, and carriers are destroyed.
   On failure, agents are captured. UUIDs stored as strings for safe pr-str round-trip.
 
-  [attacker player-map, defender player-map] -> result-map"
-  [attacker defender]
-  (let [{:keys [att-wins? agents-lost agents-captured]} (espionage-roll attacker defender :bomb)]
+  [game game-map, attacker player-map, defender player-map] -> result-map"
+  [game attacker defender]
+  (let [{:keys [att-wins? agents-lost agents-captured]} (espionage-roll game attacker defender :bomb)
+        damage-rate (or (:game/bomb-damage-rate game) const/bomb-damage-rate)]
     {:op                   "bomb"
      :attacker-id          (str (:xt/id attacker))
      :defender-id          (str (:xt/id defender))
      :defender-name        (:player/empire-name defender)
      :attacker-wins?       att-wins?
-     :soldiers             (when att-wins? (long (* (:player/soldiers   defender) const/bomb-damage-rate)))
-     :transports           (when att-wins? (long (* (:player/transports defender) const/bomb-damage-rate)))
-     :fighters             (when att-wins? (long (* (:player/fighters   defender) const/bomb-damage-rate)))
-     :carriers             (when att-wins? (long (* (:player/carriers   defender) const/bomb-damage-rate)))
+     :soldiers             (when att-wins? (long (* (:player/soldiers   defender) damage-rate)))
+     :transports           (when att-wins? (long (* (:player/transports defender) damage-rate)))
+     :fighters             (when att-wins? (long (* (:player/fighters   defender) damage-rate)))
+     :carriers             (when att-wins? (long (* (:player/carriers   defender) damage-rate)))
      :agents-lost          agents-lost
      :agents-captured      agents-captured}))
 
@@ -530,7 +553,7 @@
   [game attacker defender]
   (let [def-mult  (:game/defect-defense-multiplier game)
         rate      (:game/defect-transfer-rate      game)
-        {:keys [att-wins? agents-lost agents-captured]} (espionage-roll attacker defender :defect def-mult)]
+        {:keys [att-wins? agents-lost agents-captured]} (espionage-roll game attacker defender :defect def-mult)]
     {:op               "defect"
      :attacker-id      (str (:xt/id attacker))
      :defender-id      (str (:xt/id defender))

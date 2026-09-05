@@ -131,7 +131,7 @@
                   :player/last-battle-result (pr-str result)
                   :player/cmd-ships att-cmd-ships
                   :player/score     (utils/calculate-score
-                                      (assoc player :player/cmd-ships att-cmd-ships))}
+                                      game (assoc player :player/cmd-ships att-cmd-ships))}
                  {:db/doc-type :player :db/op :update :xt/id (:xt/id defender)
                   :player/soldiers   def-soldiers
                   :player/transports def-transports
@@ -142,7 +142,7 @@
                   :player/stations   def-stations
                   :player/agents     def-agents
                   :player/score      (utils/calculate-score
-                                       (assoc defender
+                                       game (assoc defender
                                          :player/soldiers   def-soldiers
                                          :player/generals   def-generals
                                          :player/fighters   def-fighters
@@ -210,7 +210,7 @@
                   :player/food         att-food
                   :player/fuel         att-fuel
                   :player/score        (utils/calculate-score
-                                         (assoc player
+                                         game (assoc player
                                            :player/soldiers     att-soldiers
                                            :player/generals     att-generals
                                            :player/fighters     att-fighters
@@ -238,7 +238,7 @@
                   :player/food         def-food
                   :player/fuel         def-fuel
                   :player/score        (utils/calculate-score
-                                         (assoc defender
+                                         game (assoc defender
                                            :player/soldiers     def-soldiers
                                            :player/generals     def-generals
                                            :player/fighters     def-fighters
@@ -288,10 +288,10 @@
                 bomb?       (= pending-espionage-op "bomb")
                 defect?     (= pending-espionage-op "defect")
                 result      (cond
-                              incite?  (combat/resolve-incite    player target)
-                              bomb?    (combat/resolve-bomb      player target)
+                              incite?  (combat/resolve-incite    game player target)
+                              bomb?    (combat/resolve-bomb      game player target)
                               defect?  (combat/resolve-defect    game player target)
-                              :else    (combat/resolve-espionage player target))
+                              :else    (combat/resolve-espionage game player target))
                 att-wins?      (:attacker-wins? result)
                 agents-lost    (or (:agents-lost result) 0)
                 agents-captured (or (:agents-captured result) 0)
@@ -328,7 +328,7 @@
                             :player/fighters   new-fighters
                             :player/carriers   (max 0 (- (:player/carriers   target) cd))
                             :player/score      (utils/calculate-score
-                                                 (assoc target
+                                                 game (assoc target
                                                    :player/soldiers new-soldiers
                                                    :player/fighters new-fighters))
                             :player/incoming-bomb-result
@@ -350,20 +350,25 @@
 (defn- resolve-population
   "Resolve population growth on first load; return cached result on refresh.
   Returns [growth updated-player] where growth is the population increase (may be 0)."
-  [ctx player-id player _game]
+  [ctx player-id player game]
   (let [cached (:player/last-population-growth player)]
     (if (some? cached)
       [cached player]
-      (let [pop      (:player/population player)
+      (let [capacity-per-planet (or (:game/pop-capacity-per-planet game) const/pop-capacity-per-planet)
+            growth-rate         (or (:game/pop-growth-rate         game) const/pop-growth-rate)
+            growth-per-planet   (or (:game/pop-growth-per-planet   game) const/pop-growth-per-planet)
+            random-min          (or (:game/pop-random-min          game) const/pop-random-min)
+            random-max          (or (:game/pop-random-max          game) const/pop-random-max)
+            pop      (:player/population player)
             planets  (+ (:player/ore-planets  player)
                         (:player/erg-planets  player)
                         (:player/mil-planets  player))
-            capacity (* planets const/pop-capacity-per-planet)
-            raw      (+ (* pop const/pop-growth-rate)
-                        (* planets const/pop-growth-per-planet))
+            capacity (* planets capacity-per-planet)
+            raw      (+ (* pop growth-rate)
+                        (* planets growth-per-planet))
             crowding (if (zero? capacity) 0.0 (max 0.0 (- 1.0 (/ pop capacity))))
-            rnd         (+ const/pop-random-min
-                           (* (rand) (- const/pop-random-max const/pop-random-min)))
+            rnd         (+ random-min
+                           (* (rand) (- random-max random-min)))
             raw-growth  (* raw crowding rnd)
             growth-int  (long raw-growth)
             growth-frac (- raw-growth growth-int)
@@ -539,7 +544,9 @@
                                 raw (max 0 (+ cur delta))
                                 ;; Migration wave: clamp population to planet capacity.
                                 new (if (= k :player/population)
-                                      (min raw (* total-planets-now const/pop-capacity-per-planet))
+                                      (min raw (* total-planets-now
+                                               (or (:game/pop-capacity-per-planet game)
+                                                   const/pop-capacity-per-planet)))
                                       raw)]
                             (assoc p k (long new))))
                         player

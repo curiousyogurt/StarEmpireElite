@@ -15,6 +15,7 @@
           [:game/scheduled-end-at          inst?]
           [:game/ended-at {:optional true} inst?]
           [:game/status                    :int]
+          [:game/game-duration-days {:optional true} :int]
           [:game/turns-per-round           :int]
           [:game/rounds-per-day            :int]
           [:game/minutes-between-rounds    :int]
@@ -77,6 +78,40 @@
           [:game/station-power             :int]
           [:game/general-power             :int]
           [:game/admiral-power             :int]
+          [:game/combat-variance {:optional true} :double]
+
+          ;; Command / transport capacity (divisors)
+          [:game/soldiers-per-general   {:optional true} :int]
+          [:game/soldiers-per-transport {:optional true} :int]
+          [:game/fighters-per-admiral   {:optional true} :int]
+          [:game/fighters-per-carrier   {:optional true} :int]
+
+          ;; Population growth
+          [:game/pop-growth-rate         {:optional true} :double]
+          [:game/pop-growth-per-planet   {:optional true} :double]
+          [:game/pop-capacity-per-planet {:optional true} :double]
+          [:game/pop-random-min          {:optional true} :double]
+          [:game/pop-random-max          {:optional true} :double]
+
+          ;; Starting empire defaults (per-game player seed)
+          [:game/starting-credits     {:optional true} :int]
+          [:game/starting-food        {:optional true} :int]
+          [:game/starting-fuel        {:optional true} :int]
+          [:game/starting-galaxars    {:optional true} :int]
+          [:game/starting-mil-planets {:optional true} :int]
+          [:game/starting-erg-planets {:optional true} :int]
+          [:game/starting-ore-planets {:optional true} :int]
+          [:game/starting-population  {:optional true} :int]
+          [:game/starting-stability   {:optional true} :int]
+          [:game/starting-soldiers    {:optional true} :int]
+          [:game/starting-transports  {:optional true} :int]
+          [:game/starting-generals    {:optional true} :int]
+          [:game/starting-fighters    {:optional true} :int]
+          [:game/starting-carriers    {:optional true} :int]
+          [:game/starting-admirals    {:optional true} :int]
+          [:game/starting-stations    {:optional true} :int]
+          [:game/starting-cmd-ships   {:optional true} :int]
+          [:game/starting-agents      {:optional true} :int]
 
           ;; Income generation constants
           [:game/ore-planet-credits  :int]
@@ -85,7 +120,7 @@
           [:game/mil-planet-soldiers :int]
           [:game/mil-planet-fighters :int]
           [:game/mil-planet-stations :int]
-          
+
           ;; Population tax
           [:game/population-tax-credits    :int]
 
@@ -135,9 +170,57 @@
           [:game/fuel-buy                :int]
           [:game/fuel-sell               :int]
 
+          ;; Espionage constants
+          [:game/spy-defection-rate         {:optional true} :double]
+          [:game/incite-defection-rate      {:optional true} :double]
+          [:game/bomb-defection-rate        {:optional true} :double]
+          [:game/defect-defection-rate      {:optional true} :double]
+          [:game/espionage-defection-min      {:optional true} :int]
+          [:game/espionage-defense-threshold  {:optional true} :int]
+          [:game/espionage-defense-exponent   {:optional true} :double]
+          [:game/incite-stability-damage    {:optional true} :int]
+          [:game/incite-stability-floor     {:optional true} :int]
+          [:game/bomb-damage-rate           {:optional true} :double]
+
           ;; Fate system
           [:game/fate-probability {:optional true} :double]
-          [:game/fate-rank-tilt   {:optional true} :double]]
+          [:game/fate-rank-tilt   {:optional true} :double]
+          [:game/fate-drought-lo          {:optional true} :double]
+          [:game/fate-drought-hi          {:optional true} :double]
+          [:game/fate-pirate-raid-lo      {:optional true} :double]
+          [:game/fate-pirate-raid-hi      {:optional true} :double]
+          [:game/fate-solar-flare-lo      {:optional true} :double]
+          [:game/fate-solar-flare-hi      {:optional true} :double]
+          [:game/fate-plague-lo           {:optional true} :double]
+          [:game/fate-plague-hi           {:optional true} :double]
+          [:game/fate-reactor-breach-lo   {:optional true} :double]
+          [:game/fate-reactor-breach-hi   {:optional true} :double]
+          [:game/fate-bumper-harvest-lo   {:optional true} :double]
+          [:game/fate-bumper-harvest-hi   {:optional true} :double]
+          [:game/fate-gold-rush-lo        {:optional true} :double]
+          [:game/fate-gold-rush-hi        {:optional true} :double]
+          [:game/fate-lottery-win-lo      {:optional true} :double]
+          [:game/fate-lottery-win-hi      {:optional true} :double]
+          [:game/fate-migration-wave-lo   {:optional true} :double]
+          [:game/fate-migration-wave-hi   {:optional true} :double]
+          [:game/fate-reactor-surge-lo    {:optional true} :double]
+          [:game/fate-reactor-surge-hi    {:optional true} :double]
+          [:game/fate-uncollected-stability-penalty {:optional true} :int]
+
+          ;; Score weights
+          [:game/score-population {:optional true} :int]
+          [:game/score-mil-planet {:optional true} :int]
+          [:game/score-erg-planet {:optional true} :int]
+          [:game/score-ore-planet {:optional true} :int]
+          [:game/score-soldier    {:optional true} :int]
+          [:game/score-transport  {:optional true} :int]
+          [:game/score-general    {:optional true} :int]
+          [:game/score-fighter    {:optional true} :int]
+          [:game/score-carrier    {:optional true} :int]
+          [:game/score-admiral    {:optional true} :int]
+          [:game/score-cmd-ship   {:optional true} :int]
+          [:game/score-station    {:optional true} :int]
+          [:game/score-agent      {:optional true} :int]]
 
    :player/id :uuid
    :player [:map {:closed true}

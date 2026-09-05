@@ -76,33 +76,33 @@
 
 (deftest test-effective-forces-uncapped
   (testing "When capacity exceeds unit count, all units are effective"
-    (let [forces (combat/effective-forces strong-attacker)]
+    (let [forces (combat/effective-forces game strong-attacker)]
       (is (= 1000 (:soldiers forces)))
       (is (= 200  (:fighters forces))))))
 
 (deftest test-effective-forces-transport-cap
   (testing "Transport capacity limits soldiers for attacker"
-    (let [forces (combat/effective-forces transport-limited-attacker)]
+    (let [forces (combat/effective-forces game transport-limited-attacker)]
       ;; transports: 2 * 100 = 200, generals: 5 * 1000 = 5000 — transport wins
       (is (= 200 (:soldiers forces)))))
   (testing "Carrier capacity limits fighters for attacker"
-    (let [forces (combat/effective-forces transport-limited-attacker)]
+    (let [forces (combat/effective-forces game transport-limited-attacker)]
       ;; carriers: 1 * 100 = 100, admirals: 2 * 1000 = 2000 — carrier wins
       (is (= 100 (:fighters forces))))))
 
 (deftest test-effective-forces-general-cap
   (testing "General capacity limits soldiers when it is the binding constraint"
-    (let [forces (combat/effective-forces general-limited-attacker)]
+    (let [forces (combat/effective-forces game general-limited-attacker)]
       ;; generals: 1 * 1000 = 1000, transports: 100 * 100 = 10000 — general wins
       (is (= 1000 (:soldiers forces)))))
   (testing "Admiral capacity limits fighters when it is the binding constraint"
-    (let [forces (combat/effective-forces general-limited-attacker)]
+    (let [forces (combat/effective-forces game general-limited-attacker)]
       ;; admirals: 1 * 1000 = 1000, carriers: 100 * 100 = 10000 — admiral wins
       (is (= 1000 (:fighters forces))))))
 
 (deftest test-effective-forces-passthrough-fields
   (testing "Non-capped fields pass through unchanged"
-    (let [forces (combat/effective-forces strong-attacker)]
+    (let [forces (combat/effective-forces game strong-attacker)]
       (is (= (:player/transports strong-attacker) (:transports forces)))
       (is (= (:player/generals   strong-attacker) (:generals   forces)))
       (is (= (:player/carriers   strong-attacker) (:carriers   forces)))
@@ -116,20 +116,20 @@
 
 (deftest test-defending-forces-no-transport-cap
   (testing "Defenders are not limited by transports — only generals cap soldiers"
-    (let [forces (combat/effective-defending-forces transport-limited-attacker)]
+    (let [forces (combat/effective-defending-forces game transport-limited-attacker)]
       ;; generals: 5 * 1000 = 5000, but soldiers = 1000 — so 1000 is effective
       (is (= 1000 (:soldiers forces)))))
   (testing "Defenders are not limited by carriers — only admirals cap fighters"
-    (let [forces (combat/effective-defending-forces transport-limited-attacker)]
+    (let [forces (combat/effective-defending-forces game transport-limited-attacker)]
       ;; admirals: 2 * 1000 = 2000, fighters = 500 — so 500 is effective
       (is (= 500 (:fighters forces))))))
 
 (deftest test-defending-forces-includes-stations
   (testing "Stations are present in defending forces"
-    (let [forces (combat/effective-defending-forces strong-defender)]
+    (let [forces (combat/effective-defending-forces game strong-defender)]
       (is (= 10 (:stations forces)))))
   (testing "Stations are zero for attacker forces"
-    (let [forces (combat/effective-forces strong-attacker)]
+    (let [forces (combat/effective-forces game strong-attacker)]
       (is (= 0 (:stations forces))))))
 
 ;;;;
@@ -138,14 +138,14 @@
 
 (deftest test-base-power-attacker
   (testing "Attacker power sums soldiers, fighters, cmd-ships — no generals/admirals"
-    (let [forces (combat/effective-forces strong-attacker)
+    (let [forces (combat/effective-forces game strong-attacker)
           power  (combat/base-power game forces true)]
       ;; 1000 soldiers * 1 + 200 fighters * 3 + 1 cmd-ship * 20 = 1000 + 600 + 20 = 1620
       (is (= 1620 power)))))
 
 (deftest test-base-power-defender
   (testing "Defender power includes stations but not generals/admirals"
-    (let [forces (combat/effective-defending-forces strong-defender)
+    (let [forces (combat/effective-defending-forces game strong-defender)
           power  (combat/base-power game forces false)]
       ;; 500 soldiers * 1 + 100 fighters * 3 + 0 cmd-ships * 20 + 10 stations * 5
       ;; = 500 + 300 + 0 + 50 = 850
@@ -153,7 +153,7 @@
 
 (deftest test-base-power-stations-excluded-for-attacker
   (testing "Stations do not contribute to attacker power even if present in force map"
-    (let [forces (assoc (combat/effective-forces strong-attacker) :stations 999)
+    (let [forces (assoc (combat/effective-forces game strong-attacker) :stations 999)
           with-stations    (combat/base-power game forces false)
           without-stations (combat/base-power game forces true)]
       (is (> with-stations without-stations)))))
@@ -177,7 +177,7 @@
 
 (deftest test-resolve-espionage-returns-required-keys
   (testing "Result always contains the expected keys"
-    (let [result (combat/resolve-espionage strong-attacker strong-defender)]
+    (let [result (combat/resolve-espionage game strong-attacker strong-defender)]
       (is (contains? result :attacker-id))
       (is (contains? result :defender-id))
       (is (contains? result :defender-name))
@@ -186,7 +186,7 @@
 
 (deftest test-resolve-espionage-ids-are-strings
   (testing "UUIDs are stored as strings for safe serialisation"
-    (let [result (combat/resolve-espionage strong-attacker strong-defender)]
+    (let [result (combat/resolve-espionage game strong-attacker strong-defender)]
       (is (string? (:attacker-id result)))
       (is (string? (:defender-id result))))))
 
@@ -194,7 +194,7 @@
   (testing "Intel is populated when attacker wins (force attacker win with overwhelming agents)"
     (let [big-attacker (assoc strong-attacker :player/agents 100000)
           small-defender (assoc strong-defender :player/agents 1)
-          result (combat/resolve-espionage big-attacker small-defender)]
+          result (combat/resolve-espionage game big-attacker small-defender)]
       (when (:attacker-wins? result)
         (is (some? (:intel result)))
         (is (contains? (:intel result) :soldiers))
@@ -205,7 +205,7 @@
   (testing "Intel is nil when attacker loses"
     (let [weak-attacker  (assoc strong-attacker :player/agents 1)
           strong-def     (assoc strong-defender :player/agents 100000)
-          result (combat/resolve-espionage weak-attacker strong-def)]
+          result (combat/resolve-espionage game weak-attacker strong-def)]
       (when-not (:attacker-wins? result)
         (is (nil? (:intel result)))))))
 
@@ -223,7 +223,7 @@
           wins-defect    (count (filter :attacker-wins?
                                         (repeatedly runs #(combat/resolve-defect game small-attacker mid-defender))))
           wins-spy       (count (filter :attacker-wins?
-                                        (repeatedly runs #(combat/resolve-espionage small-attacker mid-defender))))]
+                                        (repeatedly runs #(combat/resolve-espionage game small-attacker mid-defender))))]
       (is (> wins-defect wins-spy)))))
 
 (deftest defect-transfers-up-to-attacker-limit
@@ -259,7 +259,7 @@
     (let [small-attacker (assoc strong-attacker :player/agents 50)
           huge-defender  (assoc strong-defender :player/agents 100000)]
       (dotimes [_ 20]
-        (let [r (combat/resolve-espionage small-attacker huge-defender)]
+        (let [r (combat/resolve-espionage game small-attacker huge-defender)]
           (is (false? (:attacker-wins? r))))))))
 
 ;;;;

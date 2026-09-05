@@ -235,7 +235,7 @@
             :player/stations      (:stations after)
             :player/current-phase 2
             :player/score         (utils/calculate-score
-                                    (assoc player
+                                    game (assoc player
                                       :player/credits  (:credits after)
                                       :player/food     (:food after)
                                       :player/fuel     (:fuel after)

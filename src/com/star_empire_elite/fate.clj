@@ -6,8 +6,11 @@
 ;;;;; resources. Fate resolves at outcomes, alongside breakaway and population growth.
 ;;;;;
 ;;;;; No DB, HTTP, or rendering concerns live here. All functions take plain maps and return
-;;;;; plain maps. The catalog lives here, next to the logic that reads it; it is not seeded
-;;;;; onto the game entity (fate entries are structure, not per-game balance numbers).
+;;;;; plain maps. The catalog lives here, next to the logic that reads it, and stays fixed
+;;;;; across games (type/label/targets/basis are structure, not balance). Its baked-in :lo/:hi
+;;;;; are just the constants.clj defaults, though — roll-fate overlays each event's per-game
+;;;;; :game/fate-<type>-lo/-hi (and :game/fate-uncollected-stability-penalty) on top when a
+;;;;; game has customized them, via entry-lo-hi.
 ;;;;;
 ;;;;; Public API: fate-catalog, clamp01, rank-fraction, roll-fate
 ;;;;;
@@ -145,6 +148,20 @@
     ;; Fallback: unreachable for valid catalog entries, but safe.
     0))
 
+(defn- entry-lo-hi
+  "Resolve an entry's [lo hi] multiplier bounds. Prefers the game's per-game override
+  (:game/fate-<type>-lo / -hi, e.g. :game/fate-drought-lo) and falls back to the catalog
+  entry's own :lo/:hi (themselves sourced from constants.clj) for games that predate these
+  fields being snapshotted. The catalog stays structural — only the magnitudes are overlaid.
+
+  [game game-map, entry catalog-entry] -> [lo double, hi double]"
+  [game entry]
+  (let [type-name (name (:type entry))
+        lo-key    (keyword "game" (str "fate-" type-name "-lo"))
+        hi-key    (keyword "game" (str "fate-" type-name "-hi"))]
+    [(lo-key game (:lo entry))
+     (hi-key game (:hi entry))]))
+
 (defn- entry-delta
   "Compute the signed delta for one target key.
   disaster: negative, capped so the player cannot go below zero.
@@ -170,8 +187,8 @@
   Zero for boons, for non-spillable targets, and when the disaster is fully collectable.
   Scales linearly from 0 (fully paid) to fate-uncollected-stability-penalty (fully dodged).
 
-  [polarity keyword, target-key keyword, basis number, mult double, holding number] -> long"
-  [polarity target-key basis mult holding]
+  [game game-map, polarity keyword, target-key keyword, basis number, mult double, holding number] -> long"
+  [game polarity target-key basis mult holding]
   (if (or (not= polarity :disaster)
           (not (spillable-keys target-key))
           (<= basis 0))
@@ -182,7 +199,8 @@
       (if (or (zero? shortfall) (zero? raw))
         0
         (Math/round ^double (* (/ (double shortfall) (double raw))
-                                const/fate-uncollected-stability-penalty))))))
+                                (:game/fate-uncollected-stability-penalty
+                                 game const/fate-uncollected-stability-penalty)))))))
 
 ;;;;
 ;;;; Main Roll
@@ -208,18 +226,19 @@
   [player player-map, game game-map, active [player-map], rng fn] -> result-map | nil"
   [player game active rng]
   ;; Step 1 — gate: event occurs with probability fate-probability.
-  (when (< (rng) (:game/fate-probability game 0.15))
+  (when (< (rng) (:game/fate-probability game const/fate-probability))
     (let [;; Step 2 — where does this player rank among active empires?
           r          (rank-fraction player active)
           ;; Step 3 — leaders draw disasters more; trailers draw boons more.
-          p-disaster (clamp01 (+ 0.5 (* (- r 0.5) (:game/fate-rank-tilt game 0.4))))
+          p-disaster (clamp01 (+ 0.5 (* (- r 0.5) (:game/fate-rank-tilt game const/fate-rank-tilt))))
           ;; Step 4 — polarity.
           polarity   (if (< (rng) p-disaster) :disaster :boon)
           ;; Step 5 — pick uniformly from matching catalog entries.
           entries    (filterv #(= (:polarity %) polarity) fate-catalog)
           entry      (nth entries (int (* (rng) (count entries))))
-          ;; Step 6 — multiplier drawn uniformly from [lo, hi].
-          mult       (+ (:lo entry) (* (rng) (- (:hi entry) (:lo entry))))
+          ;; Step 6 — multiplier drawn uniformly from [lo, hi] (per-game override, if set).
+          [lo hi]    (entry-lo-hi game entry)
+          mult       (+ lo (* (rng) (- hi lo)))
           ;; Step 7 — compute one signed delta (and any stability spill) per target key.
           bases      (into {}
                        (for [k (:targets entry)]
@@ -231,7 +250,7 @@
                          [k (entry-delta polarity (get bases k) mult (get player k 0))]))
           spill      (reduce + 0
                        (for [k (:targets entry)]
-                         (entry-stability-spill polarity k (get bases k) mult (get player k 0))))]
+                         (entry-stability-spill game polarity k (get bases k) mult (get player k 0))))]
       ;; Step 8 — assemble result map.
       {:type            (:type entry)
        :polarity        polarity

@@ -371,7 +371,7 @@
                 :player/expense-stability-penalty  penalty
                 :player/current-phase              3
                 :player/score                      (utils/calculate-score
-                                                     (assoc player
+                                                     game (assoc player
                                                        :player/credits (:credits resources-after)
                                                        :player/food    (:food resources-after)
                                                        :player/fuel    (:fuel resources-after)))}])

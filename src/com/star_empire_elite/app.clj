@@ -33,6 +33,7 @@
             [com.star-empire-elite.pages.app.results    :as results]
             ;; Game functions
             [com.star-empire-elite.constants            :as const]
+            [com.star-empire-elite.game-config          :as cfg]
             [com.star-empire-elite.resolution           :as resolution]
             [com.star-empire-elite.ui                   :as ui]
             [com.star-empire-elite.utils                :as utils]
@@ -54,19 +55,23 @@
 ;;;; Game Management
 ;;;;
 
-(def player-defaults
-  "Starting state for a new player. Merged with identity fields (user, game, empire-name)
-  at join time."
+(defn player-defaults
+  "Starting state for a new player, seeded from the game's :game/starting-* fields (falling back
+  to constants.clj for games created before those fields were snapshotted). Merged with identity
+  fields (user, game, empire-name) at join time.
+
+  [game game-map] -> player-map"
+  [game]
   {:db/doc-type                   :player
-   :player/credits                const/starting-credits
-   :player/food                   const/starting-food
-   :player/fuel                   const/starting-fuel
-   :player/galaxars               const/starting-galaxars
-   :player/mil-planets            const/starting-mil-planets
-   :player/erg-planets            const/starting-erg-planets
-   :player/ore-planets            const/starting-ore-planets
-   :player/population             const/starting-population
-   :player/stability              const/starting-stability
+   :player/credits                (or (:game/starting-credits     game) const/starting-credits)
+   :player/food                   (or (:game/starting-food        game) const/starting-food)
+   :player/fuel                   (or (:game/starting-fuel        game) const/starting-fuel)
+   :player/galaxars               (or (:game/starting-galaxars    game) const/starting-galaxars)
+   :player/mil-planets            (or (:game/starting-mil-planets game) const/starting-mil-planets)
+   :player/erg-planets            (or (:game/starting-erg-planets game) const/starting-erg-planets)
+   :player/ore-planets            (or (:game/starting-ore-planets game) const/starting-ore-planets)
+   :player/population             (or (:game/starting-population  game) const/starting-population)
+   :player/stability              (or (:game/starting-stability   game) const/starting-stability)
    :player/status                 0
    :player/score                  0
    :player/current-turn           1
@@ -74,117 +79,59 @@
    :player/current-phase          1
    :player/turns-used             0
    :player/rounds-started-today   0
-   :player/generals               const/starting-generals
-   :player/admirals               const/starting-admirals
-   :player/soldiers               const/starting-soldiers
-   :player/transports             const/starting-transports
-   :player/stations               const/starting-stations
-   :player/carriers               const/starting-carriers
-   :player/fighters               const/starting-fighters
-   :player/cmd-ships              const/starting-cmd-ships
-   :player/agents                 const/starting-agents
+   :player/generals               (or (:game/starting-generals   game) const/starting-generals)
+   :player/admirals               (or (:game/starting-admirals   game) const/starting-admirals)
+   :player/soldiers               (or (:game/starting-soldiers   game) const/starting-soldiers)
+   :player/transports             (or (:game/starting-transports game) const/starting-transports)
+   :player/stations               (or (:game/starting-stations   game) const/starting-stations)
+   :player/carriers               (or (:game/starting-carriers   game) const/starting-carriers)
+   :player/fighters               (or (:game/starting-fighters   game) const/starting-fighters)
+   :player/cmd-ships              (or (:game/starting-cmd-ships  game) const/starting-cmd-ships)
+   :player/agents                 (or (:game/starting-agents     game) const/starting-agents)
    :player/last-population-growth nil})
 
-(def game-defaults
-  "Snapshot of all constants baked into a game entity at creation time.
-  Values are stored on the game so that mid-game constant changes don't
-  affect games already in progress."
-  {:game/turns-per-round               const/turns-per-round
-   :game/rounds-per-day                const/rounds-per-day
-   :game/minutes-between-rounds        const/minutes-between-rounds
-   :game/raid-defense-multiplier       const/raid-defense-multiplier
-   :game/raid-reward-multiplier        const/raid-reward-multiplier
-   :game/invade-defense-multiplier     const/invade-defense-multiplier
-   :game/invade-reward-multiplier      const/invade-reward-multiplier
-   :game/combat-loss-floor             const/combat-loss-floor
-   :game/combat-loser-cap              const/combat-loser-cap
-   :game/combat-winner-max             const/combat-winner-max
-   :game/cmd-ship-loss-mult            const/cmd-ship-loss-mult
-   :game/invade-planet-capture-cap     const/invade-planet-capture-cap
-   :game/invade-resource-capture-cap   const/invade-resource-capture-cap
-   :game/raid-planet-capture-cap       const/raid-planet-capture-cap
-   :game/raid-resource-capture-cap     const/raid-resource-capture-cap
-   :game/strike-damage-rate            const/strike-damage-rate
-   :game/strike-max-dispatch           const/strike-max-dispatch
-   :game/strike-interception-rate      const/strike-interception-rate
-   :game/strike-interception-cap       const/strike-interception-cap
-   :game/strike-agent-mult             const/strike-agent-mult
-   :game/defect-defense-multiplier     const/defect-defense-multiplier
-   :game/defect-transfer-rate          const/defect-transfer-rate
-   :game/general-mult-rate              const/general-mult-rate
-   :game/general-mult-cap               const/general-mult-cap
-   :game/admiral-mult-rate              const/admiral-mult-rate
-   :game/admiral-mult-cap               const/admiral-mult-cap
-   :game/agent-mult-rate                const/agent-mult-rate
-   :game/agent-mult-cap                 const/agent-mult-cap
-   :game/cmd-ship-mult-rate             const/cmd-ship-mult-rate
-   :game/cmd-ship-mult-cap              const/cmd-ship-mult-cap
-   :game/space-carryover                const/space-carryover
-   :game/soldier-power                 const/soldier-power
-   :game/fighter-power                 const/fighter-power
-   :game/cmd-ship-power                const/cmd-ship-power
-   :game/station-power                 const/station-power
-   :game/general-power                 const/general-power
-   :game/admiral-power                 const/admiral-power
-   :game/ore-planet-credits            const/ore-planet-credits
-   :game/erg-planet-food               const/erg-planet-food
-   :game/erg-planet-fuel               const/erg-planet-fuel
-   :game/mil-planet-soldiers           const/mil-planet-soldiers
-   :game/mil-planet-fighters           const/mil-planet-fighters
-   :game/mil-planet-stations           const/mil-planet-stations
-   :game/population-tax-credits        const/population-tax-credits
-   :game/planet-upkeep-credits         const/planet-upkeep-credits
-   :game/planet-upkeep-food            const/planet-upkeep-food
-   :game/soldier-upkeep-credits        const/soldier-upkeep-credits
-   :game/soldier-upkeep-food           const/soldier-upkeep-food
-   :game/fighter-upkeep-credits        const/fighter-upkeep-credits
-   :game/fighter-upkeep-fuel           const/fighter-upkeep-fuel
-   :game/station-upkeep-credits        const/station-upkeep-credits
-   :game/station-upkeep-fuel           const/station-upkeep-fuel
-   :game/agent-upkeep-food             const/agent-upkeep-food
-   :game/agent-upkeep-fuel             const/agent-upkeep-fuel
-   :game/population-upkeep-food        const/population-upkeep-food
-   :game/population-upkeep-fuel        const/population-upkeep-fuel
-   :game/soldier-cost                  const/soldier-cost
-   :game/transport-cost                const/transport-cost
-   :game/general-cost                  const/general-cost
-   :game/carrier-cost                  const/carrier-cost
-   :game/fighter-cost                  const/fighter-cost
-   :game/admiral-cost                  const/admiral-cost
-   :game/station-cost                  const/station-cost
-   :game/cmd-ship-cost                 const/cmd-ship-cost
-   :game/agent-cost                    const/agent-cost
-   :game/mil-planet-cost               const/mil-planet-cost
-   :game/erg-planet-cost               const/erg-planet-cost
-   :game/ore-planet-cost               const/ore-planet-cost
-   :game/soldier-sell                  const/soldier-sell
-   :game/transport-sell                const/transport-sell
-   :game/general-sell                  const/general-sell
-   :game/fighter-sell                  const/fighter-sell
-   :game/carrier-sell                  const/carrier-sell
-   :game/admiral-sell                  const/admiral-sell
-   :game/station-sell                  const/station-sell
-   :game/cmd-ship-sell                 const/cmd-ship-sell
-   :game/agent-sell                    const/agent-sell
-   :game/mil-planet-sell               const/mil-planet-sell
-   :game/erg-planet-sell               const/erg-planet-sell
-   :game/ore-planet-sell               const/ore-planet-sell
-   :game/food-buy                      const/food-buy
-   :game/food-sell                     const/food-sell
-   :game/fuel-buy                      const/fuel-buy
-   :game/fuel-sell                     const/fuel-sell
-   :game/expense-stability-penalty     const/expense-stability-penalty
-   :game/capture-stability-penalty-per-planet const/capture-stability-penalty-per-planet
-   :game/capture-stability-penalty-cap        const/capture-stability-penalty-cap
-   :game/stability-breakaway-threshold const/stability-breakaway-threshold
-   :game/stability-breakaway-cap       const/stability-breakaway-cap
-   :game/stability-recovery-amount     const/stability-recovery-amount
-   :game/stability-recovery-floor      const/stability-recovery-floor
-   :game/fate-probability              const/fate-probability
-   :game/fate-rank-tilt                const/fate-rank-tilt})
+;;; A field-spec becomes one labeled number input. Plain HTML5 type="number" with min/max/step
+;;; gives client-side validation for free (spinner buttons, out-of-range highlighting) with no
+;;; JS — the authoritative check is still cfg/coerce-config + cfg/enforce-invariants server-side.
+(defn- config-field-input
+  "[spec map] -> hiccup"
+  [{:keys [key label type min max step default]}]
+  (let [field-name (name (cfg/param-key key))
+        ;; :step is a browser UX hint only — game-config/coerce-config is the real authority
+        ;; on precision, server-side. For :double fields, a numeric step risks a native "step
+        ;; mismatch" that silently blocks form submission with no visible error whenever the
+        ;; field sits inside a collapsed <details> (the browser has nothing visible to show a
+        ;; validation tooltip on). "any" disables that check entirely for doubles; every :int
+        ;; field uses step 1, which no integer default can ever mismatch.
+        html-step (if (= type :double) "any" step)]
+    [:div
+     [:label.block.mb-1
+      {:for field-name :class "text-[10px] uppercase tracking-[0.1em] text-game-green-muted"}
+      label]
+     [:input.w-full
+      {:type "number" :id field-name :name field-name
+       :min min :max max :step html-step :value default
+       ;; Suppress the native up/down spinner (Firefox via appearance, WebKit via the
+       ;; pseudo-element selectors) — min/max/step still enforce range, just without the widget.
+       :class "bg-game-green-done border border-game-green-border text-green-400 py-1 px-2 font-mono text-xs rounded-sm outline-none w-full [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"}]]))
+
+(defn- config-category-section
+  "One collapsed <details> card per category, listing its fields in a responsive grid.
+
+  [[category keyword, label str]] -> hiccup"
+  [[category label]]
+  (ui/collapsible-card
+    {:summary (str label " (" (count (cfg/fields-in-category category)) ")")}
+    [:div.grid.grid-cols-1.gap-3.p-3
+     {:class "sm:grid-cols-2"}
+     (map config-field-input (cfg/fields-in-category category))]))
 
 (defn create-game-page
   "Show the create-game form (admin only). Redirects non-admins to /app.
+
+  Below the galaxy name, every admin-tunable constant (game-config/field-specs) is editable
+  inside a collapsed-by-default <details> section per category (Game, Income, Expenses, ...),
+  seeded with its constants.clj default.
 
   [ctx ring-ctx] -> hiccup"
   [{:keys [session biff/db] :as ctx}]
@@ -209,12 +156,18 @@
              [:input.w-full
               {:type "text" :name "game-name" :required true :maxlength 100 :autofocus true
                :class "bg-game-green-done border border-game-green-border text-green-400 py-1.5 px-2 font-mono text-sm rounded-sm outline-none w-full"}]]
+            [:div.mb-3.5.flex.flex-col.gap-2
+             (map config-category-section cfg/category-order)]
             [:div.flex.gap-3
              (ui/action-bar-link "/app" "Cancel")
              (ui/submit-button true "Create")])]]))))
 
 (defn create-game
-  "Create a new game entity with all constants baked in. Admin only.
+  "Create a new game entity. Admin only. Every constant in game-config/field-specs is read from
+  the submitted form, clamped to its legal range, and checked against cross-field invariants
+  (game-config/coerce-config, game-config/enforce-invariants) before being baked into the game
+  entity — so mid-game constant changes never affect games already in progress, and an
+  out-of-range or invariant-violating submission is silently corrected rather than rejected.
 
   [ctx ring-ctx] -> ring-response (303 redirect to join-game page)"
   [{:keys [session biff/db params] :as ctx}]
@@ -224,8 +177,9 @@
       {:status 303 :headers {"location" "/app"}}
       (let [game-id   (java.util.UUID/randomUUID)
             game-name (clojure.string/trim (or (:game-name params) ""))
+            config    (cfg/enforce-invariants (cfg/coerce-config params))
             now       (java.util.Date.)
-            end-date  (java.util.Date. (+ (.getTime now) (* const/game-duration-days 24 60 60 1000)))]
+            end-date  (java.util.Date. (+ (.getTime now) (* (:game/game-duration-days config) 24 60 60 1000)))]
         (biff/submit-tx ctx
           [(merge {:db/doc-type           :game
                    :xt/id                 game-id
@@ -233,7 +187,7 @@
                    :game/created-at       now
                    :game/scheduled-end-at end-date
                    :game/status           const/game-status-active}
-                  game-defaults)])
+                  config)])
         {:status 303
          :headers {"location" (str "/app/join-game/" game-id)}}))))
 
@@ -345,7 +299,7 @@
       ;; Set up new player in the game, pulling from game constants
       (let [player-id (java.util.UUID/randomUUID)]
         (biff/submit-tx ctx
-                        [(merge player-defaults
+                        [(merge (player-defaults game)
                                 {:xt/id              player-id
                                  :player/user        uid
                                  :player/game        game-id

@@ -66,7 +66,7 @@
                       (* 10 const/score-soldier) (* 4 const/score-transport) (* 5 const/score-fighter)
                       (* 2 const/score-carrier) (* 1 const/score-cmd-ship) (* 3 const/score-station)
                       (* 1 const/score-general) (* 0 const/score-admiral) (* 6 const/score-agent))]
-      (is (= expected (utils/calculate-score player))))))
+      (is (= expected (utils/calculate-score test-game player))))))
 
 (deftest test-calculate-score-zero-player
   (testing "Returns zero when all values are zero"
@@ -74,7 +74,7 @@
                   :player/soldiers 0 :player/transports 0 :player/fighters 0
                   :player/carriers 0 :player/cmd-ships 0 :player/stations 0
                   :player/generals 0 :player/admirals 0 :player/agents 0}]
-      (is (= 0 (utils/calculate-score player))))))
+      (is (= 0 (utils/calculate-score test-game player))))))
 
 (deftest test-calculate-score-planets-dominate
   (testing "A single military planet outweighs hundreds of soldiers"
@@ -82,7 +82,7 @@
           ;; Use just under enough soldiers to match one mil-planet's score.
           soldier-count  (dec (quot const/score-mil-planet const/score-soldier))
           soldier-player {:player/soldiers soldier-count}]
-      (is (> (utils/calculate-score planet-player) (utils/calculate-score soldier-player))))))
+      (is (> (utils/calculate-score test-game planet-player) (utils/calculate-score test-game soldier-player))))))
 
 ;;;;
 ;;;; apply-outcomes Tests
@@ -173,7 +173,7 @@
         (outcomes/apply-outcomes {:path-params {:player-id (str test-player-id)}
                                   :biff/db nil})
         (let [tx (first @tx-atom)
-              expected-score (utils/calculate-score test-player)]
+              expected-score (utils/calculate-score test-game test-player)]
           (is (= expected-score (:player/score tx))))))))
 
 ;;;;

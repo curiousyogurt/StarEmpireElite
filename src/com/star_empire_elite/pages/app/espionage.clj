@@ -117,7 +117,7 @@
                               :player/current-phase         6
                               :player/pending-espionage     target-uuid
                               :player/pending-espionage-op  op
-                              :player/score                 (utils/calculate-score player)}])
+                              :player/score                 (utils/calculate-score game player)}])
         {:status 303
          :headers {"location" (str "/app/game/" player-id "/outcomes")}}))))
 
