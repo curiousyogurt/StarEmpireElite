@@ -288,6 +288,25 @@
   (let [end (:game/scheduled-end-at game)]
     (boolean (and end (>= (.getTime now) (.getTime end))))))
 
+(defn game-days-complete?
+  "Returns true once the game's day counter has reached its scheduled length — i.e. the
+  same 'Day N/N' point an admin sees on screen (see ui/day-segment). This fires up to
+  slightly under 24 hours before game-ended? does, since the day counter advances once per
+  elapsed calendar day rather than waiting for the exact scheduled-end-at instant. Used to
+  gate final-standings archiving, which should match what the admin actually sees, not the
+  stricter exact-timestamp check used to lock players out of taking turns.
+
+  [game game-map, now inst] -> boolean"
+  [game now]
+  (let [created (:game/created-at game)
+        end     (:game/scheduled-end-at game)]
+    (boolean
+      (and created end
+           (let [day-ms      (* 24 60 60 1000)
+                 current-day (inc (quot (- (.getTime now) (.getTime created)) day-ms))
+                 total-days  (quot (- (.getTime end) (.getTime created)) day-ms)]
+             (>= current-day total-days))))))
+
 (defn display-turn-round
   "Return display values {:turn n :round n} for turn and round indicators.
   Derived from round-status — never reads the stored current-round, which prevents

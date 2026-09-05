@@ -289,6 +289,8 @@
           (ui/section-label "Available Games")
           (map #(available-game-card (assoc % :admin? admin?)) available-games)])
 
-       ;; Create game button — admin only
-       (when admin?
-         (ui/action-bar-primary-link "/app/create-game" "Create Game"))]])))
+       ;; Hall of Fame link (everyone) + Create Game button (admin only)
+       [:div.flex.gap-3
+        (ui/action-bar-link "/app/results" "Hall of Fame")
+        (when admin?
+          (ui/action-bar-primary-link "/app/create-game" "Create Game"))]]])))

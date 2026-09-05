@@ -236,6 +236,22 @@
                 [:event/defender-name {:optional true} [:maybe :string]]
                 [:event/payload      :string]]
 
+   ;; Final standings snapshot, written when an admin clears a completed game (see
+   ;; app/delete-game). Outlives the :game and :player entities, which are deleted at the
+   ;; same time — this is the only durable record of who won.
+   :game-result/id :uuid
+   :game-result [:map {:closed true}
+                 [:xt/id                   :game-result/id]
+                 [:game-result/game-name   :string]
+                 [:game-result/created-at  inst?]  ; when the game started
+                 [:game-result/ended-at    inst?]  ; when it was archived
+                 [:game-result/standings
+                  [:vector [:map {:closed true}
+                            [:standing/rank         :int]
+                            [:standing/empire-name  :string]
+                            [:standing/planets      :int]
+                            [:standing/score        :int]]]]]
+
    })
 
 (def module

@@ -471,6 +471,28 @@
             extra)
      label]))
 
+(defn chevron
+  "Small right-pointing chevron that rotates 90° when the parent <details> is open."
+  []
+  [:span.card-chevron.text-game-green-soft.text-xs.ml-auto "❯"])
+
+(defn collapsible-card
+  "Render a <details>/<summary> card with consistent styling.
+  badge, summary-content, and optional summary-extra appear in the summary row;
+  body is the expandable content below.
+
+  [opts {:keys [badge summary summary-extra open?]}, body hiccup] -> hiccup"
+  [{:keys [badge summary summary-extra open?]} & body]
+  [:details.rounded-game.bg-game-surface.overflow-hidden
+   (cond-> {:class "border border-game-border"}
+     open? (assoc :open true))
+   [:summary.list-none.flex.items-center.py-2.px-3.gap-3.cursor-pointer
+    badge
+    [:span.text-sm.flex-1 summary]
+    summary-extra
+    (chevron)]
+   (into [:<>] body)])
+
 
 (defn- snapshot-hero
   "Render the 4-cell hero strip: Credits, Ore/Erg/Mil Planets in oversized stat cells.

@@ -66,28 +66,6 @@
 (def ^:private col-header-cls
   "text-[10px] tracking-widest text-game-green-dim uppercase font-normal py-1.5 px-3")
 
-(defn- chevron
-  "Small right-pointing chevron that rotates 90° when the parent <details> is open."
-  []
-  [:span.card-chevron.text-game-green-soft.text-xs.ml-auto "❯"])
-
-(defn- collapsible-card
-  "Render a <details>/<summary> card with consistent styling.
-  badge, summary-content, and optional summary-extra appear in the summary row;
-  body is the expandable content below.
-
-  [opts {:keys [badge summary summary-extra open?]}, body hiccup] -> hiccup"
-  [{:keys [badge summary summary-extra open?]} & body]
-  [:details.rounded-game.bg-game-surface.overflow-hidden
-   (cond-> {:class "border border-game-border"}
-     open? (assoc :open true))
-   [:summary.list-none.flex.items-center.py-2.px-3.gap-3.cursor-pointer
-    badge
-    [:span.text-sm.flex-1 summary]
-    summary-extra
-    (chevron)]
-   (into [:<>] body)])
-
 (defn- result-summary
   "Render the ATTACKER → ACTION → DEFENDER (RESULT) summary text.
   Result text is always from the attacker's perspective: (SUCCESS) if attacker won, (FAILURE) if not.
@@ -388,7 +366,7 @@
                              (combat-row (opp-loss-cell n) label (gain-cell n))
                              (combat-row (gain-cell n) label (opp-loss-cell n)))))
         verb           (case mode :invade "invaded" :raid "raided" "attacked")]
-    (collapsible-card
+    (ui/collapsible-card
       {:badge   (ui/mode-badge mode)
        :summary (result-summary verb opp-name attacker-wins? (not stations-mine?))
        :open?   open?}
@@ -439,7 +417,7 @@
                         ["admirals"   dash (opp-loss-cell (:admirals   dl))]
                         ["def stns"   dash (opp-loss-cell (:stations   dl))]
                         ["agents"     dash (opp-loss-cell (:agents     dl))]]]
-    (collapsible-card
+    (ui/collapsible-card
       {:badge         (ui/mode-badge :strike)
        :summary       (if stations-mine?
                         [:<> [:span.text-green-300.font-bold opp-name]
@@ -465,7 +443,7 @@
                "incite" (if won? "incited unrest within" "attempted to stir unrest within")
                "defect" (if won? "subverted agents from" "attempted to subvert from")
                         (if won? "operated against" "attempted to operate against"))]
-    (collapsible-card
+    (ui/collapsible-card
       {:badge   (ui/mode-badge :spy)
        :summary (result-summary verb opp-name won? true)
        :open?   open?}
@@ -511,7 +489,7 @@
                        (destroyed-units-text
                          [["soldiers" soldiers] ["transports" transports]
                           ["fighters" fighters] ["carriers"   carriers]]))]
-    (collapsible-card
+    (ui/collapsible-card
       {:badge         (ui/mode-badge :bomb)
        :summary       (result-summary "bombed" opp-name attacker-wins? you-are-attacker?)
        :summary-extra (when summary-text [:span.text-xs.text-game-green-dim (str "— " summary-text)])
@@ -574,7 +552,7 @@
         ;; Solar Flare hits multiple unit types — expand to show the per-unit breakdown.
         ;; All other fates have one target, so the detail would just repeat the summary.
         (if (> (count effect) 1)
-          (collapsible-card
+          (ui/collapsible-card
             {:badge   (ui/mode-badge polarity)
              :summary summary
              :open?   disaster?}
@@ -681,7 +659,7 @@
 
   [mode keyword, summary-text string, body-text string] -> hiccup"
   [mode summary-text body-text]
-  (collapsible-card
+  (ui/collapsible-card
     {:badge   (ui/mode-badge mode)
      :summary [:<> [:span.text-game-green-soft summary-text]
                    [:span.text-red-400 " (SUCCESS)"]]
@@ -701,7 +679,7 @@
         summary  (if (= 1 (count esp-fails))
                    (str "An empire " (op-verb (first esp-fails)))
                    (str (count esp-fails) " empires operated against you"))]
-    (collapsible-card
+    (ui/collapsible-card
       {:badge   (ui/mode-badge :spy)
        :summary [:<> [:span.text-game-green-soft summary]
                      [:span.text-green-400 " (FAILURE)"]]

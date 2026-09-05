@@ -494,3 +494,44 @@
   (testing "Throws IllegalArgumentException for an invalid UUID string"
     (is (thrown? IllegalArgumentException
                  (utils/load-player-and-game nil "not-a-uuid")))))
+
+;;;;
+;;;; game-days-complete? Tests
+;;;;
+;;;; Mirrors the "Day N/N" counter shown on screen (ui/day-segment), not the exact
+;;;; scheduled-end-at instant used by game-ended?. See app/delete-game, which archives
+;;;; standings as soon as the admin would see the final day, not up to ~24h later.
+;;;;
+
+(def ^:private day-ms (* 24 60 60 1000))
+
+(deftest test-game-days-complete-before-final-day
+  (testing "False while the day counter is still short of the scheduled length"
+    (let [now     (java.util.Date.)
+          created (java.util.Date. (- (.getTime now) (* 2 day-ms)))
+          game    {:game/created-at created
+                   :game/scheduled-end-at (java.util.Date. (+ (.getTime created) (* 7 day-ms)))}]
+      (is (false? (utils/game-days-complete? game now))))))
+
+(deftest test-game-days-complete-on-final-day-before-exact-instant
+  (testing "True once the counter rolls to the final day, even before scheduled-end-at passes
+            — this is the case that was previously missed by game-ended?"
+    (let [now     (java.util.Date.)
+          created (java.util.Date. (- (.getTime now) (+ (* 6 day-ms) (* 20 60 60 1000))))
+          end     (java.util.Date. (+ (.getTime created) (* 7 day-ms)))
+          game    {:game/created-at created :game/scheduled-end-at end}]
+      (is (false? (utils/game-ended? game now)))
+      (is (true?  (utils/game-days-complete? game now))))))
+
+(deftest test-game-days-complete-past-scheduled-end
+  (testing "True once the scheduled end has fully passed"
+    (let [now     (java.util.Date.)
+          created (java.util.Date. (- (.getTime now) (* 8 day-ms)))
+          game    {:game/created-at created
+                   :game/scheduled-end-at (java.util.Date. (+ (.getTime created) (* 7 day-ms)))}]
+      (is (true? (utils/game-days-complete? game now))))))
+
+(deftest test-game-days-complete-missing-fields
+  (testing "False (not an exception) when created-at or scheduled-end-at is absent"
+    (is (false? (utils/game-days-complete? {} (java.util.Date.))))
+    (is (false? (utils/game-days-complete? {:game/created-at (java.util.Date.)} (java.util.Date.))))))

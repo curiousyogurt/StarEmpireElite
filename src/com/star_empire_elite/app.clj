@@ -30,6 +30,7 @@
             [com.star-empire-elite.pages.app.eliminated :as eliminated]
             [com.star-empire-elite.pages.app.news       :as news]
             [com.star-empire-elite.pages.app.guide      :as guide]
+            [com.star-empire-elite.pages.app.results    :as results]
             ;; Game functions
             [com.star-empire-elite.constants            :as const]
             [com.star-empire-elite.resolution           :as resolution]
@@ -239,6 +240,12 @@
 (defn delete-game
   "Delete a game and all associated players (admin only).
 
+  If the game's day counter has already reached its scheduled length (utils/game-days-complete?,
+  the same 'Day N/N' point shown on screen) — i.e. the admin is clearing away a completed game
+  rather than killing one early — first snapshot the final standings into a :game-result entity,
+  in the same transaction as the deletes. This is the only durable record of who won, since the
+  :game and :player entities are gone afterward.
+
   [ctx ring-ctx] -> ring-response (303 redirect to /app)"
   [{:keys [session biff/db path-params] :as ctx}]
   (let [uid  (:uid session)
@@ -246,12 +253,28 @@
     (if-not (const/admin-emails (:user/email user))
       {:status 303 :headers {"location" "/app"}}
       (let [game-id  (java.util.UUID/fromString (:game-id path-params))
+            game     (xt/entity db game-id)
+            now      (java.util.Date.)
             players  (q db '{:find [player]
                              :in [game-id]
                              :where [[player :player/game game-id]]}
-                        game-id)]
+                        game-id)
+            result-op (when (and game (utils/game-days-complete? game now))
+                        (let [standings (mapv (fn [p]
+                                                 {:standing/rank        (:rank p)
+                                                  :standing/empire-name (:player/empire-name p)
+                                                  :standing/planets     (utils/total-planets p)
+                                                  :standing/score       (:player/score p)})
+                                               (game/get-game-players db game-id))]
+                          [{:db/doc-type            :game-result
+                            :xt/id                  (random-uuid)
+                            :game-result/game-name  (:game/name game)
+                            :game-result/created-at (:game/created-at game)
+                            :game-result/ended-at   now
+                            :game-result/standings  standings}]))]
         (biff/submit-tx ctx
                         (concat
+                          result-op
                           (for [[player-id] players] {:db/op :delete :xt/id player-id})
                           [{:db/op :delete :xt/id game-id}]))
         {:status 303 :headers {"location" "/app"}}))))
@@ -511,6 +534,7 @@
     [""                                    {:get  app}]
     ["/create-game"                        {:get  create-game-page :post create-game}]
     ["/delete-game/:game-id"               {:post delete-game}]
+    ["/results"                            {:get  results/results-page}]
     ["/join-game/:game-id"                 {:get  join-game-page :post join-game}]
     ["/game/:player-id"                    {:get  game/game-view}]
     ["/game/:player-id/income"             {:get  income-handler}]
