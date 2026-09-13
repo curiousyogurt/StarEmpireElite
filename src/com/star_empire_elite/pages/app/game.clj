@@ -10,7 +10,8 @@
   (:require [com.biffweb :as biff :refer [q]]
             [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
-            [com.star-empire-elite.utils :as utils]))
+            [com.star-empire-elite.utils :as utils]
+            [xtdb.api :as xt]))
 
 ;;;;
 ;;;; Routing
@@ -54,11 +55,29 @@
 ;;;; UI Components
 ;;;;
 
+(defn- remove-player-button
+  "Render an admin-only remove button for a single player, with a confirmation prompt.
+  Styled to match the discrete delete-game × on the dashboard's game-card.
+
+  [player-id uuid] -> hiccup"
+  [player-id]
+  (biff/form
+   {:action   (str "/app/remove-player/" player-id)
+    :method   "post"
+    :hx-boost "true"
+    :class    "m-0"}
+   [:button
+    {:type       "submit"
+     :hx-confirm "Remove this player from the game?"
+     :class      "px-1 border-none bg-transparent text-game-green-dim font-mono text-xl leading-none cursor-pointer"}
+    "×"]))
+
 (defn players-table
   "Render the leaderboard showing all players in the game ranked by score.
+  Admin users also see a remove button per player.
 
-  [{:keys [players]}] -> hiccup"
-  [{:keys [players]}]
+  [{:keys [players admin?]}] -> hiccup"
+  [{:keys [players admin?]}]
   (let [th-cls       "text-green-400 text-[11px] tracking-[0.08em] uppercase"
         td-cls       "border-r border-game-border py-1 px-3 text-game-green-soft"
         td-right-cls "border-r border-game-border py-1 px-3 text-game-green-soft text-right"]
@@ -72,7 +91,9 @@
          [:th.text-left.px-3.py-1  {:class th-cls} "Rank"]
          [:th.text-left.px-3.py-1  {:class th-cls} "Empire"]
          [:th.text-right.px-3.py-1 {:class th-cls} "Planets"]
-         [:th.text-right.px-3.py-1 {:class th-cls} "Score"]]]
+         [:th.text-right.px-3.py-1 {:class th-cls} "Score"]
+         (when admin?
+           [:th.w-px.whitespace-nowrap.px-1.py-1 {:class th-cls} ""])]]
        [:tbody
         (for [player players]
           [:tr.bg-game-row.border-b.border-game-divider
@@ -80,7 +101,10 @@
            [:td {:class td-cls} (:player/empire-name player)]
            [:td {:class td-right-cls}
             (ui/format-number (utils/total-planets player))]
-           [:td {:class td-right-cls} (ui/format-number (:player/score player))]])]]]]))
+           [:td {:class td-right-cls} (ui/format-number (:player/score player))]
+           (when admin?
+             [:td.w-px.whitespace-nowrap.text-right.px-1
+              (remove-player-button (:xt/id player))])])]]]]))
 
 ;;;;
 ;;;; Page
@@ -114,9 +138,11 @@
   Shows a cooldown countdown when the player is waiting for the next round or day.
 
   [ctx ring-ctx] -> hiccup | ring-response"
-  [{:keys [path-params biff/db] :as ctx}]
+  [{:keys [session path-params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (let [players     (get-game-players (:biff/db ctx) (:xt/id game))
+          user        (xt/entity db (:uid session))
+          admin?      (boolean (const/admin-emails (:user/email user)))
           ;; Mid-turn players (past income) have already committed to their turn
           ;; and must be allowed to finish it regardless of cooldown state.
           mid-turn?   (> (:player/current-phase player) 1)
@@ -126,7 +152,7 @@
          {:class "py-2.5 px-3.5"}
          (ui/incoming-alert player "every 60s")
          (ui/snapshot-section player)
-         (players-table {:players players})]
+         (players-table {:players players :admin? admin?})]
         (ui/phase-action-bar
           (ui/action-bar-link "/app" "Back to Games")
           (ui/action-bar-link (str "/app/game/" (:xt/id player) "/news") "News")

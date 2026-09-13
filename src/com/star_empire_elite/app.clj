@@ -233,6 +233,31 @@
                           [{:db/op :delete :xt/id game-id}]))
         {:status 303 :headers {"location" "/app"}}))))
 
+(defn remove-player
+  "Remove a single player from a game (admin only), leaving the game and its other players
+  untouched.
+
+  Sets the player's status to eliminated rather than deleting the entity outright. Other
+  players may hold a live :player/pending-attack or :player/pending-espionage pointing at
+  this player's id (see resolution.clj); a hard delete would leave those dangling and crash
+  outcomes resolution for them. Eliminated status already hides the player from leaderboards,
+  target lists, and the dashboard (game/get-game-players, dashboard/get-user-games) while
+  keeping the entity in place for those pending references to resolve against.
+
+  [ctx ring-ctx] -> ring-response (303 redirect to /app)"
+  [{:keys [session biff/db path-params] :as ctx}]
+  (let [uid  (:uid session)
+        user (xt/entity db uid)]
+    (if-not (const/admin-emails (:user/email user))
+      {:status 303 :headers {"location" "/app"}}
+      (let [player-id (java.util.UUID/fromString (:player-id path-params))]
+        (biff/submit-tx ctx
+          [{:db/doc-type   :player
+            :db/op         :update
+            :xt/id         player-id
+            :player/status const/player-status-eliminated}])
+        {:status 303 :headers {"location" "/app"}}))))
+
 (defn join-game-page
   "Show the empire name prompt for joining a game.
 
@@ -488,6 +513,7 @@
     [""                                    {:get  app}]
     ["/create-game"                        {:get  create-game-page :post create-game}]
     ["/delete-game/:game-id"               {:post delete-game}]
+    ["/remove-player/:player-id"           {:post remove-player}]
     ["/results"                            {:get  results/results-page}]
     ["/join-game/:game-id"                 {:get  join-game-page :post join-game}]
     ["/game/:player-id"                    {:get  game/game-view}]
