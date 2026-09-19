@@ -183,18 +183,37 @@
   (max 0 (long (* (get forces :cmd-ships 0) rate mult))))
 
 (defn- select-planets
-  "Randomly select n planets from the defender's pool, returning a {:mil n :erg n :ore n} map of how
-  many of each type are transferred.
+  "Select n planets from the defender's pool, distributed across mil/erg/ore proportionally
+  to the defender's current holdings of each (largest-remainder method — the total always
+  equals n exactly, the same technique resolution/distribute-breakaway-planets uses for
+  breakaway losses). Deliberately proportional rather than a per-planet random sample:
+  sampling without replacement needs one sequence element per planet the defender owns,
+  which is unbounded in the defender's planet count and can exhaust the heap once that
+  count runs into the millions.
 
   [defender player-map, n int] -> transfer-map"
   [defender n]
-  (let [pool  (shuffle (concat (repeat (:player/mil-planets defender) :mil)
-                               (repeat (:player/erg-planets defender) :erg)
-                               (repeat (:player/ore-planets defender) :ore)))
-        taken (frequencies (take n pool))]
-    {:mil (get taken :mil 0)
-     :erg (get taken :erg 0)
-     :ore (get taken :ore 0)}))
+  (let [mil   (:player/mil-planets defender)
+        erg   (:player/erg-planets defender)
+        ore   (:player/ore-planets defender)
+        total (+ mil erg ore)]
+    (if (zero? total)
+      {:mil 0 :erg 0 :ore 0}
+      (let [mil-frac  (* n (/ (double mil) total))
+            erg-frac  (* n (/ (double erg) total))
+            ore-frac  (* n (/ (double ore) total))
+            mil-base  (long mil-frac)
+            erg-base  (long erg-frac)
+            ore-base  (long ore-frac)
+            remainder (- n mil-base erg-base ore-base)
+            by-frac   (sort-by second >
+                        [[:mil (- mil-frac mil-base)]
+                         [:erg (- erg-frac erg-base)]
+                         [:ore (- ore-frac ore-base)]])
+            extras    (set (map first (take remainder by-frac)))]
+        {:mil (min mil (+ mil-base (if (extras :mil) 1 0)))
+         :erg (min erg (+ erg-base (if (extras :erg) 1 0)))
+         :ore (min ore (+ ore-base (if (extras :ore) 1 0)))}))))
 
 (defn resolve-combat
   "Resolve a full two-phase combat engagement between attacker and defender.
