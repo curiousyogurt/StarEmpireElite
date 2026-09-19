@@ -18,6 +18,7 @@
 
 (ns com.star-empire-elite.log
   (:require [xtdb.api :as xt]
+            [clojure.edn :as edn]
             [clojure.string :as str]
             [com.star-empire-elite.constants :as const]))
 
@@ -77,7 +78,7 @@
 
 (defn- read-edn [s]
   (when (string? s)
-    (try (clojure.core/read-string s) (catch Exception _ nil))))
+    (try (edn/read-string s) (catch Exception _ nil))))
 
 (defn- fetch-player [db player-id-str]
   (when (and db player-id-str)

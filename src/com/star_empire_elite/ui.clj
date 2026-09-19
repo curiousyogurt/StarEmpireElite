@@ -9,6 +9,7 @@
 
 (ns com.star-empire-elite.ui
   (:require [cheshire.core :as cheshire]
+            [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as str]
             [com.star-empire-elite.settings :as settings]
@@ -833,7 +834,7 @@
 
   [record-str string] -> hiccup"
   [record-str]
-  (let [r             (read-string record-str)
+  (let [r             (edn/read-string record-str)
         mode          (:mode r)
         attacker      (:attacker-name r)
         attacker-wins? (:attacker-wins? r)
@@ -854,11 +855,11 @@
 
   [player player-map] -> hiccup | nil"
   [player]
-  (let [attacks            (seq (:player/incoming-attacks player))
-        esp-fails          (seq (:player/incoming-espionage-fails player))
+  (let [attacks            (seq (utils/take-recent (:player/incoming-attacks player)))
+        esp-fails          (seq (utils/take-recent (:player/incoming-espionage-fails player)))
         esp-agents         (or (:player/incoming-espionage-agents-gained player) 0)
         incite-stab-lost   (or (:player/incoming-incite-stability-lost player) 0)
-        bomb-result        (some-> (:player/incoming-bomb-result player) read-string)
+        bomb-result        (some-> (:player/incoming-bomb-result player) edn/read-string)
         defect-agents-lost (or (:player/incoming-defect-agents-lost player) 0)]
     (when (or attacks esp-fails (pos? incite-stab-lost) bomb-result (pos? defect-agents-lost))
       [:div.mb-4.rounded-game.border.border-game-green-border.relative

@@ -10,13 +10,27 @@
 ;;;;;
 
 (ns com.star-empire-elite.resolution
-  (:require [com.biffweb               :as biff]
+  (:require [clojure.edn                      :as edn]
+            [com.biffweb               :as biff]
             [com.star-empire-elite.combat     :as combat]
             [com.star-empire-elite.constants  :as const]
             [com.star-empire-elite.events     :as events]
             [com.star-empire-elite.fate       :as fate]
             [com.star-empire-elite.utils      :as utils]
             [xtdb.api                         :as xt]))
+
+;;;;
+;;;; Helpers
+;;;;
+
+(defn- capped-conj
+  "Append x to v, keeping only the most recent const/incoming-history-cap entries.
+  Bounds the growth of :player/incoming-attacks and :player/incoming-espionage-fails on
+  defenders who go many turns without clearing them via apply-outcomes.
+
+  [v vector|nil, x any] -> vector"
+  [v x]
+  (utils/take-recent (conj (or v []) x)))
 
 ;;;;
 ;;;; Stability Calculations
@@ -104,7 +118,7 @@
   (let [db             (:biff/db ctx)
         pending-attack (:player/pending-attack player)
         mode           (:player/pending-attack-mode player)
-        stored-battle  (some-> (:player/last-battle-result player) clojure.core/read-string)]
+        stored-battle  (some-> (:player/last-battle-result player) edn/read-string)]
     (if-not pending-attack
       [nil player]
       (let [defender (xt/entity db pending-attack)]
@@ -150,7 +164,7 @@
                                          :player/stations   def-stations
                                          :player/agents     def-agents))
                   :player/incoming-attacks
-                  (conj (or (:player/incoming-attacks defender) []) (pr-str result))}])
+                  (capped-conj (:player/incoming-attacks defender) (pr-str result))}])
               [result (assoc player :player/cmd-ships att-cmd-ships)])
             ;; --- Invade / Raid branch ---
             (let [result  (combat/resolve-combat game player defender mode)
@@ -252,7 +266,7 @@
                                            :player/food         def-food
                                            :player/fuel         def-fuel))
                   :player/incoming-attacks
-                  (conj (or (:player/incoming-attacks defender) []) (pr-str capped))}])
+                  (capped-conj (:player/incoming-attacks defender) (pr-str capped))}])
               [capped 
                (merge player 
                       {:player/soldiers     att-soldiers
@@ -276,7 +290,7 @@
   (let [db                   (:biff/db ctx)
         pending-espionage    (:player/pending-espionage player)
         pending-espionage-op (:player/pending-espionage-op player)
-        stored-espionage     (some-> (:player/last-espionage-result player) clojure.core/read-string)]
+        stored-espionage     (some-> (:player/last-espionage-result player) edn/read-string)]
     (if-not pending-espionage
       [nil player]
       (let [target (xt/entity db pending-espionage)]
@@ -306,8 +320,8 @@
                          {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
                           :player/agents (+ (or (:player/agents target) 0) agents-captured)
                           :player/incoming-espionage-fails
-                          (conj (or (:player/incoming-espionage-fails target) [])
-                                (cond incite? "incite" bomb? "bomb" defect? "defect" :else "spy"))
+                          (capped-conj (:player/incoming-espionage-fails target)
+                                       (cond incite? "incite" bomb? "bomb" defect? "defect" :else "spy"))
                           :player/incoming-espionage-agents-gained
                           (+ (or (:player/incoming-espionage-agents-gained target) 0) agents-captured)})
                        (when (and incite? att-wins? (pos? stab-dmg))
@@ -411,7 +425,7 @@
   "Roll for a stability breakaway on first load; return cached result on refresh.
   Returns [result updated-player]."
   [ctx player-id player game]
-  (let [stored (some-> (:player/last-stability-breakaway player) clojure.core/read-string)]
+  (let [stored (some-> (:player/last-stability-breakaway player) edn/read-string)]
     (if (some? stored)
       [stored player]
       (let [result (calculate-stability-breakaway player game)]
@@ -443,7 +457,7 @@
   Only eligible when expenses were fully paid and no breakaway triggered this turn.
   Returns [result updated-player] where result is nil if not eligible."
   [ctx player-id player game pending-penalty breakaway-result]
-  (let [stored             (some-> (:player/last-stability-recovery player) clojure.core/read-string)
+  (let [stored             (some-> (:player/last-stability-recovery player) edn/read-string)
         recovery-eligible? (and (some? pending-penalty)
                                 (zero? pending-penalty)
                                 (not (:triggered? breakaway-result))
@@ -510,7 +524,7 @@
   Passes rand as the rng so the roll is non-deterministic in production.
   Returns [result updated-player] where result is nil if no event triggered."
   [ctx player-id player game total-planets]
-  (let [cached (some-> (:player/last-fate-result player) clojure.core/read-string)]
+  (let [cached (some-> (:player/last-fate-result player) edn/read-string)]
     (cond
       ;; Cache hit — result already applied on a prior page load.
       (some? (:player/last-fate-result player))

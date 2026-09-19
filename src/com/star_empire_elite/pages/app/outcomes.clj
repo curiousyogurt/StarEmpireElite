@@ -34,7 +34,8 @@
 ;;;;; 2)  apply-outcomes ← utils/calculate-score, turn/round advancement
 
 (ns com.star-empire-elite.pages.app.outcomes
-  (:require [clojure.string :as str]
+  (:require [clojure.edn :as edn]
+            [clojure.string :as str]
             [com.biffweb :as biff]
             [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
@@ -163,7 +164,7 @@
         won-ground? (and battle-result
                          (:attacker-wins? battle-result)
                          (not= (:mode battle-result) :strike))
-        incoming    (mapv clojure.edn/read-string (:player/incoming-attacks player []))
+        incoming    (mapv edn/read-string (utils/take-recent (:player/incoming-attacks player)))
         in-wins     (fn [k] (reduce (fn [acc r]
                                       (if (and (:attacker-wins? r) (not= (:mode r) :strike))
                                         (merge-with + acc (k r {}))
@@ -176,7 +177,7 @@
                       :else                                    (:attacker-losses battle-result {}))
         in-losses   (reduce (fn [acc r] (merge-with + acc (:defender-losses r {})))
                             {} incoming)
-        bomb-losses (if-let [r (some-> (:player/incoming-bomb-result player) clojure.edn/read-string)]
+        bomb-losses (if-let [r (some-> (:player/incoming-bomb-result player) edn/read-string)]
                       (dissoc r :attacker-name) {})
         units-lost  (sum-vals (merge-with + out-losses in-losses bomb-losses))
         ;; Planet deltas: gained from outgoing ground wins, lost from incoming + breakaway
@@ -632,7 +633,7 @@
 (defn- incoming-card
   "Render a single incoming attack card (combat or strike)."
   [r]
-  (let [result (read-string r)]
+  (let [result (edn/read-string r)]
     (if (= (:mode result) :strike)
       (strike-card {:opp-name          (:attacker-name result)
                     :stations-mine?    true
@@ -786,11 +787,11 @@
        (summary-strip (compute-summary outcomes))
 
        ;; Incoming section — attacks and espionage received this turn
-       (let [incoming           (seq (:player/incoming-attacks player))
-             esp-fails          (:player/incoming-espionage-fails player [])
+       (let [incoming           (seq (utils/take-recent (:player/incoming-attacks player)))
+             esp-fails          (utils/take-recent (:player/incoming-espionage-fails player))
              esp-agents         (or (:player/incoming-espionage-agents-gained player) 0)
              incite-stab-lost   (or (:player/incoming-incite-stability-lost player) 0)
-             bomb-result        (some-> (:player/incoming-bomb-result player) read-string)
+             bomb-result        (some-> (:player/incoming-bomb-result player) edn/read-string)
              defect-agents-lost (or (:player/incoming-defect-agents-lost player) 0)]
          (when (or incoming (seq esp-fails) (pos? incite-stab-lost) bomb-result (pos? defect-agents-lost))
            [:div.flex.flex-col.gap-2

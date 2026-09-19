@@ -389,6 +389,28 @@
      (* (get player :player/agents       0) (or (:game/score-agent    game) const/score-agent))))
 
 ;;;;
+;;;; History Retention
+;;;;
+
+;;; :player/incoming-attacks and :player/incoming-espionage-fails are capped at write time
+;;; (see resolution/capped-conj), but a document written before that cap existed — or by an
+;;; older deployed version — can still be oversized on disk. Every read site that parses or
+;;; renders these histories calls take-recent first, so page-render cost stays bounded
+;;; regardless of how large the stored field currently is; the field itself shrinks back to
+;;; the cap the next time it's written to.
+(defn take-recent
+  "Return at most const/incoming-history-cap of the most recent entries from a history
+  vector (nil-safe), preserving append order (newest last).
+
+  [v vector|nil] -> vector"
+  [v]
+  (let [v (or v [])
+        n (count v)]
+    (if (> n const/incoming-history-cap)
+      (subvec v (- n const/incoming-history-cap))
+      v)))
+
+;;;;
 ;;;; Other-Player Fetching
 ;;;;
 

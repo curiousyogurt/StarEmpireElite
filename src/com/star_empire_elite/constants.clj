@@ -24,6 +24,18 @@
 (def enable-game-logging false)
 
 ;;;;
+;;;; Incoming History Retention
+;;;; :player/incoming-attacks and :player/incoming-espionage-fails accumulate one entry per
+;;;; attack/failed-espionage-attempt received, and are only cleared when the defender completes
+;;;; apply-outcomes. A defender who goes idle for many turns while under repeated attack would
+;;;; otherwise grow these vectors (and the pr-str'd result strings inside them) without bound.
+;;;; This caps how many of the most recent entries are kept; older ones are dropped rather than
+;;;; shown, since only the newest few are meaningfully actionable on the outcomes page anyway.
+;;;;
+
+(def incoming-history-cap 20)
+
+;;;;
 ;;;; Turn Structure
 ;;;;
 
