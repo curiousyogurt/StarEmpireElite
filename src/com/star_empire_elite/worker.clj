@@ -16,16 +16,13 @@
     (log/info "There are" n-users "users.")))
 
 (defn alert-new-user [{:keys [biff.xtdb/node]} tx]
-  ;; Only open a historical db snapshot when this tx actually contains a :user/email put —
-  ;; the vast majority of transactions (player stat updates, game events) don't, and this
-  ;; handler runs on every single submit-tx across the whole app, so skipping the snapshot
-  ;; for the common case avoids a per-transaction xt/db call during turn resolution.
-  (doseq [[op & args] (::xt/tx-ops tx)
+  (doseq [_ [nil]
+          :let [db-before (xt/db node {::xt/tx-id (dec (::xt/tx-id tx))})]
+          [op & args] (::xt/tx-ops tx)
           :when (= op ::xt/put)
           :let [[doc] args]
-          :when (contains? doc :user/email)
-          :let [db-before (xt/db node {::xt/tx-id (dec (::xt/tx-id tx))})]
-          :when (nil? (xt/entity db-before (:xt/id doc)))]
+          :when (and (contains? doc :user/email)
+                     (nil? (xt/entity db-before (:xt/id doc))))]
     ;; You could send this as an email instead of printing.
     (log/info "WOAH there's a new user")))
 
