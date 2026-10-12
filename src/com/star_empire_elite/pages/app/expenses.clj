@@ -43,6 +43,7 @@
 (ns com.star-empire-elite.pages.app.expenses
   (:require [clojure.string :as str]
             [com.biffweb :as biff]
+            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
 
@@ -50,6 +51,16 @@
 ;;;;
 ;;;; Calculations
 ;;;;
+
+(defn planet-upkeep-amount
+  "Total upkeep for all planets, raised to the super-linear exponent. Unlike a flat
+  per-planet rate, this makes upkeep grow faster than income as total-planets grows,
+  so holdings have a natural ceiling instead of compounding forever — see
+  const/planet-upkeep-exponent for where that ceiling lands.
+
+  [planet-count int, per-unit-cost int, exponent double] -> int"
+  [planet-count per-unit-cost exponent]
+  (long (Math/round (* per-unit-cost (Math/pow (double planet-count) exponent)))))
 
 (defn calculate-expenses
   "Calculate required upkeep costs for all empire assets using game constants.
@@ -63,11 +74,12 @@
   [player game]
   (let [planet-count (+ (:player/mil-planets player)
                         (:player/erg-planets player)
-                        (:player/ore-planets player))]
+                        (:player/ore-planets player))
+        exponent     (or (:game/planet-upkeep-exponent game) const/planet-upkeep-exponent)]
     ;; Keys such as :player/soldiers are fully qualified keys in the player map.
     ;;                    asset-count-for-player       upkeep-cost-per-asset-in-game)
-    {:planets-credits  (* planet-count                (:game/planet-upkeep-credits  game))
-     :planets-food     (* planet-count                (:game/planet-upkeep-food     game))
+    {:planets-credits  (planet-upkeep-amount planet-count (:game/planet-upkeep-credits game) exponent)
+     :planets-food     (planet-upkeep-amount planet-count (:game/planet-upkeep-food    game) exponent)
      :soldiers-credits (* (:player/soldiers   player) (:game/soldier-upkeep-credits game))
      :soldiers-food    (* (:player/soldiers   player) (:game/soldier-upkeep-food    game))
      :fighters-credits (* (:player/fighters   player) (:game/fighter-upkeep-credits game))

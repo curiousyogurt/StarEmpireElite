@@ -20,9 +20,17 @@
 (def max-input-value
   "Maximum value accepted from user input. Caps at 1 quadrillion to prevent long overflow when
   quantities are multiplied by per-unit costs in building and exchange calculations.
-  Clojure longs handle up to ~9.2e18; 1e15 leaves ample headroom for multiplication.
-  Public so game-config can reuse it as the upper bound for money/count constant fields."
+  Clojure longs handle up to ~9.2e18; 1e15 leaves ample headroom for multiplication."
   1000000000000000)
+
+(def max-config-value
+  "Maximum value accepted for admin-configured per-unit game-config fields (costs,
+  sell prices, power values, starting resources) — deliberately much smaller than
+  max-input-value. These are per-unit constants, not player holdings; none of them
+  plausibly needs to exceed 100 million. Keeping this separate from max-input-value
+  stops a quantity cap and a per-unit cost cap from being accidentally coupled
+  together (they have unrelated overflow considerations)."
+  100000000)
 
 (defn parse-numeric-input
   "Parse user input to a non-negative integer, stripping non-numeric chars and treating empty/nil as

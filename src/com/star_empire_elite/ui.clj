@@ -1035,11 +1035,14 @@
                 ))
          (when mirror-of
            (str "var t=document.querySelector('[name=\"" mirror-of "\"]');if(t)t.value=this.value;")))
+       ;; Pure string normalization — never round-trips through a JS Number, so there's
+       ;; no magnitude where digits silently change (Number/parseInt only have exact
+       ;; integer precision up to 2^53 and will corrupt anything larger).
        :onblur
        (str
          "let val=this.value.replace(/[^0-9]/g,'');"
-         "if(val===''||val==='0'){val='0';}"
-         "else{val=String(parseInt(val,10));}"
+         "val=val.replace(/^0+(?=\\d)/,'');"
+         "if(val===''){val='0';}"
          "this.value=val;"
          (when mirror-of
            (str "var t=document.querySelector('[name=\"" mirror-of "\"]');if(t)t.value=this.value;")))}

@@ -19,6 +19,10 @@
   {:xt/id test-game-id
    :game/planet-upkeep-credits 75
    :game/planet-upkeep-food 1
+   ;; 1.0 keeps upkeep linear (n^1.0 = n) so the exact-multiplication assertions below
+   ;; still hold; test-calculate-expenses-planet-upkeep-exponent below covers the
+   ;; super-linear (>1.0) behavior specifically.
+   :game/planet-upkeep-exponent 1.0
    :game/soldier-upkeep-credits 6
    :game/soldier-upkeep-food 9
    :game/fighter-upkeep-credits 4
@@ -73,6 +77,20 @@
       ;; population
       (is (= (* 9000 2) (:population-food req)))
       (is (= (* 9000 7) (:population-fuel req))))))
+
+(deftest test-calculate-expenses-planet-upkeep-exponent
+  (testing "Planet upkeep grows super-linearly with total-planets when exponent > 1.0"
+    (let [game-linear (assoc test-game :game/planet-upkeep-exponent 1.0)
+          game-super  (assoc test-game :game/planet-upkeep-exponent 1.5)
+          player-10   (assoc test-player :player/ore-planets 10
+                                         :player/erg-planets 0 :player/mil-planets 0)]
+      ;; At exponent 1.0, upkeep is exactly the flat per-planet rate.
+      (is (= (* 10 75) (:planets-credits (expenses/calculate-expenses player-10 game-linear))))
+      ;; At exponent 1.5, 10 planets cost more than 10x the per-planet rate.
+      (is (= (long (Math/round (* 75 (Math/pow 10 1.5))))
+             (:planets-credits (expenses/calculate-expenses player-10 game-super))))
+      (is (> (:planets-credits (expenses/calculate-expenses player-10 game-super))
+             (* 10 75))))))
 
 (deftest test-calculate-expense-totals
   (testing "Aggregates per-category expenses into per-resource totals"
