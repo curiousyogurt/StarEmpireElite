@@ -599,7 +599,7 @@
                         {:id id :hx-swap-oob "true"
                          :class (str "text-[14px] " (if (neg? t) "text-amber-400" "text-green-400"))
                          :style {:text-shadow "0 0 10px rgba(61,220,132,0.25)"}}
-                        (ui/format-number t)])]
+                        (ui/format-signed-number t)])]
       (biff/render
         [:div
          ;; Renew HTMX swap-target placeholder for the next request
