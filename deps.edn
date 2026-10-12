@@ -26,5 +26,6 @@
                     "-XX:+UseSerialGC"
                     "-Xms256m"
                     "-Xmx512m"
-                    "-Dbiff.env.BIFF_PROFILE=prod"]
+                    "-Dbiff.env.BIFF_PROFILE=prod"
+                    "--enable-native-access=ALL-UNNAMED"]
          :main-opts ["-m" "com.star-empire-elite"]}}}
