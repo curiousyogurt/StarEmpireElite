@@ -265,6 +265,22 @@
    [:div {:class "flex flex-col gap-0.5"}
     body]])
 
+(defn- projected-planet-upkeep
+  "Credit and food upkeep for projected (post-purchase) planet holdings, using the
+  same per-type super-linear formula as expenses/calculate-expenses — ore+mil
+  planets fund credit upkeep, erg-planets fund food upkeep. Duplicated here (as
+  a shared local helper, not a copy) because the Building page previews next
+  turn's expenses before they're committed, so it can't just call
+  expenses/calculate-expenses against the player's current (pre-purchase) counts.
+
+  [game game-map, ore-planets int, erg-planets int, mil-planets int] -> {:credits int, :food int}"
+  [game ore-planets erg-planets mil-planets]
+  (let [exponent (or (:game/planet-upkeep-exponent game) const/planet-upkeep-exponent)
+        mil-rate (or (:game/mil-planet-upkeep-credits game) const/mil-planet-upkeep-credits)]
+    {:credits (+ (expenses/planet-upkeep-amount ore-planets (:game/planet-upkeep-credits game) exponent)
+                 (expenses/planet-upkeep-amount mil-planets mil-rate exponent))
+     :food    (expenses/planet-upkeep-amount erg-planets (:game/planet-upkeep-food game) exponent)}))
+
 (defn- projection-grid
   "Render the projection grid: three cards (Credits, Food, Fuel) in a 3-column grid, each showing
   next-turn projections accounting for proposed purchases. Credits 'Current' row reflects credits
@@ -273,12 +289,11 @@
   [player player-map, game game-map, quantities purchase-quantities] -> hiccup"
   [player game quantities]
   (let [required          (expenses/calculate-expenses player game)
-        upkeep-exponent   (or (:game/planet-upkeep-exponent game) const/planet-upkeep-exponent)
         ;; Planet counts including proposed purchases
         new-ore-planets   (+ (:player/ore-planets player) (:ore-planets quantities))
         new-erg-planets   (+ (:player/erg-planets player) (:erg-planets quantities))
         new-mil-planets   (+ (:player/mil-planets player) (:mil-planets quantities))
-        new-total-planets (+ new-ore-planets new-erg-planets new-mil-planets)
+        planet-upkeep     (projected-planet-upkeep game new-ore-planets new-erg-planets new-mil-planets)
 
         ;; Military counts including proposed purchases + new mil planet production
         mil-soldiers      (* new-mil-planets (:game/mil-planet-soldiers game))
@@ -294,9 +309,7 @@
                              (:total-cost (calculate-purchase-cost quantities game
                                                                    (utils/total-planets player))))
         planets-cr        (- (* new-ore-planets (:game/ore-planet-credits game))
-                             (expenses/planet-upkeep-amount new-total-planets
-                                                            (:game/planet-upkeep-credits game)
-                                                            upkeep-exponent))
+                             (:credits planet-upkeep))
         military-cr       (- (+ (* proj-soldiers (:game/soldier-upkeep-credits game))
                                 (* proj-fighters (:game/fighter-upkeep-credits game))
                                 (* proj-stations (:game/station-upkeep-credits game))))
@@ -306,9 +319,7 @@
         ;; Food
         food-current      (:player/food player)
         planets-food      (- (* new-erg-planets (:game/erg-planet-food game))
-                             (expenses/planet-upkeep-amount new-total-planets
-                                                            (:game/planet-upkeep-food game)
-                                                            upkeep-exponent))
+                             (:food planet-upkeep))
         military-food     (- (+ (* proj-soldiers (:game/soldier-upkeep-food game))
                                 (* proj-agents (:game/agent-upkeep-food game))))
         pop-food          (- (:population-food required))
@@ -555,7 +566,7 @@
           new-ore-planets   (+ (:player/ore-planets player) (:ore-planets quantities))
           new-erg-planets   (+ (:player/erg-planets player) (:erg-planets quantities))
           new-mil-planets   (+ (:player/mil-planets player) (:mil-planets quantities))
-          new-total-planets (+ new-ore-planets new-erg-planets new-mil-planets)
+          planet-upkeep     (projected-planet-upkeep game new-ore-planets new-erg-planets new-mil-planets)
           mil-soldiers      (* new-mil-planets (:game/mil-planet-soldiers game))
           mil-fighters      (* new-mil-planets (:game/mil-planet-fighters game))
           mil-stations      (* new-mil-planets (:game/mil-planet-stations game))
@@ -565,14 +576,14 @@
           proj-agents       (+ (:player/agents player) (:agents quantities))
           credits-current   (- (:player/credits player) total)
           planets-cr        (- (* new-ore-planets (:game/ore-planet-credits game))
-                               (* new-total-planets (:game/planet-upkeep-credits game)))
+                               (:credits planet-upkeep))
           military-cr       (- (+ (* proj-soldiers (:game/soldier-upkeep-credits game))
                                   (* proj-fighters (:game/fighter-upkeep-credits game))
                                   (* proj-stations (:game/station-upkeep-credits game))))
           tax-cr            (* (:player/population player) (:game/population-tax-credits game))
           credits-total     (+ credits-current planets-cr military-cr tax-cr)
           planets-food      (- (* new-erg-planets (:game/erg-planet-food game))
-                               (* new-total-planets (:game/planet-upkeep-food game)))
+                               (:food planet-upkeep))
           military-food     (- (+ (* proj-soldiers (:game/soldier-upkeep-food game))
                                   (* proj-agents (:game/agent-upkeep-food game))))
           food-total        (+ (:player/food player) planets-food military-food

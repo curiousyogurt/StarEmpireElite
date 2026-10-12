@@ -226,11 +226,22 @@
 (def planet-upkeep-credits  1000)
 (def planet-upkeep-food     300)
 
-;;; Super-linear exponent on total-planet upkeep (applies to both lines above).
-;;; Planet income/upkeep is linear per-planet, so a flat exponent of 1.0 lets
-;;; reinvestment compound forever. At 1.1111, upkeep overtakes income exactly
-;;; at 1,000,000,000 total planets (10,000cr ore income vs 1,000cr upkeep),
-;;; which is the intended soft ceiling — see planet-cost-scale-divisor below.
+;;; Credit upkeep for mil-planets specifically. Mil-planets produce no credit
+;;; income of their own (they produce soldiers/fighters/stations, not credits),
+;;; so they get their own credit-upkeep line rather than sharing ore-planets'.
+;;; Defaults to the same rate as planet-upkeep-credits but is independently
+;;; tunable.
+(def mil-planet-upkeep-credits 1000)
+
+;;; Super-linear exponent applied per-planet-type, not to total-planets. Credit
+;;; upkeep scales with ore-planets and mil-planets individually; food upkeep
+;;; scales with erg-planets. This keeps each type's soft ceiling independent of
+;;; the player's mix — scaling the exponent against total-planets while income
+;;; only comes from one type made the real ceiling collapse to a fraction of
+;;; 1B for anything but a pure-ore economy (crossover ~ (10 x ore-fraction)^9).
+;;; At 1.1111, upkeep overtakes income exactly at 1,000,000,000 planets of that
+;;; type (10,000cr ore income vs 1,000cr upkeep) — the intended soft ceiling,
+;;; now per-type — see planet-cost-scale-divisor below.
 (def planet-upkeep-exponent 1.1111)
 
 (def soldier-upkeep-credits 25)

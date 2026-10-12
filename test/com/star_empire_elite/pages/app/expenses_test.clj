@@ -23,6 +23,9 @@
    ;; still hold; test-calculate-expenses-planet-upkeep-exponent below covers the
    ;; super-linear (>1.0) behavior specifically.
    :game/planet-upkeep-exponent 1.0
+   ;; Mil-planets have their own credit-upkeep line (they produce no credit income
+   ;; of their own) — see test-calculate-expenses-basic for the worked math.
+   :game/mil-planet-upkeep-credits 10
    :game/soldier-upkeep-credits 6
    :game/soldier-upkeep-food 9
    :game/fighter-upkeep-credits 4
@@ -59,9 +62,10 @@
 (deftest test-calculate-expenses-basic
   (testing "Computes per-category upkeep from player counts and game constants"
     (let [req (expenses/calculate-expenses test-player test-game)]
-      ;; planets: (2+2+1)=5 planets
-      (is (= (* 5 75) (:planets-credits req)))
-      (is (= (* 5  1) (:planets-food    req)))
+      ;; planet credits: ore-planets (2 * 75) + mil-planets (1 * 10) — erg contributes nothing
+      ;; to credits. planet food: erg-planets (2 * 1) only — ore/mil contribute nothing to food.
+      (is (= (+ (* 2 75) (* 1 10)) (:planets-credits req)))
+      (is (= (* 2 1)               (:planets-food    req)))
       ;; soldiers
       (is (= (* 3000  6) (:soldiers-credits req)))
       (is (= (* 3000  9) (:soldiers-food    req)))
@@ -238,8 +242,10 @@
 (deftest test-apply-expenses-overpayment-is-clamped
   (testing "Paying more than required deducts only the required amount"
     ;; Minimise required expenses by zeroing everything except 1 ore-planet:
-    ;;   credits: 1 × 75 = 75, food: 1 × 1 = 1, fuel: 0
-    ;; Submitting 200 credits / 50 food / 10 fuel should clamp to 75 / 1 / 0.
+    ;;   credits: 1 ore-planet × 75 = 75 (mil-planets=0 contribute nothing)
+    ;;   food: erg-planets=0, so planet-food upkeep is 0
+    ;;   fuel: 0
+    ;; Submitting 200 credits / 50 food / 10 fuel should clamp to 75 / 0 / 0.
     (let [simple-player (assoc test-player
                                :player/ore-planets 1
                                :player/erg-planets 0
@@ -266,7 +272,7 @@
                  (get-in result [:headers "location"])))
           ;; Only required amounts are deducted, not the submitted overpayment
           (is (= (- 1000 75) (:player/credits tx)))  ; required 75, not submitted 200
-          (is (= (- 800  1)  (:player/food    tx)))  ; required  1, not submitted  50
+          (is (= (- 800  0)  (:player/food    tx)))  ; required  0 (no erg-planets), not submitted 50
           (is (= (- 200  0)  (:player/fuel    tx)))))))) ; required  0, not submitted  10
 
 ;; Edge case: inputs are blank or missing (should treat as zero)
