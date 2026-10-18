@@ -201,8 +201,6 @@
     :type :int :min 0 :max utils/max-config-value :step 1 :default const/planet-upkeep-food}
    {:key :game/planet-upkeep-exponent :label "Planet upkeep exponent" :category :expenses
     :type :double :min 1.0 :max 2.0 :step 0.0001 :default const/planet-upkeep-exponent}
-   {:key :game/mil-planet-upkeep-credits :label "Mil planet upkeep credits" :category :expenses
-    :type :int :min 0 :max utils/max-config-value :step 1 :default const/mil-planet-upkeep-credits}
    {:key :game/soldier-upkeep-credits :label "Soldier upkeep credits" :category :expenses
     :type :int :min 0 :max utils/max-config-value :step 1 :default const/soldier-upkeep-credits}
    {:key :game/soldier-upkeep-food :label "Soldier upkeep food" :category :expenses

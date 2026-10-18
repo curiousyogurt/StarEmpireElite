@@ -128,7 +128,6 @@
           [:game/planet-upkeep-credits     :int]
           [:game/planet-upkeep-food        :int]
           [:game/planet-upkeep-exponent    {:optional true} :double]
-          [:game/mil-planet-upkeep-credits {:optional true} :int]
           [:game/soldier-upkeep-credits    :int]
           [:game/soldier-upkeep-food       :int]
           [:game/fighter-upkeep-credits    :int]

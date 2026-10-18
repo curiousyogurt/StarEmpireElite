@@ -53,16 +53,10 @@
 ;;;;
 
 (defn planet-upkeep-amount
-  "Upkeep for a single planet type, raised to the super-linear exponent. Unlike a
-  flat per-planet rate, this makes upkeep grow faster than income as that type's
-  count grows, so holdings have a natural ceiling instead of compounding forever.
-
-  Applied per-type (not to total-planets) so the ceiling is independent of a
-  player's mix: ore-planets fund their own credit upkeep from their own credit
-  income, erg-planets fund their own food upkeep from their own food income, and
-  mil-planets (which produce no income of their own) get their own credit-upkeep
-  line rather than riding on ore's. See const/planet-upkeep-exponent for where
-  each type's ceiling lands.
+  "Total upkeep for all planets, raised to the super-linear exponent. Unlike a flat
+  per-planet rate, this makes upkeep grow faster than income as total-planets grows,
+  so holdings have a natural ceiling instead of compounding forever — see
+  const/planet-upkeep-exponent for where that ceiling lands.
 
   [planet-count int, per-unit-cost int, exponent double] -> int"
   [planet-count per-unit-cost exponent]
@@ -78,16 +72,14 @@
                                          :agents-food int,      :agents-fuel int,
                                          :population-food int,  :population-fuel int}"
   [player game]
-  (let [ore-planets  (:player/ore-planets player)
-        erg-planets  (:player/erg-planets player)
-        mil-planets  (:player/mil-planets player)
-        exponent     (or (:game/planet-upkeep-exponent game) const/planet-upkeep-exponent)
-        mil-rate     (or (:game/mil-planet-upkeep-credits game) const/mil-planet-upkeep-credits)]
+  (let [planet-count (+ (:player/mil-planets player)
+                        (:player/erg-planets player)
+                        (:player/ore-planets player))
+        exponent     (or (:game/planet-upkeep-exponent game) const/planet-upkeep-exponent)]
     ;; Keys such as :player/soldiers are fully qualified keys in the player map.
     ;;                    asset-count-for-player       upkeep-cost-per-asset-in-game)
-    {:planets-credits  (+ (planet-upkeep-amount ore-planets (:game/planet-upkeep-credits game) exponent)
-                          (planet-upkeep-amount mil-planets mil-rate                          exponent))
-     :planets-food     (planet-upkeep-amount erg-planets (:game/planet-upkeep-food game) exponent)
+    {:planets-credits  (planet-upkeep-amount planet-count (:game/planet-upkeep-credits game) exponent)
+     :planets-food     (planet-upkeep-amount planet-count (:game/planet-upkeep-food    game) exponent)
      :soldiers-credits (* (:player/soldiers   player) (:game/soldier-upkeep-credits game))
      :soldiers-food    (* (:player/soldiers   player) (:game/soldier-upkeep-food    game))
      :fighters-credits (* (:player/fighters   player) (:game/fighter-upkeep-credits game))
