@@ -127,7 +127,6 @@
           ;; Upkeep/expense constants
           [:game/planet-upkeep-credits     :int]
           [:game/planet-upkeep-food        :int]
-          [:game/planet-upkeep-exponent    {:optional true} :double]
           [:game/soldier-upkeep-credits    :int]
           [:game/soldier-upkeep-food       :int]
           [:game/fighter-upkeep-credits    :int]
@@ -152,7 +151,6 @@
           [:game/mil-planet-cost         :int]
           [:game/erg-planet-cost        :int]
           [:game/ore-planet-cost         :int]
-          [:game/planet-cost-scale-divisor {:optional true} :int]
 
           ;; Exchange sell/buy rates
           [:game/soldier-sell            :int]

@@ -28,7 +28,6 @@
    :game/mil-planet-cost  700
    :game/erg-planet-cost 800
    :game/ore-planet-cost  900
-   :game/planet-cost-scale-divisor 1000000000
    ;; Income constants needed by projections-section
    :game/ore-planet-credits      0
    :game/erg-planet-food        0
@@ -98,14 +97,14 @@
 
 (deftest test-calculate-purchase-cost-zero
   (testing "Returns zero cost when no purchases are made"
-    (is (= 0 (:total-cost (building/calculate-purchase-cost zero-quantities test-game 0))))))
+    (is (= 0 (:total-cost (building/calculate-purchase-cost zero-quantities test-game))))))
 
 (deftest test-calculate-purchase-cost-single-type
   (testing "Calculates cost correctly for a single unit type"
     (is (= 1000 (:total-cost (building/calculate-purchase-cost
-                               (assoc zero-quantities :soldiers 100) test-game 0))))  ; 100 * 10
+                               (assoc zero-quantities :soldiers 100) test-game))))  ; 100 * 10
     (is (= 3500 (:total-cost (building/calculate-purchase-cost
-                               (assoc zero-quantities :mil-planets 5) test-game 0))))))  ; 5 * 700
+                               (assoc zero-quantities :mil-planets 5) test-game))))))  ; 5 * 700
 
 (deftest test-calculate-purchase-cost-mixed
   (testing "Sums costs correctly across all unit types"
@@ -117,27 +116,13 @@
           expected (+ (* 10 10) (* 5 20) (* 2 30) (* 3 40) (* 8 50)
                       (* 1 60) (* 4 70) (* 2 80) (* 1 90)
                       (* 1 700) (* 1 800) (* 1 900))]
-      (is (= expected (:total-cost (building/calculate-purchase-cost quantities test-game 0)))))))
+      (is (= expected (:total-cost (building/calculate-purchase-cost quantities test-game)))))))
 
 (deftest test-calculate-purchase-cost-agents
   (testing "Agent cost uses game/agent-cost (provided by enrich-game in the handler)"
     ;; The test-game has :game/agent-cost 90 already set.
     (is (= (* 5 90) (:total-cost (building/calculate-purchase-cost
-                                   (assoc zero-quantities :agents 5) test-game 0))))))
-
-(deftest test-calculate-purchase-cost-planet-scaling
-  (testing "Planet cost rises with total-planets; non-planet cost is unaffected"
-    (let [base-cost  (:total-cost (building/calculate-purchase-cost
-                                    (assoc zero-quantities :mil-planets 1) test-game 0))
-          at-divisor (:total-cost (building/calculate-purchase-cost
-                                    (assoc zero-quantities :mil-planets 1) test-game
-                                    (:game/planet-cost-scale-divisor test-game)))
-          soldiers   (:total-cost (building/calculate-purchase-cost
-                                    (assoc zero-quantities :soldiers 1) test-game
-                                    (:game/planet-cost-scale-divisor test-game)))]
-      (is (= 700 base-cost))
-      (is (= 1400 at-divisor))      ; cost doubles when total-planets == the divisor
-      (is (= 10 soldiers)))))       ; non-planet cost never scales
+                                   (assoc zero-quantities :agents 5) test-game))))))
 
 ;;;;
 ;;;; calculate-resources-after-purchases Tests
@@ -253,8 +238,7 @@
               tx     (first @tx-atom)
               ;; Derive expected values from the same pure functions the handler uses.
               quantities (#'building/parse-purchase-quantities params)
-              cost-info  (building/calculate-purchase-cost quantities test-game
-                                                            (utils/total-planets test-player))
+              cost-info  (building/calculate-purchase-cost quantities test-game)
               expected   (building/calculate-resources-after-purchases test-player quantities cost-info)]
           ;; Redirect
           (is (= 303 (:status result)))

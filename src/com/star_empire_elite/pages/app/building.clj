@@ -99,39 +99,21 @@
             (for [row purchase-rows]
               (str "[name='" (name (:qty-key row)) "']"))))
 
-(def ^:private planet-qty-keys
-  "The three purchase rows whose cost scales with total holdings (see effective-cost)."
-  #{:ore-planets :erg-planets :mil-planets})
-
-(defn- effective-cost
-  "Per-unit cost for a purchase row. Planet rows get progressively more expensive as
-  total-planets grows — negligible below ~1% of planet-cost-scale-divisor, roughly
-  doubled right at it. Non-planet rows are unaffected; this is what keeps planet
-  growth from compounding forever while leaving military/support purchases alone.
-
-  [row spec-map, game game-map, total-planets int] -> int"
-  [row game total-planets]
-  (let [base (get game (:cost-key row))]
-    (if (contains? planet-qty-keys (:qty-key row))
-      (let [divisor (or (:game/planet-cost-scale-divisor game) const/planet-cost-scale-divisor)]
-        (long (Math/round (* base (+ 1.0 (/ (double total-planets) (double divisor)))))))
-      base)))
-
 (defn- total-cost
-  "Sum of quantity × effective per-unit cost across all purchasable items.
+  "Sum of quantity × cost-per-unit across all purchasable items.
 
-  [quantities purchase-quantities, game game-map, total-planets int] -> int"
-  [quantities game total-planets]
+  [quantities purchase-quantities, game game-map] -> int"
+  [quantities game]
   (reduce + (for [row purchase-rows]
               (* (get quantities (:qty-key row))
-                 (effective-cost row game total-planets)))))
+                 (get game (:cost-key row))))))
 
 (defn calculate-purchase-cost
   "Calculate total credits needed for all purchases based on game constants.
 
-  [quantities purchase-quantities, game game-map, total-planets int] -> {:total-cost int}"
-  [quantities game total-planets]
-  {:total-cost (total-cost quantities game total-planets)})
+  [quantities purchase-quantities, game game-map] -> {:total-cost int}"
+  [quantities game]
+  {:total-cost (total-cost quantities game)})
 
 (defn calculate-max-quantities
   "Calculate the maximum total quantity of each item that can be selected.
@@ -144,12 +126,11 @@
   [player player-map, quantities purchase-quantities, game game-map] -> {:soldiers int, :transports int, ...}"
   [player quantities game]
   (let [credits (:player/credits player)
-        total-planets (utils/total-planets player)
-        selected-total-cost (total-cost quantities game total-planets)]
+        selected-total-cost (total-cost quantities game)]
     (into {}
           (for [row purchase-rows
                 :let [qty-key            (:qty-key row)
-                      cost-per-unit      (effective-cost row game total-planets)
+                      cost-per-unit      (get game (:cost-key row))
                       current-cost       (* (get quantities qty-key 0) cost-per-unit)
                       other-cost         (- selected-total-cost current-cost)
                       remaining-for-this (- credits other-cost)
@@ -273,7 +254,6 @@
   [player player-map, game game-map, quantities purchase-quantities] -> hiccup"
   [player game quantities]
   (let [required          (expenses/calculate-expenses player game)
-        upkeep-exponent   (or (:game/planet-upkeep-exponent game) const/planet-upkeep-exponent)
         ;; Planet counts including proposed purchases
         new-ore-planets   (+ (:player/ore-planets player) (:ore-planets quantities))
         new-erg-planets   (+ (:player/erg-planets player) (:erg-planets quantities))
@@ -291,12 +271,9 @@
 
         ;; Credits
         credits-current   (- (:player/credits player)
-                             (:total-cost (calculate-purchase-cost quantities game
-                                                                   (utils/total-planets player))))
+                             (:total-cost (calculate-purchase-cost quantities game)))
         planets-cr        (- (* new-ore-planets (:game/ore-planet-credits game))
-                             (expenses/planet-upkeep-amount new-total-planets
-                                                            (:game/planet-upkeep-credits game)
-                                                            upkeep-exponent))
+                             (* new-total-planets (:game/planet-upkeep-credits game)))
         military-cr       (- (+ (* proj-soldiers (:game/soldier-upkeep-credits game))
                                 (* proj-fighters (:game/fighter-upkeep-credits game))
                                 (* proj-stations (:game/station-upkeep-credits game))))
@@ -306,9 +283,7 @@
         ;; Food
         food-current      (:player/food player)
         planets-food      (- (* new-erg-planets (:game/erg-planet-food game))
-                             (expenses/planet-upkeep-amount new-total-planets
-                                                            (:game/planet-upkeep-food game)
-                                                            upkeep-exponent))
+                             (* new-total-planets (:game/planet-upkeep-food game)))
         military-food     (- (+ (* proj-soldiers (:game/soldier-upkeep-food game))
                                 (* proj-agents (:game/agent-upkeep-food game))))
         pop-food          (- (:population-food required))
@@ -356,10 +331,9 @@
   For capacity rows (those with a :fit-tooltip in their spec), also renders a hidden span carrying
   the fit quantity so the fit button can read it without a round-trip.
 
-  [row map, purchase-qty int, max-qty int, fit-qty int-or-nil, game game-map, player-id uuid,
-   total-planets int] -> hiccup"
-  [row purchase-qty max-qty fit-qty game player-id total-planets]
-  (let [cost-per-unit (effective-cost row game total-planets)
+  [row map, purchase-qty int, max-qty int, fit-qty int-or-nil, game game-map, player-id uuid] -> hiccup"
+  [row purchase-qty max-qty fit-qty game player-id]
+  (let [cost-per-unit (get game (:cost-key row))
         item-cost     (* cost-per-unit purchase-qty)
         cost-id       (str "cost-" (name (:qty-key row)))
         max-qty-id    (str "max-qty-" (name (:qty-key row)))
@@ -442,9 +416,8 @@
   [player player-map, game game-map, quantities purchase-quantities,
    max-quantities map, fit-quantities map] -> hiccup"
   [player game quantities max-quantities fit-quantities]
-  (let [player-id     (:xt/id player)
-        total-planets (utils/total-planets player)
-        groups        (partition-by :group purchase-rows)]
+  (let [player-id (:xt/id player)
+        groups    (partition-by :group purchase-rows)]
     [:div.overflow-hidden.rounded-game.bg-game-surface
      {:class "border border-game-border"}
      (ui/purchase-table-header "Each" "Build" "Cost" {:action-btn-placeholder "max"})
@@ -458,7 +431,7 @@
                      ;; nil for rows without :fit-tooltip; non-nil triggers hidden span in build-row
                      fit-qty      (when (:fit-tooltip row)
                                     (get fit-quantities qty-key))]]
-           (build-row row purchase-qty max-qty fit-qty game player-id total-planets))))]))
+           (build-row row purchase-qty max-qty fit-qty game player-id))))]))
 
 ;;;
 ;;; Credit Impact shows the before/after effect of the build order on credits
@@ -498,7 +471,7 @@
     (if-let [redirect (utils/validate-phase player 3 player-id)]
       redirect
       (let [quantities      (parse-purchase-quantities params)
-            cost-info       (calculate-purchase-cost quantities game (utils/total-planets player))
+            cost-info       (calculate-purchase-cost quantities game)
             resources-after (calculate-resources-after-purchases player quantities cost-info)]
         (if-not (valid-purchase? resources-after)
           {:status  303
@@ -538,8 +511,7 @@
   [{:keys [path-params params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (let [quantities      (parse-purchase-quantities params)
-          total-planets   (utils/total-planets player)
-          cost-info       (calculate-purchase-cost quantities game total-planets)
+          cost-info       (calculate-purchase-cost quantities game)
           resources-after (calculate-resources-after-purchases player quantities cost-info)
           affordable?     (valid-purchase? resources-after)
           max-quantities  (calculate-max-quantities player quantities game)
@@ -549,7 +521,7 @@
           after-cls       (str "font-bold " (if (neg? credits-after) "text-red-400" "text-green-400"))
           item-costs      (into {} (for [row purchase-rows]
                                      [(:qty-key row) (* (get quantities (:qty-key row))
-                                                        (effective-cost row game total-planets))]))
+                                                        (get game (:cost-key row)))]))
           ;; Projection values (same computation as projection-grid)
           required          (expenses/calculate-expenses player game)
           new-ore-planets   (+ (:player/ore-planets player) (:ore-planets quantities))

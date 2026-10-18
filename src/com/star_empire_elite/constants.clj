@@ -226,13 +226,6 @@
 (def planet-upkeep-credits  1000)
 (def planet-upkeep-food     300)
 
-;;; Super-linear exponent on total-planet upkeep (applies to both lines above).
-;;; Planet income/upkeep is linear per-planet, so a flat exponent of 1.0 lets
-;;; reinvestment compound forever. At 1.1111, upkeep overtakes income exactly
-;;; at 1,000,000,000 total planets (10,000cr ore income vs 1,000cr upkeep),
-;;; which is the intended soft ceiling — see planet-cost-scale-divisor below.
-(def planet-upkeep-exponent 1.1111)
-
 (def soldier-upkeep-credits 25)
 (def soldier-upkeep-food    20)
 
@@ -263,12 +256,6 @@
 (def mil-planet-cost 17000)
 (def erg-planet-cost 20000)
 (def ore-planet-cost 22000)
-
-;;; Divisor for cost-scales-with-holdings: a planet's purchase cost is
-;;; multiplied by (1 + total-planets / this). Paired with planet-upkeep-exponent
-;;; above to approach the 1,000,000,000-planet ceiling gently — negligible
-;;; below ~1% of the ceiling, roughly doubled cost right at it.
-(def planet-cost-scale-divisor 1000000000)
 
 (def agent-cost      5000)
 
