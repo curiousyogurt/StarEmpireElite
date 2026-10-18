@@ -38,8 +38,6 @@
 
 (defn get-game-players
   "Fetch all players in a game, sorted by score descending, with a :rank field added.
-  Also attaches each player's :user/email, looked up via xt/entity on :player/user — this
-  codebase has no nested pull-join syntax, so refs are resolved with a second lookup.
 
   [db xtdb-db, game-id uuid] -> [player-map]"
   [db game-id]
@@ -50,9 +48,7 @@
                                     game-id))
         sorted-players (sort-by :player/score > (seq results))]
     (map-indexed (fn [idx player]
-                   (assoc player
-                          :rank (inc idx)
-                          :user/email (:user/email (xt/entity db (:player/user player)))))
+                   (assoc player :rank (inc idx)))
                  sorted-players)))
 
 ;;;;
@@ -75,28 +71,6 @@
      :hx-confirm "Remove this player from the game?"
      :class      "px-1 border-none bg-transparent text-game-green-dim font-mono text-xl leading-none cursor-pointer"}
     "×"]))
-
-(defn- player-info-tooltip
-  "Render an admin-only info icon for a player; hovering or focusing it reveals a tooltip
-  with the player's email. CSS-only (:peer + peer-hover/peer-focus), so it also opens on
-  keyboard focus and touch-tap, not just mouse hover. More fields can be added to the
-  tooltip body later without changing this trigger.
-
-  The tooltip opens upward (bottom-full) rather than down: the players table sits in an
-  overflow-x-auto wrapper, which makes browsers treat its overflow-y as auto too, so a
-  downward tooltip on the table's last row — the one admins check most — would get clipped.
-
-  [email string] -> hiccup"
-  [email]
-  [:span.relative.inline-block
-   [:button.peer
-    {:type      "button"
-     :aria-label (str "Player info: " email)
-     :class     "px-1 border-none bg-transparent text-game-green-dim font-mono text-sm leading-none cursor-pointer focus:outline-none"}
-    "ⓘ"]
-   [:div
-    {:class "pointer-events-none absolute right-0 bottom-full z-10 mb-1 hidden whitespace-nowrap rounded-sm border border-game-border bg-game-header px-2 py-1 text-xs text-game-green-soft peer-hover:block peer-focus:block"}
-    email]])
 
 (defn players-table
   "Render the leaderboard showing all players in the game ranked by score.
@@ -130,7 +104,6 @@
            [:td {:class td-right-cls} (ui/format-number (:player/score player))]
            (when admin?
              [:td.w-px.whitespace-nowrap.text-right.px-1
-              (player-info-tooltip (:user/email player))
               (remove-player-button (:xt/id player))])])]]]]))
 
 ;;;;
