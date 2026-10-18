@@ -418,11 +418,17 @@
 
 (defn- parse-exchange-quantities
   "Parse all exchange quantity inputs from request params.
+  Unit/planet sell rows are capped at max-unit-quantity (multiplied by a sell rate below); food/fuel
+  buy/sell rows are capped at the much larger max-resource-amount since the Sf/Ex shortfall/excess
+  buttons fill them with raw credit/food/fuel-scale amounts, not unit counts.
 
   [params ring-params] -> {:soldiers-sold int, :transports-sold int, ...}"
   [params]
-  (into {} (for [row (concat sell-rows buy-rows)]
-             [(:qty-key row) (utils/parse-numeric-input (get params (:qty-key row)))])))
+  (into {} (concat
+             (for [row sell-asset-rows]
+               [(:qty-key row) (utils/parse-numeric-input (get params (:qty-key row)) utils/max-unit-quantity)])
+             (for [row (concat sell-resource-rows buy-rows)]
+               [(:qty-key row) (utils/parse-numeric-input (get params (:qty-key row)) utils/max-resource-amount)]))))
 
 (defn apply-exchange
   "Commit exchanges to the database and redirect back to expenses.

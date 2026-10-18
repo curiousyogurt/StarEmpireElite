@@ -9,39 +9,50 @@
 
 (deftest test-parse-numeric-input-digit-strings
   (testing "Parses plain numeric strings correctly"
-    (is (= 0   (utils/parse-numeric-input "0")))
-    (is (= 42  (utils/parse-numeric-input "42")))
-    (is (= 999 (utils/parse-numeric-input "999")))
-    (is (= 1000000 (utils/parse-numeric-input "1000000")))))
+    (is (= 0   (utils/parse-numeric-input "0" utils/max-resource-amount)))
+    (is (= 42  (utils/parse-numeric-input "42" utils/max-resource-amount)))
+    (is (= 999 (utils/parse-numeric-input "999" utils/max-resource-amount)))
+    (is (= 1000000 (utils/parse-numeric-input "1000000" utils/max-resource-amount)))))
 
 (deftest test-parse-numeric-input-empty-and-nil
   (testing "Returns 0 for empty string and nil"
-    (is (= 0 (utils/parse-numeric-input "")))
-    (is (= 0 (utils/parse-numeric-input nil)))))
+    (is (= 0 (utils/parse-numeric-input "" utils/max-resource-amount)))
+    (is (= 0 (utils/parse-numeric-input nil utils/max-resource-amount)))))
 
 (deftest test-parse-numeric-input-non-numeric
   (testing "Strips non-numeric characters and parses remaining digits"
-    (is (= 0  (utils/parse-numeric-input "abc")))
-    (is (= 12 (utils/parse-numeric-input "1a2b")))
-    (is (= 5  (utils/parse-numeric-input "  5  ")))))
+    (is (= 0  (utils/parse-numeric-input "abc" utils/max-resource-amount)))
+    (is (= 12 (utils/parse-numeric-input "1a2b" utils/max-resource-amount)))
+    (is (= 5  (utils/parse-numeric-input "  5  " utils/max-resource-amount)))))
 
 (deftest test-parse-numeric-input-negative-sign
   (testing "Strips the minus sign — always returns non-negative"
     ;; The minus sign is not a digit; parse-numeric-input strips it.
-    (is (= 50 (utils/parse-numeric-input "-50")))
-    (is (= 0  (utils/parse-numeric-input "-")))))
+    (is (= 50 (utils/parse-numeric-input "-50" utils/max-resource-amount)))
+    (is (= 0  (utils/parse-numeric-input "-" utils/max-resource-amount)))))
 
 (deftest test-parse-numeric-input-integers
   (testing "Handles integers (converts to string internally)"
-    (is (= 7   (utils/parse-numeric-input 7)))
-    (is (= 100 (utils/parse-numeric-input 100)))))
+    (is (= 7   (utils/parse-numeric-input 7 utils/max-resource-amount)))
+    (is (= 100 (utils/parse-numeric-input 100 utils/max-resource-amount)))))
 
 (deftest test-parse-numeric-input-overflow-protection
-  (testing "Inputs beyond 16 digits are trimmed; result is capped at max-input-value (1 quadrillion)"
-    (is (= 1000000000000000 (utils/parse-numeric-input "99999999999999999999999")))
-    (is (= 1000000001        (utils/parse-numeric-input "1000000001")))
-    (is (= 1000000000        (utils/parse-numeric-input 1000000000)))
-    (is (= 999999999         (utils/parse-numeric-input "999999999")))))
+  (testing "Inputs beyond 16 digits are trimmed, then clamped to whichever cap the caller passes"
+    (is (= utils/max-unit-quantity
+           (utils/parse-numeric-input "99999999999999999999999" utils/max-unit-quantity)))
+    (is (= utils/max-resource-amount
+           (utils/parse-numeric-input "99999999999999999999999" utils/max-resource-amount)))
+    (is (= 1000000001 (utils/parse-numeric-input "1000000001" utils/max-resource-amount)))
+    (is (= 1000000000 (utils/parse-numeric-input 1000000000 utils/max-resource-amount)))
+    (is (= 999999999  (utils/parse-numeric-input "999999999" utils/max-unit-quantity))))
+  (testing "A value already under max-resource-amount passes through unchanged even though it's
+           far above max-unit-quantity"
+    (is (= utils/max-resource-amount
+           (utils/parse-numeric-input (str utils/max-resource-amount) utils/max-resource-amount))))
+  (testing "A value above max-unit-quantity but under max-resource-amount is clamped by the
+           lower cap when that's the one passed"
+    (is (= utils/max-unit-quantity
+           (utils/parse-numeric-input (str utils/max-resource-amount) utils/max-unit-quantity)))))
 
 ;;;;
 ;;;; validate-phase Tests

@@ -15,25 +15,47 @@
 ;;;; Input Parsing
 ;;;;
 
-;;; Parse user numeric input safely, treating empty/nil/negative as 0. This is used across all phases 
-;;; that accept user input (expenses, exchange, building).
-(def max-input-value
-  "Maximum value accepted from user input. Caps at 1 quadrillion to prevent long overflow when
-  quantities are multiplied by per-unit costs in building and exchange calculations.
-  Clojure longs handle up to ~9.2e18; 1e15 leaves ample headroom for multiplication.
-  Public so game-config can reuse it as the upper bound for money/count constant fields."
-  1000000000000000)
+;;; Parse user numeric input safely, treating empty/nil/negative as 0. This is used across all phases
+;;; that accept user input (expenses, exchange, building). There is no single safe ceiling for all of
+;;; them: this codebase's +/-/* are Clojure's default checked operators (they throw on long overflow
+;;; rather than wrapping or auto-promoting to bignum), so a value that gets multiplied by a per-unit
+;;; cost needs a much lower ceiling than one that only ever gets added or compared.
+(def max-unit-quantity
+  "Maximum quantity accepted for inputs that get multiplied by a per-unit cost or rate: building
+  purchase rows, exchange unit/planet sell rows. Derived from Long/MAX_VALUE (~9.2e18) divided by
+  the worst realistic case — 12 purchase rows at the highest real per-unit cost, 60,000 (cmd-ship) —
+  leaving headroom. Does not protect against an admin-configured cost set far above today's real
+  constants; see max-config-value."
+  10000000000000)
+
+(def max-resource-amount
+  "Maximum value accepted for raw credit/food/fuel amounts that are only added, subtracted, or
+  compared, never multiplied by a cost: expense payments, exchange food/fuel buy/sell. Kept under
+  JavaScript's Number.MAX_SAFE_INTEGER (2^53-1 ~= 9.007e15) because numeric-input's onblur handler
+  still normalizes through JS, which only has exact integer precision up to that bound."
+  9000000000000000)
+
+(def max-config-value
+  "Maximum value accepted for admin-configured per-unit game-config fields (costs, sell prices,
+  power values, starting resources). Deliberately much smaller than max-unit-quantity/
+  max-resource-amount — these are per-unit constants, not player holdings or quantities, and
+  keeping this separate stops an admin-config ceiling from being coupled to a player-input ceiling
+  that has nothing to do with it."
+  100000000)
 
 (defn parse-numeric-input
   "Parse user input to a non-negative integer, stripping non-numeric chars and treating empty/nil as
-  0. Caps at max-input-value to prevent long overflow on subsequent multiplication."
-  [val]
+  0. Caps at max-val, which the caller chooses based on what happens to the result downstream (see
+  max-unit-quantity vs. max-resource-amount above).
+
+  [val any, max-val long] -> long"
+  [val max-val]
   (let [s (str val)
         cleaned (clojure.string/replace s #"[^0-9]" "")
         trimmed (subs cleaned 0 (min (count cleaned) 16))]
     (if (empty? trimmed)
       0
-      (min (parse-long trimmed) max-input-value))))
+      (min (parse-long trimmed) max-val))))
 
 (defn parse-choice-value
   "Split a UI choice value of the form 'left:right'. Returns nil for blank or malformed values.

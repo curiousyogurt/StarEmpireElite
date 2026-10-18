@@ -44,17 +44,17 @@
 
    ;; Combat Power
    {:key :game/soldier-power :label "Soldier power" :category :action
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/soldier-power}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/soldier-power}
    {:key :game/fighter-power :label "Fighter power" :category :action
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/fighter-power}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/fighter-power}
    {:key :game/cmd-ship-power :label "Command ship power" :category :action
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/cmd-ship-power}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/cmd-ship-power}
    {:key :game/station-power :label "Station power (defender only)" :category :action
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/station-power}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/station-power}
    {:key :game/general-power :label "General power" :category :action
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/general-power}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/general-power}
    {:key :game/admiral-power :label "Admiral power" :category :action
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/admiral-power}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/admiral-power}
    {:key :game/combat-variance :label "Combat variance (± random factor)" :category :action
     :type :double :min 0.0 :max 1.0 :step 0.01 :default const/combat-variance}
 
@@ -120,63 +120,63 @@
 
    ;; Starting Empire Defaults
    {:key :game/starting-credits :label "Starting credits" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-credits}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-credits}
    {:key :game/starting-food :label "Starting food" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-food}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-food}
    {:key :game/starting-fuel :label "Starting fuel" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-fuel}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-fuel}
    {:key :game/starting-galaxars :label "Starting galaxars" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-galaxars}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-galaxars}
    {:key :game/starting-mil-planets :label "Starting military planets" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-mil-planets}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-mil-planets}
    {:key :game/starting-erg-planets :label "Starting energy planets" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-erg-planets}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-erg-planets}
    {:key :game/starting-ore-planets :label "Starting ore planets" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-ore-planets}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-ore-planets}
    {:key :game/starting-population :label "Starting population (millions)" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-population}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-population}
    {:key :game/starting-stability :label "Starting stability (%)" :category :starting
     :type :int :min 0 :max 100 :step 1 :default const/starting-stability}
    {:key :game/starting-soldiers :label "Starting soldiers" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-soldiers}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-soldiers}
    {:key :game/starting-transports :label "Starting transports" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-transports}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-transports}
    {:key :game/starting-generals :label "Starting generals" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-generals}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-generals}
    {:key :game/starting-fighters :label "Starting fighters" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-fighters}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-fighters}
    {:key :game/starting-carriers :label "Starting carriers" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-carriers}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-carriers}
    {:key :game/starting-admirals :label "Starting admirals" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-admirals}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-admirals}
    {:key :game/starting-stations :label "Starting stations" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-stations}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-stations}
    {:key :game/starting-cmd-ships :label "Starting command ships" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-cmd-ships}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-cmd-ships}
    {:key :game/starting-agents :label "Starting agents" :category :starting
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/starting-agents}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/starting-agents}
 
    ;; Income Generation
    {:key :game/ore-planet-credits :label "Ore planet credits" :category :income
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/ore-planet-credits}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/ore-planet-credits}
    {:key :game/erg-planet-food :label "Energy planet food" :category :income
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/erg-planet-food}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/erg-planet-food}
    {:key :game/erg-planet-fuel :label "Energy planet fuel" :category :income
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/erg-planet-fuel}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/erg-planet-fuel}
    {:key :game/mil-planet-soldiers :label "Military planet soldiers" :category :income
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/mil-planet-soldiers}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/mil-planet-soldiers}
    {:key :game/mil-planet-fighters :label "Military planet fighters" :category :income
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/mil-planet-fighters}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/mil-planet-fighters}
    {:key :game/mil-planet-stations :label "Military planet stations" :category :income
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/mil-planet-stations}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/mil-planet-stations}
 
    ;; Population Tax — credits are earned at Income; food/fuel are paid at Expenses
    {:key :game/population-tax-credits :label "Population tax credits" :category :income
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/population-tax-credits}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/population-tax-credits}
    {:key :game/population-upkeep-food :label "Population upkeep food" :category :expenses
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/population-upkeep-food}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/population-upkeep-food}
    {:key :game/population-upkeep-fuel :label "Population upkeep fuel" :category :expenses
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/population-upkeep-fuel}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/population-upkeep-fuel}
 
    ;; Stability — grouped by the phase that triggers each change, not by topic
    {:key :game/capture-stability-penalty-per-planet :label "Capture stability penalty per planet" :category :action
@@ -196,51 +196,51 @@
 
    ;; Upkeep / Expenses
    {:key :game/planet-upkeep-credits :label "Planet upkeep credits" :category :expenses
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/planet-upkeep-credits}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/planet-upkeep-credits}
    {:key :game/planet-upkeep-food :label "Planet upkeep food" :category :expenses
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/planet-upkeep-food}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/planet-upkeep-food}
    {:key :game/soldier-upkeep-credits :label "Soldier upkeep credits" :category :expenses
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/soldier-upkeep-credits}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/soldier-upkeep-credits}
    {:key :game/soldier-upkeep-food :label "Soldier upkeep food" :category :expenses
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/soldier-upkeep-food}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/soldier-upkeep-food}
    {:key :game/fighter-upkeep-credits :label "Fighter upkeep credits" :category :expenses
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/fighter-upkeep-credits}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/fighter-upkeep-credits}
    {:key :game/fighter-upkeep-fuel :label "Fighter upkeep fuel" :category :expenses
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/fighter-upkeep-fuel}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/fighter-upkeep-fuel}
    {:key :game/station-upkeep-credits :label "Station upkeep credits" :category :expenses
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/station-upkeep-credits}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/station-upkeep-credits}
    {:key :game/station-upkeep-fuel :label "Station upkeep fuel" :category :expenses
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/station-upkeep-fuel}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/station-upkeep-fuel}
    {:key :game/agent-upkeep-food :label "Agent upkeep food" :category :expenses
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/agent-upkeep-food}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/agent-upkeep-food}
    {:key :game/agent-upkeep-fuel :label "Agent upkeep fuel" :category :expenses
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/agent-upkeep-fuel}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/agent-upkeep-fuel}
 
    ;; Building Costs
    {:key :game/soldier-cost :label "Soldier cost" :category :building
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/soldier-cost}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/soldier-cost}
    {:key :game/transport-cost :label "Transport cost" :category :building
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/transport-cost}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/transport-cost}
    {:key :game/general-cost :label "General cost" :category :building
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/general-cost}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/general-cost}
    {:key :game/fighter-cost :label "Fighter cost" :category :building
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/fighter-cost}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/fighter-cost}
    {:key :game/carrier-cost :label "Carrier cost" :category :building
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/carrier-cost}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/carrier-cost}
    {:key :game/admiral-cost :label "Admiral cost" :category :building
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/admiral-cost}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/admiral-cost}
    {:key :game/station-cost :label "Station cost" :category :building
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/station-cost}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/station-cost}
    {:key :game/cmd-ship-cost :label "Command ship cost" :category :building
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/cmd-ship-cost}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/cmd-ship-cost}
    {:key :game/agent-cost :label "Agent cost" :category :building
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/agent-cost}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/agent-cost}
    {:key :game/mil-planet-cost :label "Military planet cost" :category :building
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/mil-planet-cost}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/mil-planet-cost}
    {:key :game/erg-planet-cost :label "Energy planet cost" :category :building
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/erg-planet-cost}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/erg-planet-cost}
    {:key :game/ore-planet-cost :label "Ore planet cost" :category :building
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/ore-planet-cost}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/ore-planet-cost}
 
    ;; Espionage
    {:key :game/spy-defection-rate :label "Spy defection rate" :category :espionage
@@ -252,9 +252,9 @@
    {:key :game/defect-defection-rate :label "Defect defection rate" :category :espionage
     :type :double :min 0.0 :max 1.0 :step 0.01 :default const/defect-defection-rate}
    {:key :game/espionage-defection-min :label "Minimum agents lost on failed mission" :category :espionage
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/espionage-defection-min}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/espionage-defection-min}
    {:key :game/espionage-defense-threshold :label "Espionage defense threshold" :category :espionage
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/espionage-defense-threshold}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/espionage-defense-threshold}
    {:key :game/espionage-defense-exponent :label "Espionage defense exponent" :category :espionage
     :type :double :min 0.0 :max 5.0 :step 0.01 :default const/espionage-defense-exponent}
    {:key :game/incite-stability-damage :label "Incite stability damage" :category :espionage
@@ -284,37 +284,37 @@
 
    ;; Exchange Rates
    {:key :game/soldier-sell :label "Soldier sell" :category :exchange
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/soldier-sell}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/soldier-sell}
    {:key :game/transport-sell :label "Transport sell" :category :exchange
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/transport-sell}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/transport-sell}
    {:key :game/general-sell :label "General sell" :category :exchange
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/general-sell}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/general-sell}
    {:key :game/fighter-sell :label "Fighter sell" :category :exchange
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/fighter-sell}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/fighter-sell}
    {:key :game/carrier-sell :label "Carrier sell" :category :exchange
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/carrier-sell}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/carrier-sell}
    {:key :game/admiral-sell :label "Admiral sell" :category :exchange
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/admiral-sell}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/admiral-sell}
    {:key :game/station-sell :label "Station sell" :category :exchange
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/station-sell}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/station-sell}
    {:key :game/cmd-ship-sell :label "Command ship sell" :category :exchange
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/cmd-ship-sell}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/cmd-ship-sell}
    {:key :game/agent-sell :label "Agent sell" :category :exchange
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/agent-sell}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/agent-sell}
    {:key :game/mil-planet-sell :label "Military planet sell" :category :exchange
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/mil-planet-sell}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/mil-planet-sell}
    {:key :game/erg-planet-sell :label "Energy planet sell" :category :exchange
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/erg-planet-sell}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/erg-planet-sell}
    {:key :game/ore-planet-sell :label "Ore planet sell" :category :exchange
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/ore-planet-sell}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/ore-planet-sell}
    {:key :game/food-buy :label "Food buy price" :category :exchange
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/food-buy}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/food-buy}
    {:key :game/food-sell :label "Food sell price" :category :exchange
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/food-sell}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/food-sell}
    {:key :game/fuel-buy :label "Fuel buy price" :category :exchange
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/fuel-buy}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/fuel-buy}
    {:key :game/fuel-sell :label "Fuel sell price" :category :exchange
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/fuel-sell}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/fuel-sell}
 
    ;; Fate
    {:key :game/fate-probability :label "Fate probability" :category :outcomes
@@ -366,31 +366,31 @@
 
    ;; Score Weights
    {:key :game/score-population :label "Score: population" :category :scoring
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/score-population}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/score-population}
    {:key :game/score-mil-planet :label "Score: military planet" :category :scoring
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/score-mil-planet}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/score-mil-planet}
    {:key :game/score-erg-planet :label "Score: energy planet" :category :scoring
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/score-erg-planet}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/score-erg-planet}
    {:key :game/score-ore-planet :label "Score: ore planet" :category :scoring
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/score-ore-planet}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/score-ore-planet}
    {:key :game/score-soldier :label "Score: soldier" :category :scoring
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/score-soldier}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/score-soldier}
    {:key :game/score-transport :label "Score: transport" :category :scoring
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/score-transport}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/score-transport}
    {:key :game/score-general :label "Score: general" :category :scoring
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/score-general}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/score-general}
    {:key :game/score-fighter :label "Score: fighter" :category :scoring
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/score-fighter}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/score-fighter}
    {:key :game/score-carrier :label "Score: carrier" :category :scoring
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/score-carrier}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/score-carrier}
    {:key :game/score-admiral :label "Score: admiral" :category :scoring
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/score-admiral}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/score-admiral}
    {:key :game/score-cmd-ship :label "Score: command ship" :category :scoring
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/score-cmd-ship}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/score-cmd-ship}
    {:key :game/score-station :label "Score: station" :category :scoring
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/score-station}
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/score-station}
    {:key :game/score-agent :label "Score: agent" :category :scoring
-    :type :int :min 0 :max utils/max-input-value :step 1 :default const/score-agent}])
+    :type :int :min 0 :max utils/max-config-value :step 1 :default const/score-agent}])
 
 ;;;;
 ;;;; Category Order
@@ -456,7 +456,7 @@
   "Parse one submitted value against its spec, clamped to [min, max]. Blank, missing, or
   unparseable input silently falls back to the field's default rather than rejecting the
   whole form — the same philosophy as utils/parse-numeric-input, extended to doubles and to
-  custom per-field ranges instead of a single global cap.
+  each field's own custom [min, max] range rather than one of parse-numeric-input's shared caps.
 
   [spec map, raw-value any] -> number"
   [{:keys [type min max default]} raw-value]

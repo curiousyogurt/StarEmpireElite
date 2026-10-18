@@ -332,9 +332,9 @@
 
   [params ring-params] -> {:credits-pay int, :food-pay int, :fuel-pay int}"
   [params]
-  {:credits-pay (utils/parse-numeric-input (:credits-pay params))
-   :food-pay    (utils/parse-numeric-input (:food-pay    params))
-   :fuel-pay    (utils/parse-numeric-input (:fuel-pay    params))})
+  {:credits-pay (utils/parse-numeric-input (:credits-pay params) utils/max-resource-amount)
+   :food-pay    (utils/parse-numeric-input (:food-pay    params) utils/max-resource-amount)
+   :fuel-pay    (utils/parse-numeric-input (:fuel-pay    params) utils/max-resource-amount)})
 
 (defn apply-expenses
   "Commit expense payments to the database and advance to the building phase.

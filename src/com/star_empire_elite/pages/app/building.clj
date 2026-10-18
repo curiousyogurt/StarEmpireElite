@@ -458,7 +458,7 @@
   [params ring-params] -> {:soldiers int, :transports int, ...}"
   [params]
   (into {} (for [row purchase-rows]
-             [(:qty-key row) (utils/parse-numeric-input (get params (:qty-key row)))])))
+             [(:qty-key row) (utils/parse-numeric-input (get params (:qty-key row)) utils/max-unit-quantity)])))
 
 (defn apply-building
   "Commit purchases to the database, advance to action phase, and redirect.
