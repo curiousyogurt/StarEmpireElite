@@ -36,6 +36,14 @@
 ;;;; Stability Calculations
 ;;;;
 
+;;; Keys a breakaway draws down by the same fraction as planets. Agents are excluded because
+;;; they're the espionage track (already lost/gained via spy, bomb, defect); galaxars is
+;;; excluded as a premium/rare resource that shouldn't be swept up in a stability roll.
+(def breakaway-loss-keys
+  [:player/population :player/credits :player/food :player/fuel
+   :player/soldiers :player/transports :player/fighters :player/carriers
+   :player/cmd-ships :player/stations :player/generals :player/admirals])
+
 (defn- distribute-breakaway-planets
   "Distribute n planet losses proportionally across ore/erg/mil counts.
   Uses largest-remainder method so the total always equals n exactly.
@@ -63,7 +71,12 @@
 
 (defn calculate-stability-breakaway
   "Roll for a stability breakaway event. Returns a result map whether or not
-  a breakaway occurs; :triggered? indicates whether planets were lost.
+  a breakaway occurs; :triggered? indicates whether the empire fractured.
+
+  On trigger, the same :fraction is applied to planets and to every key in
+  breakaway-loss-keys. Planets round up (so a trigger always costs at least one
+  planet) while population/resources/units round down — a small stockpile
+  shouldn't be wiped out by rounding the way a single planet unavoidably is.
 
   [player player-map, game game-map] -> result-map"
   [player game]
@@ -78,16 +91,35 @@
             erg   (:player/erg-planets player)
             mil   (:player/mil-planets player)
             total (+ ore erg mil)
-            fraction     (min cap (/ (double (- roll stability threshold)) 100.0))
-            planets-lost (max 1 (long (Math/ceil (* fraction total))))
-            lost         (distribute-breakaway-planets ore erg mil planets-lost)]
-        {:roll        roll
-         :stability   stability
-         :triggered?  true
-         :ore-lost    (:ore lost)
-         :erg-lost    (:erg lost)
-         :mil-lost    (:mil lost)
-         :total-lost  planets-lost}))))
+            fraction      (min cap (/ (double (- roll stability threshold)) 100.0))
+            planets-lost  (max 1 (long (Math/ceil (* fraction total))))
+            lost          (distribute-breakaway-planets ore erg mil planets-lost)
+            resources-lost (into {}
+                             (map (fn [k] [k (long (* fraction (get player k 0)))]))
+                             breakaway-loss-keys)]
+        {:roll           roll
+         :stability      stability
+         :triggered?     true
+         :fraction       fraction
+         :ore-lost       (:ore lost)
+         :erg-lost       (:erg lost)
+         :mil-lost       (:mil lost)
+         :total-lost     planets-lost
+         :resources-lost resources-lost}))))
+
+(defn- breakaway-player-updates
+  "Compute the post-breakaway :player/* values for a triggered result.
+  Pure — resolve-stability-breakaway applies these via tx and to the in-memory player.
+
+  [player player-map, result triggered-result-map] -> player-map"
+  [player result]
+  (merge
+    {:player/ore-planets (- (:player/ore-planets player) (:ore-lost result))
+     :player/erg-planets (- (:player/erg-planets player) (:erg-lost result))
+     :player/mil-planets (- (:player/mil-planets player) (:mil-lost result))}
+    (into {}
+      (map (fn [[k lost]] [k (- (get player k 0) lost)]))
+      (:resources-lost result))))
 
 (defn calculate-stability-recovery
   "Roll for a stability recovery event. Only call when expenses were fully paid
@@ -436,21 +468,15 @@
                                 :xt/id                           player-id
                                 :player/last-stability-breakaway (pr-str result)}])
               [result player])
-          (let [ore-after (- (:player/ore-planets player) (:ore-lost result))
-                erg-after (- (:player/erg-planets player) (:erg-lost result))
-                mil-after (- (:player/mil-planets player) (:mil-lost result))]
+          (let [updates (breakaway-player-updates player result)]
             (biff/submit-tx ctx
-                            [{:db/doc-type                     :player
-                              :db/op                           :update
-                              :xt/id                           player-id
-                              :player/ore-planets              ore-after
-                              :player/erg-planets              erg-after
-                              :player/mil-planets              mil-after
-                              :player/last-stability-breakaway (pr-str result)}])
-            [result (-> player
-                        (assoc :player/ore-planets ore-after)
-                        (assoc :player/erg-planets erg-after)
-                        (assoc :player/mil-planets mil-after))]))))))
+                            [(merge
+                               {:db/doc-type                     :player
+                                :db/op                           :update
+                                :xt/id                           player-id
+                                :player/last-stability-breakaway (pr-str result)}
+                               updates)])
+            [result (merge player updates)]))))))
 
 (defn- resolve-stability-recovery
   "Roll for a stability recovery on first load; return cached result on refresh.

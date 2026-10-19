@@ -344,9 +344,11 @@
       "At the end of each round, the game rolls d100 against breakaway: if the roll exceeds "
       "your stability plus "
       (v (g game :game/stability-breakaway-threshold const/stability-breakaway-threshold))
-      ", you lose at least one planet, scaling up to "
+      ", your empire fractures: you lose at least one planet, and that same percentage — "
+      "scaling up to "
       (v (str (g game :game/stability-breakaway-cap const/stability-breakaway-cap) "%"))
-      " of your total count the further the roll clears that threshold.")
+      " the further the roll clears that threshold — is also stripped from your population, "
+      "credits, food, fuel, and military units/leaders.")
     (prose
       "A separate d100 roll checks for recovery — but only on a round where you paid your "
       "expenses in full and didn't just suffer a breakaway. If that roll falls below "

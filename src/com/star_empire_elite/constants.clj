@@ -190,7 +190,9 @@
 
 ;;;;
 ;;;; Stability
-;;;; Breakaway: if roll (1–100) > stability + threshold, planets break away.
+;;;; Breakaway: if roll (1–100) > stability + threshold, the empire fractures — the same
+;;;;   loss fraction is applied to planets, population, credits/food/fuel, and military
+;;;;   units/leaders (agents and galaxars are untouched).
 ;;;; Recovery:  if roll < max(stability, floor), stability recovers.
 
 ;;;;
@@ -203,8 +205,8 @@
 (def capture-stability-penalty-per-planet  1)  ; stability points lost per captured planet
 (def capture-stability-penalty-cap         10) ; max stability points lost per attack
 
-(def stability-breakaway-threshold 20)
-(def stability-breakaway-cap       25) ; stored as %, i.e. 25 = 25%
+(def stability-breakaway-threshold 25)
+(def stability-breakaway-cap       20) ; stored as %, i.e. 20 = 20%
 (def stability-recovery-amount     5)  ; flat stability points gained on recovery
 (def stability-recovery-floor      50) ; minimum effective stability for recovery rolls
 (def expense-stability-penalty     3)  ; stability points lost per underpaid expense fraction

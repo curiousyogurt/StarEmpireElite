@@ -194,9 +194,17 @@
         ;; Resource deltas: same pattern as planets
         out-res (if won-ground? (:resources-captured battle-result {}) {})
         in-res  (in-wins :resources-captured)
-        credits (- (:credits out-res 0) (:credits in-res 0))
-        food    (- (:food out-res 0)    (:food in-res 0))
-        fuel    (- (:fuel out-res 0)    (:fuel in-res 0))
+        ;; Breakaway also draws down population, stockpiles, and military/leader units by
+        ;; the same fraction as planets (resolution/calculate-stability-breakaway).
+        break-res   (:resources-lost breakaway-result {})
+        break-pop   (get break-res :player/population 0)
+        break-units (reduce + 0 (vals (select-keys break-res
+                                         [:player/soldiers :player/transports :player/fighters
+                                          :player/carriers :player/cmd-ships :player/stations
+                                          :player/generals :player/admirals])))
+        credits (- (:credits out-res 0) (:credits in-res 0) (get break-res :player/credits 0))
+        food    (- (:food out-res 0)    (:food in-res 0)    (get break-res :player/food    0))
+        fuel    (- (:fuel out-res 0)    (:fuel in-res 0)    (get break-res :player/fuel    0))
         ;; Stability delta
         stab-loss (+ (or expense-penalty 0)
                      (or capture-penalty 0)
@@ -221,11 +229,11 @@
         fate-credits(get fate-effect :player/credits    0)
         fate-fuel   (get fate-effect :player/fuel       0)
         fate-pop    (get fate-effect :player/population 0)]
-    {:units-lost (+ units-lost fate-units)
+    {:units-lost (+ units-lost fate-units break-units)
      :ore ore :erg erg :mil mil
      :credits (+ credits fate-credits) :food (+ food fate-food) :fuel (+ fuel fate-fuel)
      :stability (- stab-gain stab-loss)
-     :population (+ (or pop-growth 0) fate-pop)
+     :population (- (+ (or pop-growth 0) fate-pop) break-pop)
      :agents (+ (- esp-lost) esp-gained esp-defect (- in-defected))}))
 
 (defn- delta-pill
@@ -620,14 +628,31 @@
        (when has-breakaway?
          [:div.py-1.5.px-3.border-t.border-game-divider
           [:p.text-xs.text-red-400
-           (let [lost-str (str/join ", "
+           ;; Same :fraction that sized the planet loss also drained population, stockpiles,
+           ;; and forces (:resources-lost) — both appear in one combined "Lost:" list.
+           (let [res (:resources-lost breakaway-result {})
+                 unit-total (reduce + 0 (vals (select-keys res
+                                                 [:player/soldiers :player/transports :player/fighters
+                                                  :player/carriers :player/cmd-ships :player/stations
+                                                  :player/generals :player/admirals])))
+                 lost-str (str/join ", "
                             (keep identity
                               [(when (pos? (:ore-lost breakaway-result))
                                  (str (ui/format-number-str (:ore-lost breakaway-result)) " ore planet(s)"))
                                (when (pos? (:erg-lost breakaway-result))
                                  (str (ui/format-number-str (:erg-lost breakaway-result)) " energy planet(s)"))
                                (when (pos? (:mil-lost breakaway-result))
-                                 (str (ui/format-number-str (:mil-lost breakaway-result)) " military planet(s)"))]))]
+                                 (str (ui/format-number-str (:mil-lost breakaway-result)) " military planet(s)"))
+                               (when (pos? (get res :player/population 0))
+                                 (str (ui/format-population (get res :player/population 0)) " population"))
+                               (when (pos? (get res :player/credits 0))
+                                 (str (ui/format-number-str (get res :player/credits 0)) " credits"))
+                               (when (pos? (get res :player/food 0))
+                                 (str (ui/format-number-str (get res :player/food 0)) " food"))
+                               (when (pos? (get res :player/fuel 0))
+                                 (str (ui/format-number-str (get res :player/fuel 0)) " fuel"))
+                               (when (pos? unit-total)
+                                 (str (ui/format-number-str unit-total) " units"))]))]
              (str "Empire instability prompts revolution. Lost: " lost-str))]])])))
 
 (defn- incoming-card
