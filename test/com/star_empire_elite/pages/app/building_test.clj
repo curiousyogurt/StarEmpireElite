@@ -1,5 +1,6 @@
 (ns com.star-empire-elite.pages.app.building-test
   (:require [clojure.test :refer :all]
+            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.pages.app.building :as building]
             [com.star-empire-elite.test-helpers :as helpers]
             [com.star-empire-elite.utils :as utils]
@@ -97,13 +98,14 @@
 
 (deftest test-calculate-purchase-cost-zero
   (testing "Returns zero cost when no purchases are made"
-    (is (= 0 (:total-cost (building/calculate-purchase-cost zero-quantities test-game))))))
+    (is (= 0 (:total-cost (building/calculate-purchase-cost test-player zero-quantities test-game))))))
 
 (deftest test-calculate-purchase-cost-single-type
   (testing "Calculates cost correctly for a single unit type"
-    (is (= 1000 (:total-cost (building/calculate-purchase-cost
+    (is (= 1000 (:total-cost (building/calculate-purchase-cost test-player
                                (assoc zero-quantities :soldiers 100) test-game))))  ; 100 * 10
-    (is (= 3500 (:total-cost (building/calculate-purchase-cost
+    ;; test-player has :player/mil-planets 2, far below the ramp's x — flat-rate branch only.
+    (is (= 3500 (:total-cost (building/calculate-purchase-cost test-player
                                (assoc zero-quantities :mil-planets 5) test-game))))))  ; 5 * 700
 
 (deftest test-calculate-purchase-cost-mixed
@@ -116,13 +118,96 @@
           expected (+ (* 10 10) (* 5 20) (* 2 30) (* 3 40) (* 8 50)
                       (* 1 60) (* 4 70) (* 2 80) (* 1 90)
                       (* 1 700) (* 1 800) (* 1 900))]
-      (is (= expected (:total-cost (building/calculate-purchase-cost quantities test-game)))))))
+      (is (= expected (:total-cost (building/calculate-purchase-cost test-player quantities test-game)))))))
 
 (deftest test-calculate-purchase-cost-agents
   (testing "Agent cost uses game/agent-cost (provided by enrich-game in the handler)"
     ;; The test-game has :game/agent-cost 90 already set.
-    (is (= (* 5 90) (:total-cost (building/calculate-purchase-cost
+    (is (= (* 5 90) (:total-cost (building/calculate-purchase-cost test-player
                                    (assoc zero-quantities :agents 5) test-game))))))
+
+;;;;
+;;;; Planet Cost Ramp Tests
+;;;;
+;;;; planet-cost, row-cost, and max-affordable-quantity are private, reached via #'.
+;;;; Small synthetic x/y (10/18, span 8) keep expected values hand-checkable; a separate
+;;;; overflow test exercises the real production-scale thresholds.
+;;;;
+
+(defn- bruteforce-planet-cost
+  "Independent per-unit reference implementation (loops, uses doubles) to cross-check the
+  closed-form planet-cost at small scale."
+  [base-cost holdings quantity x y]
+  (reduce + (for [k (range quantity)
+                  :let [n (+ holdings k)]]
+              (if (< n x)
+                base-cost
+                (Math/round (* (double base-cost) (+ 1.0 (/ (- n x) (double (- y x))))))))))
+
+(deftest planet-cost-below-x-is-flat
+  (testing "Holdings below x: every unit costs exactly base-cost"
+    (is (= 1000 (#'building/planet-cost 1000 9 1 10 18)))
+    (is (= 2000 (#'building/planet-cost 1000 0 2 10 18)))))
+
+(deftest planet-cost-at-x-is-still-1x
+  (testing "Holdings exactly at x: ramp starts here, no discontinuity — still 1x"
+    (is (= 1000 (#'building/planet-cost 1000 10 1 10 18)))))
+
+(deftest planet-cost-mid-ramp
+  (testing "Holdings partway between x and y: linear interpolation toward 2x"
+    ;; a = 14-10 = 4, span = 8 -> multiplier = 1 + 4/8 = 1.5
+    (is (= 1500 (#'building/planet-cost 1000 14 1 10 18)))))
+
+(deftest planet-cost-at-y-is-2x
+  (testing "Holdings exactly at y: cost is exactly 2x base"
+    (is (= 2000 (#'building/planet-cost 1000 18 1 10 18)))))
+
+(deftest planet-cost-beyond-y-keeps-climbing
+  (testing "Holdings past y: ramp continues at the same slope, no plateau"
+    ;; a = 22-10 = 12, span = 8 -> multiplier = 1 + 12/8 = 2.5
+    (is (= 2500 (#'building/planet-cost 1000 22 1 10 18)))))
+
+(deftest planet-cost-batch-spanning-x-and-y-matches-bruteforce
+  (testing "A single purchase crossing from below x to above y prices the true integrated total"
+    (is (= (bruteforce-planet-cost 1000 8 20 10 18)
+           (#'building/planet-cost 1000 8 20 10 18)))
+    ;; Hand-checked sub-case: 2 flat units (8,9) + 4 ramp units (10-13) = 6750.
+    (is (= 6750 (#'building/planet-cost 1000 8 6 10 18)))))
+
+(deftest planet-cost-zero-quantity
+  (testing "Buying zero costs zero regardless of holdings"
+    (is (= 0 (#'building/planet-cost 1000 1000000 0 10 18)))))
+
+(deftest planet-cost-overflow-safety-at-production-scale
+  (testing "Production-scale holdings/quantity near the real ceiling don't throw, and clamp"
+    (let [[x y] [const/planet-cost-ramp-x const/planet-cost-ramp-y]
+          result (#'building/planet-cost const/ore-planet-cost
+                                          (* 2 x)           ; well past y, deep in the ramp
+                                          utils/max-unit-quantity
+                                          x y)]
+      (is (<= result utils/max-resource-amount))
+      (is (pos? result)))))
+
+(deftest row-cost-each-column-matches-marginal-price
+  (testing "row-cost with quantity 1 equals planet-cost evaluated once at current holdings"
+    (let [game   (assoc test-game :game/planet-cost-ramp-x 10 :game/planet-cost-ramp-y 18
+                                   :game/mil-planet-cost 1000)
+          player (assoc test-player :player/mil-planets 14)
+          row    (first (filter #(= :mil-planets (:qty-key %)) building/purchase-rows))]
+      (is (= 1500 (#'building/row-cost row player game 1))))))
+
+(deftest max-affordable-quantity-matches-bruteforce
+  (testing "Binary search agrees with a linear scan, and the boundary is exact"
+    (doseq [budget [0 999 1000 5000 6749 6750 6751 50000]]
+      (let [found (#'building/max-affordable-quantity 1000 8 budget 10 18)]
+        ;; found is affordable; found+1 is not (unless found already hit the search ceiling).
+        (is (<= (#'building/planet-cost 1000 8 found 10 18) budget))
+        (when (< found utils/max-unit-quantity)
+          (is (> (#'building/planet-cost 1000 8 (inc found) 10 18) budget)))))))
+
+(deftest max-affordable-quantity-negative-budget
+  (testing "A negative budget (other rows already over-committed) returns 0, not a crash"
+    (is (= 0 (#'building/max-affordable-quantity 1000 8 -5 10 18)))))
 
 ;;;;
 ;;;; calculate-resources-after-purchases Tests
@@ -238,7 +323,7 @@
               tx     (first @tx-atom)
               ;; Derive expected values from the same pure functions the handler uses.
               quantities (#'building/parse-purchase-quantities params)
-              cost-info  (building/calculate-purchase-cost quantities test-game)
+              cost-info  (building/calculate-purchase-cost test-player quantities test-game)
               expected   (building/calculate-resources-after-purchases test-player quantities cost-info)]
           ;; Redirect
           (is (= 303 (:status result)))

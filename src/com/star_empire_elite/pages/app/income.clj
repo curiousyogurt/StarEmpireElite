@@ -31,6 +31,7 @@
 (ns com.star-empire-elite.pages.app.income
   (:require [clojure.string :as str]
             [com.biffweb :as biff]
+            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
 
@@ -39,22 +40,58 @@
 ;;;; Calculations
 ;;;;
 
+(defn planet-synergy-bonus-rate
+  "Compute the ore-credits synergy bonus rate from how proportionally balanced the player's
+  ore/erg/mil planet counts are, independent of their absolute scale (unrelated to the
+  building-phase cost ramp, which cares about scale, not proportion).
+
+  spread-fraction = (hi - lo) / hi, where hi/lo are the largest/smallest of the three counts:
+  0 when all three are equal, growing toward 1 as one type falls toward zero relative to the
+  others. The bonus tapers linearly from the full rate at spread-fraction 0 down to zero at
+  the configured threshold, and stays zero beyond it — no cliff edge, and no bonus at all when
+  the player has no planets of any type (hi <= 0, which would otherwise divide by zero).
+
+  [player player-map, game game-map] -> double"
+  [player game]
+  (let [counts    [(:player/ore-planets player 0)
+                    (:player/erg-planets player 0)
+                    (:player/mil-planets player 0)]
+        hi        (apply max counts)
+        lo        (apply min counts)
+        threshold (or (:game/planet-synergy-threshold  game) const/planet-synergy-threshold)
+        max-rate  (or (:game/planet-synergy-bonus-rate game) const/planet-synergy-bonus-rate)]
+    (if (<= hi 0)
+      0.0
+      (let [spread-fraction (/ (- hi lo) (double hi))]
+        (if (>= spread-fraction threshold)
+          0.0
+          (* max-rate (- 1.0 (/ spread-fraction threshold))))))))
+
 (defn calculate-income
   "Calculate income from all sources using game constants.
 
-  [player player-map, game game-map] -> {:ore-credits int,  :erg-food int,     :erg-fuel int,
-                                         :mil-soldiers int, :mil-fighters int, :mil-stations int,
-                                         :tax-credits int}"
+  :ore-credits already includes the planet synergy bonus (see planet-synergy-bonus-rate);
+  :synergy-credits is that bonus broken out on its own, purely so the UI can show it as a
+  separate line — ore-credits = base-ore-credits + synergy-credits exactly, so nothing is
+  double-counted when both are added to a player's credits.
+
+  [player player-map, game game-map] -> {:ore-credits int,  :synergy-credits int, :erg-food int,
+                                         :erg-fuel int,     :mil-soldiers int,   :mil-fighters int,
+                                         :mil-stations int, :tax-credits int}"
   [player game]
   ;; Keys such as :player/ore-planets are fully qualified keys in the player map.
   ;;             (* resource-count-for-player     resource-value-in-game)
-  {:ore-credits  (* (:player/ore-planets player) (:game/ore-planet-credits     game))
-   :erg-food     (* (:player/erg-planets player) (:game/erg-planet-food        game))
-   :erg-fuel     (* (:player/erg-planets player) (:game/erg-planet-fuel        game))
-   :mil-soldiers (* (:player/mil-planets player) (:game/mil-planet-soldiers    game))
-   :mil-fighters (* (:player/mil-planets player) (:game/mil-planet-fighters    game))
-   :mil-stations (* (:player/mil-planets player) (:game/mil-planet-stations    game))
-   :tax-credits  (* (:player/population  player) (:game/population-tax-credits game))})
+  (let [base-ore-credits (* (:player/ore-planets player) (:game/ore-planet-credits game))
+        ore-credits      (long (Math/round (* base-ore-credits
+                                               (+ 1.0 (planet-synergy-bonus-rate player game)))))]
+    {:ore-credits      ore-credits
+     :synergy-credits  (- ore-credits base-ore-credits)
+     :erg-food         (* (:player/erg-planets player) (:game/erg-planet-food        game))
+     :erg-fuel         (* (:player/erg-planets player) (:game/erg-planet-fuel        game))
+     :mil-soldiers     (* (:player/mil-planets player) (:game/mil-planet-soldiers    game))
+     :mil-fighters     (* (:player/mil-planets player) (:game/mil-planet-fighters    game))
+     :mil-stations     (* (:player/mil-planets player) (:game/mil-planet-stations    game))
+     :tax-credits      (* (:player/population  player) (:game/population-tax-credits game))}))
 
 (defn calculate-resources-after-income
   "Calculate all player resources after applying income.
@@ -110,16 +147,20 @@
     [:span.text-xs.text-game-green-muted aside]]
    [:div {:class "flex flex-col gap-0.5"}
     ;; Call income-row for all possible; but nils in the income map not display
-    (income-row :credits  "cred" income-map)
-    (income-row :food     "food" income-map)
-    (income-row :fuel     "fuel" income-map)
-    (income-row :soldiers "sold" income-map)
-    (income-row :fighters "fgtr" income-map)
-    (income-row :stations "stn"  income-map)]])
+    (income-row :credits         "cred"     income-map)
+    (income-row :food            "food"     income-map)
+    (income-row :fuel            "fuel"     income-map)
+    (income-row :soldiers        "sold"     income-map)
+    (income-row :fighters        "fgtr"     income-map)
+    (income-row :stations        "stn"      income-map)
+    (income-row :tax-credits     "cred tax" income-map)
+    (income-row :synergy-credits "cred syn" income-map)]])
 
 (defn- income-grid
-  "Render the income grid: four cards (Ore, Erg, Mil, Tax) in a 2×4 responsive grid,
-  each with a header, aside, and income rows showing resources produced this turn.
+  "Render the income grid: four cards (Ore, Erg, Mil, Econ) in a 2×4 responsive grid,
+  each with a header, aside, and income rows showing resources produced this turn. The fourth
+  card ('Econ', for economy) covers both population tax and the planet synergy bonus
+  (see planet-synergy-bonus-rate) since neither has enough rows on its own for a full card.
 
   [player player-map, income income-map] -> hiccup"
   [player income]
@@ -134,8 +175,9 @@
                   {:soldiers (:mil-soldiers income)
                    :fighters (:mil-fighters income)
                    :stations (:mil-stations income)})
-     (income-card "Tax" (str "x" pop-count)
-                  {:credits (:tax-credits income)})]))
+     (income-card "Econ" (str "x" pop-count)
+                  {:tax-credits     (:tax-credits income)
+                   :synergy-credits (:synergy-credits income)})]))
 
 ;;;
 ;;; The Income Table shows income by type instead of by source: credits, food, fuel; soldiers, 

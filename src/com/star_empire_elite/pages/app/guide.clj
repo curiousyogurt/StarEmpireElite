@@ -27,11 +27,14 @@
   (if (contains? game k) (get game k) fallback))
 
 (defn- v
-  "Wrap a value in highlighted terminal-green text for inline constants.
+  "Wrap a value in highlighted terminal-green text for inline constants. ui/format-number
+  returns hiccup (not a plain string) for values >= 100K, to carry a hover tooltip with the
+  exact number — pass that through as a child instead of stringifying it, or the literal
+  hiccup form would render as visible text instead of the tooltip span.
 
   [x any] -> hiccup"
   [x]
-  [:span.text-green-300.font-bold (str x)])
+  [:span.text-green-300.font-bold (if (vector? x) x (str x))])
 
 (defn- pct
   "Format a fraction as a percentage string, e.g. 0.15 -> \"15%\".
@@ -90,6 +93,20 @@
          (ui/section-label title subtitle)]
         body))
 
+(defn- phase-banner
+  "Render a divider banner marking the start of a new turn phase in the page body, grouping
+  the one or more sections that follow. Heavier than section-label (which headers each
+  individual section) since it's marking a bigger structural break. id is optional — only
+  needed when the Contents links to this banner as a single entry spanning more than one
+  section (Action covers Combat and Strikes; Outcomes covers Population, Stability, Fate,
+  and Scoring).
+
+  [label str, id str-or-nil] -> hiccup"
+  [label & [id]]
+  [:div.mt-8.mb-3.pt-3
+   (cond-> {:class "border-t border-game-border"} id (assoc :id id))
+   [:span.text-sm.font-bold.uppercase.text-green-400 {:class "tracking-[0.15em]"} label]])
+
 ;;;;
 ;;;; Table of Contents
 ;;;;
@@ -102,13 +119,9 @@
                  ["expenses"        "Expenses"]
                  ["exchange"        "Exchange"]
                  ["building"        "Building"]
-                 ["combat"          "Combat"]
-                 ["strikes"         "Strikes"]
+                 ["action"          "Action"]
                  ["espionage"       "Espionage"]
-                 ["population"      "Population"]
-                 ["stability"       "Stability"]
-                 ["fate"            "Fate"]
-                 ["scoring"         "Scoring"]]]
+                 ["outcomes"        "Outcomes"]]]
     [:div.mb-6
      (ui/section-label "CONTENTS")
      [:div.flex.flex-col.gap-0.5
@@ -151,14 +164,14 @@
       (v (g game :game/minutes-between-rounds const/minutes-between-rounds)) " minutes.")
     (prose "Each turn you work through six sequential phases:")
     (guide-table
-     ["#" "Phase" "What you decide"]
-     [["1" "Income"    "Review resources received from your planets and population"]
-      ["2" "Expenses"  "Pay upkeep for your military and infrastructure"]
-      ["3" "Exchange"  "Buy or sell resources and units on the open market"]
-      ["4" "Building"  "Purchase new units, ships, stations, and planets"]
-      ["5" "Action"    "Raid, invade, or strike an enemy empire"]
-      ["6" "Espionage" "Assign agents to spy on, destabilise, bomb, or infiltrate a rival"]])
-    (prose "After all six phases, Outcomes resolves combat results and advances the game state.")
+     ["#"  "Phase"     "What you decide"]
+     [["1"  "Income"    "Review resources received from your planets and population"]
+      ["2"  "Expenses"  "Pay upkeep for your military and infrastructure"]
+      ["2a" "Exchange"  "Buy or sell resources and units on the open market"]
+      ["3"  "Building"  "Purchase new units, ships, stations, and planets"]
+      ["4"  "Action"    "Raid, invade, or strike an enemy empire"]
+      ["5"  "Espionage" "Assign agents to spy on, destabilise, bomb, or infiltrate a rival"]
+      ["6"  "Outcomes"  "Nothing — combat, population, stability, and fate resolve automatically"]])
     (prose
       "The " [:span.italic "highlighted values"] " throughout this guide are specific to this galaxy: "
       "different galaxies may use different settings.")))
@@ -194,16 +207,27 @@
 ;;;;
 
 (defn- income-section [game]
-  (section "income" "INCOME" "resources generated automatically each turn"
-    (prose
-      "At the start of each turn your planets and population pay into your stockpiles. "
-      "You cannot influence the amounts; income is automatic.")
-    (guide-table
-     ["Source"              "Credits"                                          "Food"                                          "Fuel"                                          "Soldiers"                                      "Fighters"                                      "Stations"]
-     [["Each ore planet"    (v (ui/format-number (g game :game/ore-planet-credits const/ore-planet-credits))) "—"   "—"   "—"  "—"  "—"]
-      ["Each erg planet"    "—"    (v (ui/format-number (g game :game/erg-planet-food const/erg-planet-food)))   (v (ui/format-number (g game :game/erg-planet-fuel const/erg-planet-fuel)))   "—"  "—"  "—"]
-      ["Each mil planet"    "—"    "—"    "—"   (v (g game :game/mil-planet-soldiers const/mil-planet-soldiers))  (v (g game :game/mil-planet-fighters const/mil-planet-fighters))  (v (g game :game/mil-planet-stations const/mil-planet-stations))]
-      ["Per million pop."   (v (ui/format-number (g game :game/population-tax-credits const/population-tax-credits))) "—" "—" "—" "—" "—"]])))
+  (let [bonus-rate (g game :game/planet-synergy-bonus-rate const/planet-synergy-bonus-rate)]
+    (section "income" "INCOME" "resources generated automatically each turn"
+      (prose
+        "At the start of each turn your planets and population pay into your stockpiles. "
+        "You cannot influence the amounts; income is automatic. The income page groups these "
+        "into four cards: Ore, Erg, Mil, and Econ (population tax plus the synergy bonus below).")
+      (guide-table
+       ["Source"                  "Credits"                                          "Food"                                          "Fuel"                                          "Soldiers"                                      "Fighters"                                      "Stations"]
+       [["Ore — each planet"      (v (ui/format-number (g game :game/ore-planet-credits const/ore-planet-credits))) "—"   "—"   "—"  "—"  "—"]
+        ["Erg — each planet"      "—"    (v (ui/format-number (g game :game/erg-planet-food const/erg-planet-food)))   (v (ui/format-number (g game :game/erg-planet-fuel const/erg-planet-fuel)))   "—"  "—"  "—"]
+        ["Mil — each planet"      "—"    "—"    "—"   (v (g game :game/mil-planet-soldiers const/mil-planet-soldiers))  (v (g game :game/mil-planet-fighters const/mil-planet-fighters))  (v (g game :game/mil-planet-stations const/mil-planet-stations))]
+        ["Econ — per million pop." (v (ui/format-number (g game :game/population-tax-credits const/population-tax-credits))) "—" "—" "—" "—" "—"]
+        ["Econ — synergy bonus"   (v (str "+0–" (pct bonus-rate) " of ore credits")) "—" "—" "—" "—" "—"]])
+      (prose
+        "Synergy bonus: ore credits get a bonus for keeping your ore/erg/mil planet counts "
+        "close to equal — full ("
+        (v (pct bonus-rate))
+        ") at an exact match, tapering linearly to zero once your smallest planet type falls "
+        "more than "
+        (v (pct (g game :game/planet-synergy-threshold const/planet-synergy-threshold)))
+        " below your largest."))))
 
 ;;;;
 ;;;; Expenses
@@ -250,7 +274,13 @@
       ["Mil planet"    (v (ui/format-number (g game :game/mil-planet-cost const/mil-planet-cost)))]
       ["Erg planet"    (v (ui/format-number (g game :game/erg-planet-cost const/erg-planet-cost)))]
       ["Ore planet"    (v (ui/format-number (g game :game/ore-planet-cost const/ore-planet-cost)))]
-      ["Agent"         (v (ui/format-number (g game :game/agent-cost      const/agent-cost)))]])))
+      ["Agent"         (v (ui/format-number (g game :game/agent-cost      const/agent-cost)))]])
+    (prose
+      "Planet costs above are the base (1x) rate. Past "
+      (v (ui/format-number (g game :game/planet-cost-ramp-x const/planet-cost-ramp-x)))
+      " planets of one type, each further one costs more — 2x base at "
+      (v (ui/format-number (g game :game/planet-cost-ramp-y const/planet-cost-ramp-y)))
+      " owned, climbing beyond that.")))
 
 ;;;;
 ;;;; Exchange
@@ -285,15 +315,18 @@
 (defn- population-section [game]
   (section "population" "POPULATION" "stored in millions"
     (prose
-      "At the end of each round, population grows. Growth is additive: "
+      "At the end of each round, population grows: "
       (v (pct (g game :game/pop-growth-rate const/pop-growth-rate))) " of current population "
       "plus " (v (str (* (g game :game/pop-growth-per-planet const/pop-growth-per-planet) 1000) "k")) " per planet you own, "
-      "scaled by a random factor between "
+      "then scaled by a random factor between "
       (v (pct (g game :game/pop-random-min const/pop-random-min))) " and "
       (v (pct (g game :game/pop-random-max const/pop-random-max))) ".")
     (prose
-      "Population is capped at "
-      (v (str (int (g game :game/pop-capacity-per-planet const/pop-capacity-per-planet)) "M")) " per planet. "
+      "That growth also shrinks the closer you get to capacity — "
+      (v (str (int (g game :game/pop-capacity-per-planet const/pop-capacity-per-planet)) "M")) " per planet — "
+      "tapering toward zero rather than cutting off outright, so you creep up on the limit "
+      "instead of slamming into it.")
+    (prose
       "Population pays " (v (ui/format-number (g game :game/population-tax-credits const/population-tax-credits)))
       " credits per million per turn, but also consumes "
       (v (ui/format-number (g game :game/population-upkeep-food const/population-upkeep-food))) " food and "
@@ -308,14 +341,15 @@
   (section "stability" "STABILITY" "your empire's internal cohesion (0–100%)"
     (prose
       "Stability represents how firmly your planets are under your control. "
-      "At the end of each round, the game rolls d100. "
-      "If the roll exceeds your stability plus "
+      "At the end of each round, the game rolls d100 against breakaway: if the roll exceeds "
+      "your stability plus "
       (v (g game :game/stability-breakaway-threshold const/stability-breakaway-threshold))
-      ", one or more planets break away, up to "
+      ", you lose at least one planet, scaling up to "
       (v (str (g game :game/stability-breakaway-cap const/stability-breakaway-cap) "%"))
-      " of your total planet count.")
+      " of your total count the further the roll clears that threshold.")
     (prose
-      "The same roll can trigger recovery: if the result falls below "
+      "A separate d100 roll checks for recovery — but only on a round where you paid your "
+      "expenses in full and didn't just suffer a breakaway. If that roll falls below "
       "max(your stability, "
       (v (g game :game/stability-recovery-floor const/stability-recovery-floor))
       "%), you gain " (v (g game :game/stability-recovery-amount const/stability-recovery-amount))
@@ -350,9 +384,10 @@
      [["Soldier"       "Ground"   (v (g game :game/soldier-power   const/soldier-power))]
       ["Fighter"       "Space"    (v (g game :game/fighter-power    const/fighter-power))]
       ["Command ship"  "Space"    (v (g game :game/cmd-ship-power   const/cmd-ship-power))]
-      ["Station"       "Space"    (v (str (g game :game/station-power const/station-power) " (defender only)"))]
-      ["General"       "Ground"   (v (g game :game/general-power    const/general-power))]
-      ["Admiral"       "Space"    (v (g game :game/admiral-power    const/admiral-power))]])
+      ["Station"       "Space"    (v (str (g game :game/station-power const/station-power) " (defender only)"))]])
+    (prose
+      "Generals and admirals aren't on this table — they carry no power of their own. "
+      "Their entire contribution is the capped multiplier below.")
 
     (ui/section-label "LEADERSHIP MULTIPLIERS" "additive bonus on top of base 1.0")
     (prose
@@ -371,10 +406,12 @@
       "adds up to " (v (pct (g game :game/space-carryover const/space-carryover)))
       " bonus ground power for the space victor.")
 
-    (ui/section-label "COMMAND CAPACITY" "soft caps on army and fleet size")
+    (ui/section-label "COMMAND CAPACITY" "hard caps on army and fleet size")
     (prose
-      "Generals and admirals impose soft limits. Units beyond the cap still fight, "
-      "but you lose the leadership multiplier benefit for them.")
+      "Generals and admirals cap how many soldiers and fighters can actually fight — anyone "
+      "beyond the cap sits out the battle entirely, contributing nothing. As an attacker you're "
+      "also capped by transports and carriers; defenders skip that cap since their forces are "
+      "already home.")
     (guide-table
      ["Leader"     "Capacity"                                                                  "Transport"  "Transport capacity"]
      [["General"   (v (str (g game :game/soldiers-per-general const/soldiers-per-general) " soldiers"))   "Transport" (v (str (g game :game/soldiers-per-transport const/soldiers-per-transport) " soldiers"))]
@@ -393,11 +430,13 @@
 
     (ui/section-label "COMBAT LOSSES")
     (prose
-      "Both sides suffer losses proportional to the margin of defeat. "
-      "In an even fight both sides lose ~" (v (pct (g game :game/combat-loss-floor const/combat-loss-floor)))
-      " of their forces. As the margin grows, the loser's losses climb toward "
+      "Both sides suffer losses that scale with the margin of victory. At an even margin, "
+      "the loser takes " (v (pct (g game :game/combat-loss-floor const/combat-loss-floor)))
+      " and the winner takes " (v (pct (g game :game/combat-winner-max const/combat-winner-max)))
+      " — two separately tunable rates that happen to match by default. As the margin widens, "
+      "the loser's rate climbs toward "
       (v (pct (g game :game/combat-loser-cap const/combat-loser-cap)))
-      " while the winner's losses fall toward zero.")
+      " while the winner's falls toward zero.")
     (prose
       "Command ships are the exception: being the most expensive unit in the game and held "
       "in far smaller numbers, they take only "
@@ -447,7 +486,7 @@
      ["Operation"  "On Success"                                                       "Agents lost on failure (min 1)"]
      [["Spy"       "Full military snapshot of target (units, agents)"                (v (pct (g game :game/spy-defection-rate const/spy-defection-rate)))]
       ["Incite"    (str "Reduce target stability up to " (g game :game/incite-stability-damage const/incite-stability-damage) " pts (floor " (g game :game/incite-stability-floor const/incite-stability-floor) "%)")  (v (pct (g game :game/incite-defection-rate const/incite-defection-rate)))]
-      ["Bomb"      (str "Destroy " (pct (g game :game/bomb-damage-rate const/bomb-damage-rate)) " of soldiers, transports, fighters, carriers") (v (pct (g game :game/bomb-defection-rate const/bomb-defection-rate)))]
+      ["Bomb"      (str "Destroy " (pct (g game :game/bomb-damage-rate-lo const/bomb-damage-rate-lo)) "-" (pct (g game :game/bomb-damage-rate-hi const/bomb-damage-rate-hi)) " of soldiers, transports, fighters, carriers") (v (pct (g game :game/bomb-defection-rate const/bomb-defection-rate)))]
       ["Defect"    (str "Turn " (pct (g game :game/defect-transfer-rate const/defect-transfer-rate)) " of defender's agents (or yours, whichever is fewer)") (v (pct (g game :game/defect-defection-rate const/defect-defection-rate)))]])
 
     (prose
@@ -591,15 +630,22 @@
      (quick-start-section)
      (overview-section game)
      (starting-empire-section game)
+     (phase-banner "Phase 1 — Income")
      (income-section game)
+     (phase-banner "Phase 2 — Expenses")
      (expenses-section game)
-     (building-section game)
+     (phase-banner "Phase 2a — Exchange")
      (exchange-section game)
-     (population-section game)
-     (stability-section game)
+     (phase-banner "Phase 3 — Building")
+     (building-section game)
+     (phase-banner "Phase 4 — Action" "action")
      (combat-section game)
      (strikes-section game)
+     (phase-banner "Phase 5 — Espionage")
      (espionage-section game)
+     (phase-banner "Phase 6 — Outcomes" "outcomes")
+     (population-section game)
+     (stability-section game)
      (fate-section game)
      (scoring-section game)]
     (ui/phase-action-bar

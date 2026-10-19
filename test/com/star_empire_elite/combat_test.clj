@@ -602,6 +602,42 @@
       (is (not (contains? result :resources-captured))))))
 
 ;;;;
+;;;; resolve-bomb Tests
+;;;;
+
+;;; Fixture: defender with round unit counts, so 5%/10% land on whole numbers.
+(def ^:private bomb-defender
+  (merge helpers/player-defaults
+         {:xt/id              #uuid "00000000-0000-0000-0000-000000000030"
+          :player/empire-name "Bomb Target"
+          :player/soldiers    1000
+          :player/transports  100
+          :player/fighters    500
+          :player/carriers    50
+          :player/agents      1}))
+
+;;; A massive agent gap guarantees the attacker wins every roll despite ±variance,
+;;; isolating the damage-rate draw from the separate success/failure roll.
+(def ^:private overwhelming-bomb-attacker
+  (assoc strong-attacker :player/agents 100000))
+
+(deftest bomb-damage-rate-stays-within-lo-hi-range
+  (testing "Every successful bomb destroys between 5% and 10% of each unit type, never outside it"
+    (let [results (repeatedly 200 #(combat/resolve-bomb game overwhelming-bomb-attacker bomb-defender))]
+      (is (every? :attacker-wins? results))
+      (doseq [result results]
+        (is (<= 50 (:soldiers result) 100))     ; 5%-10% of 1000
+        (is (<= 5  (:transports result) 10))    ; 5%-10% of 100
+        (is (<= 25 (:fighters result) 50))      ; 5%-10% of 500
+        (is (<= 2  (:carriers result) 5))))))   ; 5%-10% of 50
+
+(deftest bomb-damage-rate-varies-across-runs
+  (testing "Repeated successful bombs don't all deal the same fixed damage"
+    (let [results   (repeatedly 50 #(combat/resolve-bomb game overwhelming-bomb-attacker bomb-defender))
+          soldiers  (map :soldiers results)]
+      (is (> (count (distinct soldiers)) 1)))))
+
+;;;;
 ;;;; Loss Curve Verification
 ;;;;
 

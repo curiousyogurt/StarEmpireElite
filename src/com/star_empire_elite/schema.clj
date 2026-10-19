@@ -120,6 +120,8 @@
           [:game/mil-planet-soldiers :int]
           [:game/mil-planet-fighters :int]
           [:game/mil-planet-stations :int]
+          [:game/planet-synergy-threshold  {:optional true} :double]
+          [:game/planet-synergy-bonus-rate {:optional true} :double]
 
           ;; Population tax
           [:game/population-tax-credits    :int]
@@ -151,6 +153,8 @@
           [:game/mil-planet-cost         :int]
           [:game/erg-planet-cost        :int]
           [:game/ore-planet-cost         :int]
+          [:game/planet-cost-ramp-x      {:optional true} :int]
+          [:game/planet-cost-ramp-y      {:optional true} :int]
 
           ;; Exchange sell/buy rates
           [:game/soldier-sell            :int]
@@ -180,7 +184,8 @@
           [:game/espionage-defense-exponent   {:optional true} :double]
           [:game/incite-stability-damage    {:optional true} :int]
           [:game/incite-stability-floor     {:optional true} :int]
-          [:game/bomb-damage-rate           {:optional true} :double]
+          [:game/bomb-damage-rate-lo        {:optional true} :double]
+          [:game/bomb-damage-rate-hi        {:optional true} :double]
 
           ;; Fate system
           [:game/fate-probability {:optional true} :double]

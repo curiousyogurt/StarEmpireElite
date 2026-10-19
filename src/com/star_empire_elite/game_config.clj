@@ -159,6 +159,10 @@
    ;; Income Generation
    {:key :game/ore-planet-credits :label "Ore planet credits" :category :income
     :type :int :min 0 :max utils/max-config-value :step 1 :default const/ore-planet-credits}
+   {:key :game/planet-synergy-threshold :label "Planet synergy threshold" :category :income
+    :type :double :min 0.0 :max 1.0 :step 0.01 :default const/planet-synergy-threshold}
+   {:key :game/planet-synergy-bonus-rate :label "Planet synergy bonus rate" :category :income
+    :type :double :min 0.0 :max 1.0 :step 0.01 :default const/planet-synergy-bonus-rate}
    {:key :game/erg-planet-food :label "Energy planet food" :category :income
     :type :int :min 0 :max utils/max-config-value :step 1 :default const/erg-planet-food}
    {:key :game/erg-planet-fuel :label "Energy planet fuel" :category :income
@@ -241,6 +245,10 @@
     :type :int :min 0 :max utils/max-config-value :step 1 :default const/erg-planet-cost}
    {:key :game/ore-planet-cost :label "Ore planet cost" :category :building
     :type :int :min 0 :max utils/max-config-value :step 1 :default const/ore-planet-cost}
+   {:key :game/planet-cost-ramp-x :label "Planet cost ramp start (x)" :category :building
+    :type :int :min 0 :max utils/max-unit-quantity :step 1 :default const/planet-cost-ramp-x}
+   {:key :game/planet-cost-ramp-y :label "Planet cost ramp 2x point (y)" :category :building
+    :type :int :min 0 :max utils/max-unit-quantity :step 1 :default const/planet-cost-ramp-y}
 
    ;; Espionage
    {:key :game/spy-defection-rate :label "Spy defection rate" :category :espionage
@@ -261,8 +269,10 @@
     :type :int :min 0 :max 100 :step 1 :default const/incite-stability-damage}
    {:key :game/incite-stability-floor :label "Incite stability floor" :category :espionage
     :type :int :min 0 :max 100 :step 1 :default const/incite-stability-floor}
-   {:key :game/bomb-damage-rate :label "Bomb damage rate" :category :espionage
-    :type :double :min 0.0 :max 1.0 :step 0.01 :default const/bomb-damage-rate}
+   {:key :game/bomb-damage-rate-lo :label "Bomb damage rate (low)" :category :espionage
+    :type :double :min 0.0 :max 1.0 :step 0.01 :default const/bomb-damage-rate-lo}
+   {:key :game/bomb-damage-rate-hi :label "Bomb damage rate (high)" :category :espionage
+    :type :double :min 0.0 :max 1.0 :step 0.01 :default const/bomb-damage-rate-hi}
 
    ;; Strike Operation
    {:key :game/strike-damage-rate :label "Strike damage rate" :category :action
@@ -544,8 +554,9 @@
 (defn enforce-invariants
   "Adjust a coerced config map to satisfy known cross-field invariants: the loser's combat-loss
   cap can't sit below the even-fight floor, no asset can sell for more than it costs to build,
-  food/fuel can't sell above its buy price, and every fate lo/hi pair and the population-growth
-  random range must be ordered lo <= hi.
+  food/fuel can't sell above its buy price, and every fate lo/hi pair, the bomb-damage-rate
+  lo/hi pair, the planet-cost-ramp x/y pair, and the population-growth random range must be
+  ordered lo <= hi.
 
   [config {:game/x number}] -> {:game/x number}"
   [config]
@@ -555,4 +566,6 @@
       (update :game/food-sell min (:game/food-buy config))
       (update :game/fuel-sell min (:game/fuel-buy config))
       (order-lo-hi-pairs fate-lo-hi-pairs)
-      (order-lo-hi-pairs [[:game/pop-random-min :game/pop-random-max]])))
+      (order-lo-hi-pairs [[:game/pop-random-min :game/pop-random-max]
+                           [:game/bomb-damage-rate-lo :game/bomb-damage-rate-hi]
+                           [:game/planet-cost-ramp-x :game/planet-cost-ramp-y]])))

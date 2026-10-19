@@ -544,13 +544,18 @@
 
 (defn resolve-bomb
   "Resolve a bombing operation against the target empire's ground and space forces.
-  On success, a fixed percentage of soldiers, transports, fighters, and carriers are destroyed.
+  On success, soldiers, transports, fighters, and carriers are destroyed at a rate drawn
+  uniformly from [bomb-damage-rate-lo, bomb-damage-rate-hi] — not a fixed percentage, so
+  identical successful bombs still vary in how much damage they do.
   On failure, agents are captured. UUIDs stored as strings for safe pr-str round-trip.
 
   [game game-map, attacker player-map, defender player-map] -> result-map"
   [game attacker defender]
   (let [{:keys [att-wins? agents-lost agents-captured]} (espionage-roll game attacker defender :bomb)
-        damage-rate (or (:game/bomb-damage-rate game) const/bomb-damage-rate)]
+        lo          (or (:game/bomb-damage-rate-lo game) const/bomb-damage-rate-lo)
+        hi          (or (:game/bomb-damage-rate-hi game) const/bomb-damage-rate-hi)
+        ;; Drawn once per bomb, the same way fate events draw their multiplier from [lo hi].
+        damage-rate (+ lo (* (rand) (- hi lo)))]
     {:op                   "bomb"
      :attacker-id          (str (:xt/id attacker))
      :defender-id          (str (:xt/id defender))

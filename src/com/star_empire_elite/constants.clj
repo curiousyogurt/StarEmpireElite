@@ -166,6 +166,13 @@
 (def erg-planet-food    3000)
 (def erg-planet-fuel    2000)
 
+;;; Planet Synergy Bonus — rewards keeping ore/erg/mil planet counts proportionally close to
+;;; one another, so maximizing ore income means giving up this bonus rather than being a free
+;;; win. Graduated, not a cliff: full bonus at perfect balance, tapering linearly to zero once
+;;; the smallest planet type falls more than threshold below the largest.
+(def planet-synergy-threshold  0.10)  ; max allowed (hi-lo)/hi spread to get any bonus at all
+(def planet-synergy-bonus-rate 0.25)  ; ore-credits bonus multiplier at perfect balance (spread 0)
+
 ;; Military planets provide modest ongoing military support.
 ;; They should not out-compete ore planets as a source of sell value.
 (def mil-planet-soldiers 5)
@@ -257,6 +264,16 @@
 (def erg-planet-cost 20000)
 (def ore-planet-cost 22000)
 
+;;; Planet Cost Ramp — each planet type's purchase cost rises with the player's own holdings
+;;; of that type, so credit reinvestment can't compound into unbounded planet counts forever.
+;;; Below x, cost is flat (1x base). From x to y it rises linearly to 2x base; beyond y it keeps
+;;; climbing at the same slope (no plateau — this slows runaway growth, it doesn't cap it).
+;;; Chosen as 10%/80% of utils/max-unit-quantity (the hard per-purchase safety ceiling) at the
+;;; time these were tuned; stored as plain thresholds so they stay put even if that ceiling
+;;; constant is later revised.
+(def planet-cost-ramp-x 1000000000000)  ; 1e12 — ramp begins here (holdings of one planet type)
+(def planet-cost-ramp-y 8000000000000)  ; 8e12 — cost reaches 2x base here
+
 (def agent-cost      5000)
 
 ;;;;
@@ -284,7 +301,10 @@
 
 (def incite-stability-damage  8)     ; base stability damage for a successful incite (diminished by target's current stability)
 (def incite-stability-floor   70)    ; incite cannot reduce stability below this; keeps victims out of breakaway-danger zone
-(def bomb-damage-rate         0.10)  ; fraction of soldiers/transports/fighters/carriers destroyed on a successful bomb
+;; On a successful bomb, the damage rate is drawn uniformly from [lo, hi] rather than fixed,
+;; so a successful run deals somewhere between 5% and 10% instead of always exactly 10%.
+(def bomb-damage-rate-lo      0.05)  ; low end of the drawn fraction destroyed on a successful bomb
+(def bomb-damage-rate-hi      0.10)  ; high end of the drawn fraction destroyed on a successful bomb
 
 ;;;;
 ;;;; Strike Operation
@@ -320,9 +340,11 @@
 (def station-sell     500)
 (def cmd-ship-sell    30000)
 
-(def mil-planet-sell  9000)
-(def erg-planet-sell  10000)
-(def ore-planet-sell  11000)
+;; 90% markdown from purchase cost — selling a planet is only ever useful as a way to dodge
+;; the cost ramp's rising price (sell down, rebuy cheaper), so the loss on resale is steep.
+(def mil-planet-sell  1700)  ; 10% of mil-planet-cost (17000)
+(def erg-planet-sell  2000)  ; 10% of erg-planet-cost (20000)
+(def ore-planet-sell  2200)  ; 10% of ore-planet-cost (22000)
 
 (def agent-sell 1000)
 

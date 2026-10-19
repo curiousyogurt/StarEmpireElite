@@ -134,6 +134,64 @@
       (is (= 6250   (:mil-soldiers income)))))) ; 250 * 25
 
 ;;;;
+;;;; planet-synergy-bonus-rate Tests
+;;;;
+;;;; test-game sets no :game/planet-synergy-* overrides, so these exercise the constants.clj
+;;;; defaults (threshold 0.10, max bonus rate 0.25).
+;;;;
+
+(deftest planet-synergy-bonus-perfectly-balanced
+  (testing "Equal ore/erg/mil counts get the full bonus rate"
+    (let [player (assoc test-player :player/ore-planets 5 :player/erg-planets 5 :player/mil-planets 5)]
+      (is (= 0.25 (income/planet-synergy-bonus-rate player test-game))))))
+
+(deftest planet-synergy-bonus-exactly-at-threshold
+  (testing "Spread exactly at the threshold (10%) gets zero bonus, not a sliver of one"
+    (let [player (assoc test-player :player/ore-planets 100 :player/erg-planets 100 :player/mil-planets 90)]
+      (is (= 0.0 (income/planet-synergy-bonus-rate player test-game))))))
+
+(deftest planet-synergy-bonus-beyond-threshold
+  (testing "Spread well beyond the threshold gets zero bonus"
+    (let [player (assoc test-player :player/ore-planets 100 :player/erg-planets 100 :player/mil-planets 40)]
+      (is (= 0.0 (income/planet-synergy-bonus-rate player test-game))))))
+
+(deftest planet-synergy-bonus-tapers-partway
+  (testing "Half the threshold spread gets half the max bonus rate"
+    ;; spread-fraction = 5/100 = 0.05, half of the 0.10 threshold -> rate = 0.25 * 0.5 = 0.125
+    (let [player (assoc test-player :player/ore-planets 100 :player/erg-planets 100 :player/mil-planets 95)]
+      (is (= 0.125 (income/planet-synergy-bonus-rate player test-game))))))
+
+(deftest planet-synergy-bonus-zero-planets
+  (testing "No planets of any type: zero bonus, no divide-by-zero"
+    (let [player (assoc test-player :player/ore-planets 0 :player/erg-planets 0 :player/mil-planets 0)]
+      (is (= 0.0 (income/planet-synergy-bonus-rate player test-game))))))
+
+(deftest calculate-income-ore-credits-includes-synergy-bonus
+  (testing "A balanced player's ore-credits income includes the synergy bonus"
+    ;; 5 ore planets * 100 credits/planet = 500 base, +25% synergy bonus = 625
+    (let [player (assoc test-player :player/ore-planets 5 :player/erg-planets 5 :player/mil-planets 5)
+          income (income/calculate-income player test-game)]
+      (is (= 625 (:ore-credits income))))))
+
+(deftest calculate-income-ore-credits-unbalanced-unchanged
+  (testing "An unbalanced player's ore-credits income is the flat rate, no bonus (regression guard)"
+    ;; test-player is 3 ore / 2 erg / 4 mil — spread-fraction 0.5, far past the 0.10 threshold.
+    (is (= 300 (:ore-credits (income/calculate-income test-player test-game))))))
+
+(deftest calculate-income-synergy-credits-isolates-the-bonus
+  (testing "synergy-credits is exactly the bonus portion, and ore-credits = base + synergy"
+    (let [balanced   (assoc test-player :player/ore-planets 5 :player/erg-planets 5 :player/mil-planets 5)
+          unbalanced test-player
+          bal-income (income/calculate-income balanced test-game)
+          unb-income (income/calculate-income unbalanced test-game)]
+      ;; 5 * 100 = 500 base; +25% bonus = 125 synergy; 625 total.
+      (is (= 125 (:synergy-credits bal-income)))
+      (is (= 625 (:ore-credits bal-income)))
+      (is (= (+ 500 (:synergy-credits bal-income)) (:ore-credits bal-income)))
+      ;; Unbalanced: no bonus, so synergy-credits is zero.
+      (is (= 0 (:synergy-credits unb-income))))))
+
+;;;;
 ;;;; apply-income Tests
 ;;;;
 ;;;; apply-income writes to the database and redirects, so xt/entity and
@@ -372,4 +430,9 @@
                                     :player/credits     1234567890)
           game   (assoc test-game :game/ore-planet-credits 9999)]
       (is (vector? (income/income-page {:player player :game game}))))))
+
+(deftest test-income-page-renders-with-synergy-bonus
+  (testing "Renders without error when the planet synergy bonus is active (synergy row showing)"
+    (let [player (assoc test-player :player/ore-planets 5 :player/erg-planets 5 :player/mil-planets 5)]
+      (is (vector? (income/income-page {:player player :game test-game}))))))
 
