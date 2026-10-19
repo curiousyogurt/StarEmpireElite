@@ -13,18 +13,19 @@
 (def test-player-id #uuid "00000000-0000-0000-0000-000000000002")
 
 (def test-game
-  {:xt/id                        test-game-id
-   :game/ore-planet-credits      100
-   :game/erg-planet-food        200
-   :game/erg-planet-fuel        50
-   :game/mil-planet-soldiers     25
-   :game/mil-planet-fighters     15
-   :game/mil-planet-stations     5
-   :game/population-tax-credits  100
-   :game/turns-per-round         6
-   :game/rounds-per-day          2
-   :game/created-at              (java.util.Date. 0)
-   :game/scheduled-end-at        (java.util.Date. (* 7 24 60 60 1000))})
+  (merge helpers/game-defaults
+   {:xt/id                        test-game-id
+    :game/ore-planet-credits      100
+    :game/erg-planet-food        200
+    :game/erg-planet-fuel        50
+    :game/mil-planet-soldiers     25
+    :game/mil-planet-fighters     15
+    :game/mil-planet-stations     5
+    :game/population-tax-credits  100
+    :game/turns-per-round         6
+    :game/rounds-per-day          2
+    :game/created-at              (java.util.Date. 0)
+    :game/scheduled-end-at        (java.util.Date. (* 7 24 60 60 1000))}))
 
 ;; Base player in phase 1, turn 1, round 1 with no previous round completed.
 (def test-player

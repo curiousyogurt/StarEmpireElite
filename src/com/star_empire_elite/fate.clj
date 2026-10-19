@@ -136,31 +136,29 @@
   [target-key player game]
   (case target-key
     :player/food
-    (* (:player/erg-planets player 0) (:game/erg-planet-food game 0))
+    (* (:player/erg-planets player 0) (:game/erg-planet-food game))
 
     :player/credits
-    (+ (* (:player/ore-planets player 0) (:game/ore-planet-credits game 0))
-       (* (:player/population  player 0) (:game/population-tax-credits game 0)))
+    (+ (* (:player/ore-planets player 0) (:game/ore-planet-credits game))
+       (* (:player/population  player 0) (:game/population-tax-credits game)))
 
     :player/fuel
-    (* (:player/erg-planets player 0) (:game/erg-planet-fuel game 0))
+    (* (:player/erg-planets player 0) (:game/erg-planet-fuel game))
 
     ;; Fallback: unreachable for valid catalog entries, but safe.
     0))
 
 (defn- entry-lo-hi
-  "Resolve an entry's [lo hi] multiplier bounds. Prefers the game's per-game override
-  (:game/fate-<type>-lo / -hi, e.g. :game/fate-drought-lo) and falls back to the catalog
-  entry's own :lo/:hi (themselves sourced from constants.clj) for games that predate these
-  fields being snapshotted. The catalog stays structural — only the magnitudes are overlaid.
+  "Resolve an entry's [lo hi] multiplier bounds from the game's per-game override
+  (:game/fate-<type>-lo / -hi, e.g. :game/fate-drought-lo). The catalog's own :lo/:hi
+  (see fate-catalog) are documentation of the default range, not read here.
 
   [game game-map, entry catalog-entry] -> [lo double, hi double]"
   [game entry]
   (let [type-name (name (:type entry))
         lo-key    (keyword "game" (str "fate-" type-name "-lo"))
         hi-key    (keyword "game" (str "fate-" type-name "-hi"))]
-    [(lo-key game (:lo entry))
-     (hi-key game (:hi entry))]))
+    [(lo-key game) (hi-key game)]))
 
 (defn- entry-delta
   "Compute the signed delta for one target key.
@@ -199,8 +197,7 @@
       (if (or (zero? shortfall) (zero? raw))
         0
         (Math/round ^double (* (/ (double shortfall) (double raw))
-                                (:game/fate-uncollected-stability-penalty
-                                 game const/fate-uncollected-stability-penalty)))))))
+                                (:game/fate-uncollected-stability-penalty game)))))))
 
 ;;;;
 ;;;; Main Roll
@@ -226,11 +223,11 @@
   [player player-map, game game-map, active [player-map], rng fn] -> result-map | nil"
   [player game active rng]
   ;; Step 1 — gate: event occurs with probability fate-probability.
-  (when (< (rng) (:game/fate-probability game const/fate-probability))
+  (when (< (rng) (:game/fate-probability game))
     (let [;; Step 2 — where does this player rank among active empires?
           r          (rank-fraction player active)
           ;; Step 3 — leaders draw disasters more; trailers draw boons more.
-          p-disaster (clamp01 (+ 0.5 (* (- r 0.5) (:game/fate-rank-tilt game const/fate-rank-tilt))))
+          p-disaster (clamp01 (+ 0.5 (* (- r 0.5) (:game/fate-rank-tilt game))))
           ;; Step 4 — polarity.
           polarity   (if (< (rng) p-disaster) :disaster :boon)
           ;; Step 5 — pick uniformly from matching catalog entries.

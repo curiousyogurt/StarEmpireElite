@@ -42,7 +42,6 @@
 (ns com.star-empire-elite.pages.app.building
   (:require [clojure.string :as str]
             [com.biffweb :as biff]
-            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]
             [com.star-empire-elite.pages.app.expenses :as expenses]))
@@ -110,14 +109,14 @@
 ;;; row-cost dispatch and everything built on it stay next to each other for easier reading.
 
 (defn- planet-ramp-bounds
-  "Resolve this game's [x y] planet-cost-ramp thresholds, falling back to the constants.clj
-  defaults. Guards against a misconfigured y <= x (which would make the ramp's slope
-  undefined — division by zero) by widening y to x + 1.
+  "Resolve this game's [x y] planet-cost-ramp thresholds. Guards against a misconfigured
+  y <= x (which would make the ramp's slope undefined — division by zero) by widening y to
+  x + 1.
 
   [game game-map] -> [x long, y long]"
   [game]
-  (let [x (or (:game/planet-cost-ramp-x game) const/planet-cost-ramp-x)
-        y (or (:game/planet-cost-ramp-y game) const/planet-cost-ramp-y)]
+  (let [x (:game/planet-cost-ramp-min game)
+        y (:game/planet-cost-ramp-max game)]
     [x (max y (inc x))]))
 
 (defn- planet-cost
@@ -254,10 +253,10 @@
    [player player-map, quantities purchase-quantities, max-quantities map, game game-map]
    -> {:transports int, :generals int, :carriers int, :admirals int}"
   [player quantities max-quantities game]
-  (let [soldiers-per-transport (or (:game/soldiers-per-transport game) const/soldiers-per-transport)
-        soldiers-per-general   (or (:game/soldiers-per-general   game) const/soldiers-per-general)
-        fighters-per-carrier   (or (:game/fighters-per-carrier   game) const/fighters-per-carrier)
-        fighters-per-admiral   (or (:game/fighters-per-admiral   game) const/fighters-per-admiral)
+  (let [soldiers-per-transport (:game/soldiers-per-transport game)
+        soldiers-per-general   (:game/soldiers-per-general   game)
+        fighters-per-carrier   (:game/fighters-per-carrier   game)
+        fighters-per-admiral   (:game/fighters-per-admiral   game)
         proj-soldiers (+ (:player/soldiers player) (get quantities :soldiers 0))
         proj-fighters (+ (:player/fighters player) (get quantities :fighters 0))
         ;; Integer ceiling division: (ceil a/b) = (a + b - 1) / b using integer division.

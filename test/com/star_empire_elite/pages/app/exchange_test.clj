@@ -15,6 +15,7 @@
 
 ;; Game entity with exchange costs stored as game-level configuration.
 (def test-game
+  (merge helpers/game-defaults
   {:xt/id              test-game-id
    :game/soldier-sell     250
    :game/transport-sell  2500
@@ -57,7 +58,7 @@
    :game/turns-per-round        6
    :game/rounds-per-day         2
    :game/created-at             (java.util.Date. 0)
-   :game/scheduled-end-at       (java.util.Date. (* 7 24 60 60 1000))})
+   :game/scheduled-end-at       (java.util.Date. (* 7 24 60 60 1000))}))
 
 (def test-player
   {:xt/id               test-player-id

@@ -52,6 +52,12 @@
    :player/erg-planets 2
    :player/ore-planets 2})
 
+(def test-game
+  (merge helpers/game-defaults
+         {:xt/id                 test-game-id
+          :game/created-at       (java.util.Date. 0)
+          :game/scheduled-end-at (java.util.Date. (* 7 24 60 60 1000))}))
+
 ;;;;
 ;;;; get-other-players Tests
 ;;;;
@@ -160,20 +166,14 @@
   (testing "Returns a hiccup vector when other players are available"
     (with-redefs [biff/q (fn [_ _ & _] [test-target])]
       (is (vector? (action/action-page {:player test-player
-                          :game   {:game/turns-per-round    6
-                                   :game/rounds-per-day     2
-                                   :game/created-at         (java.util.Date. 0)
-                                   :game/scheduled-end-at   (java.util.Date. (* 7 24 60 60 1000))}
+                          :game   test-game
                           :db nil}))))))
 
 (deftest test-action-page-renders-without-targets
   (testing "Returns a hiccup vector when no other players exist"
     (with-redefs [biff/q (fn [_ _ & _] [])]
       (is (vector? (action/action-page {:player test-player
-                          :game   {:game/turns-per-round    6
-                                   :game/rounds-per-day     2
-                                   :game/created-at         (java.util.Date. 0)
-                                   :game/scheduled-end-at   (java.util.Date. (* 7 24 60 60 1000))}
+                          :game   test-game
                           :db nil}))))))
 
 ;;;;
@@ -203,7 +203,7 @@
 (deftest test-apply-action-with-invade-target
   (testing "Records pending-attack as target UUID, mode :invade, and advances to phase 5"
     (let [tx-atom (atom nil)]
-      (with-redefs [xt/entity      (helpers/fake-entity [test-player])
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
         (let [result (action/apply-action {:path-params {:player-id (str test-player-id)}
                                            :params {:target-action (str test-target-id ":invade")}
@@ -224,7 +224,7 @@
 (deftest test-apply-action-with-strike-target
   (testing "Records pending-attack as target UUID, mode :strike, and advances to phase 5"
     (let [tx-atom (atom nil)]
-      (with-redefs [xt/entity      (helpers/fake-entity [test-player])
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
         (action/apply-action {:path-params {:player-id (str test-player-id)}
                                :params {:target-action (str test-target-id ":strike")}
@@ -236,7 +236,7 @@
 (deftest test-apply-action-with-raid-target
   (testing "Records pending-attack as target UUID, mode :raid, and advances to phase 5"
     (let [tx-atom (atom nil)]
-      (with-redefs [xt/entity      (helpers/fake-entity [test-player])
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
         (action/apply-action {:path-params {:player-id (str test-player-id)}
                                :params {:target-action (str test-target-id ":raid")}
@@ -250,7 +250,7 @@
     ;; Players can choose not to attack. The pending-attack must be explicitly set to nil
     ;; so that a previous round's pending-attack is not carried forward.
     (let [tx-atom (atom nil)]
-      (with-redefs [xt/entity      (helpers/fake-entity [test-player])
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
         (action/apply-action {:path-params {:player-id (str test-player-id)}
                                :params {} :biff/db nil})
@@ -262,7 +262,7 @@
 (deftest test-apply-action-empty-target-string
   (testing "Treats an empty target-action value as no target (nil pending-attack and nil mode)"
     (let [tx-atom (atom nil)]
-      (with-redefs [xt/entity      (helpers/fake-entity [test-player])
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
         (action/apply-action {:path-params {:player-id (str test-player-id)}
                                :params {:target-action ""} :biff/db nil})

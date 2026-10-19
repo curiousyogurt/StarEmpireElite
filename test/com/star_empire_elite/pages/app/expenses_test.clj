@@ -16,6 +16,7 @@
 
 ;; Sample player and game for testing
 (def test-game
+  (merge helpers/game-defaults
   {:xt/id test-game-id
    :game/planet-upkeep-credits 75
    :game/planet-upkeep-food 1
@@ -29,7 +30,7 @@
    :game/agent-upkeep-fuel 9
    :game/population-upkeep-food 2
    :game/population-upkeep-fuel 7
-   :game/expense-stability-penalty 3})
+   :game/expense-stability-penalty 3}))
 
 (def test-player
   {:xt/id test-player-id

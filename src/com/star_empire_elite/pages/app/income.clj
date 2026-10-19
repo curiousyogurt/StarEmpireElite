@@ -31,7 +31,6 @@
 (ns com.star-empire-elite.pages.app.income
   (:require [clojure.string :as str]
             [com.biffweb :as biff]
-            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
 
@@ -58,8 +57,8 @@
                     (:player/mil-planets player 0)]
         hi        (apply max counts)
         lo        (apply min counts)
-        threshold (or (:game/planet-synergy-threshold  game) const/planet-synergy-threshold)
-        max-rate  (or (:game/planet-synergy-bonus-rate game) const/planet-synergy-bonus-rate)]
+        threshold (:game/planet-synergy-threshold  game)
+        max-rate  (:game/planet-synergy-bonus-rate game)]
     (if (<= hi 0)
       0.0
       (let [spread-fraction (/ (- hi lo) (double hi))]

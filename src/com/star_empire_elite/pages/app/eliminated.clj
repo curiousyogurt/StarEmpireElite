@@ -50,15 +50,15 @@
               :player/user                   uid
               :player/game                   game-id
               :player/empire-name            empire-name
-              :player/credits                (or (:game/starting-credits     game) const/starting-credits)
-              :player/food                   (or (:game/starting-food        game) const/starting-food)
-              :player/fuel                   (or (:game/starting-fuel        game) const/starting-fuel)
-              :player/galaxars               (or (:game/starting-galaxars    game) const/starting-galaxars)
-              :player/mil-planets            (or (:game/starting-mil-planets game) const/starting-mil-planets)
-              :player/erg-planets            (or (:game/starting-erg-planets game) const/starting-erg-planets)
-              :player/ore-planets            (or (:game/starting-ore-planets game) const/starting-ore-planets)
-              :player/population             (or (:game/starting-population  game) const/starting-population)
-              :player/stability              (or (:game/starting-stability   game) const/starting-stability)
+              :player/credits                (:game/starting-credits     game)
+              :player/food                   (:game/starting-food        game)
+              :player/fuel                   (:game/starting-fuel        game)
+              :player/galaxars               (:game/starting-galaxars    game)
+              :player/mil-planets            (:game/starting-mil-planets game)
+              :player/erg-planets            (:game/starting-erg-planets game)
+              :player/ore-planets            (:game/starting-ore-planets game)
+              :player/population             (:game/starting-population  game)
+              :player/stability              (:game/starting-stability   game)
               :player/status                 const/player-status-active
               :player/score                  0
               :player/current-turn           1
@@ -66,15 +66,15 @@
               :player/current-phase          1
               :player/turns-used             0
               :player/rounds-started-today   0
-              :player/soldiers               (or (:game/starting-soldiers   game) const/starting-soldiers)
-              :player/transports             (or (:game/starting-transports game) const/starting-transports)
-              :player/fighters               (or (:game/starting-fighters   game) const/starting-fighters)
-              :player/carriers               (or (:game/starting-carriers   game) const/starting-carriers)
-              :player/stations               (or (:game/starting-stations   game) const/starting-stations)
-              :player/cmd-ships              (or (:game/starting-cmd-ships  game) const/starting-cmd-ships)
-              :player/generals               (or (:game/starting-generals   game) const/starting-generals)
-              :player/admirals               (or (:game/starting-admirals   game) const/starting-admirals)
-              :player/agents                 (or (:game/starting-agents     game) const/starting-agents)
+              :player/soldiers               (:game/starting-soldiers   game)
+              :player/transports             (:game/starting-transports game)
+              :player/fighters               (:game/starting-fighters   game)
+              :player/carriers               (:game/starting-carriers   game)
+              :player/stations               (:game/starting-stations   game)
+              :player/cmd-ships              (:game/starting-cmd-ships  game)
+              :player/generals               (:game/starting-generals   game)
+              :player/admirals               (:game/starting-admirals   game)
+              :player/agents                 (:game/starting-agents     game)
               :player/last-population-growth nil}])
           {:status 303
            :headers {"location" (str "/app/game/" new-player-id "/income")}})))))

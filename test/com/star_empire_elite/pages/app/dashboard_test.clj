@@ -122,11 +122,11 @@
 ;;
 
 (def ^:private minimal-game
-  {:xt/id                     test-game-id
-   :game/name                 "Galactic Conquest"
-   :game/turns-per-round      4
-   :game/rounds-per-day       3
-   :game/hours-between-rounds 0})
+  {:xt/id                       test-game-id
+   :game/name                   "Galactic Conquest"
+   :game/turns-per-round        4
+   :game/rounds-per-day         3
+   :game/minutes-between-rounds 0})
 
 (def ^:private minimal-player
   {:xt/id                     test-player-id

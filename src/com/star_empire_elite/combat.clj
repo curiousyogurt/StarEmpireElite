@@ -23,15 +23,14 @@
 ;;;;
 
 (defn effective-forces
-  "Compute effective force counts, capped by transport and general capacity. Falls back to the
-  global constant when a game predates these fields being snapshotted (schema-optional).
+  "Compute effective force counts, capped by transport and general capacity.
 
   [game game-map, player player-map] -> force-map"
   [game player]
-  (let [soldiers-per-transport (or (:game/soldiers-per-transport game) const/soldiers-per-transport)
-        soldiers-per-general   (or (:game/soldiers-per-general   game) const/soldiers-per-general)
-        fighters-per-carrier   (or (:game/fighters-per-carrier   game) const/fighters-per-carrier)
-        fighters-per-admiral   (or (:game/fighters-per-admiral   game) const/fighters-per-admiral)]
+  (let [soldiers-per-transport (:game/soldiers-per-transport game)
+        soldiers-per-general   (:game/soldiers-per-general   game)
+        fighters-per-carrier   (:game/fighters-per-carrier   game)
+        fighters-per-admiral   (:game/fighters-per-admiral   game)]
     {:soldiers   (min (:player/soldiers player)
                       (* (:player/transports player) soldiers-per-transport)
                       (* (:player/generals   player) soldiers-per-general))
@@ -55,8 +54,8 @@
 
   [game game-map, player player-map] -> force-map"
   [game player]
-  (let [soldiers-per-general (or (:game/soldiers-per-general game) const/soldiers-per-general)
-        fighters-per-admiral (or (:game/fighters-per-admiral game) const/fighters-per-admiral)]
+  (let [soldiers-per-general (:game/soldiers-per-general game)
+        fighters-per-admiral (:game/fighters-per-admiral game)]
     (-> (effective-forces game player)
         (assoc :soldiers  (min (:player/soldiers player)
                                (* (:player/generals player) soldiers-per-general))
@@ -148,7 +147,7 @@
   [game game-map, att-forces force-map, def-forces force-map,
    att-mult double, def-mult double, att-is-attacker? bool] -> phase-result"
   [game att-forces def-forces att-mult def-mult att-is-attacker?]
-  (let [variance  (or (:game/combat-variance game) const/combat-variance)
+  (let [variance  (:game/combat-variance game)
         att-base  (base-power game att-forces att-is-attacker?)
         def-base  (base-power game def-forces false)
         att-roll  (* att-base att-mult (random-factor variance))
@@ -271,12 +270,12 @@
         ground-margin  (:margin ground-result)
 
         ;; Loss curves
-        loss-floor  (or (:game/combat-loss-floor game) const/combat-loss-floor)
-        loser-cap   (or (:game/combat-loser-cap  game) const/combat-loser-cap)
-        winner-max  (or (:game/combat-winner-max game) const/combat-winner-max)
+        loss-floor  (:game/combat-loss-floor game)
+        loser-cap   (:game/combat-loser-cap  game)
+        winner-max  (:game/combat-winner-max game)
         loser-rate  (fn [m] (min loser-cap (+ loss-floor (* (- loser-cap loss-floor) m))))
         winner-rate (fn [m] (* winner-max (- 1.0 m)))
-        cmd-ship-mult (or (:game/cmd-ship-loss-mult game) const/cmd-ship-loss-mult)
+        cmd-ship-mult (:game/cmd-ship-loss-mult game)
 
         ;; Space-phase losses. Cmd-ships still count toward space power/margin above,
         ;; but take a dampened share of the phase's loss rate (see cmd-ship-losses).
@@ -304,11 +303,11 @@
 
         ;; Capture model — driven off ground margin with per-mode caps
         planet-cap   (case mode
-                       :raid   (or (:game/raid-planet-capture-cap   game) const/raid-planet-capture-cap)
-                       :invade (or (:game/invade-planet-capture-cap game) const/invade-planet-capture-cap))
+                       :raid   (:game/raid-planet-capture-cap   game)
+                       :invade (:game/invade-planet-capture-cap game))
         resource-cap (case mode
-                       :raid   (or (:game/raid-resource-capture-cap   game) const/raid-resource-capture-cap)
-                       :invade (or (:game/invade-resource-capture-cap game) const/invade-resource-capture-cap))
+                       :raid   (:game/raid-resource-capture-cap   game)
+                       :invade (:game/invade-resource-capture-cap game))
 
         def-total-planets (+ (:player/mil-planets  defender)
                              (:player/erg-planets  defender)
@@ -323,8 +322,8 @@
 
         ;; Acquisition penalty: annexing territory costs stability
         captured-total     (+ (:mil planets-transferred) (:erg planets-transferred) (:ore planets-transferred))
-        penalty-per-planet (or (:game/capture-stability-penalty-per-planet game) const/capture-stability-penalty-per-planet)
-        penalty-cap        (or (:game/capture-stability-penalty-cap game) const/capture-stability-penalty-cap)
+        penalty-per-planet (:game/capture-stability-penalty-per-planet game)
+        penalty-cap        (:game/capture-stability-penalty-cap game)
         capture-penalty    (min penalty-cap (* penalty-per-planet captured-total))]
 
     {:attacker-id     (str (:xt/id attacker))
@@ -419,16 +418,15 @@
 ;;;;
 
 (defn- op-failure-rate
-  "Look up an espionage op's agent-defection rate from the game entity, falling back to
-  constants.clj when a game predates these fields being snapshotted.
+  "Look up an espionage op's agent-defection rate from the game entity.
 
   [game game-map, op keyword] -> double"
   [game op]
   (case op
-    :spy    (or (:game/spy-defection-rate    game) const/spy-defection-rate)
-    :incite (or (:game/incite-defection-rate game) const/incite-defection-rate)
-    :bomb   (or (:game/bomb-defection-rate   game) const/bomb-defection-rate)
-    :defect (or (:game/defect-defection-rate game) const/defect-defection-rate)))
+    :spy    (:game/spy-defection-rate    game)
+    :incite (:game/incite-defection-rate game)
+    :bomb   (:game/bomb-defection-rate   game)
+    :defect (:game/defect-defection-rate game)))
 
 (defn- effective-defense-agents
   "Apply the diminishing-returns soft cap to a defender's engaged agent count.
@@ -440,8 +438,8 @@
 
   [game game-map, agents number] -> double"
   [game agents]
-  (let [t   (double (or (:game/espionage-defense-threshold game) const/espionage-defense-threshold))
-        exp (or (:game/espionage-defense-exponent game) const/espionage-defense-exponent)]
+  (let [t   (double (:game/espionage-defense-threshold game))
+        exp (:game/espionage-defense-exponent game)]
     (if (<= agents t)
       (double agents)
       (+ t (Math/pow (- agents t) exp)))))
@@ -460,8 +458,8 @@
   [game game-map, attacker player-map, defender player-map, op keyword, def-mult float] -> roll-map"
   ([game attacker defender op] (espionage-roll game attacker defender op 1.0))
   ([game attacker defender op def-mult]
-   (let [variance    (or (:game/combat-variance game) const/combat-variance)
-         defection-min (or (:game/espionage-defection-min game) const/espionage-defection-min)
+   (let [variance    (:game/combat-variance game)
+         defection-min (:game/espionage-defection-min game)
          att-agents  (:player/agents attacker)
          def-engaged (effective-defense-agents game (* (:player/agents defender) def-mult))
          att-roll    (* att-agents (random-factor variance))
@@ -519,8 +517,8 @@
 
   [game game-map, target-stability number] -> long"
   [game target-stability]
-  (let [damage (or (:game/incite-stability-damage game) const/incite-stability-damage)
-        floor  (or (:game/incite-stability-floor  game) const/incite-stability-floor)
+  (let [damage (:game/incite-stability-damage game)
+        floor  (:game/incite-stability-floor  game)
         raw    (* damage (/ (double target-stability) 100.0))
         room   (max 0 (- target-stability floor))]
     (long (Math/round (double (min raw room))))))
@@ -552,8 +550,8 @@
   [game game-map, attacker player-map, defender player-map] -> result-map"
   [game attacker defender]
   (let [{:keys [att-wins? agents-lost agents-captured]} (espionage-roll game attacker defender :bomb)
-        lo          (or (:game/bomb-damage-rate-lo game) const/bomb-damage-rate-lo)
-        hi          (or (:game/bomb-damage-rate-hi game) const/bomb-damage-rate-hi)
+        lo          (:game/bomb-damage-rate-lo game)
+        hi          (:game/bomb-damage-rate-hi game)
         ;; Drawn once per bomb, the same way fate events draw their multiplier from [lo hi].
         damage-rate (+ lo (* (rand) (- hi lo)))]
     {:op                   "bomb"

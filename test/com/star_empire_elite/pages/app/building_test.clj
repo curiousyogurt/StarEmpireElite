@@ -16,6 +16,7 @@
 
 ;; Game entity with realistic purchase costs.
 (def test-game
+  (merge helpers/game-defaults
   {:xt/id                test-game-id
    :game/soldier-cost    10
    :game/transport-cost  20
@@ -54,7 +55,7 @@
    :game/turns-per-round        6
    :game/rounds-per-day         2
    :game/created-at             (java.util.Date. 0)
-   :game/scheduled-end-at       (java.util.Date. (* 7 24 60 60 1000))})
+   :game/scheduled-end-at       (java.util.Date. (* 7 24 60 60 1000))}))
 
 ;; Player in phase 3 with enough credits to buy most things.
 (def test-player
@@ -180,7 +181,7 @@
 
 (deftest planet-cost-overflow-safety-at-production-scale
   (testing "Production-scale holdings/quantity near the real ceiling don't throw, and clamp"
-    (let [[x y] [const/planet-cost-ramp-x const/planet-cost-ramp-y]
+    (let [[x y] [const/planet-cost-ramp-min const/planet-cost-ramp-max]
           result (#'building/planet-cost const/ore-planet-cost
                                           (* 2 x)           ; well past y, deep in the ramp
                                           utils/max-unit-quantity
@@ -190,7 +191,7 @@
 
 (deftest row-cost-each-column-matches-marginal-price
   (testing "row-cost with quantity 1 equals planet-cost evaluated once at current holdings"
-    (let [game   (assoc test-game :game/planet-cost-ramp-x 10 :game/planet-cost-ramp-y 18
+    (let [game   (assoc test-game :game/planet-cost-ramp-min 10 :game/planet-cost-ramp-max 18
                                    :game/mil-planet-cost 1000)
           player (assoc test-player :player/mil-planets 14)
           row    (first (filter #(= :mil-planets (:qty-key %)) building/purchase-rows))]

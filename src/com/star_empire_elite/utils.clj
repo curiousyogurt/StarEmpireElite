@@ -269,9 +269,9 @@
                 (or (:player/current-turn player) 1)
                 (or (:player/current-phase player) 1)
                 (:player/last-turn-at player)
-                (or (:game/rounds-per-day game) 2)
-                (or (:game/turns-per-round game) 6)
-                (or (:game/minutes-between-rounds game) 0)
+                (:game/rounds-per-day game)
+                (:game/turns-per-round game)
+                (:game/minutes-between-rounds game)
                 (java.util.Date.)))
 
 ;;;;
@@ -391,24 +391,23 @@
   (reduce-kv #(assoc %1 (keyword "player" (name %2)) %3) {} snapshot))
 
 (defn calculate-score
-  "Compute player score: planets (dominant) + military units (power-weighted). Falls back to
-  constants.clj when a game predates score weights being snapshotted (schema-optional).
+  "Compute player score: planets (dominant) + military units (power-weighted).
 
   [game game-map, player player-map] -> int"
   [game player]
-  (+ (* (get player :player/population   0) (or (:game/score-population game) const/score-population))
-     (* (get player :player/mil-planets  0) (or (:game/score-mil-planet game) const/score-mil-planet))
-     (* (get player :player/erg-planets  0) (or (:game/score-erg-planet game) const/score-erg-planet))
-     (* (get player :player/ore-planets  0) (or (:game/score-ore-planet game) const/score-ore-planet))
-     (* (get player :player/soldiers     0) (or (:game/score-soldier   game) const/score-soldier))
-     (* (get player :player/transports   0) (or (:game/score-transport game) const/score-transport))
-     (* (get player :player/fighters     0) (or (:game/score-fighter   game) const/score-fighter))
-     (* (get player :player/carriers     0) (or (:game/score-carrier   game) const/score-carrier))
-     (* (get player :player/cmd-ships    0) (or (:game/score-cmd-ship  game) const/score-cmd-ship))
-     (* (get player :player/stations     0) (or (:game/score-station  game) const/score-station))
-     (* (get player :player/generals     0) (or (:game/score-general  game) const/score-general))
-     (* (get player :player/admirals     0) (or (:game/score-admiral  game) const/score-admiral))
-     (* (get player :player/agents       0) (or (:game/score-agent    game) const/score-agent))))
+  (+ (* (get player :player/population   0) (:game/score-population game))
+     (* (get player :player/mil-planets  0) (:game/score-mil-planet game))
+     (* (get player :player/erg-planets  0) (:game/score-erg-planet game))
+     (* (get player :player/ore-planets  0) (:game/score-ore-planet game))
+     (* (get player :player/soldiers     0) (:game/score-soldier   game))
+     (* (get player :player/transports   0) (:game/score-transport game))
+     (* (get player :player/fighters     0) (:game/score-fighter   game))
+     (* (get player :player/carriers     0) (:game/score-carrier   game))
+     (* (get player :player/cmd-ships    0) (:game/score-cmd-ship  game))
+     (* (get player :player/stations     0) (:game/score-station  game))
+     (* (get player :player/generals     0) (:game/score-general  game))
+     (* (get player :player/admirals     0) (:game/score-admiral  game))
+     (* (get player :player/agents       0) (:game/score-agent    game))))
 
 ;;;;
 ;;;; History Retention

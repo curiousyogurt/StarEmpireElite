@@ -245,10 +245,10 @@
     :type :int :min 0 :max utils/max-config-value :step 1 :default const/erg-planet-cost}
    {:key :game/ore-planet-cost :label "Ore planet cost" :category :building
     :type :int :min 0 :max utils/max-config-value :step 1 :default const/ore-planet-cost}
-   {:key :game/planet-cost-ramp-x :label "Planet cost ramp start (x)" :category :building
-    :type :int :min 0 :max utils/max-unit-quantity :step 1 :default const/planet-cost-ramp-x}
-   {:key :game/planet-cost-ramp-y :label "Planet cost ramp 2x point (y)" :category :building
-    :type :int :min 0 :max utils/max-unit-quantity :step 1 :default const/planet-cost-ramp-y}
+   {:key :game/planet-cost-ramp-min :label "Planet cost ramp start (min)" :category :building
+    :type :int :min 0 :max utils/max-unit-quantity :step 1 :default const/planet-cost-ramp-min}
+   {:key :game/planet-cost-ramp-max :label "Planet cost ramp 2x point (max)" :category :building
+    :type :int :min 0 :max utils/max-unit-quantity :step 1 :default const/planet-cost-ramp-max}
 
    ;; Espionage
    {:key :game/spy-defection-rate :label "Spy defection rate" :category :espionage
@@ -555,7 +555,7 @@
   "Adjust a coerced config map to satisfy known cross-field invariants: the loser's combat-loss
   cap can't sit below the even-fight floor, no asset can sell for more than it costs to build,
   food/fuel can't sell above its buy price, and every fate lo/hi pair, the bomb-damage-rate
-  lo/hi pair, the planet-cost-ramp x/y pair, and the population-growth random range must be
+  lo/hi pair, the planet-cost-ramp min/max pair, and the population-growth random range must be
   ordered lo <= hi.
 
   [config {:game/x number}] -> {:game/x number}"
@@ -568,4 +568,4 @@
       (order-lo-hi-pairs fate-lo-hi-pairs)
       (order-lo-hi-pairs [[:game/pop-random-min :game/pop-random-max]
                            [:game/bomb-damage-rate-lo :game/bomb-damage-rate-hi]
-                           [:game/planet-cost-ramp-x :game/planet-cost-ramp-y]])))
+                           [:game/planet-cost-ramp-min :game/planet-cost-ramp-max]])))

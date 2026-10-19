@@ -1,5 +1,6 @@
 (ns com.star-empire-elite.test-helpers
-  (:require [com.biffweb :as biff])
+  (:require [com.biffweb :as biff]
+            [com.star-empire-elite.game-config :as cfg])
   (:import (java.util UUID)
            (java.time Instant)))
 
@@ -23,114 +24,121 @@
 
 ;; ---- schema-complete defaults (match your Malli keys) -----------------------
 
+;;; Layered on top of cfg/game-defaults (every field-spec's real default, keyed by :game/...)
+;;; so the fixture is schema-complete — missing keys used to silently fall back to
+;;; constants.clj at the call site, but that fallback is gone now that every game is always
+;;; fully snapshotted. The explicit map below keeps every value this fixture has always used
+;;; (several deliberately 0, to keep upkeep/sell-price math simple in tests); only fields it
+;;; never set before — e.g. minutes-between-rounds, most asset costs — now come from cfg.
 (def game-defaults
-  {:db/doc-type                    :game
-   :xt/id                          (uuid)
-   :game/name                      "Test Game"
-   :game/created-at                (now)
-   :game/scheduled-end-at          (plus-days (now) 30)
-   :game/status                    0
-   :game/turns-per-round           6
-   :game/rounds-per-day            4
-   :game/hours-between-rounds      2
+  (merge
+   cfg/game-defaults
+   {:db/doc-type                    :game
+    :xt/id                          (uuid)
+    :game/name                      "Test Game"
+    :game/created-at                (now)
+    :game/scheduled-end-at          (plus-days (now) 30)
+    :game/status                    0
+    :game/turns-per-round           6
+    :game/rounds-per-day            4
 
-   ;; Combat mode multipliers
-   :game/raid-defense-multiplier   0.1
-   :game/raid-reward-multiplier    0.1
-   :game/raid-planet-capture-cap   0.05
-   :game/invade-defense-multiplier 1.0
-   :game/invade-reward-multiplier  1.0
+    ;; Combat mode multipliers
+    :game/raid-defense-multiplier   0.1
+    :game/raid-reward-multiplier    0.1
+    :game/raid-planet-capture-cap   0.05
+    :game/invade-defense-multiplier 1.0
+    :game/invade-reward-multiplier  1.0
 
-   ;; Strike operation constants
-   :game/strike-damage-rate        0.01
-   :game/strike-max-dispatch       15
-   :game/strike-interception-rate  0.001
-   :game/strike-interception-cap   0.20
-   :game/strike-agent-mult         0.35
+    ;; Strike operation constants
+    :game/strike-damage-rate        0.01
+    :game/strike-max-dispatch       15
+    :game/strike-interception-rate  0.001
+    :game/strike-interception-cap   0.20
+    :game/strike-agent-mult         0.35
 
-   ;; Defect operation constants
-   :game/defect-defense-multiplier 0.1
-   :game/defect-transfer-rate      0.1
+    ;; Defect operation constants
+    :game/defect-defense-multiplier 0.1
+    :game/defect-transfer-rate      0.1
 
-   ;; Combat multiplier constants
-   :game/general-mult-rate  0.01
-   :game/general-mult-cap   0.15
-   :game/admiral-mult-rate  0.01
-   :game/admiral-mult-cap   0.15
-   :game/cmd-ship-mult-rate 0.02
-   :game/cmd-ship-mult-cap  0.30
-   :game/agent-mult-rate    0.005
-   :game/agent-mult-cap     0.10
-   :game/space-carryover    0.15
+    ;; Combat multiplier constants
+    :game/general-mult-rate  0.01
+    :game/general-mult-cap   0.15
+    :game/admiral-mult-rate  0.01
+    :game/admiral-mult-cap   0.15
+    :game/cmd-ship-mult-rate 0.02
+    :game/cmd-ship-mult-cap  0.30
+    :game/agent-mult-rate    0.005
+    :game/agent-mult-cap     0.10
+    :game/space-carryover    0.15
 
-   ;; Combat losses & capture
-   :game/combat-loss-floor           0.30
-   :game/combat-loser-cap            0.70
-   :game/combat-winner-max           0.30
-   :game/invade-planet-capture-cap   0.25
-   :game/invade-resource-capture-cap 0.50
-   :game/raid-resource-capture-cap   0.10
+    ;; Combat losses & capture
+    :game/combat-loss-floor           0.30
+    :game/combat-loser-cap            0.70
+    :game/combat-winner-max           0.30
+    :game/invade-planet-capture-cap   0.25
+    :game/invade-resource-capture-cap 0.50
+    :game/raid-resource-capture-cap   0.10
 
-   ;; Combat power constants
-   :game/soldier-power             1
-   :game/fighter-power             3
-   :game/cmd-ship-power            20
-   :game/station-power             5
-   :game/general-power             5
-   :game/admiral-power             10
+    ;; Combat power constants
+    :game/soldier-power             1
+    :game/fighter-power             3
+    :game/cmd-ship-power            20
+    :game/station-power             5
+    :game/general-power             5
+    :game/admiral-power             10
 
-   ;; required fields seen in your error report:
-   :game/soldier-upkeep-credits    0
-   :game/soldier-upkeep-food       0
-   :game/fighter-upkeep-credits    0
-   :game/fighter-upkeep-fuel       0
-   :game/agent-upkeep-food         0
-   :game/agent-upkeep-fuel         0
-   :game/population-upkeep-food    0
-   :game/population-upkeep-fuel    0
-   :game/station-upkeep-credits    0
-   :game/station-upkeep-fuel       0
-   :game/planet-upkeep-credits     0
-   :game/planet-upkeep-food        0
-   :game/ore-planet-credits        0
-   :game/erg-planet-food          0
-   :game/erg-planet-fuel          0
-   :game/mil-planet-stations  0
-   :game/mil-planet-fighters  0
-   :game/mil-planet-soldiers  0
-   :game/agent-cost           0
+    ;; required fields seen in your error report:
+    :game/soldier-upkeep-credits    0
+    :game/soldier-upkeep-food       0
+    :game/fighter-upkeep-credits    0
+    :game/fighter-upkeep-fuel       0
+    :game/agent-upkeep-food         0
+    :game/agent-upkeep-fuel         0
+    :game/population-upkeep-food    0
+    :game/population-upkeep-fuel    0
+    :game/station-upkeep-credits    0
+    :game/station-upkeep-fuel       0
+    :game/planet-upkeep-credits     0
+    :game/planet-upkeep-food        0
+    :game/ore-planet-credits        0
+    :game/erg-planet-food          0
+    :game/erg-planet-fuel          0
+    :game/mil-planet-stations  0
+    :game/mil-planet-fighters  0
+    :game/mil-planet-soldiers  0
+    :game/agent-cost           0
 
-   ;; Population tax
-   :game/population-tax-credits 0
+    ;; Population tax
+    :game/population-tax-credits 0
 
-   ;; Expense stability penalty
-   :game/expense-stability-penalty 0
+    ;; Expense stability penalty
+    :game/expense-stability-penalty 0
 
-   ;; Stability breakaway and recovery
-   :game/capture-stability-penalty-per-planet 1
-   :game/capture-stability-penalty-cap        10
-   :game/stability-breakaway-threshold 20
-   :game/stability-breakaway-cap       25
-   :game/stability-recovery-amount      5
-   :game/stability-recovery-floor      50
+    ;; Stability breakaway and recovery
+    :game/capture-stability-penalty-per-planet 1
+    :game/capture-stability-penalty-cap        10
+    :game/stability-breakaway-threshold 20
+    :game/stability-breakaway-cap       25
+    :game/stability-recovery-amount      5
+    :game/stability-recovery-floor      50
 
-   ;; Exchange sell/buy rates
-   :game/soldier-sell         0
-   :game/transport-sell       0
-   :game/general-sell         0
-   :game/fighter-sell         0
-   :game/carrier-sell         0
-   :game/admiral-sell         0
-   :game/station-sell         0
-   :game/cmd-ship-sell        0
-   :game/agent-sell           0
-   :game/mil-planet-sell      0
-   :game/erg-planet-sell     0
-   :game/ore-planet-sell      0
-   :game/food-buy             1
-   :game/food-sell            0
-   :game/fuel-buy             1
-   :game/fuel-sell            0})
+    ;; Exchange sell/buy rates
+    :game/soldier-sell         0
+    :game/transport-sell       0
+    :game/general-sell         0
+    :game/fighter-sell         0
+    :game/carrier-sell         0
+    :game/admiral-sell         0
+    :game/station-sell         0
+    :game/cmd-ship-sell        0
+    :game/agent-sell           0
+    :game/mil-planet-sell      0
+    :game/erg-planet-sell     0
+    :game/ore-planet-sell      0
+    :game/food-buy             1
+    :game/food-sell            0
+    :game/fuel-buy             1
+    :game/fuel-sell            0}))
 
 (defn make-game [sys overrides]
   (let [doc (merge game-defaults overrides)]

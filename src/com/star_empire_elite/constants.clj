@@ -184,7 +184,6 @@
 ;;;; Population is stored in millions, so these are per-population-unit.
 
 (def population-tax-credits  2000)  ; credits per million population per round
-
 (def population-upkeep-food  1000)
 (def population-upkeep-fuel  1000)
 
@@ -270,11 +269,10 @@
 ;;; of that type, so credit reinvestment can't compound into unbounded planet counts forever.
 ;;; Below x, cost is flat (1x base). From x to y it rises linearly to 2x base; beyond y it keeps
 ;;; climbing at the same slope (no plateau — this slows runaway growth, it doesn't cap it).
-;;; Chosen as 10%/80% of utils/max-unit-quantity (the hard per-purchase safety ceiling) at the
-;;; time these were tuned; stored as plain thresholds so they stay put even if that ceiling
-;;; constant is later revised.
-(def planet-cost-ramp-x 1000000000000)  ; 1e12 — ramp begins here (holdings of one planet type)
-(def planet-cost-ramp-y 8000000000000)  ; 8e12 — cost reaches 2x base here
+;;; Stored as plain thresholds (not derived from utils/max-unit-quantity) so they stay put
+;;; regardless of that ceiling constant.
+(def planet-cost-ramp-min 1000000000)   ; 1.0B — ramp begins here (holdings of one planet type)
+(def planet-cost-ramp-max 10000000000)  ; 10.0B — cost reaches 2x base here
 
 (def agent-cost      5000)
 
@@ -342,7 +340,7 @@
 (def station-sell     500)
 (def cmd-ship-sell    30000)
 
-;; 90% markdown from purchase cost — selling a planet is only ever useful as a way to dodge
+;; 90% markdown from purchase cost. Selling a planet is only ever useful as a way to dodge
 ;; the cost ramp's rising price (sell down, rebuy cheaper), so the loss on resale is steep.
 (def mil-planet-sell  1700)  ; 10% of mil-planet-cost (17000)
 (def erg-planet-sell  2000)  ; 10% of erg-planet-cost (20000)

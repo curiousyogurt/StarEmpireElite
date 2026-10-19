@@ -38,6 +38,12 @@
    :player/erg-planets 1
    :player/ore-planets 3})
 
+(def test-game
+  (merge helpers/game-defaults
+         {:xt/id                 test-game-id
+          :game/created-at       (java.util.Date. 0)
+          :game/scheduled-end-at (java.util.Date. (* 7 24 60 60 1000))}))
+
 ;;;;
 ;;;; get-other-players Tests
 ;;;;
@@ -87,27 +93,18 @@
 (deftest test-espionage-page-renders-with-agents-and-targets
   (testing "Returns a hiccup vector when player has agents and targets exist"
     (with-redefs [biff/q (fn [_ _ & _] [test-target])]
-      (is (vector? (espionage/espionage-page {:player test-player :game {:game/turns-per-round  6
-                                  :game/rounds-per-day   2
-                                  :game/created-at       (java.util.Date. 0)
-                                  :game/scheduled-end-at (java.util.Date. (* 7 24 60 60 1000))} :db nil}))))))
+      (is (vector? (espionage/espionage-page {:player test-player :game test-game :db nil}))))))
 
 (deftest test-espionage-page-renders-without-agents
   (testing "Returns a hiccup vector with a warning when player has no agents"
     ;; When agents == 0 the page shows a warning instead of the target table.
     (with-redefs [biff/q (fn [_ _ & _] [test-target])]
-      (is (vector? (espionage/espionage-page {:player agent-less-player :game {:game/turns-per-round  6
-                                  :game/rounds-per-day   2
-                                  :game/created-at       (java.util.Date. 0)
-                                  :game/scheduled-end-at (java.util.Date. (* 7 24 60 60 1000))} :db nil}))))))
+      (is (vector? (espionage/espionage-page {:player agent-less-player :game test-game :db nil}))))))
 
 (deftest test-espionage-page-renders-without-targets
   (testing "Returns a hiccup vector when no other players exist"
     (with-redefs [biff/q (fn [_ _ & _] [])]
-      (is (vector? (espionage/espionage-page {:player test-player :game {:game/turns-per-round  6
-                                  :game/rounds-per-day   2
-                                  :game/created-at       (java.util.Date. 0)
-                                  :game/scheduled-end-at (java.util.Date. (* 7 24 60 60 1000))} :db nil}))))))
+      (is (vector? (espionage/espionage-page {:player test-player :game test-game :db nil}))))))
 
 ;;;;
 ;;;; apply-espionage Tests
@@ -136,7 +133,7 @@
 (deftest test-apply-espionage-with-spy
   (testing "Records pending-espionage and op=spy when spy action submitted"
     (let [tx-atom (atom nil)]
-      (with-redefs [xt/entity      (helpers/fake-entity [test-player])
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
         (let [result (espionage/apply-espionage
                        {:path-params {:player-id (str test-player-id)}
@@ -155,7 +152,7 @@
 (deftest test-apply-espionage-with-incite
   (testing "Records pending-espionage and op=incite when incite action submitted"
     (let [tx-atom (atom nil)]
-      (with-redefs [xt/entity      (helpers/fake-entity [test-player])
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
         (let [result (espionage/apply-espionage
                        {:path-params {:player-id (str test-player-id)}
@@ -171,7 +168,7 @@
     ;; Players may choose to skip espionage. pending-espionage is explicitly set to nil
     ;; so a previous round's value is not carried forward.
     (let [tx-atom (atom nil)]
-      (with-redefs [xt/entity      (helpers/fake-entity [test-player])
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
         (espionage/apply-espionage {:path-params {:player-id (str test-player-id)}
                                     :params {} :biff/db nil})
@@ -183,7 +180,7 @@
 (deftest test-apply-espionage-empty-action-string
   (testing "Treats an empty espionage-action as no target (nil pending-espionage)"
     (let [tx-atom (atom nil)]
-      (with-redefs [xt/entity      (helpers/fake-entity [test-player])
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
         (espionage/apply-espionage {:path-params {:player-id (str test-player-id)}
                                     :params {:espionage-action ""} :biff/db nil})

@@ -277,9 +277,9 @@
       ["Agent"         (v (ui/format-number (g game :game/agent-cost      const/agent-cost)))]])
     (prose
       "Planet costs above are the base (1x) rate. Past "
-      (v (ui/format-number (g game :game/planet-cost-ramp-x const/planet-cost-ramp-x)))
+      (v (ui/format-number (g game :game/planet-cost-ramp-min const/planet-cost-ramp-min)))
       " planets of one type, each further one costs more — 2x base at "
-      (v (ui/format-number (g game :game/planet-cost-ramp-y const/planet-cost-ramp-y)))
+      (v (ui/format-number (g game :game/planet-cost-ramp-max const/planet-cost-ramp-max)))
       " owned, climbing beyond that.")))
 
 ;;;;

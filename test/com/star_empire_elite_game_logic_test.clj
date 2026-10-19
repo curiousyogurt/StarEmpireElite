@@ -5,6 +5,7 @@
             [com.star-empire-elite.app :as app]
             [com.star-empire-elite.utils :as utils]  ; CHANGED: Added utils import
             [com.star-empire-elite.constants :as const]
+            [com.star-empire-elite.game-config :as cfg]
             [com.star-empire-elite.pages.app.income :as income]
             [xtdb.api :as xt]))
 
@@ -20,7 +21,8 @@
         now (java.util.Date.)
         end-date (java.util.Date. (+ (.getTime now) (* 30 24 60 60 1000)))
 
-        base-game {:db/doc-type :game
+        base-game (merge cfg/game-defaults
+                  {:db/doc-type :game
                    :xt/id game-id
                    :game/name "Test Game"
                    :game/created-at now
@@ -100,7 +102,7 @@
                    :game/food-buy        const/food-buy
                    :game/food-sell       const/food-sell
                    :game/fuel-buy        const/fuel-buy
-                   :game/fuel-sell       const/fuel-sell}
+                   :game/fuel-sell       const/fuel-sell})
 
         base-player {:db/doc-type :player
                      :xt/id player-id

@@ -6,6 +6,7 @@
             [com.star-empire-elite :as main]
             [com.star-empire-elite.app :as app]
             [com.star-empire-elite.constants :as const]
+            [com.star-empire-elite.game-config :as cfg]
             [malli.generator :as mg]
             [rum.core :as rum]
             [xtdb.api :as xt]))
@@ -58,7 +59,8 @@
             now (java.util.Date.)
             end-date (java.util.Date. (+ (.getTime now) (* 30 24 60 60 1000)))]
         (biff/submit-tx ctx
-          [{:db/doc-type :game
+          [(merge cfg/game-defaults
+           {:db/doc-type :game
             :xt/id game-id
             :game/name "Complete Test Game"
             :game/created-at now
@@ -143,7 +145,7 @@
             :game/food-buy        const/food-buy
             :game/food-sell       const/food-sell
             :game/fuel-buy        const/fuel-buy
-            :game/fuel-sell       const/fuel-sell}])
+            :game/fuel-sell       const/fuel-sell})])
 
         (let [db (xt/db node)
               game (xt/entity db game-id)]
@@ -215,7 +217,8 @@
           end-date (java.util.Date. (+ (.getTime now) (* 30 24 60 60 1000)))
           ctx (assoc (get-context node) :session {:uid (:xt/id user)})
           _ (biff/submit-tx ctx
-              [{:db/doc-type :game
+              [(merge cfg/game-defaults
+               {:db/doc-type :game
                 :xt/id game-id
                 :game/name "Test Game"
                 :game/created-at now
@@ -292,7 +295,7 @@
                 :game/food-buy        const/food-buy
                 :game/food-sell       const/food-sell
                 :game/fuel-buy        const/fuel-buy
-                :game/fuel-sell       const/fuel-sell}
+                :game/fuel-sell       const/fuel-sell})
                {:db/doc-type :player
                 :xt/id player-id
                 :player/user (:xt/id user)

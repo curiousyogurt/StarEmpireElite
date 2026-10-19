@@ -16,11 +16,12 @@
 
 ;; Game with 3 turns per round (so turn 3 triggers end-of-round).
 (def test-game
+  (merge helpers/game-defaults
   {:xt/id                  test-game-id
    :game/turns-per-round   3
    :game/rounds-per-day    2
    :game/created-at        (java.util.Date. 0)
-   :game/scheduled-end-at  (java.util.Date. (* 7 24 60 60 1000))})
+   :game/scheduled-end-at  (java.util.Date. (* 7 24 60 60 1000))}))
 
 ;; Player in phase 6 (outcomes), mid-round at turn 1 of 3.
 (def test-player

@@ -1,6 +1,7 @@
 (ns com.star-empire-elite.fate-test
   (:require [clojure.test :refer :all]
-            [com.star-empire-elite.fate :as fate]))
+            [com.star-empire-elite.fate :as fate]
+            [com.star-empire-elite.game-config :as cfg]))
 
 ;;;;
 ;;;; Fixtures
@@ -20,13 +21,14 @@
         v))))
 
 (def test-game
-  "Minimal game map with the constants roll-fate reads."
-  {:game/fate-probability       0.15
-   :game/fate-rank-tilt         0.4
-   :game/erg-planet-food        3000
-   :game/erg-planet-fuel        4000
-   :game/ore-planet-credits     10000
-   :game/population-tax-credits 2000})
+  "cfg/game-defaults (schema-complete) layered with the specific values these tests tune."
+  (merge cfg/game-defaults
+   {:game/fate-probability       0.15
+    :game/fate-rank-tilt         0.4
+    :game/erg-planet-food        3000
+    :game/erg-planet-fuel        4000
+    :game/ore-planet-credits     10000
+    :game/population-tax-credits 2000}))
 
 (def test-player
   "A mid-range player for use as baseline in most tests."

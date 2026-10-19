@@ -400,11 +400,11 @@
   (let [cached (:player/last-population-growth player)]
     (if (some? cached)
       [cached player]
-      (let [capacity-per-planet (or (:game/pop-capacity-per-planet game) const/pop-capacity-per-planet)
-            growth-rate         (or (:game/pop-growth-rate         game) const/pop-growth-rate)
-            growth-per-planet   (or (:game/pop-growth-per-planet   game) const/pop-growth-per-planet)
-            random-min          (or (:game/pop-random-min          game) const/pop-random-min)
-            random-max          (or (:game/pop-random-max          game) const/pop-random-max)
+      (let [capacity-per-planet (:game/pop-capacity-per-planet game)
+            growth-rate         (:game/pop-growth-rate         game)
+            growth-per-planet   (:game/pop-growth-per-planet   game)
+            random-min          (:game/pop-random-min          game)
+            random-max          (:game/pop-random-max          game)
             pop      (:player/population player)
             planets  (+ (:player/ore-planets  player)
                         (:player/erg-planets  player)
@@ -585,8 +585,7 @@
                                 ;; Migration wave: clamp population to planet capacity.
                                 new (if (= k :player/population)
                                       (min raw (* total-planets-now
-                                               (or (:game/pop-capacity-per-planet game)
-                                                   const/pop-capacity-per-planet)))
+                                               (:game/pop-capacity-per-planet game)))
                                       raw)]
                             (assoc p k (long new))))
                         player
