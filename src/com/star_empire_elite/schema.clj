@@ -19,6 +19,7 @@
           [:game/turns-per-round           :int]
           [:game/rounds-per-day            :int]
           [:game/minutes-between-rounds    :int]
+          [:game/alliance-slots            :int]
 
           ;; Expense underpayment penalty
           [:game/expense-stability-penalty    :int]
@@ -307,7 +308,30 @@
             [:player/incoming-espionage-agents-gained  {:optional true} [:maybe :int]]
             [:player/incoming-incite-stability-lost    {:optional true} [:maybe :int]]
             [:player/incoming-bomb-result              {:optional true} [:maybe :string]]
-            [:player/incoming-defect-agents-lost       {:optional true} [:maybe :int]]]
+            [:player/incoming-defect-agents-lost       {:optional true} [:maybe :int]]
+            [:player/incoming-treaty-proposed           {:optional true} [:maybe [:vector :string]]]
+            [:player/incoming-treaty-accepted          {:optional true} [:maybe [:vector :string]]]
+            [:player/incoming-treaty-withdrawn         {:optional true} [:maybe [:vector :string]]]
+            [:player/incoming-treaty-dissolved         {:optional true} [:maybe [:vector :string]]]]
+
+   ;; A treaty between two players. Shared by both sides so the relationship can't drift —
+   ;; neither player's entity carries its own copy. Lifecycle: :proposed -> :active (accepted)
+   ;; | :declined | :withdrawn; :active -> :dissolved (ended by either side, from the
+   ;; diplomacy phase) | :broken (ended by an attack). Proposing/accepting/declining/
+   ;; withdrawing/dissolving only happen during the diplomacy phase (7); breaking happens
+   ;; during combat resolution (resolution.clj). See diplomacy.clj.
+   :alliance/id :uuid
+   :alliance [:map {:closed true}
+              [:xt/id                 :alliance/id]
+              [:alliance/game         :game/id]
+              [:alliance/kind         :keyword]  ; :peace (later :defensive / :offensive)
+              [:alliance/proposer     :player/id]
+              [:alliance/recipient    :player/id]
+              [:alliance/status       :keyword]  ; :proposed :active :declined :withdrawn :dissolved :broken
+              [:alliance/proposed-at  inst?]
+              [:alliance/formed-at {:optional true} [:maybe inst?]]
+              [:alliance/ended-at  {:optional true} [:maybe inst?]]
+              [:alliance/ended-by  {:optional true} [:maybe :player/id]]]
 
    :game-event/id :uuid
    :game-event [:map {:closed true}

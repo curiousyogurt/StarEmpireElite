@@ -45,6 +45,15 @@
 (def game-duration-days     7)
 
 ;;;;
+;;;; Diplomacy
+;;;; The diplomacy window opens once per round, after the last turn's Outcomes phase (see
+;;;; phase 7 in resolution.clj / app.clj). alliance-slots caps how many treaties — active plus
+;;;; outgoing proposals — a player can hold at once.
+;;;;
+
+(def alliance-slots 3)
+
+;;;;
 ;;;; Combat Modes
 ;;;; Raid is a limited engagement that targets a fraction of the defender's empire.
 ;;;; Invade is a full-scale assault. The engagement multiplier governs both the

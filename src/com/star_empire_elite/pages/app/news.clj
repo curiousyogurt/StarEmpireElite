@@ -114,6 +114,28 @@
   (let [subj (if mine? "You" (empire-span empire-name))]
     [:span subj " were eliminated"]))
 
+(defn- treaty-summary
+  "Verb phrase for treaty-formed / treaty-dissolved / treaty-broken events.
+
+  Unlike the other summary renderers this reads straight off the event (not its payload) —
+  :event/attacker-name/:event/defender-name already carry whichever two empires are involved,
+  and there's no 'win/loss' outcome to show.
+
+  [event event-map, kind keyword, player-id uuid] -> hiccup-fragment"
+  [event kind player-id]
+  (let [att-name (:event/attacker-name event)
+        def-name (:event/defender-name event)
+        you-att? (= player-id (:event/attacker event))
+        you-def? (= player-id (:event/defender event))
+        verb     (case kind
+                   :treaty-formed    "signed a peace treaty with"
+                   :treaty-dissolved "dissolved the peace treaty with"
+                   :treaty-broken    "broke a peace treaty with")]
+    (cond
+      you-att? [:span "You " verb " " (empire-span def-name)]
+      you-def? [:span (empire-span att-name) " " verb " you"]
+      :else    [:span (empire-span att-name) " " verb " " (empire-span def-name)])))
+
 (defn- fate-summary
   "Verb phrase for disaster/boon events.
 
@@ -165,6 +187,7 @@
       :breakaway   (breakaway-summary payload def-name mine?)
       :elimination (elimination-summary def-name mine?)
       (:disaster :boon) (fate-summary payload def-name)
+      (:treaty-formed :treaty-dissolved :treaty-broken) (treaty-summary event kind player-id)
       [:span "Unknown event"])))
 
 ;;;;

@@ -81,7 +81,15 @@
     ;; row: [:tr.classes [:td empire-name] [:td total-planets] [:td score] [:td op] ...]
     ;; index 0=:tr, 1=empire-td, 2=planets-td; planets-td is [:td {attrs} 6].
     (let [planet-td (nth (#'espionage/target-row test-target "attacker-id" true) 2)]
-      (is (= "6" (last planet-td))))))
+      (is (= "6" (last planet-td)))))
+
+  (testing "No treaty indicator when treaty? is omitted or false — espionage never breaks one"
+    (let [result (#'espionage/target-row test-target "attacker-id" true)]
+      (is (not (clojure.string/includes? (pr-str result) "Active peace treaty")))))
+
+  (testing "Renders the treaty indicator next to the name when treaty? is true"
+    (let [result (#'espionage/target-row test-target "attacker-id" true true)]
+      (is (clojure.string/includes? (pr-str result) "Active peace treaty")))))
 
 ;;;;
 ;;;; espionage-page Tests

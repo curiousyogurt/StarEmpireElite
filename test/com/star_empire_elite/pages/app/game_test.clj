@@ -23,13 +23,13 @@
       (is (= (str "/app/game/" id "/building")  (game/get-phase-url id 3)))
       (is (= (str "/app/game/" id "/action")    (game/get-phase-url id 4)))
       (is (= (str "/app/game/" id "/espionage") (game/get-phase-url id 5)))
-      (is (= (str "/app/game/" id "/outcomes")  (game/get-phase-url id 6))))))
+      (is (= (str "/app/game/" id "/outcomes")  (game/get-phase-url id 6)))
+      (is (= (str "/app/game/" id "/diplomacy") (game/get-phase-url id 7))))))
 
 (deftest test-get-phase-url-default
   (testing "Unknown phases fall back to the game overview URL"
     (let [id test-player-id]
       (is (= (str "/app/game/" id) (game/get-phase-url id 0)))
-      (is (= (str "/app/game/" id) (game/get-phase-url id 7)))
       (is (= (str "/app/game/" id) (game/get-phase-url id 99))))))
 
 ;;

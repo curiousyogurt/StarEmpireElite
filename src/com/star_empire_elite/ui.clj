@@ -398,7 +398,8 @@
 
 (defn mode-badge
   "Render a colored badge pill: ACTION (red), ESPIONAGE (amber), GROWTH (green),
-  STABILITY (yellow), EVENT (gray), or FATE (violet). Used across outcomes, alerts, and news.
+  STABILITY (yellow), EVENT (gray), FATE (violet), or DIPLOMACY (blue). Used across
+  outcomes, alerts, and news.
 
   [mode keyword] -> hiccup"
   [mode]
@@ -409,9 +410,27 @@
                      (:elimination :event)        ["EVENT"     "border-[#9ca3af] text-[#9ca3af]"]
                      ;; Both polarities share one badge; summary text and color carry the good/bad signal.
                      (:disaster :boon)            ["FATE"      "border-[#a78bfa] text-[#a78bfa]"]
+                     ;; All three treaty lifecycle moments (formed/dissolved/broken) share one badge.
+                     (:treaty-formed :treaty-dissolved :treaty-broken)
+                                                   ["DIPLOMACY" "border-[#60a5fa] text-[#60a5fa]"]
                                                   ["ACTION"    "border-[#f87171] text-[#f87171]"])]
     [:span {:class (str "border px-[7px] py-[2px] text-[11px] tracking-[0.12em] " cls)}
      text]))
+
+(defn treaty-indicator
+  "Render a small square 'P' marker for a target-table row, meaning 'you hold an active
+  peace treaty with this empire' by default — pass title to say something else, e.g. a
+  diplomacy-page proposal that isn't active yet. Shared by the action and espionage target
+  tables — see target-operation-row's :name-suffix. Vertical centering against the empire
+  name is handled by the flex wrapper in target-info-tds, not here — a lone inline-flex box
+  has no text baseline of its own to line up against plain text.
+
+  [& [title str]] -> hiccup"
+  [& [title]]
+  [:span.inline-flex.items-center.justify-center.font-bold.border.rounded-sm
+   {:class "w-4 h-4 text-[9px] border-[#60a5fa] text-[#60a5fa]"
+    :title (or title "Active peace treaty")}
+   "P"])
 
 (defn resource-pills
   "Render resource pills for a phase summary card: one pill per non-zero value in value-map.
@@ -830,7 +849,9 @@
    (into [:span.text-game-green-soft.flex-1] body)])
 
 (defn- attack-info-line
-  "Render one alert row summarizing a single incoming attack record (pr-str'd map).
+  "Render one alert row summarizing a single incoming attack record (pr-str'd map), plus a
+  second DIPLOMACY row when that attack also broke an active peace treaty — see
+  resolution/resolve-combat.
 
   [record-str string] -> hiccup"
   [record-str]
@@ -845,9 +866,14 @@
                         "attacked")
         outcome       (when (not= mode :strike)
                         (if attacker-wins? " (SUCCESS)" " (FAILURE)"))]
-    (alert-line mode
-      [:span.text-green-300.font-bold attacker]
-      (str " " verb " you" outcome))))
+    [:<>
+     (alert-line mode
+       [:span.text-green-300.font-bold attacker]
+       (str " " verb " you" outcome))
+     (when (:treaty-broken? r)
+       (alert-line :treaty-broken
+         [:span.text-green-300.font-bold attacker]
+         " broke a peace treaty with you."))]))
 
 (defn incoming-alert-content
   "Render the alert banner summarizing incoming activity with badges matching outcomes page style.
@@ -860,8 +886,13 @@
         esp-agents         (or (:player/incoming-espionage-agents-gained player) 0)
         incite-stab-lost   (or (:player/incoming-incite-stability-lost player) 0)
         bomb-result        (some-> (:player/incoming-bomb-result player) edn/read-string)
-        defect-agents-lost (or (:player/incoming-defect-agents-lost player) 0)]
-    (when (or attacks esp-fails (pos? incite-stab-lost) bomb-result (pos? defect-agents-lost))
+        defect-agents-lost (or (:player/incoming-defect-agents-lost player) 0)
+        treaties-proposed  (seq (utils/take-recent (:player/incoming-treaty-proposed player)))
+        treaties-accepted  (seq (utils/take-recent (:player/incoming-treaty-accepted player)))
+        treaties-withdrawn (seq (utils/take-recent (:player/incoming-treaty-withdrawn player)))
+        treaties-dissolved (seq (utils/take-recent (:player/incoming-treaty-dissolved player)))]
+    (when (or attacks esp-fails (pos? incite-stab-lost) bomb-result (pos? defect-agents-lost)
+              treaties-proposed treaties-accepted treaties-withdrawn treaties-dissolved)
       [:div.mb-4.rounded-game.border.border-game-green-border.relative
        {:class "px-3.5 pt-2.5"}
        ;; Refresh link — top-right corner
@@ -895,7 +926,27 @@
                          "defect" "turned agents from"
                          "attacked")]
               (alert-line (keyword op)
-                (str "An unknown agent " verb " you (FAILED)")))))]
+                (str "An unknown agent " verb " you (FAILED)")))))
+        (when treaties-proposed
+          (for [empire-name treaties-proposed]
+            (alert-line :treaty-formed
+              [:span.text-green-300.font-bold empire-name]
+              " proposed a peace treaty with you.")))
+        (when treaties-accepted
+          (for [empire-name treaties-accepted]
+            (alert-line :treaty-formed
+              [:span.text-green-300.font-bold empire-name]
+              " accepted your peace treaty proposal.")))
+        (when treaties-withdrawn
+          (for [empire-name treaties-withdrawn]
+            (alert-line :treaty-dissolved
+              [:span.text-green-300.font-bold empire-name]
+              " withdrew their peace treaty proposal.")))
+        (when treaties-dissolved
+          (for [empire-name treaties-dissolved]
+            (alert-line :treaty-dissolved
+              [:span.text-green-300.font-bold empire-name]
+              " dissolved your peace treaty.")))]
        ;; Footer
        [:p.text-game-green-dim.italic.mt-2 {:class "text-[11px]"}
         "Full details available in Outcomes phase."]])))
@@ -1263,23 +1314,30 @@
 
 (defn target-info-tds
   "Render the Empire name, Planets, and Score cells for a target table row.
-  Returns a vector of 3 [:td ...] elements.
+  Returns a vector of 3 [:td ...] elements. name-suffix, when given, is extra hiccup
+  rendered right after the empire name (e.g. action/espionage's treaty indicator), with a
+  small gap between them — nil by default, so existing callers are unaffected. The name and
+  suffix are wrapped in their own flex row so a suffix of a different height (like a small
+  boxed badge) still centers cleanly against the text instead of sagging below its baseline.
 
-  [player player-map] -> [[:td ...] [:td ...] [:td ...]]"
-  [player]
+  [player player-map, & [{:keys [name-suffix]}]] -> [[:td ...] [:td ...] [:td ...]]"
+  [player & [{:keys [name-suffix]}]]
   (let [td-cls       "border-r border-game-border py-1 px-3 text-game-green-soft"
         td-right-cls "border-r border-game-border py-1 px-3 text-game-green-soft text-right"]
-    [[:td {:class td-cls}       (:player/empire-name player)]
+    [[:td {:class td-cls}
+      [:span.inline-flex.items-center.gap-x-2
+       (:player/empire-name player) name-suffix]]
      [:td {:class td-right-cls} (format-number (utils/total-planets player))]
      [:td {:class td-right-cls} (format-number (:player/score player))]]))
 
 (defn target-operation-row
   "Render a target table row using shared empire/planet/score cells plus operation cells.
+  opts is passed through to target-info-tds (see its :name-suffix).
 
-  [player player-map, operations seq-of-hiccup, cell-class str] -> hiccup"
-  [player operations cell-class]
+  [player player-map, operations seq-of-hiccup, cell-class str, & [opts]] -> hiccup"
+  [player operations cell-class & [opts]]
   (into [:tr.bg-game-row.border-b.border-game-divider]
         (concat
-          (target-info-tds player)
+          (target-info-tds player opts)
           (for [op operations]
             [:td {:class cell-class} op]))))

@@ -14,6 +14,7 @@
             [com.biffweb               :as biff]
             [com.star-empire-elite.combat     :as combat]
             [com.star-empire-elite.constants  :as const]
+            [com.star-empire-elite.diplomacy  :as diplomacy]
             [com.star-empire-elite.events     :as events]
             [com.star-empire-elite.fate       :as fate]
             [com.star-empire-elite.utils      :as utils]
@@ -23,14 +24,20 @@
 ;;;; Helpers
 ;;;;
 
-(defn- capped-conj
-  "Append x to v, keeping only the most recent const/incoming-history-cap entries.
-  Bounds the growth of :player/incoming-attacks and :player/incoming-espionage-fails on
-  defenders who go many turns without clearing them via apply-outcomes.
+;;; A peace treaty only breaks for an Action-phase attack against an *active* treaty partner
+;;; — see diplomacy.clj's lifecycle doc comment for why a merely :proposed treaty is immune
+;;; (it hasn't "arrived" yet). Called once per attack, on the fresh-resolve path only.
+(defn- break-treaty-if-active
+  "If attacker-id and defender-id currently hold an active peace treaty, return the updated
+  (now :broken) alliance map; else nil. Pure data — the caller adds :db/doc-type and includes
+  it in the same submit-tx as the battle, so the break applies atomically with it.
 
-  [v vector|nil, x any] -> vector"
-  [v x]
-  (utils/take-recent (conj (or v []) x)))
+  [db xtdb-db, game-id uuid, attacker-id uuid, defender-id uuid, now Date] -> alliance-map | nil"
+  [db game-id attacker-id defender-id now]
+  (let [alliances (diplomacy/alliances-for-player db game-id attacker-id)
+        treaty    (diplomacy/active-treaty-between alliances attacker-id defender-id)]
+    (when treaty
+      (diplomacy/break-by-attack treaty attacker-id now))))
 
 ;;;;
 ;;;; Stability Calculations
@@ -145,21 +152,29 @@
 
 (defn- resolve-combat
   "Resolve combat on first load; return cached result on refresh.
-  Returns [result updated-player] where result is nil if no attack was pending."
+  Returns [result updated-player broken-alliance] where result is nil if no attack was
+  pending, and broken-alliance is the now-:broken alliance map if this attack broke an
+  active peace treaty (nil otherwise, including on every cache-hit — the break, like the
+  battle, only happens once, on first resolve)."
   [ctx player-id player game]
   (let [db             (:biff/db ctx)
         pending-attack (:player/pending-attack player)
         mode           (:player/pending-attack-mode player)
         stored-battle  (some-> (:player/last-battle-result player) edn/read-string)]
     (if-not pending-attack
-      [nil player]
+      [nil player nil]
       (let [defender (xt/entity db pending-attack)]
         (if (and stored-battle (= (:defender-id stored-battle) (str pending-attack)))
           ;; Cache hit — changes already applied; player entity is fresh on this request
-          [stored-battle player]
+          [stored-battle player nil]
           (if (= mode :strike)
             ;; --- Strike branch ---
-            (let [result        (combat/resolve-strike game player defender)
+            (let [raw-result    (combat/resolve-strike game player defender)
+                  broken-alliance (break-treaty-if-active
+                                    db (:player/game player) player-id
+                                    (:xt/id defender) (java.util.Date.))
+                  result        (cond-> raw-result
+                                  broken-alliance (assoc :treaty-broken? true))
                   dl            (:defender-losses result)
                   ships-lost    (:cmd-ships-lost result)
                   att-cmd-ships (max 0 (- (:player/cmd-ships player) ships-lost))
@@ -173,31 +188,33 @@
                   def-agents     (max 0 (- (:player/agents     defender) (:agents     dl)))]
               (biff/submit-tx
                 ctx
-                [{:db/doc-type :player :db/op :update :xt/id player-id
-                  :player/last-battle-result (pr-str result)
-                  :player/cmd-ships att-cmd-ships
-                  :player/score     (utils/calculate-score
-                                      game (assoc player :player/cmd-ships att-cmd-ships))}
-                 {:db/doc-type :player :db/op :update :xt/id (:xt/id defender)
-                  :player/soldiers   def-soldiers
-                  :player/transports def-transports
-                  :player/generals   def-generals
-                  :player/fighters   def-fighters
-                  :player/carriers   def-carriers
-                  :player/admirals   def-admirals
-                  :player/stations   def-stations
-                  :player/agents     def-agents
-                  :player/score      (utils/calculate-score
-                                       game (assoc defender
-                                         :player/soldiers   def-soldiers
-                                         :player/generals   def-generals
-                                         :player/fighters   def-fighters
-                                         :player/admirals   def-admirals
-                                         :player/stations   def-stations
-                                         :player/agents     def-agents))
-                  :player/incoming-attacks
-                  (capped-conj (:player/incoming-attacks defender) (pr-str result))}])
-              [result (assoc player :player/cmd-ships att-cmd-ships)])
+                (cond->
+                  [{:db/doc-type :player :db/op :update :xt/id player-id
+                    :player/last-battle-result (pr-str result)
+                    :player/cmd-ships att-cmd-ships
+                    :player/score     (utils/calculate-score
+                                        game (assoc player :player/cmd-ships att-cmd-ships))}
+                   {:db/doc-type :player :db/op :update :xt/id (:xt/id defender)
+                    :player/soldiers   def-soldiers
+                    :player/transports def-transports
+                    :player/generals   def-generals
+                    :player/fighters   def-fighters
+                    :player/carriers   def-carriers
+                    :player/admirals   def-admirals
+                    :player/stations   def-stations
+                    :player/agents     def-agents
+                    :player/score      (utils/calculate-score
+                                         game (assoc defender
+                                           :player/soldiers   def-soldiers
+                                           :player/generals   def-generals
+                                           :player/fighters   def-fighters
+                                           :player/admirals   def-admirals
+                                           :player/stations   def-stations
+                                           :player/agents     def-agents))
+                    :player/incoming-attacks
+                    (utils/capped-conj (:player/incoming-attacks defender) (pr-str result))}]
+                  broken-alliance (conj (assoc broken-alliance :db/doc-type :alliance))))
+              [result (assoc player :player/cmd-ships att-cmd-ships) broken-alliance])
             ;; --- Invade / Raid branch ---
             (let [result  (combat/resolve-combat game player defender mode)
                   al      (:attacker-losses result)
@@ -206,7 +223,11 @@
                   pt-mil  (min (:mil raw-pt) (:player/mil-planets defender))
                   pt-erg  (min (:erg raw-pt) (:player/erg-planets defender))
                   pt-ore  (min (:ore raw-pt) (:player/ore-planets defender))
-                  capped       (assoc result :planets-transferred {:mil pt-mil :erg pt-erg :ore pt-ore})
+                  broken-alliance (break-treaty-if-active
+                                    db (:player/game player) player-id
+                                    (:xt/id defender) (java.util.Date.))
+                  capped       (cond-> (assoc result :planets-transferred {:mil pt-mil :erg pt-erg :ore pt-ore})
+                                 broken-alliance (assoc :treaty-broken? true))
                   rc           (or (:resources-captured capped) {:credits 0 :food 0 :fuel 0})
                   rc-credits   (:credits rc)
                   rc-food      (:food    rc)
@@ -240,6 +261,7 @@
                   def-fuel       (max 0 (- (:player/fuel        defender) rc-fuel))]
               (biff/submit-tx
                 ctx
+                (cond->
                 [{:db/doc-type :player :db/op :update :xt/id player-id
                   :player/last-battle-result (pr-str capped)
                   :player/soldiers     att-soldiers
@@ -298,9 +320,10 @@
                                            :player/food         def-food
                                            :player/fuel         def-fuel))
                   :player/incoming-attacks
-                  (capped-conj (:player/incoming-attacks defender) (pr-str capped))}])
-              [capped 
-               (merge player 
+                  (utils/capped-conj (:player/incoming-attacks defender) (pr-str capped))}]
+                  broken-alliance (conj (assoc broken-alliance :db/doc-type :alliance))))
+              [capped
+               (merge player
                       {:player/soldiers     att-soldiers
                        :player/transports   att-transports
                        :player/generals     att-generals
@@ -313,7 +336,8 @@
                        :player/ore-planets  att-ore-plts
                        :player/credits      att-credits
                        :player/food         att-food
-                       :player/fuel         att-fuel})])))))))
+                       :player/fuel         att-fuel})
+               broken-alliance])))))))
 
 (defn- resolve-espionage
   "Resolve espionage on first load; return cached result on refresh.
@@ -352,7 +376,7 @@
                          {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
                           :player/agents (+ (or (:player/agents target) 0) agents-captured)
                           :player/incoming-espionage-fails
-                          (capped-conj (:player/incoming-espionage-fails target)
+                          (utils/capped-conj (:player/incoming-espionage-fails target)
                                        (cond incite? "incite" bomb? "bomb" defect? "defect" :else "spy"))
                           :player/incoming-espionage-agents-gained
                           (+ (or (:player/incoming-espionage-agents-gained target) 0) agents-captured)})
@@ -614,6 +638,10 @@
   results on refresh. Steps: combat → espionage → population → expense penalty →
   stability breakaway → stability recovery → elimination check.
 
+  An Action-phase attack against an active peace-treaty partner breaks that treaty as part
+  of the combat step (resolve-combat) — the broken alliance produces its own :treaty-broken
+  event here, and :battle-result carries a :treaty-broken? flag for outcomes/outcomes-page.
+
   After resolution, writes game-event documents for any freshly resolved results.
   Cache-hit results (already persisted on a prior page load) do not produce duplicate
   events — the cache fields on the original player entity are checked before resolution
@@ -629,7 +657,7 @@
         breakaway-cached? (some? (:player/last-stability-breakaway player))
         fate-cached?      (some? (:player/last-fate-result player))
 
-        [battle-result    p1] (resolve-combat              ctx player-id player game)
+        [battle-result p1 broken-alliance] (resolve-combat ctx player-id player game)
         [espionage-result p2] (resolve-espionage           ctx player-id p1     game)
         [pop-growth       p3] (resolve-population          ctx player-id p2     game)
         [expense-penalty  p4] (resolve-expense-penalty     ctx player-id p3     game)
@@ -657,6 +685,15 @@
         events (cond-> []
                  (and battle-result (not combat-cached?))
                  (conj (events/event-of-battle-result battle-result event-meta))
+
+                 ;; broken-alliance is only ever non-nil on the same fresh-resolve path as
+                 ;; battle-result (see resolve-combat), so no separate cache check is needed.
+                 broken-alliance
+                 (conj (events/event-of-treaty
+                         broken-alliance :treaty-broken
+                         {player-id (:attacker-name battle-result)
+                          (diplomacy/partner-id broken-alliance player-id) (:defender-name battle-result)}
+                         event-meta))
 
                  (and espionage-result (not espionage-cached?))
                  (into (events/event-of-espionage-result

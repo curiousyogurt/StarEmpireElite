@@ -1,7 +1,10 @@
 (ns com.star-empire-elite.resolution-test
   (:require [clojure.test :refer :all]
+            [com.biffweb :as biff :refer [test-xtdb-node]]
+            [com.star-empire-elite :as main]
             [com.star-empire-elite.resolution :as resolution]
-            [com.star-empire-elite.test-helpers :as helpers]))
+            [com.star-empire-elite.test-helpers :as helpers]
+            [xtdb.api :as xt]))
 
 ;;;;
 ;;;; Fixtures
@@ -84,3 +87,103 @@
         (is (= (- 10 (:ore-lost result)) (:player/ore-planets updates)))
         (is (not (contains? updates :player/agents)))
         (is (not (contains? updates :player/galaxars)))))))
+
+;;;;
+;;;; resolve-combat — breaking a peace treaty by attack (DB-backed)
+;;;;
+;;;; A fresh (non-cached) Action-phase attack against an active treaty partner breaks the
+;;;; treaty atomically with the battle. An attack against a merely :proposed treaty — one
+;;;; that hasn't "arrived" yet, see diplomacy.clj — leaves it untouched.
+;;;;
+
+(defn- get-ctx [node]
+  {:biff.xtdb/node  node
+   :biff/db         (xt/db node)
+   :biff/malli-opts #'main/malli-opts})
+
+(defn- submit! [ctx doc]
+  (biff/submit-tx ctx [doc])
+  doc)
+
+(defn- alliance-fixture [overrides]
+  (merge {:xt/id                 (random-uuid)
+          :db/doc-type           :alliance
+          :alliance/kind         :peace
+          :alliance/proposed-at  (java.util.Date.)}
+         overrides))
+
+(deftest test-attack-on-active-treaty-partner-breaks-it-once
+  (testing "a fresh raid against an active treaty partner flags :treaty-broken? and breaks
+            the alliance; a refresh (cache hit) does neither a second time"
+    (with-open [node (test-xtdb-node [])]
+      (let [ctx0     (get-ctx node)
+            game-id  (random-uuid)
+            att-id   (random-uuid)
+            def-id   (random-uuid)
+            game     (submit! ctx0 (merge helpers/game-defaults {:xt/id game-id}))
+            attacker (submit! ctx0 (merge helpers/player-defaults
+                                          {:xt/id                      att-id
+                                           :player/game                 game-id
+                                           :player/empire-name          "Attacker"
+                                           :player/pending-attack       def-id
+                                           :player/pending-attack-mode  :raid}))
+            _        (submit! ctx0 (merge helpers/player-defaults
+                                          {:xt/id              def-id
+                                           :player/game         game-id
+                                           :player/empire-name  "Defender"}))
+            _        (submit! ctx0 (alliance-fixture
+                                     {:alliance/game       game-id
+                                      :alliance/proposer   att-id
+                                      :alliance/recipient  def-id
+                                      :alliance/status     :active
+                                      :alliance/formed-at  (java.util.Date.)}))
+            ctx1     (assoc ctx0 :biff/db (xt/db node))
+            [result1 _ broken1] (#'resolution/resolve-combat ctx1 att-id attacker game)]
+        (is (true? (:treaty-broken? result1)))
+        (is (= :broken (:alliance/status broken1)))
+        (is (= att-id (:alliance/ended-by broken1)))
+
+        ;; Refresh: reload the attacker (now cached) and resolve again from a fresh db snapshot.
+        (let [db2       (xt/db node)
+              attacker2 (xt/entity db2 att-id)
+              ctx2      (assoc ctx0 :biff/db db2)
+              [result2 _ broken2] (#'resolution/resolve-combat ctx2 att-id attacker2 game)]
+          (is (= result1 result2) "the cached result is served unchanged")
+          (is (nil? broken2) "no second break on a cache-hit refresh"))
+
+        ;; The alliance document itself only ever flips to :broken once.
+        (let [alliances (biff/q (xt/db node) '{:find (pull a [*]) :where [[a :alliance/game _]]})]
+          (is (= 1 (count alliances)))
+          (is (= :broken (:alliance/status (first alliances)))))))))
+
+(deftest test-attack-on-proposed-treaty-does-not-break-it
+  (testing "an attack while the treaty is only :proposed leaves it :proposed — it hasn't
+            'arrived' yet, so the recipient can still accept it in the diplomacy phase"
+    (with-open [node (test-xtdb-node [])]
+      (let [ctx0     (get-ctx node)
+            game-id  (random-uuid)
+            att-id   (random-uuid)
+            def-id   (random-uuid)
+            game     (submit! ctx0 (merge helpers/game-defaults {:xt/id game-id}))
+            attacker (submit! ctx0 (merge helpers/player-defaults
+                                          {:xt/id                      att-id
+                                           :player/game                 game-id
+                                           :player/empire-name          "Attacker"
+                                           :player/pending-attack       def-id
+                                           :player/pending-attack-mode  :raid}))
+            _        (submit! ctx0 (merge helpers/player-defaults
+                                          {:xt/id              def-id
+                                           :player/game         game-id
+                                           :player/empire-name  "Defender"}))
+            _        (submit! ctx0 (alliance-fixture
+                                     {:alliance/game       game-id
+                                      :alliance/proposer   att-id
+                                      :alliance/recipient  def-id
+                                      :alliance/status     :proposed}))
+            ctx1     (assoc ctx0 :biff/db (xt/db node))
+            [result _ broken] (#'resolution/resolve-combat ctx1 att-id attacker game)]
+        (is (nil? (:treaty-broken? result)))
+        (is (nil? broken))
+        (let [alliances (biff/q (xt/db node) '{:find (pull a [*]) :where [[a :alliance/game _]]})]
+          (is (= 1 (count alliances)))
+          (is (= :proposed (:alliance/status (first alliances)))))))))

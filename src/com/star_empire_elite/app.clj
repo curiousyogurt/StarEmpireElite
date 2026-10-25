@@ -27,6 +27,7 @@
             [com.star-empire-elite.pages.app.action     :as action]
             [com.star-empire-elite.pages.app.espionage  :as espionage]
             [com.star-empire-elite.pages.app.outcomes   :as outcomes]
+            [com.star-empire-elite.pages.app.diplomacy  :as diplomacy]
             [com.star-empire-elite.pages.app.eliminated :as eliminated]
             [com.star-empire-elite.pages.app.news       :as news]
             [com.star-empire-elite.pages.app.guide      :as guide]
@@ -192,13 +193,13 @@
          :headers {"location" (str "/app/join-game/" game-id)}}))))
 
 (defn delete-game
-  "Delete a game and all associated players (admin only).
+  "Delete a game and all associated players and alliances (admin only).
 
   If the game's day counter has already reached its scheduled length (utils/game-days-complete?,
   the same 'Day N/N' point shown on screen) — i.e. the admin is clearing away a completed game
   rather than killing one early — first snapshot the final standings into a :game-result entity,
   in the same transaction as the deletes. This is the only durable record of who won, since the
-  :game and :player entities are gone afterward.
+  :game, :player, and :alliance entities are gone afterward.
 
   [ctx ring-ctx] -> ring-response (303 redirect to /app)"
   [{:keys [session biff/db path-params] :as ctx}]
@@ -213,6 +214,10 @@
                              :in [game-id]
                              :where [[player :player/game game-id]]}
                         game-id)
+            alliances (q db '{:find [alliance]
+                              :in [game-id]
+                              :where [[alliance :alliance/game game-id]]}
+                         game-id)
             result-op (when (and game (utils/game-days-complete? game now))
                         (let [standings (mapv (fn [p]
                                                  {:standing/rank        (:rank p)
@@ -230,6 +235,7 @@
                         (concat
                           result-op
                           (for [[player-id] players] {:db/op :delete :xt/id player-id})
+                          (for [[alliance-id] alliances] {:db/op :delete :xt/id alliance-id})
                           [{:db/op :delete :xt/id game-id}]))
         {:status 303 :headers {"location" "/app"}}))))
 
@@ -442,6 +448,21 @@
     (or (utils/validate-phase player 6 player-id)
         (outcomes/outcomes-page (resolution/resolve-turn ctx player-id player game)))))
 
+(defn diplomacy-handler
+  "Phase 7 — diplomacy. Opens only once per round, after the last turn's outcomes — see
+  outcomes/apply-outcomes. Every move (propose, accept, decline, withdraw, dissolve) is a
+  deferred radio choice resolved all at once by apply-diplomacy on End Current Round."
+  [{:keys [session] :as ctx}]
+  (utils/with-player-and-game [player game player-id] ctx
+    (or (utils/validate-phase player 7 player-id)
+        (let [[flash new-session] (utils/take-flash session)]
+          {:status  200
+           :headers {"content-type" "text/html"}
+           :session new-session
+           :body    (rum/render-static-markup
+                      (diplomacy/diplomacy-page
+                        {:player player :game game :db (:biff/db ctx) :flash flash}))}))))
+
 ;;;;
 ;;;; News
 ;;;;
@@ -536,6 +557,9 @@
     ["/game/:player-id/apply-espionage"    {:post espionage/apply-espionage}]
     ["/game/:player-id/outcomes"           {:get  outcomes-handler}]
     ["/game/:player-id/apply-outcomes"     {:post outcomes/apply-outcomes}]
+    ["/game/:player-id/diplomacy"          {:get  diplomacy-handler}]
+    ["/game/:player-id/diplomacy-warning"  {:post diplomacy/update-diplomacy-warning}]
+    ["/game/:player-id/apply-diplomacy"    {:post diplomacy/apply-diplomacy}]
     ["/game/:player-id/eliminated"         {:get  eliminated/eliminated-page}]
     ["/game/:player-id/rejoin"             {:post eliminated/rejoin}]
     ["/game/:player-id/news"               {:get  news-handler}]

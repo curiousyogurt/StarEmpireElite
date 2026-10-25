@@ -34,6 +34,7 @@
   (:require [clojure.string :as str]
             [com.biffweb :as biff]
             [com.star-empire-elite.combat :as combat]
+            [com.star-empire-elite.diplomacy :as diplomacy]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
 
@@ -126,7 +127,9 @@
 ;;; Each row shows empire name, planet count, score, and three radio-button attack
 ;;; modes (Invade, Raid, Strike).  Invade requires deployable soldiers, deployable
 ;;; fighters, and command ships.  Raid requires deployable soldiers and deployable
-;;; fighters.  Strike requires command ships.
+;;; fighters.  Strike requires command ships.  A treaty partner's row carries a "P"
+;;; marker (ui/treaty-indicator) right after their name — attacking them is still allowed,
+;;; but it breaks the treaty (see resolution/resolve-combat).
 ;;;
 ;;; - target-row: one table row with three radio-button attack modes
 ;;;
@@ -140,9 +143,11 @@
   Raid requires deployable soldiers and deployable fighters.
   Strike requires command ships.
   attacker-id-str is the current player's id, used for the HTMX warning endpoint.
+  treaty? marks this target as a current peace-treaty partner; defaults to false.
 
-  [player player-map, ef {:soldiers int :fighters int}, cmd-ships int, attacker-id-str string] -> hiccup"
-  [player ef cmd-ships attacker-id-str]
+  [player player-map, ef {:soldiers int :fighters int}, cmd-ships int, attacker-id-str string,
+   & [treaty? bool]] -> hiccup"
+  [player ef cmd-ships attacker-id-str & [treaty?]]
   (let [target-id-str (str (:xt/id player))
         radio-name    "target-action"
         warning-ep    (str "/app/game/" attacker-id-str "/action-warning")
@@ -162,7 +167,8 @@
       [(if can-attack? (op-btn :invade "Invade") (disabled-btn "Invade"))
        (if can-attack? (op-btn :raid "Raid") (disabled-btn "Raid"))
        (if has-cmd? (op-btn :strike "Strike") (disabled-btn "Strike"))]
-      "py-1 px-2")))
+      "py-1 px-2"
+      {:name-suffix (when treaty? (ui/treaty-indicator))})))
 
 ;;;;
 ;;;; Actions
@@ -221,6 +227,11 @@
         attacker-id    (str player-id)
         ef             (combat/effective-forces game player)
         other-players  (utils/get-other-players db (:player/game player) player-id)
+        ;; Active treaties only — a mere proposal hasn't "arrived" yet (see diplomacy.clj)
+        ;; and doesn't block or mark anything here.
+        alliances      (diplomacy/alliances-for-player db (:player/game player) player-id)
+        treaty-ids     (set (map #(diplomacy/partner-id % player-id)
+                                 (diplomacy/active-treaties alliances player-id)))
         has-soldiers?  (pos? (:soldiers ef))
         has-fighters?  (pos? (:fighters ef))
         has-cmd?       (pos? (get player :player/cmd-ships 0))
@@ -249,7 +260,8 @@
           [:div
            (ui/section-label "Choose a Target")
            [:p.text-xs.mb-2.text-game-green-muted
-            "Invade: Target entire empire. Raid: Target outer planets. Strike: Missiles launched from command ships."]
+            "Invade: Target entire empire. Raid: Target outer planets. Strike: Missiles launched from command ships. "
+            "A “P” marker means you hold an active peace treaty with that empire — attacking them breaks it."]
            [:div.overflow-x-auto
             [:table.w-full.text-sm
              {:class "border border-game-border border-collapse"}
@@ -261,7 +273,8 @@
                [:th.px-3.py-1.text-center {:class th-cls :col-span 3} "Operations"]]]
              [:tbody
               (for [target other-players]
-                (target-row target ef (:player/cmd-ships player) attacker-id))]]]]))
+                (target-row target ef (:player/cmd-ships player) attacker-id
+                            (contains? treaty-ids (:xt/id target))))]]]]))
        (when disabled-hint
          [:input {:type "hidden" :name "action-disabled-hint" :value disabled-hint}])
        (ui/phase-warning-div "action-warning" disabled-hint {:color "text-game-green-soft"})

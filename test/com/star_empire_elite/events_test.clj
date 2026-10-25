@@ -192,6 +192,40 @@
       (is (= 3 (:total-lost payload))))))
 
 ;;;;
+;;;; Treaty events
+;;;;
+
+(def treaty
+  {:xt/id              (UUID/randomUUID)
+   :alliance/game      game-id
+   :alliance/kind      :peace
+   :alliance/proposer  attacker-id
+   :alliance/recipient defender-id
+   :alliance/status    :active
+   :alliance/formed-at (Date.)})
+
+(def treaty-names {attacker-id "Ironwall" defender-id "Crimson Hand"})
+
+(deftest test-event-of-treaty-formed-attributes-to-proposer
+  (let [evt (events/event-of-treaty treaty :treaty-formed treaty-names meta-ctx)]
+    (is (= :treaty-formed (:event/kind evt)))
+    (is (= :public         (:event/visibility evt)))
+    (is (= attacker-id      (:event/attacker evt)))
+    (is (= "Ironwall"       (:event/attacker-name evt)))
+    (is (= defender-id      (:event/defender evt)))
+    (is (= "Crimson Hand"   (:event/defender-name evt)))))
+
+(deftest test-event-of-treaty-dissolved-attributes-to-ended-by
+  (testing "whichever side dissolved the treaty is the attacker, regardless of who proposed it"
+    (let [dissolved (assoc treaty :alliance/status :dissolved :alliance/ended-by defender-id)
+          evt       (events/event-of-treaty dissolved :treaty-dissolved treaty-names meta-ctx)]
+      (is (= :treaty-dissolved (:event/kind evt)))
+      (is (= defender-id        (:event/attacker evt)))
+      (is (= "Crimson Hand"     (:event/attacker-name evt)))
+      (is (= attacker-id        (:event/defender evt)))
+      (is (= "Ironwall"         (:event/defender-name evt))))))
+
+;;;;
 ;;;; Elimination events
 ;;;;
 

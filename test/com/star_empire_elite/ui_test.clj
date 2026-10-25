@@ -483,3 +483,59 @@
                                 {:label "C" :value 3}])
                              3) 2)]
       (is (= 3 (count rows-seq))))))
+
+;;;;
+;;;; Incoming Alert Tests
+;;;; attack-info-line and incoming-alert-content surface the "Activity since the end of
+;;;; your last turn" banner. A treaty-broken attack gets a second DIPLOMACY line; an
+;;;; accepted or withdrawn proposal gets its own DIPLOMACY line even though neither ever
+;;;; touches :player/incoming-attacks.
+;;;;
+
+(def ^:private attack-info-line #'ui/attack-info-line)
+
+(deftest test-attack-info-line-plain-attack-has-no-treaty-line
+  (testing "an attack that didn't touch a treaty renders only the one attack line"
+    (let [lines (attack-info-line (pr-str {:mode :raid :attacker-name "Ironwall"
+                                            :attacker-wins? true}))]
+      (is (not (str/includes? (pr-str lines) "peace treaty"))))))
+
+(deftest test-attack-info-line-treaty-broken-adds-a-diplomacy-line
+  (testing "a :treaty-broken? attack renders a second line naming the attacker"
+    (let [lines (attack-info-line (pr-str {:mode :invade :attacker-name "Ironwall"
+                                            :attacker-wins? true :treaty-broken? true}))
+          text  (pr-str lines)]
+      (is (str/includes? text "Ironwall"))
+      (is (str/includes? text "broke a peace treaty with you")))))
+
+(deftest test-incoming-alert-content-nil-when-nothing-to-show
+  (testing "returns nil for a player with no incoming activity and no accepted proposals"
+    (is (nil? (ui/incoming-alert-content {})))))
+
+(deftest test-incoming-alert-content-shows-proposed-treaties
+  (testing "an incoming proposal shows up even though incoming-attacks is empty"
+    (let [content (ui/incoming-alert-content {:player/incoming-treaty-proposed ["Ironwall"]})]
+      (is (some? content))
+      (is (str/includes? (pr-str content) "Ironwall"))
+      (is (str/includes? (pr-str content) "proposed a peace treaty with you")))))
+
+(deftest test-incoming-alert-content-shows-accepted-treaties
+  (testing "an accepted proposal shows up even though incoming-attacks is empty"
+    (let [content (ui/incoming-alert-content {:player/incoming-treaty-accepted ["Crimson Hand"]})]
+      (is (some? content))
+      (is (str/includes? (pr-str content) "Crimson Hand"))
+      (is (str/includes? (pr-str content) "accepted your peace treaty proposal")))))
+
+(deftest test-incoming-alert-content-shows-withdrawn-treaties
+  (testing "a withdrawn proposal shows up even though incoming-attacks is empty"
+    (let [content (ui/incoming-alert-content {:player/incoming-treaty-withdrawn ["Ironwall"]})]
+      (is (some? content))
+      (is (str/includes? (pr-str content) "Ironwall"))
+      (is (str/includes? (pr-str content) "withdrew their peace treaty proposal")))))
+
+(deftest test-incoming-alert-content-shows-dissolved-treaties
+  (testing "a dissolved treaty shows up even though incoming-attacks is empty"
+    (let [content (ui/incoming-alert-content {:player/incoming-treaty-dissolved ["Crimson Hand"]})]
+      (is (some? content))
+      (is (str/includes? (pr-str content) "Crimson Hand"))
+      (is (str/includes? (pr-str content) "dissolved your peace treaty")))))

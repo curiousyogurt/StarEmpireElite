@@ -30,6 +30,7 @@
     4 (str "/app/game/" player-id "/action")
     5 (str "/app/game/" player-id "/espionage")
     6 (str "/app/game/" player-id "/outcomes")
+    7 (str "/app/game/" player-id "/diplomacy")
     (str "/app/game/" player-id)))
 
 ;;;;

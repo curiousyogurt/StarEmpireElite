@@ -121,7 +121,8 @@
                  ["building"        "Building"]
                  ["action"          "Action"]
                  ["espionage"       "Espionage"]
-                 ["outcomes"        "Outcomes"]]]
+                 ["outcomes"        "Outcomes"]
+                 ["diplomacy"       "Diplomacy"]]]
     [:div.mb-6
      (ui/section-label "CONTENTS")
      [:div.flex.flex-col.gap-0.5
@@ -171,7 +172,11 @@
       ["3"  "Building"  "Purchase new units, ships, stations, and planets"]
       ["4"  "Action"    "Raid, invade, or strike an enemy empire"]
       ["5"  "Espionage" "Assign agents to spy on, destabilise, bomb, or infiltrate a rival"]
-      ["6"  "Outcomes"  "Nothing — combat, population, stability, and fate resolve automatically"]])
+      ["6"  "Outcomes"  "Nothing — combat, population, stability, and fate resolve automatically"]
+      ["7*" "Diplomacy" "Propose, accept, decline, withdraw, or dissolve peace treaties"]])
+    (prose
+      "* Diplomacy only opens once per round, right after Outcomes on the round's final turn — "
+      "not after every turn.")
     (prose
       "The " [:span.italic "highlighted values"] " throughout this guide are specific to this galaxy: "
       "different galaxies may use different settings.")))
@@ -592,6 +597,39 @@
       (prose "Fate events are visible to all players in the News feed. "))))
 
 ;;;;
+;;;; Diplomacy
+;;;;
+
+(defn- diplomacy-section [game]
+  (section "diplomacy" "DIPLOMACY" "peace treaties, negotiated once per round"
+    (prose
+      "The diplomacy window opens once per round, right after you finish the Outcomes phase "
+      "of the round's final turn — not every turn. From there you can propose, accept, "
+      "decline, withdraw, or dissolve peace treaties before continuing on to the next "
+      "round's Income phase.")
+    (prose
+      "You have " (v (g game :game/alliance-slots const/alliance-slots))
+      " treaty slots. Active treaties and proposals you've sent both count against this "
+      "limit; a proposal someone else has sent you does not, unless and until you accept it.")
+    (prose
+      "A proposal is an envoy in transit: it doesn't “arrive” until the recipient "
+      "reaches their own diplomacy phase, so nothing that happens to either side in the "
+      "meantime affects it. The recipient can Accept or Decline it there; the sender can "
+      "Withdraw it any time before it's answered. Either side can Dissolve an active treaty "
+      "at any time from the diplomacy phase.")
+    (prose
+      "Every choice on this page — Accept, Decline, Withdraw, Dissolve, and a new Propose — "
+      "only highlights it. None of them take effect until you click End Current Round, and "
+      "you can change your mind or cancel any of them before then. You can queue a decision "
+      "on more than one relationship at once; only Propose is limited to one new offer per "
+      "round.")
+    (prose
+      "Attacking an active treaty partner (Invade, Raid, or Strike) is still allowed, but it "
+      "automatically breaks the treaty the moment the attack resolves — covert espionage "
+      "operations don't. A small boxed “P” next to an empire's name on the Action and "
+      "Espionage target tables tells you who you currently hold a treaty with.")))
+
+;;;;
 ;;;; Scoring
 ;;;;
 
@@ -649,6 +687,8 @@
      (population-section game)
      (stability-section game)
      (fate-section game)
+     (phase-banner "Phase 7 — Diplomacy")
+     (diplomacy-section game)
      (scoring-section game)]
     (ui/phase-action-bar
       (ui/action-bar-link (str "/app/game/" (:xt/id player)) "Back to Game"))))

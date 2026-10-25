@@ -413,12 +413,12 @@
 ;;;; History Retention
 ;;;;
 
-;;; :player/incoming-attacks and :player/incoming-espionage-fails are capped at write time
-;;; (see resolution/capped-conj), but a document written before that cap existed — or by an
-;;; older deployed version — can still be oversized on disk. Every read site that parses or
-;;; renders these histories calls take-recent first, so page-render cost stays bounded
-;;; regardless of how large the stored field currently is; the field itself shrinks back to
-;;; the cap the next time it's written to.
+;;; :player/incoming-attacks, :player/incoming-espionage-fails, and :player/incoming-treaty-
+;;; accepted are capped at write time (see capped-conj below), but a document written before
+;;; that cap existed — or by an older deployed version — can still be oversized on disk.
+;;; Every read site that parses or renders these histories calls take-recent first, so
+;;; page-render cost stays bounded regardless of how large the stored field currently is;
+;;; the field itself shrinks back to the cap the next time it's written to.
 (defn take-recent
   "Return at most const/incoming-history-cap of the most recent entries from a history
   vector (nil-safe), preserving append order (newest last).
@@ -430,6 +430,15 @@
     (if (> n const/incoming-history-cap)
       (subvec v (- n const/incoming-history-cap))
       v)))
+
+(defn capped-conj
+  "Append x to v, keeping only the most recent const/incoming-history-cap entries.
+  Bounds the growth of every :player/incoming-* history field on a player who goes many
+  turns without clearing it via apply-outcomes.
+
+  [v vector|nil, x any] -> vector"
+  [v x]
+  (take-recent (conj (or v []) x)))
 
 ;;;;
 ;;;; Other-Player Fetching

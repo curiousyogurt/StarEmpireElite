@@ -33,6 +33,7 @@
 (ns com.star-empire-elite.pages.app.espionage
   (:require [clojure.string :as str]
             [com.biffweb :as biff]
+            [com.star-empire-elite.diplomacy :as diplomacy]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]))
 
@@ -45,7 +46,10 @@
 ;;; Target rows populate the targets table, one row per other player in the game.
 ;;; Each row shows empire name, planet count, score, and four radio-button operation
 ;;; modes (Spy, Incite, Bomb, Defect). A local `op-btn` fn renders each radio input
-;;; with toggle-on-reclick behaviour and HTMX warning updates.
+;;; with toggle-on-reclick behaviour and HTMX warning updates. A treaty partner's row
+;;; carries a "P" marker (ui/treaty-indicator) right after their name — purely informational
+;;; here, since espionage never breaks a treaty (only an Action-phase attack does — see
+;;; resolution/resolve-combat).
 ;;;
 ;;; - target-row: one table row with four radio-button operation modes
 ;;;
@@ -56,9 +60,10 @@
   selection across the whole table can be made.
   Composite radio values 'op:player-id' are parsed in apply-espionage.
   attacker-id-str is the current player's id, used for the HTMX warning endpoint.
+  treaty? marks this target as a current peace-treaty partner; defaults to false.
 
-  [player player-map, attacker-id-str string, has-agents? boolean] -> hiccup"
-  [player attacker-id-str has-agents?]
+  [player player-map, attacker-id-str string, has-agents? boolean, & [treaty? bool]] -> hiccup"
+  [player attacker-id-str has-agents? & [treaty?]]
   (let [target-id-str (str (:xt/id player))
         radio-name    "espionage-action"
         warning-ep    (str "/app/game/" attacker-id-str "/espionage-warning")
@@ -75,7 +80,8 @@
        (op-btn "incite" "Incite")
        (op-btn "bomb" "Bomb")
        (op-btn "defect" "Defect")]
-      "py-1 px-3")))
+      "py-1 px-3"
+      {:name-suffix (when treaty? (ui/treaty-indicator))})))
 
 ;;;;
 ;;;; Actions
@@ -134,6 +140,10 @@
         attacker-id    (str player-id)
         has-agents?    (pos? (:player/agents player))
         other-players  (utils/get-other-players db (:player/game player) player-id)
+        ;; Informational only — espionage never breaks a treaty (see diplomacy.clj).
+        alliances      (diplomacy/alliances-for-player db (:player/game player) player-id)
+        treaty-ids     (set (map #(diplomacy/partner-id % player-id)
+                                 (diplomacy/active-treaties alliances player-id)))
         disabled-hint  (when (and (seq other-players) (not has-agents?))
                          "Espionage operations require at least one agent.")
         th-cls         "text-green-400 text-[11px] tracking-[0.08em] uppercase"]
@@ -161,7 +171,8 @@
                [:th.px-3.py-1 {:colspan 4 :class th-cls} "Operations"]]]
              [:tbody
               (for [target other-players]
-                (target-row target attacker-id has-agents?))]]]]))
+                (target-row target attacker-id has-agents?
+                            (contains? treaty-ids (:xt/id target))))]]]]))
        (when disabled-hint
          [:input {:type "hidden" :name "espionage-disabled-hint" :value disabled-hint}])
        (ui/phase-warning-div "espionage-warning" disabled-hint {:color "text-game-green-soft"})

@@ -33,6 +33,10 @@
    {:key :game/minutes-between-rounds :label "Minutes between rounds" :category :game
     :type :int :min 1 :max 10080 :step 1 :default const/minutes-between-rounds}
 
+   ;; Diplomacy
+   {:key :game/alliance-slots :label "Alliance slots" :category :diplomacy
+    :type :int :min 0 :max 20 :step 1 :default const/alliance-slots}
+
    ;; Combat Modes — raid/invade-reward-multiplier are NOT included here: constants.clj marks
    ;; them "superseded by combat-loss and capture-cap constants ... kept for reference," and no
    ;; code path reads them, so exposing them as editable would be a dead control that does
@@ -407,9 +411,9 @@
 ;;;; :game (length and turn structure), :starting (player seed values), and :scoring (point
 ;;;; weights) lead, since none is tied to a turn phase and all three are settings an admin is
 ;;;; likely to want up front. The rest map to the game's turn phases (see the app.clj module
-;;;; doc-comment: Income -> Expenses -> Exchange -> Building -> Action -> Espionage), plus
-;;;; Outcomes for the mechanics that resolve there (population growth, stability
-;;;; breakaway/recovery, fate). A field is filed under whichever phase's resolution logic
+;;;; doc-comment: Income -> Expenses -> Exchange -> Building -> Action -> Espionage ->
+;;;; Diplomacy), plus Outcomes for the mechanics that resolve there (population growth,
+;;;; stability breakaway/recovery, fate). A field is filed under whichever phase's resolution logic
 ;;;; actually reads it, not the phase where a player takes the related action — e.g.
 ;;;; combat-power lives under Action even though damage is applied at Outcomes, because Action
 ;;;; is where the player experiences it (choosing to raid/invade/strike).
@@ -427,6 +431,7 @@
    [:building   "Building"]
    [:action     "Action"]
    [:espionage  "Espionage"]
+   [:diplomacy  "Diplomacy"]
    [:outcomes   "Outcomes"]])
 
 (defn fields-in-category

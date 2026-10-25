@@ -17,11 +17,13 @@
 ;;;;;        │  └─ delta-pill  (per non-zero delta)
 ;;;;;        ├─ incoming section
 ;;;;;        │  ├─ incoming-card  (per incoming attack)
-;;;;;        │  │  └─ combat-card | strike-card
+;;;;;        │  │  ├─ combat-card | strike-card
+;;;;;        │  │  └─ treaty-broken-card  (if this attack broke an active treaty)
 ;;;;;        │  ├─ espionage-fail-card
 ;;;;;        │  ├─ incoming-espionage-card  (incite / defect)
-;;;;;        │  └─ bomb-card
-;;;;;        ├─ combat-card | strike-card  (outgoing battle)
+;;;;;        │  ├─ bomb-card
+;;;;;        │  └─ treaty-notice-card  (per proposed/accepted/withdrawn/dissolved treaty)
+;;;;;        ├─ combat-card | strike-card | treaty-broken-card  (outgoing battle)
 ;;;;;        ├─ spy-card | bomb-card  (outgoing espionage)
 ;;;;;        ├─ stability-card
 ;;;;;        ├─ elimination notice
@@ -29,7 +31,7 @@
 ;;;;;        ├─ ui/snapshot-section
 ;;;;;        └─ ui/phase-action-bar
 ;;;;;           ├─ ui/action-bar-link "Pause"
-;;;;;           └─ ui/submit-button "End the Current Round" | "Continue to Next Turn"
+;;;;;           └─ ui/submit-button "Continue to Diplomacy" | "Continue to Next Turn"
 ;;;;;
 ;;;;; 2)  apply-outcomes ← utils/calculate-score, turn/round advancement
 
@@ -584,6 +586,22 @@
             (ui/mode-badge polarity)
             [:span.text-sm.flex-1 summary]]])))))
 
+(defn- treaty-broken-card
+  "Render a one-line notice when this battle broke an active peace treaty between the two
+  empires. you-are-attacker? controls perspective: true for the outgoing battle card (you
+  attacked), false for an incoming one (they attacked you).
+
+  [opp-name str, you-are-attacker? bool] -> hiccup"
+  [opp-name you-are-attacker?]
+  [:div.rounded-game.bg-game-surface.overflow-hidden
+   {:class "border border-game-border"}
+   [:div.flex.items-center.py-2.px-3.gap-3
+    (ui/mode-badge :treaty-broken)
+    [:span.text-sm.text-game-green-soft
+     (if you-are-attacker?
+       (str "You broke your peace treaty with " opp-name ".")
+       (str opp-name " broke their peace treaty with you."))]]])
+
 (defn- growth-card [{:keys [pop-growth]}]
   [:div.rounded-game.bg-game-surface.overflow-hidden
    {:class "border border-game-border"}
@@ -656,29 +674,33 @@
              (str "Empire instability prompts revolution. Lost: " lost-str))]])])))
 
 (defn- incoming-card
-  "Render a single incoming attack card (combat or strike)."
+  "Render a single incoming attack card (combat or strike), plus a treaty-broken notice
+  when this attack broke an active peace treaty between the two empires."
   [r]
-  (let [result (edn/read-string r)]
-    (if (= (:mode result) :strike)
-      (strike-card {:opp-name          (:attacker-name result)
-                    :stations-mine?    true
-                    :dispatched        (:cmd-ships-dispatched result)
-                    :intercepted       (:cmd-ships-lost result)
-                    :defender-losses   (:defender-losses result)
-                    :open?             true})
-      (let [space-r (:space-result result)]
-        (combat-card {:mode                (get result :mode :invade)
-                      :opp-name            (:attacker-name result)
-                      :attacker-wins?      (:attacker-wins? result)
-                      :my-counts           (:defender-counts result)
-                      :my-losses           (:defender-losses result)
-                      :opp-losses          (:attacker-losses result)
-                      :stations-mine?      true
-                      :resources-taken     (:resources-captured result)
-                      :planets-transferred (:planets-transferred result)
-                      :space-att-wins?     (:att-wins? space-r)
-                      :space-buff          (:space-carryover result)
-                      :open?               true})))))
+  (let [result (edn/read-string r)
+        card   (if (= (:mode result) :strike)
+                 (strike-card {:opp-name          (:attacker-name result)
+                               :stations-mine?    true
+                               :dispatched        (:cmd-ships-dispatched result)
+                               :intercepted       (:cmd-ships-lost result)
+                               :defender-losses   (:defender-losses result)
+                               :open?             true})
+                 (let [space-r (:space-result result)]
+                   (combat-card {:mode                (get result :mode :invade)
+                                 :opp-name            (:attacker-name result)
+                                 :attacker-wins?      (:attacker-wins? result)
+                                 :my-counts           (:defender-counts result)
+                                 :my-losses           (:defender-losses result)
+                                 :opp-losses          (:attacker-losses result)
+                                 :stations-mine?      true
+                                 :resources-taken     (:resources-captured result)
+                                 :planets-transferred (:planets-transferred result)
+                                 :space-att-wins?     (:att-wins? space-r)
+                                 :space-buff          (:space-carryover result)
+                                 :open?               true})))]
+    (if (:treaty-broken? result)
+      [:<> card (treaty-broken-card (:attacker-name result) false)]
+      card)))
 
 (defn- incoming-espionage-card
   "Render a collapsible card for a successful incoming espionage operation (incite or defect).
@@ -692,6 +714,22 @@
      :open?   true}
     [:div.py-2.px-3.border-t.border-game-divider
      [:p.text-xs.text-yellow-400 body-text]]))
+
+(defn- treaty-notice-card
+  "Render a one-line DIPLOMACY notice card for a diplomacy move someone else made against
+  you since your last turn (proposed/accepted/withdrew/dissolved) — reuses the same wording
+  as the alert banner (ui/incoming-alert-content) so the message reads the same whether you
+  saw it there first or are seeing it for the first time here, right before apply-outcomes
+  clears the underlying :player/incoming-treaty-* field.
+
+  [empire-name str, text str] -> hiccup"
+  [empire-name text]
+  [:div.rounded-game.bg-game-surface.overflow-hidden
+   {:class "border border-game-border"}
+   [:div.flex.items-center.py-2.px-3.gap-3
+    (ui/mode-badge :treaty-formed)
+    [:span.text-sm.text-game-green-soft
+     [:span.text-green-300.font-bold empire-name] " " text]]])
 
 (defn- espionage-fail-card
   "Render a collapsible card for incoming espionage operations that failed."
@@ -725,7 +763,12 @@
   All stat changes were applied when the player loaded the outcomes page (GET);
   this POST only handles turn progression and cleanup.
 
-  [ctx ring-ctx] -> ring-response (303 redirect to income)"
+  Ending a round routes to the diplomacy phase (7) instead of straight to the next income
+  phase (1) — see pages/app/diplomacy.clj. The turn/round counters are already advanced to
+  their next values here; diplomacy only moves the phase counter the rest of the way to 1
+  once the player is done there.
+
+  [ctx ring-ctx] -> ring-response (303 redirect to diplomacy, if ending a round, else income)"
   [{:keys [path-params] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (if-let [redirect (utils/validate-phase player 6 player-id)]
@@ -759,7 +802,7 @@
                      :player/current-turn                    next-turn
                      :player/current-round                   next-round
                      :player/turns-used                      reset-used
-                     :player/current-phase                   1
+                     :player/current-phase                   (if end-round? 7 1)
                      :player/last-turn-at                    now
                      :player/rounds-started-today            new-starts
                      :player/last-battle-result              nil
@@ -777,12 +820,17 @@
                      :player/incoming-incite-stability-lost  nil
                      :player/incoming-bomb-result            nil
                      :player/incoming-defect-agents-lost    nil
+                     :player/incoming-treaty-proposed         nil
+                     :player/incoming-treaty-accepted        nil
+                     :player/incoming-treaty-withdrawn       nil
+                     :player/incoming-treaty-dissolved       nil
                      :player/pending-espionage-op            nil
                      :player/score                           (utils/calculate-score game player)}
                     (when end-round?
                       {:player/last-round-completed-at now}))])
           {:status 303
-           :headers {"location" (str "/app/game/" player-id "/income")}})))))
+           :headers {"location" (str "/app/game/" player-id
+                                      (if end-round? "/diplomacy" "/income"))}})))))
 
 ;;;;
 ;;;; Page
@@ -811,14 +859,19 @@
 
        (summary-strip (compute-summary outcomes))
 
-       ;; Incoming section — attacks and espionage received this turn
+       ;; Incoming section — attacks, espionage, and diplomacy received this turn
        (let [incoming           (seq (utils/take-recent (:player/incoming-attacks player)))
              esp-fails          (utils/take-recent (:player/incoming-espionage-fails player))
              esp-agents         (or (:player/incoming-espionage-agents-gained player) 0)
              incite-stab-lost   (or (:player/incoming-incite-stability-lost player) 0)
              bomb-result        (some-> (:player/incoming-bomb-result player) edn/read-string)
-             defect-agents-lost (or (:player/incoming-defect-agents-lost player) 0)]
-         (when (or incoming (seq esp-fails) (pos? incite-stab-lost) bomb-result (pos? defect-agents-lost))
+             defect-agents-lost (or (:player/incoming-defect-agents-lost player) 0)
+             treaties-proposed  (seq (utils/take-recent (:player/incoming-treaty-proposed  player)))
+             treaties-accepted  (seq (utils/take-recent (:player/incoming-treaty-accepted  player)))
+             treaties-withdrawn (seq (utils/take-recent (:player/incoming-treaty-withdrawn player)))
+             treaties-dissolved (seq (utils/take-recent (:player/incoming-treaty-dissolved player)))]
+         (when (or incoming (seq esp-fails) (pos? incite-stab-lost) bomb-result (pos? defect-agents-lost)
+                   treaties-proposed treaties-accepted treaties-withdrawn treaties-dissolved)
            [:div.flex.flex-col.gap-2
             (map incoming-card incoming)
             (when (seq esp-fails)
@@ -839,39 +892,50 @@
                           :transports        (:transports bomb-result)
                           :fighters          (:fighters   bomb-result)
                           :carriers          (:carriers   bomb-result)
-                          :open?             true}))]))
+                          :open?             true}))
+            (for [empire-name treaties-proposed]
+              (treaty-notice-card empire-name "proposed a peace treaty with you."))
+            (for [empire-name treaties-accepted]
+              (treaty-notice-card empire-name "accepted your peace treaty proposal."))
+            (for [empire-name treaties-withdrawn]
+              (treaty-notice-card empire-name "withdrew their peace treaty proposal."))
+            (for [empire-name treaties-dissolved]
+              (treaty-notice-card empire-name "dissolved your peace treaty."))]))
 
        ;; Outgoing battle result
        (when battle-result
          (let [mode     (get battle-result :mode :invade)
-               def-name (:defender-name battle-result)]
-           (if (= mode :strike)
-             (let [committed (:cmd-ships-committed battle-result 0)
-                   lost      (:cmd-ships-lost battle-result 0)]
-               (strike-card {:opp-name        def-name
-                             :stations-mine?  false
-                             :dispatched      (:cmd-ships-dispatched battle-result)
-                             :intercepted     lost
-                             :defender-losses (:defender-losses      battle-result)
-                             :open?           (and (pos? committed)
-                                                   (> (/ (double lost) committed) 0.05))}))
-             (let [space-r (:space-result battle-result)]
-               (combat-card {:mode                mode
-                             :opp-name            def-name
-                             :attacker-wins?      (:attacker-wins? battle-result)
-                             :my-counts           (:attacker-counts battle-result)
-                             :my-losses           (:attacker-losses battle-result)
-                             :opp-losses          (:defender-losses battle-result)
-                             :stations-mine?      false
-                             :resources-taken     (:resources-captured battle-result)
-                             :planets-transferred (:planets-transferred battle-result)
-                             :space-att-wins?     (:att-wins? space-r)
-                             :space-buff          (:space-carryover battle-result)
-                             :open?               (or (not (:attacker-wins? battle-result))
-                                                          (and space-r (not (:att-wins? space-r)))
-                                                          (non-trivial-losses?
-                                                            (:attacker-counts battle-result)
-                                                            (:attacker-losses battle-result)))})))))
+               def-name (:defender-name battle-result)
+               card     (if (= mode :strike)
+                          (let [committed (:cmd-ships-committed battle-result 0)
+                                lost      (:cmd-ships-lost battle-result 0)]
+                            (strike-card {:opp-name        def-name
+                                          :stations-mine?  false
+                                          :dispatched      (:cmd-ships-dispatched battle-result)
+                                          :intercepted     lost
+                                          :defender-losses (:defender-losses      battle-result)
+                                          :open?           (and (pos? committed)
+                                                                (> (/ (double lost) committed) 0.05))}))
+                          (let [space-r (:space-result battle-result)]
+                            (combat-card {:mode                mode
+                                          :opp-name            def-name
+                                          :attacker-wins?      (:attacker-wins? battle-result)
+                                          :my-counts           (:attacker-counts battle-result)
+                                          :my-losses           (:attacker-losses battle-result)
+                                          :opp-losses          (:defender-losses battle-result)
+                                          :stations-mine?      false
+                                          :resources-taken     (:resources-captured battle-result)
+                                          :planets-transferred (:planets-transferred battle-result)
+                                          :space-att-wins?     (:att-wins? space-r)
+                                          :space-buff          (:space-carryover battle-result)
+                                          :open?               (or (not (:attacker-wins? battle-result))
+                                                                       (and space-r (not (:att-wins? space-r)))
+                                                                       (non-trivial-losses?
+                                                                         (:attacker-counts battle-result)
+                                                                         (:attacker-losses battle-result)))})))]
+           (if (:treaty-broken? battle-result)
+             [:<> card (treaty-broken-card def-name true)]
+             card)))
 
        ;; Outgoing espionage result
        (when espionage-result
@@ -922,5 +986,5 @@
         (biff/form
           {:action (str "/app/game/" player-id "/apply-outcomes") :method "post"
            :class  "m-0"}
-          (ui/submit-button true (if end-round? "End the Current Round" "Continue to Next Turn")))))))
+          (ui/submit-button true (if end-round? "Continue to Diplomacy" "Continue to Next Turn")))))))
 

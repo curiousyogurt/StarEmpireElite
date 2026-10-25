@@ -9,7 +9,7 @@
 ;;;;; biff/submit-tx call.
 ;;;;;
 ;;;;; Public API: event-of-battle-result, event-of-espionage-result, event-of-breakaway,
-;;;;;             event-of-elimination, record-events!
+;;;;;             event-of-elimination, event-of-treaty, record-events!
 ;;;;;
 
 (ns com.star-empire-elite.events
@@ -122,6 +122,30 @@
           :event/defender      player-id
           :event/defender-name empire-name
           :event/payload       (pr-str result)}))
+
+(defn event-of-treaty
+  "Construct a :public event for a treaty lifecycle moment (formed or dissolved).
+
+  kind is :treaty-formed or :treaty-dissolved. :event/attacker is whichever player caused
+  the moment — the proposer for :treaty-formed, :alliance/ended-by for :treaty-dissolved —
+  and :event/defender is their treaty partner; names is a {player-id empire-name} map
+  covering both sides, used to look up the two display names.
+
+  [alliance alliance-map, kind keyword, names {player-id empire-name},
+   meta {:keys [game-id turn round at]}] -> event-map"
+  [alliance kind names meta]
+  (let [actor-id   (if (= kind :treaty-formed)
+                      (:alliance/proposer alliance)
+                      (:alliance/ended-by alliance))
+        partner-id (if (= actor-id (:alliance/proposer alliance))
+                      (:alliance/recipient alliance)
+                      (:alliance/proposer alliance))]
+    (merge (base-event meta kind :public)
+           {:event/attacker      actor-id
+            :event/attacker-name (get names actor-id)
+            :event/defender      partner-id
+            :event/defender-name (get names partner-id)
+            :event/payload       (pr-str alliance)})))
 
 (defn event-of-elimination
   "Construct a :public event when a player is eliminated (zero planets).

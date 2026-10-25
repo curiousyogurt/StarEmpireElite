@@ -49,8 +49,18 @@
    :player/last-espionage-result     "some-result"
    :player/last-population-growth    3
    :player/pending-espionage         test-game-id ; non-nil to verify it is cleared
-   :player/incoming-attacks          ["attack-1"]
-   :player/incoming-espionage-fails  ["spy" "incite"]})
+   ;; A real pr-str'd result, not a bare string — outcomes-page actually renders this via
+   ;; incoming-card/combat-card, and a placeholder string crashes once something forces
+   ;; the (otherwise-lazy) hiccup tree, e.g. str on the whole page.
+   :player/incoming-attacks          [(pr-str {:mode :raid :attacker-name "Aggressor"
+                                                :attacker-wins? true :defender-counts {}
+                                                :attacker-losses {} :defender-losses {}
+                                                :planets-transferred {:mil 0 :erg 0 :ore 0}})]
+   :player/incoming-espionage-fails  ["spy" "incite"]
+   :player/incoming-treaty-proposed  ["Proposer Empire"]
+   :player/incoming-treaty-accepted  ["Acceptor Empire"]
+   :player/incoming-treaty-withdrawn ["Withdrawer Empire"]
+   :player/incoming-treaty-dissolved ["Dissolver Empire"]})
 
 ;;;;
 ;;;; calculate-score Tests
@@ -132,20 +142,26 @@
           (is (nil? (:player/last-round-completed-at tx))))))))
 
 (deftest test-apply-outcomes-end-of-round
-  (testing "End-of-round: resets turn to 1, increments round, records completion time, resets turns-used"
+  (testing "End-of-round: resets turn to 1, increments round, records completion time, resets
+            turns-used, and routes to the diplomacy phase (7) instead of straight to income"
     ;; turns-per-round is 3; player at turns-used 2, so this is the last turn.
     (let [end-round-player (assoc test-player :player/current-turn 3 :player/turns-used 2)
           tx-atom (atom nil)]
       (with-redefs [xt/entity      (helpers/fake-entity [end-round-player test-game])
                     biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
-        (outcomes/apply-outcomes {:path-params {:player-id (str test-player-id)}
-                                  :biff/db nil})
-        (let [tx (first @tx-atom)]
+        (let [result (outcomes/apply-outcomes {:path-params {:player-id (str test-player-id)}
+                                               :biff/db nil})
+              tx     (first @tx-atom)]
+          ;; Redirect to diplomacy, not income
+          (is (= 303 (:status result)))
+          (is (= (str "/app/game/" test-player-id "/diplomacy") (get-in result [:headers "location"])))
           ;; Turn wraps back to 1, round increments
           (is (= 1 (:player/current-turn  tx)))
           (is (= 2 (:player/current-round tx)))
           ;; Turns used resets to 0 at round end
           (is (= 0 (:player/turns-used tx)))
+          ;; Phase advances to diplomacy (7), not straight back to income (1)
+          (is (= 7 (:player/current-phase tx)))
           ;; Completion timestamp is set (non-nil)
           (is (some? (:player/last-round-completed-at tx))))))))
 
@@ -163,7 +179,11 @@
           (is (nil? (:player/last-population-growth   tx)))
           (is (nil? (:player/pending-espionage        tx)))
           (is (nil? (:player/incoming-attacks         tx)))
-          (is (nil? (:player/incoming-espionage-fails tx))))))))
+          (is (nil? (:player/incoming-espionage-fails tx)))
+          (is (nil? (:player/incoming-treaty-proposed  tx)))
+          (is (nil? (:player/incoming-treaty-accepted  tx)))
+          (is (nil? (:player/incoming-treaty-withdrawn tx)))
+          (is (nil? (:player/incoming-treaty-dissolved tx))))))))
 
 (deftest test-apply-outcomes-records-score
   (testing "Writes a computed score to the transaction"
@@ -249,6 +269,22 @@
                                      :player/incoming-espionage-fails ["spy"])]
       (is (vector? (outcomes/outcomes-page {:player player-with-attacks :game test-game
                                             :battle-result nil :espionage-result nil}))))))
+
+(deftest test-outcomes-page-with-diplomacy-notices
+  (testing "Shows a notice card for each diplomacy move made against this player since
+            their last turn, before apply-outcomes clears the underlying fields"
+    (let [page (outcomes/outcomes-page {:player test-player :game test-game
+                                        :battle-result nil :espionage-result nil})
+          html (str page)]
+      (is (vector? page))
+      (is (clojure.string/includes? html "Proposer Empire"))
+      (is (clojure.string/includes? html "proposed a peace treaty with you"))
+      (is (clojure.string/includes? html "Acceptor Empire"))
+      (is (clojure.string/includes? html "accepted your peace treaty proposal"))
+      (is (clojure.string/includes? html "Withdrawer Empire"))
+      (is (clojure.string/includes? html "withdrew their peace treaty proposal"))
+      (is (clojure.string/includes? html "Dissolver Empire"))
+      (is (clojure.string/includes? html "dissolved your peace treaty")))))
 
 (deftest test-outcomes-page-with-pop-growth
   (testing "Renders population growth message when pop-growth is positive"
