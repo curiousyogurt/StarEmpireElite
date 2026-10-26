@@ -1,6 +1,7 @@
 (ns com.star-empire-elite.ui-test
   (:require [clojure.string :as str]
             [clojure.test :refer :all]
+            [com.star-empire-elite.alerts :as alerts]
             [com.star-empire-elite.ui :as ui]))
 
 ;; Private sub-function access via var reference
@@ -256,35 +257,76 @@
       (is (some #(= "-" %) (rest result))))))
 
 ;;;;
-;;;; incoming-alert-content Tests
+;;;; alert-chip Tests
 ;;;;
 
-(deftest test-incoming-alert-content-no-alerts
-  (testing "Returns nil when there are no attacks and zero espionage failures"
-    (is (nil? (ui/incoming-alert-content {:player/incoming-attacks        nil
-                                          :player/incoming-espionage-fails nil})))
-    (is (nil? (ui/incoming-alert-content {})))))
+(def ^:private empty-player {})
+(def ^:private unread-player {:player/incoming-attacks [(pr-str {:mode :strike :attacker-name "X"})]
+                               :player/incoming-seq 1})
+(def ^:private read-player (assoc unread-player :player/incoming-seen-seq 1))
 
-(deftest test-incoming-alert-content-with-attacks
-  (testing "Returns hiccup when the player has incoming attacks"
-    (let [result (ui/incoming-alert-content {:player/incoming-attacks        [:some-attack]
-                                             :player/incoming-espionage-fails nil})]
-      (is (some? result))
-      (is (vector? result)))))
+(deftest test-alert-chip-empty-state-invisible-placeholder
+  (testing "No messages ever: no visible text, but still disabled and invisible (not gone —
+            reserves its footprint so the stepper above it doesn't shift on first arrival)"
+    (let [result (str (ui/alert-chip empty-player false))]
+      (is (not (str/includes? result "no activity")))
+      (is (str/includes? result "invisible"))
+      (is (str/includes? result "disabled")))))
 
-(deftest test-incoming-alert-content-with-esp-fails
-  (testing "Returns hiccup when espionage failures are recorded"
-    (let [result (ui/incoming-alert-content {:player/incoming-attacks        nil
-                                             :player/incoming-espionage-fails ["spy" "incite"]})]
-      (is (some? result))
-      (is (vector? result)))))
+(deftest test-alert-chip-unread-state-same-label-as-read
+  (testing "Unread shows the same summary text as :read — no 'N new' wording, just color"
+    (let [unread-result (str (ui/alert-chip unread-player false))
+          read-result   (str (ui/alert-chip read-player false))]
+      (is (not (str/includes? unread-result "new")))
+      ;; Both render the same summary string, e.g. "1 attack".
+      (is (= (alerts/summary (alerts/incoming-messages unread-player))
+             (alerts/summary (alerts/incoming-messages read-player)))))))
 
-(deftest test-incoming-alert-content-both-alerts
-  (testing "Returns hiccup when both attacks and espionage failures are present"
-    (let [result (ui/incoming-alert-content {:player/incoming-attacks        [:attack]
-                                             :player/incoming-espionage-fails ["spy"]})]
-      (is (some? result))
-      (is (vector? result)))))
+(deftest test-alert-chip-unread-state-is-yellow-not-red
+  (testing "Unread renders the app's warning yellow, not red"
+    (let [result (str (ui/alert-chip unread-player false))]
+      (is (str/includes? result "#facc15"))
+      (is (not (str/includes? result "#f87171"))))))
+
+(deftest test-alert-chip-read-state-no-new-label
+  (testing "All seen, closed: label omits 'new'"
+    (let [result (str (ui/alert-chip read-player false))]
+      (is (not (str/includes? result "new ·"))))))
+
+(deftest test-alert-chip-open-state-ignores-unread
+  (testing "Open overrides unread — renders green/open even with unseen messages"
+    (let [result (str (ui/alert-chip unread-player true))]
+      (is (str/includes? result "#4ade80")))))
+
+;;;;
+;;;; alert-panel Tests
+;;;;
+
+(deftest test-alert-panel-closed-is-a-placeholder
+  (testing "Closed renders only the empty #alert-panel div, no row/footer content"
+    (let [result (ui/alert-panel unread-player false false)]
+      (is (= [:div#alert-panel] result)))))
+
+(deftest test-alert-panel-open-renders-rows
+  (testing "Open renders the sender and body text for each grouped row"
+    (let [result (str (ui/alert-panel unread-player true false))]
+      (is (str/includes? result "X"))
+      (is (str/includes? result "launched a strike against you")))))
+
+(deftest test-alert-panel-open-empty-player-no-rows
+  (testing "Open with zero messages renders the footer but no rows"
+    (let [result (str (ui/alert-panel empty-player true false))]
+      (is (str/includes? result "Details at end of turn (action/espionage) or round (diplomacy).")))))
+
+(deftest test-alert-panel-animate-adds-class
+  (testing "animate? true includes the entrance-animation class"
+    (let [result (str (ui/alert-panel unread-player true true))]
+      (is (str/includes? result "animate-fold-in")))))
+
+(deftest test-alert-panel-oob-adds-swap-attr
+  (testing "oob? true adds hx-swap-oob to the panel, closed or open"
+    (is (str/includes? (str (ui/alert-panel unread-player false false true)) "hx-swap-oob"))
+    (is (str/includes? (str (ui/alert-panel unread-player true false true)) "hx-swap-oob"))))
 
 ;;;;
 ;;;; deduction-table-header Tests
@@ -484,58 +526,6 @@
                              3) 2)]
       (is (= 3 (count rows-seq))))))
 
-;;;;
-;;;; Incoming Alert Tests
-;;;; attack-info-line and incoming-alert-content surface the "Activity since the end of
-;;;; your last turn" banner. A treaty-broken attack gets a second DIPLOMACY line; an
-;;;; accepted or withdrawn proposal gets its own DIPLOMACY line even though neither ever
-;;;; touches :player/incoming-attacks.
-;;;;
-
-(def ^:private attack-info-line #'ui/attack-info-line)
-
-(deftest test-attack-info-line-plain-attack-has-no-treaty-line
-  (testing "an attack that didn't touch a treaty renders only the one attack line"
-    (let [lines (attack-info-line (pr-str {:mode :raid :attacker-name "Ironwall"
-                                            :attacker-wins? true}))]
-      (is (not (str/includes? (pr-str lines) "peace treaty"))))))
-
-(deftest test-attack-info-line-treaty-broken-adds-a-diplomacy-line
-  (testing "a :treaty-broken? attack renders a second line naming the attacker"
-    (let [lines (attack-info-line (pr-str {:mode :invade :attacker-name "Ironwall"
-                                            :attacker-wins? true :treaty-broken? true}))
-          text  (pr-str lines)]
-      (is (str/includes? text "Ironwall"))
-      (is (str/includes? text "broke a peace treaty with you")))))
-
-(deftest test-incoming-alert-content-nil-when-nothing-to-show
-  (testing "returns nil for a player with no incoming activity and no accepted proposals"
-    (is (nil? (ui/incoming-alert-content {})))))
-
-(deftest test-incoming-alert-content-shows-proposed-treaties
-  (testing "an incoming proposal shows up even though incoming-attacks is empty"
-    (let [content (ui/incoming-alert-content {:player/incoming-treaty-proposed ["Ironwall"]})]
-      (is (some? content))
-      (is (str/includes? (pr-str content) "Ironwall"))
-      (is (str/includes? (pr-str content) "proposed a peace treaty with you")))))
-
-(deftest test-incoming-alert-content-shows-accepted-treaties
-  (testing "an accepted proposal shows up even though incoming-attacks is empty"
-    (let [content (ui/incoming-alert-content {:player/incoming-treaty-accepted ["Crimson Hand"]})]
-      (is (some? content))
-      (is (str/includes? (pr-str content) "Crimson Hand"))
-      (is (str/includes? (pr-str content) "accepted your peace treaty proposal")))))
-
-(deftest test-incoming-alert-content-shows-withdrawn-treaties
-  (testing "a withdrawn proposal shows up even though incoming-attacks is empty"
-    (let [content (ui/incoming-alert-content {:player/incoming-treaty-withdrawn ["Ironwall"]})]
-      (is (some? content))
-      (is (str/includes? (pr-str content) "Ironwall"))
-      (is (str/includes? (pr-str content) "withdrew their peace treaty proposal")))))
-
-(deftest test-incoming-alert-content-shows-dissolved-treaties
-  (testing "a dissolved treaty shows up even though incoming-attacks is empty"
-    (let [content (ui/incoming-alert-content {:player/incoming-treaty-dissolved ["Crimson Hand"]})]
-      (is (some? content))
-      (is (str/includes? (pr-str content) "Crimson Hand"))
-      (is (str/includes? (pr-str content) "dissolved your peace treaty")))))
+;;;; Attack/treaty message wording is now covered by alerts-test (incoming-messages), since
+;;;; that formatting moved to the pure com.star-empire-elite.alerts namespace — see
+;;;; test-incoming-messages-* and test-incoming-messages-treaty-* there.

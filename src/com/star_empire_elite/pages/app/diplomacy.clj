@@ -296,25 +296,48 @@
                           (merge {:db/doc-type :alliance} alliance))
             ;; Tells the other side's alert banner about anything that changed even if they
             ;; never revisit this page themselves — same reasoning throughout this file.
-            notify-tx (for [{:keys [op alliance]} resolved
-                            :let [[field other-id]
-                                  (case op
-                                    :propose  [:player/incoming-treaty-proposed  (:alliance/recipient alliance)]
-                                    :accept   [:player/incoming-treaty-accepted  (:alliance/proposer alliance)]
-                                    :withdraw [:player/incoming-treaty-withdrawn (:alliance/recipient alliance)]
-                                    :dissolve [:player/incoming-treaty-dissolved (diplomacy/partner-id alliance player-id)]
-                                    :decline  [nil nil])]
-                            :when field
+            notifications (for [{:keys [op alliance]} resolved
+                                :let [[field other-id]
+                                      (case op
+                                        :propose  [:player/incoming-treaty-proposed  (:alliance/recipient alliance)]
+                                        :accept   [:player/incoming-treaty-accepted  (:alliance/proposer alliance)]
+                                        :withdraw [:player/incoming-treaty-withdrawn (:alliance/recipient alliance)]
+                                        :dissolve [:player/incoming-treaty-dissolved (diplomacy/partner-id alliance player-id)]
+                                        :decline  [nil nil])]
+                                :when field]
+                            {:field field :other-id other-id})
+            ;; Two decisions in one submission (e.g. dissolving an active treaty with X while
+            ;; also accepting a separate pending proposal from X) can both notify the same
+            ;; opponent — group by recipient so each gets exactly one :db/op :update per
+            ;; submit-tx. biff's :db/op :update builds one match+put pair per map; two separate
+            ;; maps updating the same entity in one tx would have the second map's match
+            ;; checked against a stale pre-tx snapshot the first map's put already changed — a
+            ;; deterministic failure, not a race, that retries can't fix.
+            notify-tx (for [[other-id entries] (group-by :other-id notifications)
                             :let [other (xt/entity db other-id)]]
-                        {:db/doc-type :player :db/op :update :xt/id other-id
-                         field (utils/capped-conj (get other field) (:player/empire-name player))})
+                        (merge
+                          {:db/doc-type :player :db/op :update :xt/id other-id
+                           :player/incoming-seq (utils/next-incoming-seq other (count entries))}
+                          (into {}
+                                (map (fn [[field field-entries]]
+                                       [field (reduce (fn [v _] (utils/capped-conj v (:player/empire-name player)))
+                                                       (get other field) field-entries)]))
+                                (group-by :field entries))))
             tx-events (for [{:keys [op alliance]} resolved
                             :when (#{:accept :dissolve} op)]
                         (events/event-of-treaty alliance
                           (if (= op :accept) :treaty-formed :treaty-dissolved)
                           names (event-meta player game now)))]
         (biff/submit-tx ctx
-          (into [{:db/doc-type :player :db/op :update :xt/id player-id :player/current-phase 1}]
+          (into [{:db/doc-type :player :db/op :update :xt/id player-id :player/current-phase 1
+                  ;; Diplomacy notifications are cleared here, not at apply-outcomes — see the
+                  ;; comment there. By now the player has seen and acted on every incoming
+                  ;; proposal/accept/withdraw/dissolve (they're the same relationships just
+                  ;; resolved above), so it's safe to clear them.
+                  :player/incoming-treaty-proposed  nil
+                  :player/incoming-treaty-accepted  nil
+                  :player/incoming-treaty-withdrawn nil
+                  :player/incoming-treaty-dissolved nil}]
                 (concat alliance-tx notify-tx)))
         (events/record-events! ctx tx-events)
         {:status 303 :headers {"location" (str "/app/game/" player-id "/income")}}))))

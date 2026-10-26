@@ -717,10 +717,12 @@
 
 (defn- treaty-notice-card
   "Render a one-line DIPLOMACY notice card for a diplomacy move someone else made against
-  you since your last turn (proposed/accepted/withdrew/dissolved) — reuses the same wording
-  as the alert banner (ui/incoming-alert-content) so the message reads the same whether you
-  saw it there first or are seeing it for the first time here, right before apply-outcomes
-  clears the underlying :player/incoming-treaty-* field.
+  you (proposed/accepted/withdrew/dissolved) — reuses the same wording as the status-line
+  alert chip's fold-out panel (com.star-empire-elite.alerts) so the message reads the same
+  wherever you see it. Unlike the other incoming-* fields shown on this page, the underlying
+  :player/incoming-treaty-* field is NOT cleared when this turn's outcomes are applied — it
+  stays live until the Diplomacy phase is actually submitted (apply-diplomacy), so this card
+  can keep showing on every outcomes page in between.
 
   [empire-name str, text str] -> hiccup"
   [empire-name text]
@@ -820,10 +822,15 @@
                      :player/incoming-incite-stability-lost  nil
                      :player/incoming-bomb-result            nil
                      :player/incoming-defect-agents-lost    nil
-                     :player/incoming-treaty-proposed         nil
-                     :player/incoming-treaty-accepted        nil
-                     :player/incoming-treaty-withdrawn       nil
-                     :player/incoming-treaty-dissolved       nil
+                     ;; incoming-treaty-* is deliberately NOT cleared here — those
+                     ;; notifications (someone proposed/accepted/withdrew/dissolved a treaty
+                     ;; with you) stay live through to the Diplomacy phase, where they're
+                     ;; actually actionable, and get cleared there instead (apply-diplomacy).
+                     ;; Clearing them here would wipe the diplomacy alert before the player
+                     ;; even reaches the Diplomacy phase that only opens once per round.
+                     :player/incoming-seq                    nil
+                     :player/incoming-seen-seq               nil
+                     :player/incoming-seen-groups             nil
                      :player/pending-espionage-op            nil
                      :player/score                           (utils/calculate-score game player)}
                     (when end-round?

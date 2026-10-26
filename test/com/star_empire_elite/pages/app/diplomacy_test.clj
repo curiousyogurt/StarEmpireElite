@@ -41,8 +41,8 @@
                         ;; mg/generate fills every optional field with random garbage. The
                         ;; treaty-* fields are read-and-capped-onto by apply-diplomacy's
                         ;; decision-resolution; incoming-attacks and incoming-bomb-result are
-                        ;; edn/read-string'd by diplomacy-page's alert banner
-                        ;; (ui/incoming-alert-content) once something forces the
+                        ;; edn/read-string'd by diplomacy-page's status-line alert chip
+                        ;; (phase-shell -> alerts/incoming-messages) once something forces the
                         ;; (otherwise-lazy) hiccup tree, e.g. pr-str in a test. A random
                         ;; garbage string in either crashes that read, so all are started
                         ;; clean unless a test explicitly seeds one via overrides.
@@ -96,6 +96,24 @@
       (is (= 303 (:status result)))
       (is (= (str "/app/game/" (:xt/id player) "/income") (get-in result [:headers "location"])))
       (is (= 1 (:player/current-phase reloaded))))))
+
+(deftest test-apply-diplomacy-clears-treaty-notifications
+  (testing "Diplomacy notifications left over from this round clear here, not at
+            apply-outcomes — see apply-outcomes' comment on why they persist that long"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {})
+            player    (make-player! setup-ctx (:xt/id game)
+                        {:player/incoming-treaty-proposed  ["A"]
+                         :player/incoming-treaty-accepted  ["B"]
+                         :player/incoming-treaty-withdrawn ["C"]
+                         :player/incoming-treaty-dissolved ["D"]})
+            _         (page/apply-diplomacy (ctx-for node (:xt/id player)))
+            reloaded  (xt/entity (xt/db node) (:xt/id player))]
+        (is (nil? (:player/incoming-treaty-proposed  reloaded)))
+        (is (nil? (:player/incoming-treaty-accepted  reloaded)))
+        (is (nil? (:player/incoming-treaty-withdrawn reloaded)))
+        (is (nil? (:player/incoming-treaty-dissolved reloaded)))))))
 
 ;;;;
 ;;;; apply-diplomacy — Propose a Treaty (deferred, resolved via diplomacy/resolve-decisions —

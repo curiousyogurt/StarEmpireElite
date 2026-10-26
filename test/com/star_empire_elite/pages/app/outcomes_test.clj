@@ -57,6 +57,7 @@
                                                 :attacker-losses {} :defender-losses {}
                                                 :planets-transferred {:mil 0 :erg 0 :ore 0}})]
    :player/incoming-espionage-fails  ["spy" "incite"]
+   ;; NOT cleared by apply-outcomes — these persist until apply-diplomacy (see its comment).
    :player/incoming-treaty-proposed  ["Proposer Empire"]
    :player/incoming-treaty-accepted  ["Acceptor Empire"]
    :player/incoming-treaty-withdrawn ["Withdrawer Empire"]
@@ -179,11 +180,21 @@
           (is (nil? (:player/last-population-growth   tx)))
           (is (nil? (:player/pending-espionage        tx)))
           (is (nil? (:player/incoming-attacks         tx)))
-          (is (nil? (:player/incoming-espionage-fails tx)))
-          (is (nil? (:player/incoming-treaty-proposed  tx)))
-          (is (nil? (:player/incoming-treaty-accepted  tx)))
-          (is (nil? (:player/incoming-treaty-withdrawn tx)))
-          (is (nil? (:player/incoming-treaty-dissolved tx))))))))
+          (is (nil? (:player/incoming-espionage-fails tx))))))))
+
+(deftest test-apply-outcomes-does-not-clear-treaty-notifications
+  (testing "Diplomacy notifications are left alone — they clear at apply-diplomacy instead,
+            not every turn's apply-outcomes, so they survive until the Diplomacy phase"
+    (let [tx-atom (atom nil)]
+      (with-redefs [xt/entity      (helpers/fake-entity [test-player test-game])
+                    biff/submit-tx (fn [_ tx] (reset! tx-atom tx) :ok)]
+        (outcomes/apply-outcomes {:path-params {:player-id (str test-player-id)}
+                                  :biff/db nil})
+        (let [tx (first @tx-atom)]
+          (is (not (contains? tx :player/incoming-treaty-proposed)))
+          (is (not (contains? tx :player/incoming-treaty-accepted)))
+          (is (not (contains? tx :player/incoming-treaty-withdrawn)))
+          (is (not (contains? tx :player/incoming-treaty-dissolved))))))))
 
 (deftest test-apply-outcomes-records-score
   (testing "Writes a computed score to the transaction"
@@ -271,8 +282,8 @@
                                             :battle-result nil :espionage-result nil}))))))
 
 (deftest test-outcomes-page-with-diplomacy-notices
-  (testing "Shows a notice card for each diplomacy move made against this player since
-            their last turn, before apply-outcomes clears the underlying fields"
+  (testing "Shows a notice card for each diplomacy move made against this player — these
+            fields persist across outcomes submissions and only clear at apply-diplomacy"
     (let [page (outcomes/outcomes-page {:player test-player :game test-game
                                         :battle-result nil :espionage-result nil})
           html (str page)]

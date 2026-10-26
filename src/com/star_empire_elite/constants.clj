@@ -36,6 +36,15 @@
 (def incoming-history-cap 20)
 
 ;;;;
+;;;; Alert Chip
+;;;; The status-line alert chip's fold-out panel (com.star-empire-elite.alerts) groups and
+;;;; dedupes incoming messages, then shows at most this many rows; the rest are counted in the
+;;;; panel footer as hidden, with full detail still available on the Outcomes phase page.
+;;;;
+
+(def alert-max-rows 8)
+
+;;;;
 ;;;; Turn Structure
 ;;;;
 

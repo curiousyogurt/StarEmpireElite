@@ -440,6 +440,18 @@
   [v x]
   (take-recent (conj (or v []) x)))
 
+;;; The status-line alert chip (com.star-empire-elite.alerts) needs to know how many incoming
+;;; messages have arrived, but the incoming-* vectors above are capped — once a vector is full,
+;;; a new arrival drops the oldest entry and leaves the count unchanged. A separate monotonic
+;;; counter stays accurate regardless of the cap.
+(defn next-incoming-seq
+  "Return the next :player/incoming-seq value for target, after n new incoming messages are
+  recorded for it in this resolve.
+
+  [target player-map, n int] -> int"
+  [target n]
+  (+ (or (:player/incoming-seq target) 0) n))
+
 ;;;;
 ;;;; Other-Player Fetching
 ;;;;

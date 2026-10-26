@@ -212,7 +212,11 @@
                                            :player/stations   def-stations
                                            :player/agents     def-agents))
                     :player/incoming-attacks
-                    (utils/capped-conj (:player/incoming-attacks defender) (pr-str result))}]
+                    (utils/capped-conj (:player/incoming-attacks defender) (pr-str result))
+                    ;; One new ACTION alert row, plus a DIPLOMACY row when this strike also
+                    ;; broke an active peace treaty — see utils/next-incoming-seq.
+                    :player/incoming-seq
+                    (utils/next-incoming-seq defender (if broken-alliance 2 1))}]
                   broken-alliance (conj (assoc broken-alliance :db/doc-type :alliance))))
               [result (assoc player :player/cmd-ships att-cmd-ships) broken-alliance])
             ;; --- Invade / Raid branch ---
@@ -320,7 +324,11 @@
                                            :player/food         def-food
                                            :player/fuel         def-fuel))
                   :player/incoming-attacks
-                  (utils/capped-conj (:player/incoming-attacks defender) (pr-str capped))}]
+                  (utils/capped-conj (:player/incoming-attacks defender) (pr-str capped))
+                  ;; See the strike branch above for why this counts separately from the
+                  ;; capped incoming-attacks vector.
+                  :player/incoming-seq
+                  (utils/next-incoming-seq defender (if broken-alliance 2 1))}]
                   broken-alliance (conj (assoc broken-alliance :db/doc-type :alliance))))
               [capped
                (merge player
@@ -366,6 +374,15 @@
                 agents-lost    (or (:agents-lost result) 0)
                 agents-captured (or (:agents-captured result) 0)
                 stab-dmg       (or (:stability-damage result) 0)]
+            ;; combat/resolve-* only ever sets :agents-lost when the attacker loses (see
+            ;; combat.clj), so the fail branch below and the incite/bomb/defect branches (each
+            ;; gated on att-wins?) can never both fire for the same resolve — exactly one
+            ;; conditional map below ever targets :xt/id target. That matters for
+            ;; :player/incoming-seq: biff's :db/op :update builds one match+put pair per map,
+            ;; so two separate maps updating the same entity in one submit-tx would have the
+            ;; second map's match checked against a stale pre-tx snapshot that the first map's
+            ;; put has already changed — a deterministic failure, not a race, and retries won't
+            ;; fix it. Bumping the counter inside whichever single map fires avoids that.
             (biff/submit-tx
               ctx
               (remove nil?
@@ -379,12 +396,16 @@
                           (utils/capped-conj (:player/incoming-espionage-fails target)
                                        (cond incite? "incite" bomb? "bomb" defect? "defect" :else "spy"))
                           :player/incoming-espionage-agents-gained
-                          (+ (or (:player/incoming-espionage-agents-gained target) 0) agents-captured)})
+                          (+ (or (:player/incoming-espionage-agents-gained target) 0) agents-captured)
+                          :player/incoming-seq
+                          (utils/next-incoming-seq target 1)})
                        (when (and incite? att-wins? (pos? stab-dmg))
                          {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
                           :player/stability (max 0 (- (:player/stability target) stab-dmg))
                           :player/incoming-incite-stability-lost
-                          (+ (or (:player/incoming-incite-stability-lost target) 0) stab-dmg)})
+                          (+ (or (:player/incoming-incite-stability-lost target) 0) stab-dmg)
+                          :player/incoming-seq
+                          (utils/next-incoming-seq target 1)})
                        (when (and bomb? att-wins?)
                          (let [sd          (or (:soldiers   result) 0)
                                td          (or (:transports result) 0)
@@ -406,13 +427,17 @@
                                      :soldiers      sd
                                      :transports    td
                                      :fighters      fd
-                                     :carriers      cd})}))
+                                     :carriers      cd})
+                            :player/incoming-seq
+                            (utils/next-incoming-seq target 1)}))
                        (when (and defect? att-wins?)
                          (let [n (or (:agents-defected result) 0)]
                            {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
                             :player/agents (max 0 (- (or (:player/agents target) 0) n))
                             :player/incoming-defect-agents-lost
-                            (+ (or (:player/incoming-defect-agents-lost target) 0) n)}))]))
+                            (+ (or (:player/incoming-defect-agents-lost target) 0) n)
+                            :player/incoming-seq
+                            (utils/next-incoming-seq target 1)}))]))
             (let [agents-gained (if (and defect? att-wins?) (or (:agents-defected result) 0) 0)]
               [result (assoc player :player/agents
                              (max 0 (+ (- (:player/agents player) agents-lost) agents-gained)))])))))))

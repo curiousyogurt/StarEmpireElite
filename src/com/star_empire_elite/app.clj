@@ -33,6 +33,7 @@
             [com.star-empire-elite.pages.app.guide      :as guide]
             [com.star-empire-elite.pages.app.results    :as results]
             ;; Game functions
+            [com.star-empire-elite.alerts                :as alerts]
             [com.star-empire-elite.constants            :as const]
             [com.star-empire-elite.game-config          :as cfg]
             [com.star-empire-elite.resolution           :as resolution]
@@ -508,10 +509,28 @@
 ;;;;
 ;;;; Alerts
 ;;;;
+;;;; Backs the status-line alert chip and its fold-out panel (ui/alert-chip, ui/alert-panel;
+;;;; grouping/dedupe logic is in com.star-empire-elite.alerts). Three round trips:
+;;;;  - poll:  background refresh, chip only — never touches the panel (see ui/alert-chip's
+;;;;           docstring for why).
+;;;;  - open:  the chip's click-to-open action — read-only, renders the chip in its :open
+;;;;           state plus a freshly animated panel via an out-of-band swap.
+;;;;  - seen:  the chip's click-to-close action (also the panel footer's "collapse" link) —
+;;;;           the only one that writes to the database, marking everything seen.
+;;;; refresh just reloads the page (HX-Refresh), replacing the old javascript: href.
+;;;;
 
-(defn alerts-handler
-  "HTMX polling fragment — returns the rendered alert banner content.
-  Updates in place every 10s; no page refresh.
+(defn- alerts-open-param
+  "Parse the chip/panel's ?open= query param, so a background poll keeps rendering whichever
+  open/closed state the client currently has on screen.
+
+  [ctx ring-ctx] -> bool"
+  [ctx]
+  (= "true" (get-in ctx [:query-params :open])))
+
+(defn alerts-poll-handler
+  "HTMX polling fragment — returns just the status-line chip (#alert-chip). See the
+  Alerts section comment above for why this never touches the fold-out panel.
 
   [ctx ring-ctx] -> ring-response (200 with HTML fragment)"
   [{:keys [biff/db path-params] :as ctx}]
@@ -519,7 +538,55 @@
         player    (xt/entity db player-id)]
     {:status  200
      :headers {"content-type" "text/html"}
-     :body    (rum/render-static-markup (ui/incoming-alert-content player))}))
+     :body    (rum/render-static-markup (ui/alert-chip player (alerts-open-param ctx)))}))
+
+(defn alerts-open-handler
+  "The alert chip's click-to-open action. Read-only — opening never marks messages seen,
+  only closing does (alerts-seen-handler) — so this just renders the chip in its :open state
+  plus a fresh, animated fold-out panel via an out-of-band swap.
+
+  [ctx ring-ctx] -> ring-response (200 with HTML fragment)"
+  [{:keys [biff/db path-params] :as ctx}]
+  (let [player-id (java.util.UUID/fromString (:player-id path-params))
+        player    (xt/entity db player-id)]
+    {:status  200
+     :headers {"content-type" "text/html"}
+     :body    (rum/render-static-markup
+                [:<>
+                 (ui/alert-chip player true)
+                 (ui/alert-panel player true true true)])}))
+
+(defn alerts-seen-handler
+  "The alert chip's click-to-close action (also used by the panel footer's 'collapse' link).
+  Persists the current :player/incoming-seq as :player/incoming-seen-seq, plus a snapshot of
+  the current grouped counts (:player/incoming-seen-groups) so already-seen rows don't show
+  the 'new' highlight the next time the panel opens. Returns the closed chip and clears the
+  panel via an out-of-band swap.
+
+  [ctx ring-ctx] -> ring-response (200 with HTML fragment)"
+  [{:keys [biff/db path-params] :as ctx}]
+  (let [player-id    (java.util.UUID/fromString (:player-id path-params))
+        player       (xt/entity db player-id)
+        seen-seq     (or (:player/incoming-seq player) 0)
+        seen-groups  (alerts/group-counts (alerts/incoming-messages player))]
+    (biff/submit-tx ctx
+      [{:db/doc-type :player :db/op :update :xt/id player-id
+        :player/incoming-seen-seq    seen-seq
+        :player/incoming-seen-groups (pr-str seen-groups)}])
+    {:status  200
+     :headers {"content-type" "text/html"}
+     :body    (rum/render-static-markup
+                [:<>
+                 (ui/alert-chip (assoc player :player/incoming-seen-seq seen-seq) false)
+                 (ui/alert-panel player false false true)])}))
+
+(defn alerts-refresh-handler
+  "The panel footer's '↻ refresh' link — asks the browser to reload the page via the
+  HX-Refresh response header, so empire stats update with no inline javascript: href.
+
+  [ctx ring-ctx] -> ring-response (200, HX-Refresh header)"
+  [ctx]
+  {:status 200 :headers {"HX-Refresh" "true"} :body ""})
 
 ;;;;
 ;;;; Routes
@@ -564,6 +631,9 @@
     ["/game/:player-id/rejoin"             {:post eliminated/rejoin}]
     ["/game/:player-id/news"               {:get  news-handler}]
     ["/game/:player-id/guide"              {:get  guide-handler}]
-    ["/game/:player-id/alerts"             {:get  alerts-handler}]
+    ["/game/:player-id/alerts/poll"        {:get  alerts-poll-handler}]
+    ["/game/:player-id/alerts/open"        {:get  alerts-open-handler}]
+    ["/game/:player-id/alerts/seen"        {:post alerts-seen-handler}]
+    ["/game/:player-id/alerts/refresh"     {:get  alerts-refresh-handler}]
     ["/game/:player-id/cooldown"           {:get  cooldown-handler}]]})
 

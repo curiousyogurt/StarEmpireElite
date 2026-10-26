@@ -151,7 +151,6 @@
       (ui/phase-shell player game "GAME OVERVIEW"
         [:div.flex.flex-col.gap-2
          {:class "py-2.5 px-3.5"}
-         (ui/incoming-alert player "every 60s")
          (ui/snapshot-section player)
          (players-table {:players players :admin? admin?})]
         (ui/phase-action-bar

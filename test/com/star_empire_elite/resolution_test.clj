@@ -187,3 +187,42 @@
         (let [alliances (biff/q (xt/db node) '{:find (pull a [*]) :where [[a :alliance/game _]]})]
           (is (= 1 (count alliances)))
           (is (= :proposed (:alliance/status (first alliances)))))))))
+
+;;;;
+;;;; resolve-espionage — bomb success writes a single tx (DB-backed)
+;;;;
+;;;; Regression for a bug where the bomb-success branch and a separate :player/incoming-seq
+;;;; bump were two different :db/op :update maps targeting the same defender in one
+;;;; submit-tx. biff's :db/op :update builds a match+put pair per map; the second map's match
+;;;; is checked against a stale pre-tx snapshot the first map's put has already changed, so
+;;;; the whole tx fails every time (not just on contention) — submit-tx throws after
+;;;; exhausting its retries. See the incoming-seq comment in resolve-espionage.
+;;;;
+
+(deftest test-resolve-espionage-bomb-success-single-tx
+  (testing "a bomb against a defenseless target (guaranteed win) resolves without throwing
+            and bumps :player/incoming-seq exactly once"
+    (with-open [node (test-xtdb-node [])]
+      (let [ctx0     (get-ctx node)
+            game-id  (random-uuid)
+            att-id   (random-uuid)
+            def-id   (random-uuid)
+            game     (submit! ctx0 (merge helpers/game-defaults {:xt/id game-id}))
+            attacker (submit! ctx0 (merge helpers/player-defaults
+                                          {:xt/id                       att-id
+                                           :player/game                  game-id
+                                           :player/empire-name           "Attacker"
+                                           :player/agents                10000
+                                           :player/pending-espionage     def-id
+                                           :player/pending-espionage-op  "bomb"}))
+            _        (submit! ctx0 (merge helpers/player-defaults
+                                          {:xt/id              def-id
+                                           :player/game         game-id
+                                           :player/empire-name  "Defender"
+                                           :player/agents       0}))
+            ctx1     (assoc ctx0 :biff/db (xt/db node))
+            [result _] (#'resolution/resolve-espionage ctx1 att-id attacker game)
+            defender (xt/entity (xt/db node) def-id)]
+        (is (true? (:attacker-wins? result)))
+        (is (some? (:player/incoming-bomb-result defender)))
+        (is (= 1 (:player/incoming-seq defender)))))))

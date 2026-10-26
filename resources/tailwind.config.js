@@ -29,6 +29,16 @@ module.exports = {
       borderRadius: {
         'game': '3px',  // standard card border-radius
       },
+      keyframes: {
+        // Entrance animation for the alert chip's fold-out panel (ui/alert-panel).
+        'fold-in': {
+          '0%':   { opacity: '0', transform: 'translateY(-6px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      animation: {
+        'fold-in': 'fold-in 160ms ease-out',
+      },
     },
   },
   plugins: [

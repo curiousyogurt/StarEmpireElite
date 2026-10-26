@@ -9,9 +9,10 @@
 
 (ns com.star-empire-elite.ui
   (:require [cheshire.core :as cheshire]
-            [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as str]
+            [com.star-empire-elite.alerts :as alerts]
+            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.settings :as settings]
             [com.star-empire-elite.utils :as utils]
             [com.biffweb :as biff]
@@ -273,8 +274,14 @@
     [:span {:class color}
      (str "Day " current-day "/" total-days)]))
 
+;;; phase-topbar needs alert-chip, but alert-chip is defined much further down (it depends on
+;;; mode-badge, which in turn is defined after phase-topbar) — forward-declare it so Clojure's
+;;; usual top-to-bottom definition order doesn't force a bigger reshuffle of this file.
+(declare alert-chip)
+
 (defn phase-topbar
   "Render the terminal-shell topbar with empire name, turn/round subtitle, and phase stepper.
+  The alert chip sits directly below the phase stepper, right-aligned under it.
 
   [player player-map, game game-map, phase-label str] -> hiccup"
   [player game phase-label]
@@ -290,7 +297,9 @@
        phase-label " · " (day-segment game)
        (str " · Turn " turn "/" (:game/turns-per-round game)
             " · Round " round "/" (:game/rounds-per-day game))]]
-     (phase-stepper (:player/current-phase player))]))
+     [:div.flex.flex-col.items-end.gap-2
+      (phase-stepper (:player/current-phase player))
+      (alert-chip player false)]]))
 
 ;;;;
 ;;;; Page Shell
@@ -399,23 +408,27 @@
 (defn mode-badge
   "Render a colored badge pill: ACTION (red), ESPIONAGE (amber), GROWTH (green),
   STABILITY (yellow), EVENT (gray), FATE (violet), or DIPLOMACY (blue). Used across
-  outcomes, alerts, and news.
+  outcomes, the alert chip's fold-out panel, and news. size :sm renders the smaller
+  variant used in the fold-out panel's rows; omit it for the normal outcomes/news size.
 
-  [mode keyword] -> hiccup"
-  [mode]
-  (let [[text cls] (case mode
-                     (:bomb :spy :incite :defect) ["ESPIONAGE" "border-[#fbbf24] text-[#fbbf24]"]
-                     (:stability :breakaway)      ["STABILITY" "border-[#facc15] text-[#facc15]"]
-                     :growth                      ["GROWTH"    "border-[#4ade80] text-[#4ade80]"]
-                     (:elimination :event)        ["EVENT"     "border-[#9ca3af] text-[#9ca3af]"]
-                     ;; Both polarities share one badge; summary text and color carry the good/bad signal.
-                     (:disaster :boon)            ["FATE"      "border-[#a78bfa] text-[#a78bfa]"]
-                     ;; All three treaty lifecycle moments (formed/dissolved/broken) share one badge.
-                     (:treaty-formed :treaty-dissolved :treaty-broken)
-                                                   ["DIPLOMACY" "border-[#60a5fa] text-[#60a5fa]"]
-                                                  ["ACTION"    "border-[#f87171] text-[#f87171]"])]
-    [:span {:class (str "border px-[7px] py-[2px] text-[11px] tracking-[0.12em] " cls)}
-     text]))
+  ([mode keyword])
+  ([mode keyword, size keyword (optional, :sm)]) -> hiccup"
+  ([mode] (mode-badge mode nil))
+  ([mode size]
+   (let [[text cls] (case mode
+                       (:bomb :spy :incite :defect) ["ESPIONAGE" "border-[#fbbf24] text-[#fbbf24]"]
+                       (:stability :breakaway)      ["STABILITY" "border-[#facc15] text-[#facc15]"]
+                       :growth                      ["GROWTH"    "border-[#4ade80] text-[#4ade80]"]
+                       (:elimination :event)        ["EVENT"     "border-[#9ca3af] text-[#9ca3af]"]
+                       ;; Both polarities share one badge; summary text and color carry the good/bad signal.
+                       (:disaster :boon)            ["FATE"      "border-[#a78bfa] text-[#a78bfa]"]
+                       ;; All three treaty lifecycle moments (formed/dissolved/broken) share one badge.
+                       (:treaty-formed :treaty-dissolved :treaty-broken)
+                                                     ["DIPLOMACY" "border-[#60a5fa] text-[#60a5fa]"]
+                                                    ["ACTION"    "border-[#f87171] text-[#f87171]"])
+         size-cls (if (= size :sm) "px-[5px] text-[10px]" "px-[7px] py-[2px] text-[11px]")]
+     [:span {:class (str "border tracking-[0.12em] " size-cls " " cls)}
+      text])))
 
 (defn treaty-indicator
   "Render a small square 'P' marker for a target-table row, meaning 'you hold an active
@@ -835,136 +848,145 @@
         message]])))
 
 ;;;;
-;;;; Incoming Alerts
+;;;; Incoming Alerts — Status-Line Chip and Fold-Out Panel
+;;;;
+;;;; Replaces the old in-body "Activity since your last turn" block with a one-line chip on
+;;;; the topbar status line (see phase-topbar) that opens a fold-out panel underneath the
+;;;; header (see phase-shell). All grouping/dedupe/sort/summary logic is pure and lives in
+;;;; com.star-empire-elite.alerts; these functions are rendering only. The HTMX round trips
+;;;; are wired up in app.clj's alerts-* handlers.
 ;;;;
 
-(defn- alert-line
-  "Render one alert row: badge + text, matching the news feed's minimal style.
+;;; Standalone from mode-badge's broader mode set (which also covers growth/stability/fate/
+;;; event) because every alert row's category is always one of these three — see
+;;; alerts/category-order. Mirrors mode-badge's existing ACTION/ESPIONAGE/DIPLOMACY colors
+;;; (reused rather than the handoff's new hexes, per design decision).
+(defn- alert-count-color-class
+  "[category keyword] -> tailwind class string"
+  [category]
+  (case category
+    :action    "text-[#f87171]"
+    :espionage "text-[#fbbf24]"
+    :diplomacy "text-[#60a5fa]"))
 
-  [badge-mode keyword, & body hiccup] -> hiccup"
-  [badge-mode & body]
-  [:div.flex.items-center.gap-2.text-sm
-   {:class "py-[3px] px-2 bg-game-row rounded-sm"}
-   (mode-badge badge-mode)
-   (into [:span.text-game-green-soft.flex-1] body)])
+(defn- alert-chip-style
+  "Return the chip's background/border/text classes and icon/caret glyphs for one of the
+  four states in the handoff's state table. :empty has no visible glyphs \u2014 alert-chip
+  renders it invisible (see its docstring) rather than showing an empty-state badge.
 
-(defn- attack-info-line
-  "Render one alert row summarizing a single incoming attack record (pr-str'd map), plus a
-  second DIPLOMACY row when that attack also broke an active peace treaty — see
-  resolution/resolve-combat.
+  [state keyword] -> {:bg :border :text :icon :caret}"
+  [state]
+  (case state
+    :empty  {:bg "bg-transparent" :border "border-[#1f3a2a]" :text "text-[#3f6b4f]" :icon "\u00a0" :caret nil}
+    ;; Unread uses the app's existing warning yellow (matches day-segment's low-days-left
+    ;; warning and mode-badge's STABILITY badge), not red — unread alerts aren't all bad news.
+    :unread {:bg "bg-[#2a2410]"   :border "border-[#facc15]" :text "text-[#facc15]" :icon "\u26a0" :caret "\u25be"}
+    :read   {:bg "bg-transparent" :border "border-[#2a5a3c]" :text "text-[#7fa98c]" :icon "\u26a0" :caret "\u25be"}
+    :open   {:bg "bg-[#1a2a20]"   :border "border-[#4ade80]" :text "text-[#4ade80]" :icon "\u26a0" :caret "\u25b4"}))
 
-  [record-str string] -> hiccup"
-  [record-str]
-  (let [r             (edn/read-string record-str)
-        mode          (:mode r)
-        attacker      (:attacker-name r)
-        attacker-wins? (:attacker-wins? r)
-        verb          (case mode
-                        :invade "invaded"
-                        :raid   "raided"
-                        :strike "launched a strike against"
-                        "attacked")
-        outcome       (when (not= mode :strike)
-                        (if attacker-wins? " (SUCCESS)" " (FAILURE)"))]
-    [:<>
-     (alert-line mode
-       [:span.text-green-300.font-bold attacker]
-       (str " " verb " you" outcome))
-     (when (:treaty-broken? r)
-       (alert-line :treaty-broken
-         [:span.text-green-300.font-bold attacker]
-         " broke a peace treaty with you."))]))
+(defn alert-chip
+  "Render the status-line summary chip: a polling wrapper (#alert-chip) around a <button>
+  whose color/label/caret reflect the current alert state (alerts/chip-state). The wrapper
+  re-polls itself every 10s; clicking the button opens the fold-out panel (when closed) or
+  marks everything seen and closes it (when open) — see app.clj's alerts-poll/-open/-seen
+  handlers.
 
-(defn incoming-alert-content
-  "Render the alert banner summarizing incoming activity with badges matching outcomes page style.
-  Returns nil when there are no alerts.
+  The :empty state (no messages yet this turn) shows nothing at all — no badge, no 'no
+  activity' text — but the button still renders, invisible (visibility:hidden), with the
+  same border/padding/font-size as every other state. That reserves its exact footprint so
+  the stepper above it doesn't shift position the moment the first message of the turn
+  arrives and the chip becomes visible.
 
-  [player player-map] -> hiccup | nil"
-  [player]
-  (let [attacks            (seq (utils/take-recent (:player/incoming-attacks player)))
-        esp-fails          (seq (utils/take-recent (:player/incoming-espionage-fails player)))
-        esp-agents         (or (:player/incoming-espionage-agents-gained player) 0)
-        incite-stab-lost   (or (:player/incoming-incite-stability-lost player) 0)
-        bomb-result        (some-> (:player/incoming-bomb-result player) edn/read-string)
-        defect-agents-lost (or (:player/incoming-defect-agents-lost player) 0)
-        treaties-proposed  (seq (utils/take-recent (:player/incoming-treaty-proposed player)))
-        treaties-accepted  (seq (utils/take-recent (:player/incoming-treaty-accepted player)))
-        treaties-withdrawn (seq (utils/take-recent (:player/incoming-treaty-withdrawn player)))
-        treaties-dissolved (seq (utils/take-recent (:player/incoming-treaty-dissolved player)))]
-    (when (or attacks esp-fails (pos? incite-stab-lost) bomb-result (pos? defect-agents-lost)
-              treaties-proposed treaties-accepted treaties-withdrawn treaties-dissolved)
-      [:div.mb-4.rounded-game.border.border-game-green-border.relative
-       {:class "px-3.5 pt-2.5"}
-       ;; Refresh link — top-right corner
-       [:a.absolute.text-xs.text-game-green-dim.underline
-        {:class "top-2.5 right-3.5"
-         :href  "javascript:window.location.reload()"
-         :title "Reload the page to update empire stats. Any in-progress form input will be lost."}
-        "\u21bb refresh"]
-       ;; Heading
-       [:p.font-bold.text-yellow-400.mb-2.text-sm "\u26a0 Activity since the end of your last turn"]
-       ;; Event lines — minimal badge + text, matching news feed style
-       [:div.flex.flex-col.gap-1
-        (map attack-info-line attacks)
-        (when bomb-result
-          (let [total (+ (or (:soldiers bomb-result) 0)
-                         (or (:transports bomb-result) 0)
-                         (or (:fighters bomb-result) 0)
-                         (or (:carriers bomb-result) 0))]
-            (alert-line :bomb
-              (str "An unknown agent bombed you " (if (pos? total) "(SUCCESS)" "(FAILURE)")))))
-        (when (pos? incite-stab-lost)
-          (alert-line :incite "An unknown agent incited unrest in your empire (SUCCESS)"))
-        (when (pos? defect-agents-lost)
-          (alert-line :defect "An unknown agent turned agents from you (SUCCESS)"))
-        (when esp-fails
-          (for [op esp-fails]
-            (let [verb (case op
-                         "spy"    "spied on"
-                         "incite" "incited unrest in"
-                         "bomb"   "bombed"
-                         "defect" "turned agents from"
-                         "attacked")]
-              (alert-line (keyword op)
-                (str "An unknown agent " verb " you (FAILED)")))))
-        (when treaties-proposed
-          (for [empire-name treaties-proposed]
-            (alert-line :treaty-formed
-              [:span.text-green-300.font-bold empire-name]
-              " proposed a peace treaty with you.")))
-        (when treaties-accepted
-          (for [empire-name treaties-accepted]
-            (alert-line :treaty-formed
-              [:span.text-green-300.font-bold empire-name]
-              " accepted your peace treaty proposal.")))
-        (when treaties-withdrawn
-          (for [empire-name treaties-withdrawn]
-            (alert-line :treaty-dissolved
-              [:span.text-green-300.font-bold empire-name]
-              " withdrew their peace treaty proposal.")))
-        (when treaties-dissolved
-          (for [empire-name treaties-dissolved]
-            (alert-line :treaty-dissolved
-              [:span.text-green-300.font-bold empire-name]
-              " dissolved your peace treaty.")))]
-       ;; Footer
-       [:p.text-game-green-dim.italic.mt-2 {:class "text-[11px]"}
-        "Full details available in Outcomes phase."]])))
+  [player player-map, open? bool] -> hiccup"
+  [player open?]
+  (let [player-id (:xt/id player)
+        msgs      (alerts/incoming-messages player)
+        unread    (alerts/unread-count player)
+        state     (alerts/chip-state (count msgs) unread open?)
+        empty?    (= state :empty)
+        {:keys [bg border text icon caret]} (alert-chip-style state)
+        ;; Unread doesn't get its own wording \u2014 just the summary, turned yellow by
+        ;; alert-chip-style. The color is the signal; the text stays the same as :read.
+        label     (if empty? "\u00a0" (alerts/summary msgs))
+        click-attrs (case state
+                      :empty nil
+                      :open  {:hx-post   (str "/app/game/" player-id "/alerts/seen")
+                              :hx-target "#alert-chip" :hx-swap "outerHTML"}
+                      {:hx-get    (str "/app/game/" player-id "/alerts/open")
+                       :hx-target "#alert-chip" :hx-swap "outerHTML"})]
+    [:div#alert-chip
+     {:hx-get     (str "/app/game/" player-id "/alerts/poll?open=" open?)
+      :hx-trigger "every 10s"
+      :hx-swap    "outerHTML"}
+     [:button.font-mono.rounded-game.border
+      (merge {:type     "button"
+              :disabled empty?
+              :class    (str "text-[15px] leading-none py-[2px] px-[10px] whitespace-nowrap "
+                              bg " " border " " text
+                              (when empty? " invisible cursor-default"))}
+             click-attrs)
+      [:span.flex.items-center.gap-2
+       [:span icon] [:span label] (when caret [:span caret])]]]))
 
-(defn incoming-alert
-  "Render the HTMX polling container that updates the alert banner in place.
-  The player uses the inline refresh link to reload the page when ready.
-  poll-interval defaults to \"every 10s\"; pass a slower value on idle pages.
+(defn- alert-row
+  "Render one fold-out panel row: a small category tag, '<b>sender</b> text', and an \u00d7N
+  count when the group has more than one raw message behind it.
 
-  [player player-map, poll-interval str (optional)] -> hiccup"
-  ([player] (incoming-alert player "every 10s"))
-  ([player poll-interval]
-   (let [player-id (:xt/id player)]
-     [:div#incoming-alert
-      {:hx-get     (str "/app/game/" player-id "/alerts")
-       :hx-trigger poll-interval
-       :hx-swap    "innerHTML"}
-      (incoming-alert-content player)])))
+  [group alert-map with :alert/count, :alert/new?] -> hiccup"
+  [{:keys [alert/badge alert/category alert/sender alert/text alert/count alert/new?]}]
+  [:div.flex.items-center
+   {:class (str "gap-[10px] py-[6px] px-[10px] text-[14px] "
+                (if new? "bg-[#1c1f19]" "bg-transparent"))}
+   (mode-badge badge :sm)
+   [:div.flex-1.truncate
+    [:b {:class "text-[#c8f0d4]"} sender] " "
+    [:span {:class "text-[#a9d9b8]"} text]]
+   (when (> count 1)
+     [:span {:class (str "font-extrabold " (alert-count-color-class category))}
+      "\u00d7" count])])
+
+(defn alert-panel
+  "Render the #alert-panel fold-out container. Closed (open? false) is an empty, borderless
+  placeholder that takes no visual space — phase-shell always renders one so there's a
+  stable id for HTMX to swap into. Open renders the grouped/deduped/capped rows (see
+  alerts/group-messages, const/alert-max-rows) and a footer with the refresh/collapse
+  actions. animate? adds the entrance animation, and should be true only on the explicit
+  'open' response — never on a background poll or on close, so it doesn't replay. Pass
+  oob? true when this is piggybacking on a larger HTMX response as an out-of-band swap
+  (the alerts-open/-seen handlers do this to update the panel alongside the chip).
+
+  [player player-map, open? bool, animate? bool, oob? bool (optional)] -> hiccup"
+  [player open? animate? & [oob?]]
+  (if-not open?
+    (cond-> [:div#alert-panel]
+      oob? (conj {:hx-swap-oob "true"}))
+    (let [msgs      (alerts/incoming-messages player)
+          groups    (alerts/group-messages msgs (alerts/seen-groups player))
+          shown     (take const/alert-max-rows groups)
+          hidden    (- (count groups) (count shown))
+          player-id (:xt/id player)
+          attrs     (cond-> {:class (str "border-b flex flex-col gap-2 bg-[#141511] border-[#1d5a36] "
+                                          "py-[12px] px-[26px] pb-[14px] "
+                                          (when animate? "animate-fold-in"))}
+                      oob? (assoc :hx-swap-oob "true"))]
+      [:div#alert-panel attrs
+       [:div.grid
+        {:class "gap-[6px_18px]"
+         :style {:grid-template-columns "repeat(auto-fill, minmax(440px, 1fr))"}}
+        (for [g shown] (alert-row g))]
+       [:div.flex.justify-between.items-center {:class "text-[12px] text-[#5f8f70]"}
+        [:span.italic
+         (if (pos? hidden)
+           (str "+" hidden " more \u00b7 details at end of turn (action/espionage) or round (diplomacy).")
+           "Details at end of turn (action/espionage) or round (diplomacy).")]
+        [:span.flex.items-center.gap-3
+         [:a {:class  "text-[#7fa98c] cursor-pointer hover:underline"
+              :hx-get (str "/app/game/" player-id "/alerts/refresh")}
+          "\u21bb refresh"]
+         [:a {:class     "text-[#7fa98c] cursor-pointer hover:underline"
+              :hx-post   (str "/app/game/" player-id "/alerts/seen")
+              :hx-target "#alert-chip" :hx-swap "outerHTML"}
+          "collapse \u25b4"]]]])))
 
 ;;;;
 ;;;; Phase Page Layout Helpers
@@ -972,7 +994,8 @@
 
 (defn phase-shell
   "Render the standard phase page: outer page wrapper + terminal card div + scanline overlay +
-  phase topbar. All children are rendered inside the terminal card.
+  phase topbar + the alert fold-out panel (closed by default; see ui/alert-panel). All
+  children are rendered inside the terminal card, below the panel.
 
   [player player-map, game game-map, phase-name str & children hiccup] -> hiccup"
   [player game phase-name & children]
@@ -981,18 +1004,20 @@
     (into [:div.text-base.w-full.max-w-4xl.mx-auto.overflow-hidden.relative.bg-game-bg.rounded.text-green-400.font-mono
            {:class "border-[1.5px] border-game-green-border"}
            (scanline-overlay)
-           (phase-topbar player game (str/upper-case phase-name))]
+           (phase-topbar player game (str/upper-case phase-name))
+           (alert-panel player false false)]
           children)))
 
 (defn phase-body
-  "Render the padded body area for a phase page.
-  (incoming-alert player) is always appended as the last child.
+  "Render the padded body area for a phase page. _player is unused now that the alert panel
+  has moved to phase-shell, but kept as the first argument so every existing call site
+  (`(ui/phase-body player ...)`) still reads the same.
 
-  [player player-map & children hiccup] -> hiccup"
-  [player & children]
+  [_player player-map & children hiccup] -> hiccup"
+  [_player & children]
   (into [:div.flex.flex-col.gap-2
          {:class "py-2.5 px-3.5"}]
-        (concat children [(incoming-alert player)])))
+        children))
 
 (defn phase-warning
   "Render a fixed-height empty placeholder between phase-body and phase-action-bar.

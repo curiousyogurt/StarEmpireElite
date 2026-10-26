@@ -312,7 +312,17 @@
             [:player/incoming-treaty-proposed           {:optional true} [:maybe [:vector :string]]]
             [:player/incoming-treaty-accepted          {:optional true} [:maybe [:vector :string]]]
             [:player/incoming-treaty-withdrawn         {:optional true} [:maybe [:vector :string]]]
-            [:player/incoming-treaty-dissolved         {:optional true} [:maybe [:vector :string]]]]
+            [:player/incoming-treaty-dissolved         {:optional true} [:maybe [:vector :string]]]
+
+            ;; Alert chip read-state (see com.star-empire-elite.alerts). incoming-seq is a
+            ;; monotonic counter bumped once per incoming message, independent of the capped
+            ;; incoming-* vectors above — it stays accurate once a vector saturates its cap.
+            ;; incoming-seen-seq is the incoming-seq value as of the last time the player closed
+            ;; the fold-out panel; incoming-seen-groups snapshots the grouped counts at that same
+            ;; moment so individual rows can be marked new vs. already-seen.
+            [:player/incoming-seq           {:optional true} [:maybe :int]]
+            [:player/incoming-seen-seq      {:optional true} [:maybe :int]]
+            [:player/incoming-seen-groups   {:optional true} [:maybe :string]]]
 
    ;; A treaty between two players. Shared by both sides so the relationship can't drift —
    ;; neither player's entity carries its own copy. Lifecycle: :proposed -> :active (accepted)
