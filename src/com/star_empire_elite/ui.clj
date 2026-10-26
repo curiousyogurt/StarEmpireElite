@@ -407,7 +407,7 @@
 
 (defn mode-badge
   "Render a colored badge pill: ACTION (red), ESPIONAGE (amber), GROWTH (green),
-  STABILITY (yellow), EVENT (gray), FATE (violet), or DIPLOMACY (blue). Used across
+  STABILITY (white), EVENT (gray), FATE (violet), or DIPLOMACY (blue). Used across
   outcomes, the alert chip's fold-out panel, and news. size :sm renders the smaller
   variant used in the fold-out panel's rows; omit it for the normal outcomes/news size.
 
@@ -417,7 +417,7 @@
   ([mode size]
    (let [[text cls] (case mode
                        (:bomb :spy :incite :defect) ["ESPIONAGE" "border-[#fbbf24] text-[#fbbf24]"]
-                       (:stability :breakaway)      ["STABILITY" "border-[#facc15] text-[#facc15]"]
+                       (:stability :breakaway)      ["STABILITY" "border-white text-white"]
                        :growth                      ["GROWTH"    "border-[#4ade80] text-[#4ade80]"]
                        (:elimination :event)        ["EVENT"     "border-[#9ca3af] text-[#9ca3af]"]
                        ;; Both polarities share one badge; summary text and color carry the good/bad signal.
