@@ -189,6 +189,141 @@
           (is (= :proposed (:alliance/status (first alliances)))))))))
 
 ;;;;
+;;;; resolve-espionage — breaking a peace treaty by espionage (DB-backed)
+;;;;
+;;;; Mirrors the resolve-combat treaty tests above: a fresh espionage attempt against an
+;;;; active treaty partner breaks the treaty atomically with the attempt, whether or not the
+;;;; attempt itself succeeds — the hostile act is what ends it, not the outcome.
+;;;;
+
+(deftest test-espionage-on-active-treaty-partner-breaks-it-even-on-failure
+  (testing "a failed spy attempt (attacker's agents are caught) against an active treaty
+            partner still flags :treaty-broken? and breaks the alliance — merged into the
+            SAME target update as the espionage-fail fields, not a second tx map"
+    (with-open [node (test-xtdb-node [])]
+      (let [ctx0     (get-ctx node)
+            game-id  (random-uuid)
+            att-id   (random-uuid)
+            def-id   (random-uuid)
+            game     (submit! ctx0 (merge helpers/game-defaults {:xt/id game-id}))
+            attacker (submit! ctx0 (merge helpers/player-defaults
+                                          {:xt/id                       att-id
+                                           :player/game                  game-id
+                                           :player/empire-name           "Spymaster"
+                                           ;; Vastly outnumbered — guarantees a failed spy
+                                           ;; attempt regardless of the random roll.
+                                           :player/agents                1
+                                           :player/pending-espionage     def-id
+                                           :player/pending-espionage-op  "spy"}))
+            _        (submit! ctx0 (merge helpers/player-defaults
+                                          {:xt/id              def-id
+                                           :player/game         game-id
+                                           :player/empire-name  "Defender"
+                                           :player/agents       10000}))
+            _        (submit! ctx0 (alliance-fixture
+                                     {:alliance/game       game-id
+                                      :alliance/proposer   att-id
+                                      :alliance/recipient  def-id
+                                      :alliance/status     :active
+                                      :alliance/formed-at  (java.util.Date.)}))
+            ctx1     (assoc ctx0 :biff/db (xt/db node))
+            [result1 _ broken1] (#'resolution/resolve-espionage ctx1 att-id attacker game)
+            defender (xt/entity (xt/db node) def-id)]
+        (is (false? (:attacker-wins? result1)))
+        (is (true? (:treaty-broken? result1)))
+        (is (= :broken (:alliance/status broken1)))
+        (is (= att-id (:alliance/ended-by broken1)))
+        (is (= ["Spymaster"] (:player/incoming-espionage-treaty-broken defender)))
+        (is (some? (:player/incoming-espionage-fails defender))
+            "the fail notice and the treaty-broken notice land on the same target update")
+        (is (= 2 (:player/incoming-seq defender)) "two alert rows: the fail, and the break")
+
+        ;; Refresh: cache hit does neither a second time.
+        (let [db2       (xt/db node)
+              attacker2 (xt/entity db2 att-id)
+              ctx2      (assoc ctx0 :biff/db db2)
+              [result2 _ broken2] (#'resolution/resolve-espionage ctx2 att-id attacker2 game)]
+          (is (= result1 result2) "the cached result is served unchanged")
+          (is (nil? broken2) "no second break on a cache-hit refresh"))
+
+        (let [alliances (biff/q (xt/db node) '{:find (pull a [*]) :where [[a :alliance/game _]]})]
+          (is (= 1 (count alliances)))
+          (is (= :broken (:alliance/status (first alliances)))))))))
+
+(deftest test-successful-silent-spy-against-a-treaty-partner-still-breaks-it
+  (testing "a successful spy op is normally silent (no trace left on the target), but a
+            treaty break is never silent — it still writes the target's treaty-broken field
+            and bumps :player/incoming-seq, even though no op-specific field fires"
+    (with-open [node (test-xtdb-node [])]
+      (let [ctx0     (get-ctx node)
+            game-id  (random-uuid)
+            att-id   (random-uuid)
+            def-id   (random-uuid)
+            game     (submit! ctx0 (merge helpers/game-defaults {:xt/id game-id}))
+            attacker (submit! ctx0 (merge helpers/player-defaults
+                                          {:xt/id                       att-id
+                                           :player/game                  game-id
+                                           :player/empire-name           "Spymaster"
+                                           :player/agents                10000
+                                           :player/pending-espionage     def-id
+                                           :player/pending-espionage-op  "spy"}))
+            _        (submit! ctx0 (merge helpers/player-defaults
+                                          {:xt/id              def-id
+                                           :player/game         game-id
+                                           :player/empire-name  "Defender"
+                                           :player/agents       0}))
+            _        (submit! ctx0 (alliance-fixture
+                                     {:alliance/game       game-id
+                                      :alliance/proposer   att-id
+                                      :alliance/recipient  def-id
+                                      :alliance/status     :active
+                                      :alliance/formed-at  (java.util.Date.)}))
+            ctx1     (assoc ctx0 :biff/db (xt/db node))
+            [result _ broken] (#'resolution/resolve-espionage ctx1 att-id attacker game)
+            defender (xt/entity (xt/db node) def-id)]
+        (is (true? (:attacker-wins? result)))
+        (is (true? (:treaty-broken? result)))
+        (is (= :broken (:alliance/status broken)))
+        (is (= ["Spymaster"] (:player/incoming-espionage-treaty-broken defender)))
+        (is (nil? (:player/incoming-espionage-fails defender))
+            "a successful spy still leaves no fail trace")
+        (is (= 1 (:player/incoming-seq defender)) "one alert row: just the treaty break")))))
+
+(deftest test-espionage-on-proposed-treaty-does-not-break-it
+  (testing "espionage against a merely :proposed treaty partner leaves it :proposed — it
+            hasn't 'arrived' yet, same as resolve-combat"
+    (with-open [node (test-xtdb-node [])]
+      (let [ctx0     (get-ctx node)
+            game-id  (random-uuid)
+            att-id   (random-uuid)
+            def-id   (random-uuid)
+            game     (submit! ctx0 (merge helpers/game-defaults {:xt/id game-id}))
+            attacker (submit! ctx0 (merge helpers/player-defaults
+                                          {:xt/id                       att-id
+                                           :player/game                  game-id
+                                           :player/empire-name           "Spymaster"
+                                           :player/agents                10000
+                                           :player/pending-espionage     def-id
+                                           :player/pending-espionage-op  "spy"}))
+            _        (submit! ctx0 (merge helpers/player-defaults
+                                          {:xt/id              def-id
+                                           :player/game         game-id
+                                           :player/empire-name  "Defender"
+                                           :player/agents       0}))
+            _        (submit! ctx0 (alliance-fixture
+                                     {:alliance/game       game-id
+                                      :alliance/proposer   att-id
+                                      :alliance/recipient  def-id
+                                      :alliance/status     :proposed}))
+            ctx1     (assoc ctx0 :biff/db (xt/db node))
+            [result _ broken] (#'resolution/resolve-espionage ctx1 att-id attacker game)]
+        (is (nil? (:treaty-broken? result)))
+        (is (nil? broken))
+        (let [alliances (biff/q (xt/db node) '{:find (pull a [*]) :where [[a :alliance/game _]]})]
+          (is (= 1 (count alliances)))
+          (is (= :proposed (:alliance/status (first alliances)))))))))
+
+;;;;
 ;;;; resolve-espionage — bomb success writes a single tx (DB-backed)
 ;;;;
 ;;;; Regression for a bug where the bomb-success branch and a separate :player/incoming-seq

@@ -8,6 +8,11 @@
 ;;;;; The POST (apply-outcomes) only handles turn advancement and cleanup: incrementing turn/round
 ;;;;; counters, clearing pending state, and recording the score.
 ;;;;;
+;;;;; A proposed/accepted/withdrawn/dissolved treaty is deliberately NOT shown here — those
+;;;;; are already covered by the status-line alert chip's "instant messages" (see alerts.clj).
+;;;;; The only diplomacy news this page ever carries is a treaty BREAKING as the direct
+;;;;; consequence of this turn's own attack or espionage attempt — see treaty-broken-card below.
+;;;;;
 
 ;;;;; Logical Structure:
 ;;;;;
@@ -22,9 +27,9 @@
 ;;;;;        │  ├─ espionage-fail-card
 ;;;;;        │  ├─ incoming-espionage-card  (incite / defect)
 ;;;;;        │  ├─ bomb-card
-;;;;;        │  └─ treaty-notice-card  (per proposed/accepted/withdrawn/dissolved treaty)
+;;;;;        │  └─ treaty-broken-card  (per treaty broken by incoming espionage)
 ;;;;;        ├─ combat-card | strike-card | treaty-broken-card  (outgoing battle)
-;;;;;        ├─ spy-card | bomb-card  (outgoing espionage)
+;;;;;        ├─ spy-card | bomb-card | treaty-broken-card  (outgoing espionage)
 ;;;;;        ├─ stability-card
 ;;;;;        ├─ elimination notice
 ;;;;;        ├─ growth-card
@@ -715,24 +720,6 @@
     [:div.py-2.px-3.border-t.border-game-divider
      [:p.text-xs.text-yellow-400 body-text]]))
 
-(defn- treaty-notice-card
-  "Render a one-line DIPLOMACY notice card for a diplomacy move someone else made against
-  you (proposed/accepted/withdrew/dissolved) — reuses the same wording as the status-line
-  alert chip's fold-out panel (com.star-empire-elite.alerts) so the message reads the same
-  wherever you see it. Unlike the other incoming-* fields shown on this page, the underlying
-  :player/incoming-treaty-* field is NOT cleared when this turn's outcomes are applied — it
-  stays live until the Diplomacy phase is actually submitted (apply-diplomacy), so this card
-  can keep showing on every outcomes page in between.
-
-  [empire-name str, text str] -> hiccup"
-  [empire-name text]
-  [:div.rounded-game.bg-game-surface.overflow-hidden
-   {:class "border border-game-border"}
-   [:div.flex.items-center.py-2.px-3.gap-3
-    (ui/mode-badge :treaty-formed)
-    [:span.text-sm.text-game-green-soft
-     [:span.text-green-300.font-bold empire-name] " " text]]])
-
 (defn- espionage-fail-card
   "Render a collapsible card for incoming espionage operations that failed."
   [esp-fails esp-agents]
@@ -822,6 +809,11 @@
                      :player/incoming-incite-stability-lost  nil
                      :player/incoming-bomb-result            nil
                      :player/incoming-defect-agents-lost    nil
+                     ;; Unlike incoming-treaty-proposed/accepted/withdrawn/dissolved below,
+                     ;; a treaty broken by espionage isn't actionable in the Diplomacy phase
+                     ;; — it's already gone — so this clears on the same turn-end schedule as
+                     ;; the other incoming-* history fields above, not the treaty-* ones.
+                     :player/incoming-espionage-treaty-broken nil
                      ;; incoming-treaty-* is deliberately NOT cleared here — those
                      ;; notifications (someone proposed/accepted/withdrew/dissolved a treaty
                      ;; with you) stay live through to the Diplomacy phase, where they're
@@ -866,19 +858,20 @@
 
        (summary-strip (compute-summary outcomes))
 
-       ;; Incoming section — attacks, espionage, and diplomacy received this turn
-       (let [incoming           (seq (utils/take-recent (:player/incoming-attacks player)))
-             esp-fails          (utils/take-recent (:player/incoming-espionage-fails player))
-             esp-agents         (or (:player/incoming-espionage-agents-gained player) 0)
-             incite-stab-lost   (or (:player/incoming-incite-stability-lost player) 0)
-             bomb-result        (some-> (:player/incoming-bomb-result player) edn/read-string)
-             defect-agents-lost (or (:player/incoming-defect-agents-lost player) 0)
-             treaties-proposed  (seq (utils/take-recent (:player/incoming-treaty-proposed  player)))
-             treaties-accepted  (seq (utils/take-recent (:player/incoming-treaty-accepted  player)))
-             treaties-withdrawn (seq (utils/take-recent (:player/incoming-treaty-withdrawn player)))
-             treaties-dissolved (seq (utils/take-recent (:player/incoming-treaty-dissolved player)))]
+       ;; Incoming section — attacks and espionage received this turn. Diplomacy notices
+       ;; (proposed/accepted/withdrawn/dissolved) are NOT shown here — see the file header
+       ;; comment. A treaty broken by someone else's espionage against you is the one
+       ;; diplomacy item that does belong here, since it's a direct consequence of an
+       ;; incoming espionage attempt this turn, same as combat's treaty-broken-card above.
+       (let [incoming             (seq (utils/take-recent (:player/incoming-attacks player)))
+             esp-fails            (utils/take-recent (:player/incoming-espionage-fails player))
+             esp-agents           (or (:player/incoming-espionage-agents-gained player) 0)
+             incite-stab-lost     (or (:player/incoming-incite-stability-lost player) 0)
+             bomb-result          (some-> (:player/incoming-bomb-result player) edn/read-string)
+             defect-agents-lost   (or (:player/incoming-defect-agents-lost player) 0)
+             esp-treaties-broken  (seq (utils/take-recent (:player/incoming-espionage-treaty-broken player)))]
          (when (or incoming (seq esp-fails) (pos? incite-stab-lost) bomb-result (pos? defect-agents-lost)
-                   treaties-proposed treaties-accepted treaties-withdrawn treaties-dissolved)
+                   esp-treaties-broken)
            [:div.flex.flex-col.gap-2
             (map incoming-card incoming)
             (when (seq esp-fails)
@@ -900,14 +893,8 @@
                           :fighters          (:fighters   bomb-result)
                           :carriers          (:carriers   bomb-result)
                           :open?             true}))
-            (for [empire-name treaties-proposed]
-              (treaty-notice-card empire-name "proposed a peace treaty with you."))
-            (for [empire-name treaties-accepted]
-              (treaty-notice-card empire-name "accepted your peace treaty proposal."))
-            (for [empire-name treaties-withdrawn]
-              (treaty-notice-card empire-name "withdrew their peace treaty proposal."))
-            (for [empire-name treaties-dissolved]
-              (treaty-notice-card empire-name "dissolved your peace treaty."))]))
+            (for [empire-name esp-treaties-broken]
+              (treaty-broken-card empire-name false))]))
 
        ;; Outgoing battle result
        (when battle-result
@@ -947,25 +934,28 @@
        ;; Outgoing espionage result
        (when espionage-result
          (let [won? (:attacker-wins? espionage-result)
-               op   (get espionage-result :op "spy")]
-           (if (= op "bomb")
-             (bomb-card {:opp-name          (:defender-name espionage-result)
-                         :attacker-wins?    won?
-                         :you-are-attacker? true
-                         :soldiers          (:soldiers   espionage-result)
-                         :transports        (:transports espionage-result)
-                         :fighters          (:fighters   espionage-result)
-                         :carriers          (:carriers   espionage-result)
-                         :agents-lost       (:agents-lost espionage-result 0)
-                         :open?             (not won?)})
-             (spy-card {:opp-name        (:defender-name espionage-result)
-                        :won?            won?
-                        :op              op
-                        :spy             (:intel espionage-result)
-                        :lost            (:agents-lost espionage-result 0)
-                        :stab            (:stability-damage espionage-result)
-                        :agents-defected (:agents-defected espionage-result)
-                        :open?           (not won?)}))))
+               op   (get espionage-result :op "spy")
+               card (if (= op "bomb")
+                      (bomb-card {:opp-name          (:defender-name espionage-result)
+                                  :attacker-wins?    won?
+                                  :you-are-attacker? true
+                                  :soldiers          (:soldiers   espionage-result)
+                                  :transports        (:transports espionage-result)
+                                  :fighters          (:fighters   espionage-result)
+                                  :carriers          (:carriers   espionage-result)
+                                  :agents-lost       (:agents-lost espionage-result 0)
+                                  :open?             (not won?)})
+                      (spy-card {:opp-name        (:defender-name espionage-result)
+                                 :won?            won?
+                                 :op              op
+                                 :spy             (:intel espionage-result)
+                                 :lost            (:agents-lost espionage-result 0)
+                                 :stab            (:stability-damage espionage-result)
+                                 :agents-defected (:agents-defected espionage-result)
+                                 :open?           (not won?)}))]
+           (if (:treaty-broken? espionage-result)
+             [:<> card (treaty-broken-card (:defender-name espionage-result) true)]
+             card)))
 
        (stability-card {:expense-penalty  expense-penalty
                         :capture-penalty  capture-penalty

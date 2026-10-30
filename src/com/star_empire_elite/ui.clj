@@ -1289,23 +1289,36 @@
 ;;;;
 
 (defn op-radio-btn
-  "Render a radio button for selecting a target operation. Supports toggle-on-reclick
-  (clicking an already-selected radio deselects it) and fires an HTMX warning update.
+  "Render a radio button for selecting a target operation. By default supports
+  toggle-on-reclick (clicking an already-selected radio deselects it) and fires an HTMX
+  warning update.
 
-  [radio-name str, value str, label str, warning-endpoint str, warning-id str] -> hiccup"
-  [radio-name value label warning-endpoint warning-id]
+  opts:
+    :checked? — render this radio pre-selected (e.g. a forced default choice).
+    :sticky?  — omit the toggle-off behavior, so once selected this radio can only be
+                replaced by picking another option in the same radio-name group, never
+                deselected back to nothing. Used where a choice must always be made (see
+                diplomacy.clj's incoming-row, where Decline is the default and Accept/Decline
+                must always resolve to one or the other).
+
+  [radio-name str, value str, label str, warning-endpoint str, warning-id str,
+   opts {:checked? bool, :sticky? bool}|nil] -> hiccup"
+  [radio-name value label warning-endpoint warning-id & [{:keys [checked? sticky?]}]]
   [:label.block.cursor-pointer
    [:input.peer.sr-only
-    {:type       "radio"
-     :name       radio-name
-     :value      value
-     :hx-post    warning-endpoint
-     :hx-trigger "click"
-     :hx-target  (str "#" warning-id)
-     :hx-swap    "outerHTML"
-     :onclick    (str "var p=this.dataset.was==='true';"
-                      "document.querySelectorAll('[name=" radio-name "]').forEach(function(r){r.dataset.was='false';});"
-                      "if(p){this.checked=false;}else{this.dataset.was='true';}")}]
+    (cond-> {:type       "radio"
+             :name       radio-name
+             :value      value
+             :hx-post    warning-endpoint
+             :hx-trigger "click"
+             :hx-target  (str "#" warning-id)
+             :hx-swap    "outerHTML"}
+      checked? (assoc :checked true :data-was "true")
+      (not sticky?)
+      (assoc :onclick
+        (str "var p=this.dataset.was==='true';"
+             "document.querySelectorAll('[name=" radio-name "]').forEach(function(r){r.dataset.was='false';});"
+             "if(p){this.checked=false;}else{this.dataset.was='true';}")))]
    [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
     {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
     label]])

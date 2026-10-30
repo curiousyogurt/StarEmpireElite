@@ -67,6 +67,21 @@
       (is (every? #(= :diplomacy (:alert/category %)) rows))
       (is (= ["A" "B" "C" "D"] (mapv :alert/sender rows))))))
 
+(deftest test-incoming-messages-espionage-treaty-broken
+  (testing "A treaty broken by someone else's espionage against you is its own DIPLOMACY
+            row, ordered right after espionage-fail rows and before the four treaty-
+            lifecycle vectors — mirrors the ACTION+DIPLOMACY pairing attack-messages
+            already does for a combat-broken treaty"
+    (let [player {:player/incoming-espionage-treaty-broken ["Spymaster Empire"]
+                  :player/incoming-treaty-proposed         ["Proposer"]}
+          rows   (alerts/incoming-messages player)]
+      (is (= [:diplomacy :diplomacy] (mapv :alert/category rows)))
+      (is (= :treaty-broken (:alert/badge (first rows))))
+      (is (= "Spymaster Empire" (:alert/sender (first rows))))
+      (is (= "broke a peace treaty with you (espionage)." (:alert/text (first rows))))
+      (is (= "Proposer" (:alert/sender (second rows)))
+          "the espionage-broken row comes before the treaty-lifecycle vectors"))))
+
 ;;;;
 ;;;; group-messages Tests
 ;;;;

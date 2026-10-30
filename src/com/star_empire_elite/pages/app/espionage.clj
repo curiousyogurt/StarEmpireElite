@@ -47,9 +47,9 @@
 ;;; Each row shows empire name, planet count, score, and four radio-button operation
 ;;; modes (Spy, Incite, Bomb, Defect). A local `op-btn` fn renders each radio input
 ;;; with toggle-on-reclick behaviour and HTMX warning updates. A treaty partner's row
-;;; carries a "P" marker (ui/treaty-indicator) right after their name — purely informational
-;;; here, since espionage never breaks a treaty (only an Action-phase attack does — see
-;;; resolution/resolve-combat).
+;;; carries a "P" marker (ui/treaty-indicator) right after their name — a warning, since
+;;; running any espionage op against them breaks the treaty just like an Action-phase
+;;; attack does (see resolution/resolve-espionage).
 ;;;
 ;;; - target-row: one table row with four radio-button operation modes
 ;;;
@@ -140,7 +140,9 @@
         attacker-id    (str player-id)
         has-agents?    (pos? (:player/agents player))
         other-players  (utils/get-other-players db (:player/game player) player-id)
-        ;; Informational only — espionage never breaks a treaty (see diplomacy.clj).
+        ;; Active treaties only — a mere proposal hasn't "arrived" yet (see diplomacy.clj).
+        ;; Marked so the player sees, before choosing a target, that any op against one of
+        ;; these breaks the treaty (see resolution/resolve-espionage).
         alliances      (diplomacy/alliances-for-player db (:player/game player) player-id)
         treaty-ids     (set (map #(diplomacy/partner-id % player-id)
                                  (diplomacy/active-treaties alliances player-id)))
@@ -159,7 +161,8 @@
           [:div
            (ui/section-label "Choose a Target")
            [:p.text-xs.mb-2.text-game-green-muted
-            "Spy: Reveal military forces. Incite: Reduce stability. Bomb: Covertly destroy units. Defect: Turn enemy agents."]
+            "Spy: Reveal military forces. Incite: Reduce stability. Bomb: Covertly destroy units. Defect: Turn enemy agents. "
+            "A “P” marker means you hold an active peace treaty with that empire — any operation against them breaks it."]
            [:div.overflow-x-auto
             [:table.w-full.text-sm
              {:class "border border-game-border border-collapse"}

@@ -309,6 +309,7 @@
             [:player/incoming-incite-stability-lost    {:optional true} [:maybe :int]]
             [:player/incoming-bomb-result              {:optional true} [:maybe :string]]
             [:player/incoming-defect-agents-lost       {:optional true} [:maybe :int]]
+            [:player/incoming-espionage-treaty-broken  {:optional true} [:maybe [:vector :string]]]
             [:player/incoming-treaty-proposed           {:optional true} [:maybe [:vector :string]]]
             [:player/incoming-treaty-accepted          {:optional true} [:maybe [:vector :string]]]
             [:player/incoming-treaty-withdrawn         {:optional true} [:maybe [:vector :string]]]

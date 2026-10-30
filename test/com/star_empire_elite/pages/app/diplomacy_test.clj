@@ -245,32 +245,37 @@
       (is (= 303 (:status result)))
       (is (= :proposed (:alliance/status (first (alliances-in (xt/db node) (:xt/id game)))))))))
 
-(deftest test-accept-decision-with-no-free-slots-is-silently-dropped
-  (with-open [node (test-xtdb-node [])]
-    (let [setup-ctx (ctx-for node nil)
-          game      (make-game! setup-ctx {})
-          a         (make-player! setup-ctx (:xt/id game) {})
-          b         (make-player! setup-ctx (:xt/id game) {})
-          c         (make-player! setup-ctx (:xt/id game) {})
-          d         (make-player! setup-ctx (:xt/id game) {})
-          proposal  (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/status :proposed
-                                               :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
-          _ (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/status :active
-                                       :alliance/proposer (:xt/id b) :alliance/recipient (:xt/id c)})
-          _ (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/status :active
-                                       :alliance/proposer (:xt/id b) :alliance/recipient (:xt/id d)})
-          result    (page/apply-diplomacy
-                      (ctx-for node (:xt/id b)
-                        {:params (decision-params (:xt/id proposal) "accept")}))]
-      (is (= 303 (:status result)))
-      (is (= :proposed (:alliance/status (first (filter #(= (:xt/id proposal) (:xt/id %))
-                                                          (alliances-in (xt/db node) (:xt/id game))))))))))
+(deftest test-accept-decision-with-no-free-slots-falls-back-to-decline
+  (testing "an incoming proposal can never stay :proposed past this phase — if Accept turns
+            out invalid by submit time (no slot left), it's treated as a Decline instead of
+            being silently dropped"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {})
+            c         (make-player! setup-ctx (:xt/id game) {})
+            d         (make-player! setup-ctx (:xt/id game) {})
+            proposal  (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/status :proposed
+                                                 :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
+            _ (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/status :active
+                                         :alliance/proposer (:xt/id b) :alliance/recipient (:xt/id c)})
+            _ (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/status :active
+                                         :alliance/proposer (:xt/id b) :alliance/recipient (:xt/id d)})
+            result    (page/apply-diplomacy
+                        (ctx-for node (:xt/id b)
+                          {:params (decision-params (:xt/id proposal) "accept")}))]
+        (is (= 303 (:status result)))
+        (is (= :declined (:alliance/status (first (filter #(= (:xt/id proposal) (:xt/id %))
+                                                            (alliances-in (xt/db node) (:xt/id game)))))))))))
 
 (deftest test-two-incoming-accepts-with-one-free-slot-only-one-wins
   (testing "with only one slot free, two simultaneous Accept decisions can't both succeed —
             exactly which one wins is diplomacy/resolve-decisions's own concern (see its
             ordering test in diplomacy_test.clj, where the decisions order is controlled
-            directly); this just confirms apply-diplomacy doesn't let both through"
+            directly); this just confirms apply-diplomacy doesn't let both through. The
+            loser falls back to :declined rather than staying :proposed, since an incoming
+            proposal can never be left pending past this phase."
     (with-open [node (test-xtdb-node [])]
       (let [setup-ctx (ctx-for node nil)
             game      (make-game! setup-ctx {})
@@ -294,7 +299,39 @@
             statuses [(:alliance/status (by-id (:xt/id p1))) (:alliance/status (by-id (:xt/id p2)))]]
         (is (= 303 (:status result)))
         (is (= 1 (count (filter #{:active} statuses))) "exactly one of the two was accepted")
-        (is (= 1 (count (filter #{:proposed} statuses))) "the other stayed pending")))))
+        (is (= 1 (count (filter #{:declined} statuses))) "the other was declined, not left pending")))))
+
+(deftest test-incoming-proposal-with-no-params-is-declined
+  (testing "submitting End Current Round with nothing selected must not leave an incoming
+            proposal pending — Decline is the forced default (see apply-diplomacy)"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {})
+            proposal  (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/status :proposed
+                                                 :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
+            result    (page/apply-diplomacy (ctx-for node (:xt/id b)))
+            db        (xt/db node)]
+        (is (= 303 (:status result)))
+        (is (= :declined (:alliance/status (first (alliances-in db (:xt/id game))))))))))
+
+(deftest test-incoming-proposal-with-a-tampered-value-is-declined
+  (testing "any value other than exactly 'accept' on an incoming proposal's radio resolves
+            to Decline, the same as if nothing had been sent"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {})
+            proposal  (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/status :proposed
+                                                 :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
+            result    (page/apply-diplomacy
+                        (ctx-for node (:xt/id b)
+                          {:params (decision-params (:xt/id proposal) "withdraw")}))
+            db        (xt/db node)]
+        (is (= 303 (:status result)))
+        (is (= :declined (:alliance/status (first (alliances-in db (:xt/id game))))))))))
 
 ;;;;
 ;;;; apply-diplomacy — Decline / Withdraw decisions (no event)
@@ -348,19 +385,23 @@
       ;; The recipient's alert banner picks this up even if they never revisit diplomacy.
       (is (= ["Proposer"] (:player/incoming-treaty-withdrawn (xt/entity db (:xt/id b))))))))
 
-(deftest test-withdraw-decision-by-non-proposer-is-silently-dropped
-  (with-open [node (test-xtdb-node [])]
-    (let [setup-ctx (ctx-for node nil)
-          game      (make-game! setup-ctx {})
-          a         (make-player! setup-ctx (:xt/id game) {})
-          b         (make-player! setup-ctx (:xt/id game) {})
-          proposal  (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/status :proposed
-                                               :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
-          result    (page/apply-diplomacy
-                      (ctx-for node (:xt/id b)
-                        {:params (decision-params (:xt/id proposal) "withdraw")}))]
-      (is (= 303 (:status result)))
-      (is (= :proposed (:alliance/status (first (alliances-in (xt/db node) (:xt/id game)))))))))
+(deftest test-withdraw-decision-by-non-proposer-is-declined-not-withdrawn
+  (testing "withdraw is only valid for the proposer, so b (the recipient) can't use it to
+            withdraw a's proposal — but b's incoming proposal still can't be left pending:
+            an invalid value here falls back to Decline, same as a tampered or missing one
+            (see test-incoming-proposal-with-a-tampered-value-is-declined)"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {})
+            proposal  (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/status :proposed
+                                                 :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
+            result    (page/apply-diplomacy
+                        (ctx-for node (:xt/id b)
+                          {:params (decision-params (:xt/id proposal) "withdraw")}))]
+        (is (= 303 (:status result)))
+        (is (= :declined (:alliance/status (first (alliances-in (xt/db node) (:xt/id game))))))))))
 
 ;;;;
 ;;;; apply-diplomacy — Dissolve decision (event, either side may do it)
@@ -507,3 +548,38 @@
         (is (str/includes? html (str "treaty-" (:xt/id treaty))))
         (is (str/includes? html (str "treaty-" (:xt/id incoming))))
         (is (not (str/includes? html "diplomacy-op")))))))
+
+(deftest test-incoming-proposal-defaults-to-a-forced-decline
+  (testing "an incoming proposal's Decline radio is pre-checked and neither Accept nor
+            Decline carries the toggle-off onclick other deferred radios use — the player
+            can switch between the two but can never land on 'nothing selected'"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {})
+            proposal  (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/status :proposed
+                                                 :alliance/proposer (:xt/id b) :alliance/recipient (:xt/id a)})
+            db        (xt/db node)
+            html      (pr-str (page/diplomacy-page {:player a :game game :db db}))
+            radio-name (str "treaty-" (:xt/id proposal))]
+        (is (str/includes? html ":checked true"))
+        (is (not (str/includes? html (str "document.querySelectorAll('[name=" radio-name "]')"))))
+        (is (str/includes? html "ⓘ Treaty proposal will be declined."))))))
+
+(deftest test-cancel-diplomacy-never-touches-accept-or-decline
+  (testing "Cancel Diplomacy only resets the optional treaty-* radios (dissolve/withdraw/
+            propose) — it must never flip an incoming proposal's Accept/Decline back to the
+            default, since that choice is forced, not something to 'cancel out of'"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {})
+            _         (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/status :proposed
+                                                 :alliance/proposer (:xt/id b) :alliance/recipient (:xt/id a)})
+            db        (xt/db node)
+            html      (pr-str (page/diplomacy-page {:player a :game game :db db}))]
+        (is (str/includes? html "r.value!=='decline'&&r.value!=='accept'")
+            "Cancel's reset only applies to radios whose value is neither decline nor accept")
+        (is (not (str/includes? html "hx-vals")))))))

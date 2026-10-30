@@ -180,7 +180,8 @@
           (is (nil? (:player/last-population-growth   tx)))
           (is (nil? (:player/pending-espionage        tx)))
           (is (nil? (:player/incoming-attacks         tx)))
-          (is (nil? (:player/incoming-espionage-fails tx))))))))
+          (is (nil? (:player/incoming-espionage-fails tx)))
+          (is (nil? (:player/incoming-espionage-treaty-broken tx))))))))
 
 (deftest test-apply-outcomes-does-not-clear-treaty-notifications
   (testing "Diplomacy notifications are left alone — they clear at apply-diplomacy instead,
@@ -281,21 +282,45 @@
       (is (vector? (outcomes/outcomes-page {:player player-with-attacks :game test-game
                                             :battle-result nil :espionage-result nil}))))))
 
-(deftest test-outcomes-page-with-diplomacy-notices
-  (testing "Shows a notice card for each diplomacy move made against this player — these
-            fields persist across outcomes submissions and only clear at apply-diplomacy"
+(deftest test-outcomes-page-never-shows-proposed-accepted-withdrawn-dissolved-notices
+  (testing "A proposed/accepted/withdrawn/dissolved treaty is never shown on Outcomes — that's
+            handled exclusively by the status-line alert chip's instant messages (alerts.clj).
+            test-player carries all four incoming-treaty-* fields (see fixture above) so this
+            genuinely exercises the omission, not an empty-fixture false negative."
     (let [page (outcomes/outcomes-page {:player test-player :game test-game
                                         :battle-result nil :espionage-result nil})
           html (str page)]
       (is (vector? page))
-      (is (clojure.string/includes? html "Proposer Empire"))
-      (is (clojure.string/includes? html "proposed a peace treaty with you"))
-      (is (clojure.string/includes? html "Acceptor Empire"))
-      (is (clojure.string/includes? html "accepted your peace treaty proposal"))
-      (is (clojure.string/includes? html "Withdrawer Empire"))
-      (is (clojure.string/includes? html "withdrew their peace treaty proposal"))
-      (is (clojure.string/includes? html "Dissolver Empire"))
-      (is (clojure.string/includes? html "dissolved your peace treaty")))))
+      (is (not (clojure.string/includes? html "Proposer Empire")))
+      (is (not (clojure.string/includes? html "proposed a peace treaty with you")))
+      (is (not (clojure.string/includes? html "Acceptor Empire")))
+      (is (not (clojure.string/includes? html "accepted your peace treaty proposal")))
+      (is (not (clojure.string/includes? html "Withdrawer Empire")))
+      (is (not (clojure.string/includes? html "withdrew their peace treaty proposal")))
+      (is (not (clojure.string/includes? html "Dissolver Empire")))
+      (is (not (clojure.string/includes? html "dissolved your peace treaty"))))))
+
+(deftest test-outcomes-page-shows-incoming-espionage-treaty-broken
+  (testing "A treaty broken by someone else's espionage against this player IS shown — it's a
+            direct consequence of this turn's incoming espionage, not a lifecycle notice"
+    (let [player-with-broken (assoc test-player
+                                     :player/incoming-espionage-treaty-broken ["Spymaster Empire"])
+          html (str (outcomes/outcomes-page {:player player-with-broken :game test-game
+                                             :battle-result nil :espionage-result nil}))]
+      (is (clojure.string/includes? html "Spymaster Empire"))
+      (is (clojure.string/includes? html "broke their peace treaty with you")))))
+
+(deftest test-outcomes-page-shows-outgoing-espionage-treaty-broken
+  (testing "When the player's own espionage attempt broke an active treaty, the outgoing
+            espionage card is followed by a treaty-broken notice from their perspective"
+    (let [espionage-result {:op "spy" :attacker-wins? true :defender-name "Target Empire"
+                            :agents-lost 0 :treaty-broken? true
+                            :intel {:soldiers 1 :transports 1 :generals 1 :fighters 1
+                                    :carriers 1 :admirals 1 :stations 1 :cmd-ships 1 :agents 1}}
+          html (str (outcomes/outcomes-page {:player test-player :game test-game
+                                             :battle-result nil :espionage-result espionage-result}))]
+      (is (clojure.string/includes? html "Target Empire"))
+      (is (clojure.string/includes? html "You broke your peace treaty with Target Empire")))))
 
 (deftest test-outcomes-page-with-pop-growth
   (testing "Renders population growth message when pop-growth is positive"

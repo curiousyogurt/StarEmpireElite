@@ -242,7 +242,10 @@
           "freed by the dissolve above, in the same submission"))))
 
 (deftest test-resolve-decisions-two-accepts-one-free-slot-keeps-the-first
-  (testing "ties for the last slot break by decisions' order, not by chance"
+  (testing "ties for the last slot break by decisions' order, not by chance. The loser falls
+            back to :decline rather than being dropped — an incoming proposal can never stay
+            :proposed past this phase (see apply-diplomacy, which always sends every incoming
+            proposal through here as :accept or :decline)."
     (let [tight-game {:game/alliance-slots 1}
           p1 (alliance :proposed b-id a-id)
           p2 (alliance :proposed c-id a-id)
@@ -251,8 +254,22 @@
                                                   [(:xt/id p2) :accept]]
                                                  nil now)]
       (is (= :active (:alliance/status (:alliance (first (filter #(= (:xt/id p1) (:xt/id (:alliance %))) resolved))))))
-      (is (empty? (filter #(= (:xt/id p2) (:xt/id (:alliance %))) resolved))
-          "the second accept found no free slot left and was dropped"))))
+      (let [loser (first (filter #(= (:xt/id p2) (:xt/id (:alliance %))) resolved))]
+        (is (= :decline (:op loser)))
+        (is (= :declined (:alliance/status (:alliance loser)))
+            "the second accept found no free slot left and fell back to decline")))))
+
+(deftest test-resolve-decisions-accept-with-no-free-slot-falls-back-to-decline
+  (testing "a lone Accept that fails check-accept (no free slot, no competing accept
+            involved) still resolves to :decline rather than being dropped"
+    (let [full-game {:game/alliance-slots 1}
+          already   (alliance :active a-id c-id)     ; a-id's one slot already used
+          proposal  (alliance :proposed b-id a-id)
+          resolved  (diplomacy/resolve-decisions full-game [already proposal] a-id
+                                                  [[(:xt/id proposal) :accept]] nil now)
+          result    (by-op resolved :decline)]
+      (is (= :declined (:alliance/status result)))
+      (is (= (:xt/id proposal) (:xt/id result))))))
 
 (deftest test-resolve-decisions-propose-checked-last-after-accepts-use-the-slots
   (testing "Propose only claims a slot nothing above already took"

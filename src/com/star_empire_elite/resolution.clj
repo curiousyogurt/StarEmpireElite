@@ -24,13 +24,16 @@
 ;;;; Helpers
 ;;;;
 
-;;; A peace treaty only breaks for an Action-phase attack against an *active* treaty partner
-;;; — see diplomacy.clj's lifecycle doc comment for why a merely :proposed treaty is immune
-;;; (it hasn't "arrived" yet). Called once per attack, on the fresh-resolve path only.
+;;; A peace treaty only breaks for a hostile action — an Action-phase attack or an espionage
+;;; attempt — against an *active* treaty partner — see diplomacy.clj's lifecycle doc comment
+;;; for why a merely :proposed treaty is immune (it hasn't "arrived" yet). Called once per
+;;; attack or espionage attempt, on the fresh-resolve path only. The treaty breaks whether or
+;;; not the attack/espionage succeeds — the hostile act itself is what ends it.
 (defn- break-treaty-if-active
   "If attacker-id and defender-id currently hold an active peace treaty, return the updated
   (now :broken) alliance map; else nil. Pure data — the caller adds :db/doc-type and includes
-  it in the same submit-tx as the battle, so the break applies atomically with it.
+  it in the same submit-tx as the battle or espionage attempt, so the break applies
+  atomically with it.
 
   [db xtdb-db, game-id uuid, attacker-id uuid, defender-id uuid, now Date] -> alliance-map | nil"
   [db game-id attacker-id defender-id now]
@@ -349,98 +352,117 @@
 
 (defn- resolve-espionage
   "Resolve espionage on first load; return cached result on refresh.
-  Returns [result updated-player] where result is nil if no espionage was pending."
+  Returns [result updated-player broken-alliance] where result is nil if no espionage was
+  pending, and broken-alliance is the now-:broken alliance map if this espionage attempt
+  broke an active peace treaty with the target (nil otherwise, including on every cache-hit
+  — the break, like the attempt itself, only happens once, on first resolve). The treaty
+  breaks whether the attempt succeeds or fails — see break-treaty-if-active above."
   [ctx player-id player game]
   (let [db                   (:biff/db ctx)
         pending-espionage    (:player/pending-espionage player)
         pending-espionage-op (:player/pending-espionage-op player)
         stored-espionage     (some-> (:player/last-espionage-result player) edn/read-string)]
     (if-not pending-espionage
-      [nil player]
+      [nil player nil]
       (let [target (xt/entity db pending-espionage)]
         (if (and stored-espionage (= (:defender-id stored-espionage) (str pending-espionage)))
           ;; Cache hit — changes already applied on first load
-          [stored-espionage player]
+          [stored-espionage player nil]
           ;; Fresh resolve
           (let [incite?     (= pending-espionage-op "incite")
                 bomb?       (= pending-espionage-op "bomb")
                 defect?     (= pending-espionage-op "defect")
-                result      (cond
+                broken-alliance (break-treaty-if-active
+                                   db (:player/game player) player-id
+                                   (:xt/id target) (java.util.Date.))
+                raw-result  (cond
                               incite?  (combat/resolve-incite    game player target)
                               bomb?    (combat/resolve-bomb      game player target)
                               defect?  (combat/resolve-defect    game player target)
                               :else    (combat/resolve-espionage game player target))
+                result      (cond-> raw-result broken-alliance (assoc :treaty-broken? true))
                 att-wins?      (:attacker-wins? result)
                 agents-lost    (or (:agents-lost result) 0)
                 agents-captured (or (:agents-captured result) 0)
-                stab-dmg       (or (:stability-damage result) 0)]
-            ;; combat/resolve-* only ever sets :agents-lost when the attacker loses (see
-            ;; combat.clj), so the fail branch below and the incite/bomb/defect branches (each
-            ;; gated on att-wins?) can never both fire for the same resolve — exactly one
-            ;; conditional map below ever targets :xt/id target. That matters for
-            ;; :player/incoming-seq: biff's :db/op :update builds one match+put pair per map,
-            ;; so two separate maps updating the same entity in one submit-tx would have the
-            ;; second map's match checked against a stale pre-tx snapshot that the first map's
-            ;; put has already changed — a deterministic failure, not a race, and retries won't
-            ;; fix it. Bumping the counter inside whichever single map fires avoids that.
+                stab-dmg       (or (:stability-damage result) 0)
+                ;; combat/resolve-* only ever sets :agents-lost when the attacker loses (see
+                ;; combat.clj), so the fail branch and the incite/bomb/defect branches (each
+                ;; gated on att-wins?) can never both fire for the same resolve — at most one
+                ;; of these four ever applies. A plain successful "spy" leaves none of them
+                ;; set at all (spying success is silent), which is why treaty-fields below is
+                ;; merged in rather than being its own branch here: it's the one update that
+                ;; can fire independently of (or together with) whichever op-fields above do.
+                op-fields   (cond
+                              (pos? agents-lost)
+                              {:player/agents (+ (or (:player/agents target) 0) agents-captured)
+                               :player/incoming-espionage-fails
+                               (utils/capped-conj (:player/incoming-espionage-fails target)
+                                            (cond incite? "incite" bomb? "bomb" defect? "defect" :else "spy"))
+                               :player/incoming-espionage-agents-gained
+                               (+ (or (:player/incoming-espionage-agents-gained target) 0) agents-captured)}
+
+                              (and incite? att-wins? (pos? stab-dmg))
+                              {:player/stability (max 0 (- (:player/stability target) stab-dmg))
+                               :player/incoming-incite-stability-lost
+                               (+ (or (:player/incoming-incite-stability-lost target) 0) stab-dmg)}
+
+                              (and bomb? att-wins?)
+                              (let [sd           (or (:soldiers   result) 0)
+                                    td           (or (:transports result) 0)
+                                    fd           (or (:fighters   result) 0)
+                                    cd           (or (:carriers   result) 0)
+                                    new-soldiers (max 0 (- (:player/soldiers target) sd))
+                                    new-fighters (max 0 (- (:player/fighters target) fd))]
+                                {:player/soldiers   new-soldiers
+                                 :player/transports (max 0 (- (:player/transports target) td))
+                                 :player/fighters   new-fighters
+                                 :player/carriers   (max 0 (- (:player/carriers   target) cd))
+                                 :player/score      (utils/calculate-score
+                                                      game (assoc target
+                                                        :player/soldiers new-soldiers
+                                                        :player/fighters new-fighters))
+                                 :player/incoming-bomb-result
+                                 (pr-str {:attacker-name (:player/empire-name player)
+                                          :soldiers      sd
+                                          :transports    td
+                                          :fighters      fd
+                                          :carriers      cd})})
+
+                              (and defect? att-wins?)
+                              (let [n (or (:agents-defected result) 0)]
+                                {:player/agents (max 0 (- (or (:player/agents target) 0) n))
+                                 :player/incoming-defect-agents-lost
+                                 (+ (or (:player/incoming-defect-agents-lost target) 0) n)}))
+                treaty-fields (when broken-alliance
+                                {:player/incoming-espionage-treaty-broken
+                                 (utils/capped-conj (:player/incoming-espionage-treaty-broken target)
+                                                     (:player/empire-name player))})
+                ;; op-fields and treaty-fields never collide on a key, so merging them is safe
+                ;; and keeps every :xt/id target update inside this ONE map — biff's :db/op
+                ;; :update builds one match+put pair per map, so two separate maps updating
+                ;; the same entity in one submit-tx would have the second map's match checked
+                ;; against a stale pre-tx snapshot that the first map's put already changed, a
+                ;; deterministic failure retries can't fix. :player/incoming-seq is bumped once
+                ;; per distinct alert row this map is about to add (the op result, and/or the
+                ;; treaty-broken notice).
+                target-fields (merge op-fields treaty-fields)
+                alert-count   (+ (if op-fields 1 0) (if treaty-fields 1 0))]
             (biff/submit-tx
               ctx
               (remove nil?
                       [{:db/doc-type :player :db/op :update :xt/id player-id
                         :player/last-espionage-result (pr-str result)
                         :player/agents (max 0 (- (:player/agents player) agents-lost))}
-                       (when (pos? agents-lost)
-                         {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
-                          :player/agents (+ (or (:player/agents target) 0) agents-captured)
-                          :player/incoming-espionage-fails
-                          (utils/capped-conj (:player/incoming-espionage-fails target)
-                                       (cond incite? "incite" bomb? "bomb" defect? "defect" :else "spy"))
-                          :player/incoming-espionage-agents-gained
-                          (+ (or (:player/incoming-espionage-agents-gained target) 0) agents-captured)
-                          :player/incoming-seq
-                          (utils/next-incoming-seq target 1)})
-                       (when (and incite? att-wins? (pos? stab-dmg))
-                         {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
-                          :player/stability (max 0 (- (:player/stability target) stab-dmg))
-                          :player/incoming-incite-stability-lost
-                          (+ (or (:player/incoming-incite-stability-lost target) 0) stab-dmg)
-                          :player/incoming-seq
-                          (utils/next-incoming-seq target 1)})
-                       (when (and bomb? att-wins?)
-                         (let [sd          (or (:soldiers   result) 0)
-                               td          (or (:transports result) 0)
-                               fd          (or (:fighters   result) 0)
-                               cd          (or (:carriers   result) 0)
-                               new-soldiers (max 0 (- (:player/soldiers  target) sd))
-                               new-fighters (max 0 (- (:player/fighters  target) fd))]
-                           {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
-                            :player/soldiers   new-soldiers
-                            :player/transports (max 0 (- (:player/transports target) td))
-                            :player/fighters   new-fighters
-                            :player/carriers   (max 0 (- (:player/carriers   target) cd))
-                            :player/score      (utils/calculate-score
-                                                 game (assoc target
-                                                   :player/soldiers new-soldiers
-                                                   :player/fighters new-fighters))
-                            :player/incoming-bomb-result
-                            (pr-str {:attacker-name (:player/empire-name player)
-                                     :soldiers      sd
-                                     :transports    td
-                                     :fighters      fd
-                                     :carriers      cd})
-                            :player/incoming-seq
-                            (utils/next-incoming-seq target 1)}))
-                       (when (and defect? att-wins?)
-                         (let [n (or (:agents-defected result) 0)]
-                           {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
-                            :player/agents (max 0 (- (or (:player/agents target) 0) n))
-                            :player/incoming-defect-agents-lost
-                            (+ (or (:player/incoming-defect-agents-lost target) 0) n)
-                            :player/incoming-seq
-                            (utils/next-incoming-seq target 1)}))]))
+                       (when target-fields
+                         (merge {:db/doc-type :player :db/op :update :xt/id (:xt/id target)
+                                 :player/incoming-seq (utils/next-incoming-seq target alert-count)}
+                                target-fields))
+                       (when broken-alliance (assoc broken-alliance :db/doc-type :alliance))]))
             (let [agents-gained (if (and defect? att-wins?) (or (:agents-defected result) 0) 0)]
-              [result (assoc player :player/agents
-                             (max 0 (+ (- (:player/agents player) agents-lost) agents-gained)))])))))))
+              [result
+               (assoc player :player/agents
+                      (max 0 (+ (- (:player/agents player) agents-lost) agents-gained)))
+               broken-alliance])))))))
 
 (defn- resolve-population
   "Resolve population growth on first load; return cached result on refresh.
@@ -663,9 +685,11 @@
   results on refresh. Steps: combat → espionage → population → expense penalty →
   stability breakaway → stability recovery → elimination check.
 
-  An Action-phase attack against an active peace-treaty partner breaks that treaty as part
-  of the combat step (resolve-combat) — the broken alliance produces its own :treaty-broken
-  event here, and :battle-result carries a :treaty-broken? flag for outcomes/outcomes-page.
+  An Action-phase attack OR an espionage attempt against an active peace-treaty partner
+  breaks that treaty, as part of the combat step (resolve-combat) or the espionage step
+  (resolve-espionage) respectively — either broken alliance produces its own :treaty-broken
+  event here, and :battle-result / :espionage-result each carry their own :treaty-broken?
+  flag for outcomes/outcomes-page.
 
   After resolution, writes game-event documents for any freshly resolved results.
   Cache-hit results (already persisted on a prior page load) do not produce duplicate
@@ -682,8 +706,8 @@
         breakaway-cached? (some? (:player/last-stability-breakaway player))
         fate-cached?      (some? (:player/last-fate-result player))
 
-        [battle-result p1 broken-alliance] (resolve-combat ctx player-id player game)
-        [espionage-result p2] (resolve-espionage           ctx player-id p1     game)
+        [battle-result p1 combat-broken-alliance]     (resolve-combat    ctx player-id player game)
+        [espionage-result p2 espionage-broken-alliance] (resolve-espionage ctx player-id p1     game)
         [pop-growth       p3] (resolve-population          ctx player-id p2     game)
         [expense-penalty  p4] (resolve-expense-penalty     ctx player-id p3     game)
         [breakaway-result p5] (resolve-stability-breakaway ctx player-id p4     game)
@@ -711,13 +735,24 @@
                  (and battle-result (not combat-cached?))
                  (conj (events/event-of-battle-result battle-result event-meta))
 
-                 ;; broken-alliance is only ever non-nil on the same fresh-resolve path as
-                 ;; battle-result (see resolve-combat), so no separate cache check is needed.
-                 broken-alliance
+                 ;; combat-broken-alliance is only ever non-nil on the same fresh-resolve path
+                 ;; as battle-result (see resolve-combat), so no separate cache check is needed.
+                 combat-broken-alliance
                  (conj (events/event-of-treaty
-                         broken-alliance :treaty-broken
+                         combat-broken-alliance :treaty-broken
                          {player-id (:attacker-name battle-result)
-                          (diplomacy/partner-id broken-alliance player-id) (:defender-name battle-result)}
+                          (diplomacy/partner-id combat-broken-alliance player-id) (:defender-name battle-result)}
+                         event-meta))
+
+                 ;; Same reasoning as combat-broken-alliance above, but for an espionage
+                 ;; attempt — espionage-result itself has no :attacker-name field (see
+                 ;; combat.clj's resolve-espionage/-incite/-bomb/-defect), so the attacker's
+                 ;; name comes from player directly instead.
+                 espionage-broken-alliance
+                 (conj (events/event-of-treaty
+                         espionage-broken-alliance :treaty-broken
+                         {player-id (:player/empire-name player)
+                          (diplomacy/partner-id espionage-broken-alliance player-id) (:defender-name espionage-result)}
                          event-meta))
 
                  (and espionage-result (not espionage-cached?))

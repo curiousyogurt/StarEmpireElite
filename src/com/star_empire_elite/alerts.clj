@@ -100,7 +100,8 @@
 (defn incoming-messages
   "Flatten a player's incoming-* history fields into alert rows, one per raw message —
   the same events shown in detail on the Outcomes phase page. Order: attacks (plus any
-  treaty-broken rows), espionage, then the four treaty-lifecycle vectors.
+  treaty-broken rows), espionage (plus any treaty-broken-by-espionage rows), then the four
+  treaty-lifecycle vectors.
 
   [player player-map] -> [alert-map]"
   [player]
@@ -109,6 +110,8 @@
       (attack-messages player)
       (keep identity [(bomb-message player) (incite-message player) (defect-message player)])
       (espionage-fail-messages player)
+      (treaty-messages player :player/incoming-espionage-treaty-broken :treaty-broken
+                        "broke a peace treaty with you (espionage).")
       (treaty-messages player :player/incoming-treaty-proposed  :treaty-formed
                         "proposed a peace treaty with you.")
       (treaty-messages player :player/incoming-treaty-accepted  :treaty-formed

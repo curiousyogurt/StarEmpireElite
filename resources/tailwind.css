@@ -167,4 +167,7 @@ details[open] > summary .card-chevron {
 .cancel-target { display: none; }
 form:has([name=espionage-action]:checked) .cancel-target,
 form:has([name=target-action]:checked) .cancel-target,
-form:has([name^=treaty-]:checked) .cancel-target { display: inline-block; }
+/* Accept/Decline (incoming-row) are a forced choice, not an optional queued action — the
+   player must always pick one, so switching between them is never something to "cancel"
+   out of. Only dissolve/withdraw/propose (truly optional treaty-* radios) show the button. */
+form:has([name^=treaty-]:checked:not([value=decline], [value=accept])) .cancel-target { display: inline-block; }

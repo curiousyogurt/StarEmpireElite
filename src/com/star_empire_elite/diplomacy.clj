@@ -8,12 +8,14 @@
 ;;;;;
 ;;;;; Lifecycle: :proposed -> :active (accepted) | :declined | :withdrawn;
 ;;;;;            :active   -> :dissolved (ended by either side, from the diplomacy phase)
-;;;;;                       | :broken (ended by an attack).
+;;;;;                       | :broken (ended by an attack or an espionage attempt).
 ;;;;;
 ;;;;; Proposing, accepting, declining, and withdrawing only ever happen during the diplomacy
-;;;;; phase (see pages/app/diplomacy.clj). Breaking a treaty by attack happens during combat
-;;;;; resolution (resolution.clj) and can only happen to an :active treaty — a :proposed one
-;;;;; is an offer that hasn't "arrived" yet, so an attack during that window leaves it pending.
+;;;;; phase (see pages/app/diplomacy.clj). Breaking a treaty by attacking or running espionage
+;;;;; against its partner happens during turn resolution (resolution.clj's resolve-combat and
+;;;;; resolve-espionage, both via the shared break-treaty-if-active) and can only happen to an
+;;;;; :active treaty — a :proposed one is an offer that hasn't "arrived" yet, so a hostile
+;;;;; action during that window leaves it pending.
 ;;;;;
 ;;;;; Public API: partner-id, involves?, for-player, only-live-partners, active-treaty-between,
 ;;;;;             outgoing-proposals, incoming-proposals, active-treaties, slots-used,
@@ -228,7 +230,8 @@
          :alliance/ended-by player-id))
 
 (defn break-by-attack
-  "End an active treaty because attacker-id attacked their treaty partner.
+  "End an active treaty because attacker-id took a hostile action — an Action-phase attack
+  or an espionage attempt — against their treaty partner.
 
   [alliance alliance-map, attacker-id uuid, now inst] -> alliance-map"
   [alliance attacker-id now]
@@ -255,8 +258,10 @@
   slot or needs none — they never compete with each other. Accepts are applied next, each
   re-checked with check-accept against the slots freed by the releases above and by any
   earlier accept in this same list — so if two incoming proposals are both accepted but
-  only one slot is free, the one earlier in decisions wins and the other is silently
-  dropped, the same way a single stale choice already was. The Propose target (if any) is
+  only one slot is free, the one earlier in decisions wins; the other falls back to
+  :decline instead of staying :proposed, since an incoming proposal must always resolve one
+  way or the other (see apply-diplomacy, which forces every incoming proposal to appear
+  here as either :accept or :decline — never absent). The Propose target (if any) is
   checked last of all, so it only claims a slot nothing above already took.
 
   A decision on an alliance missing from alliances, already resolved, or not currently valid
@@ -298,11 +303,21 @@
         step2   (reduce
                   (fn [{:keys [by-id results]} [id op]]
                     (let [a (by-id id)]
-                      (if (and (= op :accept) a (= (:alliance/recipient a) player-id)
-                               (:ok? (check-accept game (vals by-id) a)))
+                      (cond
+                        (not (and (= op :accept) a (= (:alliance/recipient a) player-id)
+                                  (= (:alliance/status a) :proposed)))
+                        {:by-id by-id :results results}
+
+                        (:ok? (check-accept game (vals by-id) a))
                         (let [updated (accept a now)]
                           {:by-id (assoc by-id id updated) :results (conj results {:op :accept :alliance updated})})
-                        {:by-id by-id :results results})))
+
+                        ;; No slot left for this accept by the time it's checked — an
+                        ;; incoming proposal can never stay :proposed past this phase, so it
+                        ;; falls back to :decline rather than being dropped.
+                        :else
+                        (let [updated (decline a now)]
+                          {:by-id (assoc by-id id updated) :results (conj results {:op :decline :alliance updated})}))))
                   step1
                   decisions)
         {:keys [by-id results]} step2]

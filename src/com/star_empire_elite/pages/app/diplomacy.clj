@@ -108,14 +108,18 @@
   alliance shares a radio-name, so e.g. Accept and Decline on one incoming proposal are
   mutually exclusive, but a different alliance's radios never compete with these.
 
-  [player-id uuid, alliance-id uuid, op str, label str] -> hiccup"
-  [player-id alliance-id op label]
+  opts (optional) passes straight through to ui/op-radio-btn — :checked? and :sticky? are
+  used by incoming-row to make Decline the forced, non-deselectable default.
+
+  [player-id uuid, alliance-id uuid, op str, label str, opts map|nil] -> hiccup"
+  [player-id alliance-id op label & [opts]]
   (ui/op-radio-btn
     (str "treaty-" alliance-id)
     op
     label
     (str "/app/game/" player-id "/diplomacy-warning")
-    "diplomacy-warning"))
+    "diplomacy-warning"
+    opts))
 
 (def ^:private th-cls "text-green-400 text-[11px] tracking-[0.08em] uppercase")
 
@@ -153,11 +157,16 @@
 
 (defn- incoming-row
   "One row in the Incoming Proposals table — Accept and Decline radios sharing one group,
-  mirroring Invade/Raid/Strike's 'one mode per target' pattern. Accept is drawn disabled
-  (ui/disabled-radio-btn), the same way Propose falls back to plain text, when the player
-  has no free slot at page-load time. Carries the same boxed 'P' marker active treaties do
-  (with a different tooltip, since this one isn't active yet), so the recipient can see at a
-  glance what kind of treaty is being offered.
+  mirroring Invade/Raid/Strike's 'one mode per target' pattern. Unlike every other deferred
+  choice on this page, an incoming proposal can never be left undecided: Decline is
+  pre-selected (:checked?) and both radios are :sticky? (no toggle-off), so the player can
+  switch between Accept and Decline but can never get back to 'nothing selected' — see
+  apply-diplomacy, which also enforces this server-side regardless of what the form sends.
+  Accept is drawn disabled (ui/disabled-radio-btn), the same way Propose falls back to plain
+  text, when the player has no free slot at page-load time — Decline is still the only live
+  choice then. Carries the same boxed 'P' marker active treaties do (with a different
+  tooltip, since this one isn't active yet), so the recipient can see at a glance what kind
+  of treaty is being offered.
 
   [player-id uuid, alliance alliance-map, partner player-map, free? bool] -> hiccup"
   [player-id alliance partner free?]
@@ -165,9 +174,9 @@
     (ui/target-operation-row
       partner
       [(if free?
-         (decision-radio player-id (:xt/id alliance) "accept" "Accept")
+         (decision-radio player-id (:xt/id alliance) "accept" "Accept" {:sticky? true})
          (ui/disabled-radio-btn radio-name "Accept"))
-       (decision-radio player-id (:xt/id alliance) "decline" "Decline")]
+       (decision-radio player-id (:xt/id alliance) "decline" "Decline" {:checked? true :sticky? true})]
       "py-1 px-3"
       {:name-suffix (when (= :peace (:alliance/kind alliance))
                       (ui/treaty-indicator "Peace treaty proposed"))})))
@@ -237,6 +246,30 @@
     (cond-> (vec per-relationship)
       (= kind "peace") (conj ["propose" "Peace treaty will be offered."]))))
 
+(defn- decisions-message
+  "The warning text for a set of queued decisions — the specific label when exactly one is
+  queued, otherwise just a count. Shared by the page's initial render (whose only queue, if
+  any, is each incoming proposal's forced Decline default — see default-decision-params)
+  and update-diplomacy-warning's live HTMX refresh.
+
+  [queued seq-of-[op-str label-str]] -> string|nil"
+  [queued]
+  (case (count queued)
+    0 nil
+    1 (str "ⓘ " (second (first queued)))
+    (str "ⓘ " (count queued) " diplomatic actions will be taken.")))
+
+(defn- default-decision-params
+  "The implicit param map matching the page's default radio state. Every other radio here
+  starts unchecked, but an incoming proposal can't — Decline is pre-selected (see
+  incoming-row) so the player is never silently defaulting to 'nothing chosen'. Feeding this
+  through queued-decisions lets the page's initial warning reuse the exact same message
+  logic as a live HTMX update, instead of duplicating it.
+
+  [incoming seq-of-alliance-map] -> params-map"
+  [incoming]
+  (into {} (map (fn [a] [(keyword (str "treaty-" (:xt/id a))) "decline"])) incoming))
+
 (defn update-diplomacy-warning
   "Return a phase-warning-div for direct outerHTML swap, summarizing every diplomacy radio
   currently selected across the whole form — mirrors action.clj's update-action-warning, but
@@ -245,13 +278,10 @@
 
   [ctx ring-ctx] -> hiccup"
   [{:keys [params]}]
-  (let [queued  (queued-decisions params)
-        message (case (count queued)
-                  0 nil
-                  1 (str "ⓘ " (second (first queued)))
-                  (str "ⓘ " (count queued) " diplomatic actions will be taken."))]
-    (biff/render
-      (ui/phase-warning-div "diplomacy-warning" message {:color "text-yellow-400"}))))
+  (biff/render
+    (ui/phase-warning-div "diplomacy-warning"
+      (decisions-message (queued-decisions params))
+      {:color "text-yellow-400"})))
 
 (defn apply-diplomacy
   "End the diplomacy window: resolve every queued decision — Accept/Decline/Withdraw/
@@ -261,27 +291,37 @@
   apply-action. This is the one place any of them actually takes effect.
 
   Each per-relationship decision is read off a param named 'treaty-<alliance-id>' (see
-  decision-radio); Propose still comes through 'treaty-proposal'. diplomacy/resolve-decisions
-  — a pure function — applies them in order: releases (decline/withdraw/dissolve) first,
-  since they can free a slot; then accepts, each re-checked against the slots freed so far,
-  in the order their alliances were loaded (which filter preserves through to the order each
-  list is rendered in — see live-context/diplomacy-page — so ties among several accepts
-  break in the same top-to-bottom order the player saw them); then the one Propose, last of
-  all. A decision that's no longer valid by submit time (stale alliance, no slots left,
-  eliminated partner, …) is silently dropped rather than rejecting the whole submission —
-  the same philosophy a stale Propose target already followed.
+  decision-radio); Propose still comes through 'treaty-proposal'. An active treaty or
+  outgoing proposal only gets a decision when its radio was actually selected. An incoming
+  proposal is different and can never be left pending: it always gets a decision, Accept
+  only when that param is exactly \"accept\", Decline for anything else (missing, stale,
+  tampered) — capped here at the source, not just in the UI (see incoming-row), so a
+  stripped form field can't be used to dodge the choice. diplomacy/resolve-decisions — a pure
+  function — applies them in order: releases (decline/withdraw/dissolve) first, since they
+  can free a slot; then accepts, each re-checked against the slots freed so far, in the
+  order their alliances were loaded (which filter preserves through to the order each list
+  is rendered in — see live-context/diplomacy-page — so ties among several accepts break in
+  the same top-to-bottom order the player saw them; a loser falls back to :decline rather
+  than staying pending); then the one Propose, last of all. A decision on an active treaty
+  or outgoing proposal that's no longer valid by submit time (stale alliance, eliminated
+  partner, …) is silently dropped rather than rejecting the whole submission — the same
+  philosophy a stale Propose target already followed.
 
   [ctx ring-ctx] -> ring-response (303 redirect to income)"
   [{:keys [params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
     (if-let [redirect (utils/validate-phase player 7 player-id)]
       redirect
-      (let [now       (java.util.Date.)
+      (let [now         (java.util.Date.)
             {:keys [live-ids names live]} (live-context db (:player/game player) player)
-            decisions (for [a live
-                            :let [op (get params (keyword (str "treaty-" (:xt/id a))))]
-                            :when (contains? op-labels op)]
-                        [(:xt/id a) (keyword op)])
+            incoming-ids (set (map :xt/id (diplomacy/incoming-proposals live player-id)))
+            decisions   (for [a live
+                              :let [id (:xt/id a)
+                                    op (get params (keyword (str "treaty-" id)))]
+                              :when (or (contains? op-labels op) (incoming-ids id))]
+                          [id (keyword (if (incoming-ids id)
+                                         (if (= op "accept") "accept" "decline")
+                                         op))])
             [target-id-str _kind] (utils/parse-choice-value (:treaty-proposal params))
             target-id (when target-id-str (parse-uuid target-id-str))
             ;; Only a still-live candidate counts — live-ids already excludes eliminated
@@ -399,7 +439,9 @@
              (ui/section-label "Outgoing Proposals")
              (relation-table 1
                (for [a outgoing] (outgoing-row player-id a (partner a))))]))
-        (ui/phase-warning-div "diplomacy-warning" nil {:color "text-game-green-soft"})
+        (let [initial-message (decisions-message (queued-decisions (default-decision-params incoming)))]
+          (ui/phase-warning-div "diplomacy-warning" initial-message
+            {:color (if initial-message "text-yellow-400" "text-game-green-soft")}))
         (ui/phase-action-bar
           (ui/action-bar-link (str "/app/game/" player-id) "Pause")
           (ui/action-bar-button "Cancel Diplomacy"
@@ -407,6 +449,14 @@
              :hx-post    (str "/app/game/" player-id "/diplomacy-warning")
              :hx-target  "#diplomacy-warning"
              :hx-swap    "outerHTML"
-             :hx-params  "none"
-             :onclick    "document.querySelectorAll('[name^=treaty-]').forEach(function(r){r.checked=false;r.dataset.was='false';});"})
+             ;; Cancel only clears the OPTIONAL treaty-* radios — dissolve/withdraw/propose,
+             ;; the only ones the cancel-target CSS rule ever shows this button for (see
+             ;; tailwind.css). It must never touch an incoming proposal's Accept/Decline:
+             ;; that's a forced choice, not a queued action, so whatever the player picked
+             ;; there (or the Decline default, if they picked nothing) is left exactly as
+             ;; is. hx-params is left at its default ('include the whole form'), so the POST
+             ;; below picks up that now-mutated DOM state — same ordering op-radio-btn's own
+             ;; toggle-off onclick already relies on (mutate, then let the same click's HTMX
+             ;; request read the result).
+             :onclick    "document.querySelectorAll('[name^=treaty-]').forEach(function(r){if(r.value!=='decline'&&r.value!=='accept'){r.checked=false;r.dataset.was='false';}});"})
           (ui/submit-button true "End Current Round"))))))
