@@ -529,3 +529,59 @@
 ;;;; Attack/treaty message wording is now covered by alerts-test (incoming-messages), since
 ;;;; that formatting moved to the pure com.star-empire-elite.alerts namespace — see
 ;;;; test-incoming-messages-* and test-incoming-messages-treaty-* there.
+
+;;;;
+;;;; treaty-indicator
+;;;;
+
+(deftest test-treaty-indicator-peace-marker-and-default-title
+  (let [el (ui/treaty-indicator :peace)]
+    (is (= "P" (last el)))
+    (is (= "Active peace treaty" (:title (second el))))))
+
+(deftest test-treaty-indicator-defence-marker-and-default-title
+  (let [el (ui/treaty-indicator :defence)]
+    (is (= "D" (last el)))
+    (is (= "Active defence treaty" (:title (second el))))))
+
+(deftest test-treaty-indicator-custom-title-overrides-default
+  (let [el (ui/treaty-indicator :peace "Peace treaty proposed")]
+    (is (= "Peace treaty proposed" (:title (second el))))))
+
+(deftest test-treaty-indicator-unrecognized-kind-renders-nothing
+  (testing "an unrecognized kind (e.g. stale test or legacy data) renders nothing rather
+            than crashing the page"
+    (is (nil? (ui/treaty-indicator :unknown-kind)))))
+
+;;;;
+;;;; op-radio-btn — :id and :also-clear
+;;;;
+;;;; These let two radios in DIFFERENT radio-name groups behave as one mutually exclusive
+;;;; choice — see diplomacy.clj's active-treaty-row, where a switch-kind radio (shared
+;;;; page-wide 'treaty-proposal' group) and Dissolve (a group private to that one alliance)
+;;;; must still resolve to at most one selection for the same relationship.
+;;;;
+
+(deftest test-op-radio-btn-sets-the-given-id
+  (let [input (second (ui/op-radio-btn "g" "v" "L" "/ep" "warn" {:id "my-id"}))]
+    (is (= "my-id" (:id (second input))))))
+
+(deftest test-op-radio-btn-omits-id-when-not-given
+  (let [input (second (ui/op-radio-btn "g" "v" "L" "/ep" "warn"))]
+    (is (not (contains? (second input) :id)))))
+
+(deftest test-op-radio-btn-also-clear-appears-in-the-select-branch-only
+  (testing "the also-clear selector's querySelectorAll call is only reachable from the
+            else-branch (selecting this radio), not the toggle-off branch (deselecting it)"
+    (let [input   (second (ui/op-radio-btn "g" "v" "L" "/ep" "warn" {:also-clear "#other"}))
+          onclick (:onclick (second input))]
+      (is (str/includes? onclick "querySelectorAll('#other')"))
+      (is (str/includes? onclick "else{"))
+      (is (< (.indexOf onclick "else{") (.indexOf onclick "#other"))
+          "the also-clear call sits after the else{ that guards it"))))
+
+(deftest test-op-radio-btn-sticky-omits-also-clear-entirely
+  (testing ":sticky? skips the whole onclick handler, also-clear included — sticky radios
+            (e.g. incoming-row's forced Accept/Decline) have no toggle-off logic to carry it"
+    (let [input (second (ui/op-radio-btn "g" "v" "L" "/ep" "warn" {:sticky? true :also-clear "#other"}))]
+      (is (not (contains? (second input) :onclick))))))

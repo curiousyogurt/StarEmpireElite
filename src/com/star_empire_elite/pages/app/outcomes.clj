@@ -8,10 +8,15 @@
 ;;;;; The POST (apply-outcomes) only handles turn advancement and cleanup: incrementing turn/round
 ;;;;; counters, clearing pending state, and recording the score.
 ;;;;;
-;;;;; A proposed/accepted/withdrawn/dissolved treaty is deliberately NOT shown here — those
-;;;;; are already covered by the status-line alert chip's "instant messages" (see alerts.clj).
+;;;;; A proposed/accepted/withdrawn/declined/dissolved treaty is deliberately NOT shown here
+;;;;; — those are already covered by the status-line alert chip's "instant messages" (see
+;;;;; alerts.clj).
 ;;;;; The only diplomacy news this page ever carries is a treaty BREAKING as the direct
 ;;;;; consequence of this turn's own attack or espionage attempt — see treaty-broken-card below.
+;;;;; A defence ally's forces joining a battle shows up two ways: alliance-line, a third
+;;;;; result line on the battle card itself (right after Orbit and Ground — both sides'
+;;;;; perspectives), and ally-battle-card, this player's own card when THEY were the ally
+;;;;; who joined someone else's fight.
 ;;;;;
 
 ;;;;; Logical Structure:
@@ -22,8 +27,10 @@
 ;;;;;        │  └─ delta-pill  (per non-zero delta)
 ;;;;;        ├─ incoming section
 ;;;;;        │  ├─ incoming-card  (per incoming attack)
-;;;;;        │  │  ├─ combat-card | strike-card
+;;;;;        │  │  ├─ combat-card | strike-card  (combat-card's Alliance line names any
+;;;;;        │  │  │  defence ally who joined — see alliance-line, below Orbit/Ground)
 ;;;;;        │  │  └─ treaty-broken-card  (if this attack broke an active treaty)
+;;;;;        │  ├─ ally-battle-card  (per battle this player's own forces joined as an ally)
 ;;;;;        │  ├─ espionage-fail-card
 ;;;;;        │  ├─ incoming-espionage-card  (incite / defect)
 ;;;;;        │  ├─ bomb-card
@@ -73,6 +80,13 @@
 
 (def ^:private col-header-cls
   "text-[10px] tracking-widest text-game-green-dim uppercase font-normal py-1.5 px-3")
+
+;;; The six unit types a defence (or future offence) ally can contribute — see
+;;; combat/contributable-units — as the same label+order battle-unit-specs already uses for
+;;; the main combat table, so ally-battle-card's table reads as the same kind of report.
+(def ^:private ally-unit-specs
+  (filter #(#{:soldiers :transports :generals :fighters :carriers :admirals} (:unit-key %))
+          battle-unit-specs))
 
 (defn- result-summary
   "Render the ATTACKER → ACTION → DEFENDER (RESULT) summary text.
@@ -177,16 +191,25 @@
                                         (merge-with + acc (k r {}))
                                         acc))
                                     {} incoming))
-        ;; Unit losses — three sources, all as unit-count maps, merged and summed once
+        ;; Unit losses — four sources, all as unit-count maps, merged and summed once.
+        ;; in-losses reads :defender-own-losses, not :defender-losses — the latter is the
+        ;; POOLED total an attack took (defender plus any defence allies), so using it here
+        ;; would overstate THIS player's own losses by whatever an ally absorbed instead
+        ;; (see combat/resolve-combat). Falls back to :defender-losses for a result stored
+        ;; before that field existed, when the two were always identical anyway.
         out-losses  (cond
                       (nil? battle-result)                     {}
                       (= (:mode battle-result) :strike)        {:cmd-ships (:cmd-ships-lost battle-result 0)}
                       :else                                    (:attacker-losses battle-result {}))
-        in-losses   (reduce (fn [acc r] (merge-with + acc (:defender-losses r {})))
+        in-losses   (reduce (fn [acc r]
+                              (merge-with + acc (or (:defender-own-losses r) (:defender-losses r) {})))
                             {} incoming)
         bomb-losses (if-let [r (some-> (:player/incoming-bomb-result player) edn/read-string)]
                       (dissoc r :attacker-name) {})
-        units-lost  (sum-vals (merge-with + out-losses in-losses bomb-losses))
+        ;; A turn this player's own defence-treaty forces spent helping defend someone else.
+        ally-losses (reduce (fn [acc r] (merge-with + acc (:losses r {})))
+                            {} (map edn/read-string (utils/take-recent (:player/incoming-ally-battles player))))
+        units-lost  (sum-vals (merge-with + out-losses in-losses bomb-losses ally-losses))
         ;; Planet deltas: gained from outgoing ground wins, lost from incoming + breakaway
         out-pt      (if won-ground? (:planets-transferred battle-result {}) {})
         in-pt       (in-wins :planets-transferred)
@@ -346,15 +369,32 @@
            "» GROUND: Your ground forces prevented the enemy overcoming planetary defences"
            "» GROUND: Your ground forces failed to prevent the enemy overcoming planetary defences"))])))
 
+(defn- alliance-line
+  "Render the Alliance result line for the combat card, naming the defence allies whose
+  forces joined this battle — same one-line pattern as orbit-line/ground-line above it, so
+  the three read as one connected report instead of a separate notice bolted on afterward.
+  Returns nil when no ally joined.
+
+  [allies seq-of-{:ally-name str, ...}] -> hiccup|nil"
+  [allies]
+  (when (seq allies)
+    [:div.text-xs.py-1.5.px-3.border-t.border-game-divider
+     ;; Same green as a won Orbit/Ground line — reinforcement is never the bad outcome.
+     {:class "text-green-400"}
+     (str "» DEFENCE: Joined by " (str/join ", " (map :ally-name allies)) ".")]))
+
 (defn- combat-card
   "Render a collapsible combat card with header summary and 3-col symmetric table.
 
   Left col: your unit count + inline red loss. Right col: opponent's loss delta.
   :stations-mine? true when you are the defender (you have stations).
+  :allies, when given, lists the defence allies who joined the defending side (see
+  alliance-line) — present on both the attacker's outgoing card (who they really fought)
+  and the defender's incoming card (who helped).
   :open? controls the initial expansion state."
   [{:keys [mode opp-name attacker-wins? my-counts my-losses opp-losses
            stations-mine? resources-taken planets-transferred
-           space-att-wins? space-buff open?]}]
+           space-att-wins? space-buff allies open?]}]
   (let [dash           [:span.text-game-green-dim "—"]
         make-left      (fn [unit-key defender-only?]
                          (if (and defender-only? (not stations-mine?))
@@ -388,6 +428,7 @@
        :open?   open?}
       (orbit-line space-att-wins? space-buff opp-name (not stations-mine?))
       (ground-line space-att-wins? attacker-wins? (not stations-mine?))
+      (alliance-line allies)
       [:div.overflow-x-auto
        [:table.w-full.text-xs.table-fixed
         (combat-table-header opp-name)
@@ -592,20 +633,24 @@
             [:span.text-sm.flex-1 summary]]])))))
 
 (defn- treaty-broken-card
-  "Render a one-line notice when this battle broke an active peace treaty between the two
+  "Render a one-line notice when this battle broke an active treaty between the two
   empires. you-are-attacker? controls perspective: true for the outgoing battle card (you
-  attacked), false for an incoming one (they attacked you).
+  attacked), false for an incoming one (they attacked you). kind names which treaty kind was
+  broken (:peace, :defence, …) when known; omit it for a kind-neutral 'a treaty' when it
+  isn't — e.g. a treaty broken by someone else's espionage against you, whose history field
+  only ever stored an empire name, never the kind.
 
-  [opp-name str, you-are-attacker? bool] -> hiccup"
-  [opp-name you-are-attacker?]
-  [:div.rounded-game.bg-game-surface.overflow-hidden
-   {:class "border border-game-border"}
-   [:div.flex.items-center.py-2.px-3.gap-3
-    (ui/mode-badge :treaty-broken)
-    [:span.text-sm.text-game-green-soft
-     (if you-are-attacker?
-       (str "You broke your peace treaty with " opp-name ".")
-       (str opp-name " broke their peace treaty with you."))]]])
+  [opp-name str, you-are-attacker? bool, & [kind keyword|nil]] -> hiccup"
+  [opp-name you-are-attacker? & [kind]]
+  (let [label (when kind (str (name kind) " "))]
+    [:div.rounded-game.bg-game-surface.overflow-hidden
+     {:class "border border-game-border"}
+     [:div.flex.items-center.py-2.px-3.gap-3
+      (ui/mode-badge :treaty-broken)
+      [:span.text-sm.text-game-green-soft
+       (if you-are-attacker?
+         (str "You broke your " label "treaty with " opp-name ".")
+         (str opp-name " broke their " label "treaty with you."))]]]))
 
 (defn- growth-card [{:keys [pop-growth]}]
   [:div.rounded-game.bg-game-surface.overflow-hidden
@@ -680,7 +725,11 @@
 
 (defn- incoming-card
   "Render a single incoming attack card (combat or strike), plus a treaty-broken notice
-  when this attack broke an active peace treaty between the two empires."
+  when this attack broke an active treaty between the two empires. A defence ally's forces
+  joining the fight shows up as the card's own Alliance line (see alliance-line), not a
+  separate notice. :defender-own-counts/:defender-own-losses fall back to the plain
+  :defender-counts/:defender-losses keys for a result stored before defence treaties
+  existed, which never pooled anyone else in — the two pairs were identical then anyway."
   [r]
   (let [result (edn/read-string r)
         card   (if (= (:mode result) :strike)
@@ -694,18 +743,60 @@
                    (combat-card {:mode                (get result :mode :invade)
                                  :opp-name            (:attacker-name result)
                                  :attacker-wins?      (:attacker-wins? result)
-                                 :my-counts           (:defender-counts result)
-                                 :my-losses           (:defender-losses result)
+                                 :my-counts           (or (:defender-own-counts result)
+                                                           (:defender-counts result))
+                                 :my-losses           (or (:defender-own-losses result)
+                                                           (:defender-losses result))
                                  :opp-losses          (:attacker-losses result)
                                  :stations-mine?      true
                                  :resources-taken     (:resources-captured result)
                                  :planets-transferred (:planets-transferred result)
                                  :space-att-wins?     (:att-wins? space-r)
                                  :space-buff          (:space-carryover result)
+                                 :allies              (:defender-allies result)
                                  :open?               true})))]
-    (if (:treaty-broken? result)
-      [:<> card (treaty-broken-card (:attacker-name result) false)]
-      card)))
+    [:<> card
+     (when (:treaty-broken? result)
+       (treaty-broken-card (:attacker-name result) false (:treaty-broken-kind result)))]))
+
+(defn- ally-battle-card
+  "Render a card for a battle this player's own defence-treaty forces joined on someone
+  else's behalf (see resolution/ally-update-tx) — who they defended, who attacked, the
+  outcome, and a 3-column table in the same shape as the real attacker/defender's own
+  combat card (see combat-table-header/combat-row): '◄ YOU' is this player's contributed
+  units with any loss shown inline, same as combat-card's make-left; '<ATTACKER> ►' is the
+  attacker's own losses for that unit, via the same opp-loss-cell every other card uses.
+  :attacker-losses falls back to {} for a record stored before this table existed, which
+  renders every attacker-side cell as 0 rather than erroring. role is always :defending
+  today; a future offence treaty would add its own wording for :attacking here.
+
+  [r string (pr-str'd summary)] -> hiccup"
+  [r]
+  (let [{:keys [attacker-name defender-name mode attacker-wins? contributed losses
+                attacker-losses]
+         :or   {attacker-losses {}}}
+        (edn/read-string r)
+        ;; Joining the defence succeeds when the attacker loses — same reasoning as
+        ;; alerts/ally-battle-messages.
+        won? (not attacker-wins?)]
+    (ui/collapsible-card
+      {:badge   (ui/mode-badge mode)
+       :summary [:<> [:span.text-game-green-soft
+                      (str "You joined " defender-name "'s defence against " attacker-name)]
+                     [:span {:class (if won? "text-green-400" "text-red-400")}
+                      (if won? " (SUCCESS)" " (FAILURE)")]]
+       :open?   (not won?)}
+      [:div.overflow-x-auto
+       [:table.w-full.text-xs.table-fixed
+        (combat-table-header attacker-name)
+        [:tbody
+         (for [{:keys [label unit-key]} ally-unit-specs]
+           (combat-row
+             [:<> [:span.text-game-green-soft (ui/format-number (get contributed unit-key 0))]
+                  (let [lost (get losses unit-key 0)]
+                    (when (pos? lost) [:span.text-red-400.ml-1.5 "−" (ui/format-number lost)]))]
+             label
+             (opp-loss-cell (get attacker-losses unit-key 0))))]]])))
 
 (defn- incoming-espionage-card
   "Render a collapsible card for a successful incoming espionage operation (incite or defect).
@@ -804,19 +895,21 @@
                      :player/last-fate-result                nil
                      :player/pending-espionage               nil
                      :player/incoming-attacks                nil
+                     :player/incoming-ally-battles            nil
                      :player/incoming-espionage-fails        nil
                      :player/incoming-espionage-agents-gained nil
                      :player/incoming-incite-stability-lost  nil
                      :player/incoming-bomb-result            nil
                      :player/incoming-defect-agents-lost    nil
-                     ;; Unlike incoming-treaty-proposed/accepted/withdrawn/dissolved below,
-                     ;; a treaty broken by espionage isn't actionable in the Diplomacy phase
-                     ;; — it's already gone — so this clears on the same turn-end schedule as
-                     ;; the other incoming-* history fields above, not the treaty-* ones.
+                     ;; Unlike incoming-treaty-proposed/accepted/withdrawn/declined/dissolved
+                     ;; below, a treaty broken by espionage isn't actionable in the Diplomacy
+                     ;; phase — it's already gone — so this clears on the same turn-end
+                     ;; schedule as the other incoming-* history fields above, not the
+                     ;; treaty-* ones.
                      :player/incoming-espionage-treaty-broken nil
                      ;; incoming-treaty-* is deliberately NOT cleared here — those
-                     ;; notifications (someone proposed/accepted/withdrew/dissolved a treaty
-                     ;; with you) stay live through to the Diplomacy phase, where they're
+                     ;; notifications (someone proposed/accepted/withdrew/declined/dissolved
+                     ;; a treaty with you) stay live through to the Diplomacy phase, where they're
                      ;; actually actionable, and get cleared there instead (apply-diplomacy).
                      ;; Clearing them here would wipe the diplomacy alert before the player
                      ;; even reaches the Diplomacy phase that only opens once per round.
@@ -859,21 +952,23 @@
        (summary-strip (compute-summary outcomes))
 
        ;; Incoming section — attacks and espionage received this turn. Diplomacy notices
-       ;; (proposed/accepted/withdrawn/dissolved) are NOT shown here — see the file header
-       ;; comment. A treaty broken by someone else's espionage against you is the one
+       ;; (proposed/accepted/withdrawn/declined/dissolved) are NOT shown here — see the file
+       ;; header comment. A treaty broken by someone else's espionage against you is the one
        ;; diplomacy item that does belong here, since it's a direct consequence of an
        ;; incoming espionage attempt this turn, same as combat's treaty-broken-card above.
        (let [incoming             (seq (utils/take-recent (:player/incoming-attacks player)))
+             ally-battles         (seq (utils/take-recent (:player/incoming-ally-battles player)))
              esp-fails            (utils/take-recent (:player/incoming-espionage-fails player))
              esp-agents           (or (:player/incoming-espionage-agents-gained player) 0)
              incite-stab-lost     (or (:player/incoming-incite-stability-lost player) 0)
              bomb-result          (some-> (:player/incoming-bomb-result player) edn/read-string)
              defect-agents-lost   (or (:player/incoming-defect-agents-lost player) 0)
              esp-treaties-broken  (seq (utils/take-recent (:player/incoming-espionage-treaty-broken player)))]
-         (when (or incoming (seq esp-fails) (pos? incite-stab-lost) bomb-result (pos? defect-agents-lost)
-                   esp-treaties-broken)
+         (when (or incoming ally-battles (seq esp-fails) (pos? incite-stab-lost) bomb-result
+                   (pos? defect-agents-lost) esp-treaties-broken)
            [:div.flex.flex-col.gap-2
             (map incoming-card incoming)
+            (map ally-battle-card ally-battles)
             (when (seq esp-fails)
               (espionage-fail-card esp-fails esp-agents))
             (when (pos? incite-stab-lost)
@@ -922,14 +1017,15 @@
                                           :planets-transferred (:planets-transferred battle-result)
                                           :space-att-wins?     (:att-wins? space-r)
                                           :space-buff          (:space-carryover battle-result)
+                                          :allies              (:defender-allies battle-result)
                                           :open?               (or (not (:attacker-wins? battle-result))
                                                                        (and space-r (not (:att-wins? space-r)))
                                                                        (non-trivial-losses?
                                                                          (:attacker-counts battle-result)
                                                                          (:attacker-losses battle-result)))})))]
-           (if (:treaty-broken? battle-result)
-             [:<> card (treaty-broken-card def-name true)]
-             card)))
+           [:<> card
+            (when (:treaty-broken? battle-result)
+              (treaty-broken-card def-name true (:treaty-broken-kind battle-result)))]))
 
        ;; Outgoing espionage result
        (when espionage-result
@@ -954,7 +1050,8 @@
                                  :agents-defected (:agents-defected espionage-result)
                                  :open?           (not won?)}))]
            (if (:treaty-broken? espionage-result)
-             [:<> card (treaty-broken-card (:defender-name espionage-result) true)]
+             [:<> card (treaty-broken-card (:defender-name espionage-result) true
+                         (:treaty-broken-kind espionage-result))]
              card)))
 
        (stability-card {:expense-penalty  expense-penalty

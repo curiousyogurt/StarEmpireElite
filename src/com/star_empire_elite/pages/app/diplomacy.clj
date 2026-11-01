@@ -17,6 +17,13 @@
 ;;;;; proposal and dissolve an unrelated treaty in the same visit); only Propose is limited to
 ;;;;; one new offer per round, by there being a single candidate to choose from.
 ;;;;;
+;;;;; A pair holds at most one treaty, of exactly one kind (see diplomacy/proposable-kinds).
+;;;;; An existing active partner's switch-to-the-other-kind option lives on their Active
+;;;;; Treaties row, next to Dissolve — accepting it replaces their current treaty
+;;;;; (diplomacy/replacement?) rather than claim a new slot. Propose a Treaty therefore only
+;;;;; ever lists complete strangers — an empire with an existing treaty or a pending proposal
+;;;;; never appears there too, which would otherwise show the same partner twice.
+;;;;;
 
 ;;;;; Logical Structure:
 ;;;;;
@@ -27,8 +34,8 @@
 ;;;;;           │  ├─ ui/snapshot-section
 ;;;;;           │  ├─ ui/flash-notice
 ;;;;;           │  ├─ slot-counter
-;;;;;           │  ├─ relation-table  (Active Treaties → active-treaty-row → decision-radio "Dissolve")
-;;;;;           │  ├─ relation-table  (Propose a Treaty → propose-row → ui/op-radio-btn "Peace")
+;;;;;           │  ├─ relation-table  (Active Treaties → active-treaty-row → switch-kind radio(s) + decision-radio "Dissolve")
+;;;;;           │  ├─ relation-table  (Propose a Treaty, strangers only → propose-row → ui/op-radio-btn per kind)
 ;;;;;           │  ├─ relation-table  (Incoming Proposals → incoming-row → decision-radio "Accept"/"Decline")
 ;;;;;           │  └─ relation-table  (Outgoing Proposals → outgoing-row → decision-radio "Withdraw")
 ;;;;;           ├─ ui/phase-warning
@@ -45,11 +52,18 @@
 (ns com.star-empire-elite.pages.app.diplomacy
   (:require [clojure.string :as str]
             [com.biffweb :as biff]
+            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.diplomacy :as diplomacy]
             [com.star-empire-elite.events :as events]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]
             [xtdb.api :as xt]))
+
+;;; Display label for a treaty kind ("Peace", "Defence", …), or nil for an unrecognized
+;;; kind — see const/treaty-kinds, the single source of truth every treaty-kind-aware piece
+;;; of UI here draws from.
+(defn- kind-label [kind]
+  (:label (first (filter #(= kind (:kind %)) const/treaty-kinds))))
 
 ;;;;
 ;;;; Shared Data Loading
@@ -90,15 +104,17 @@
 ;;;; UI Components
 ;;;; - decision-radio:    a deferred radio for one relationship's Accept/Decline/Withdraw/
 ;;;;                      Dissolve choice — same ui/op-radio-btn Invade/Raid/Strike use
-;;;; - relation-table:    the Empire/Planets/Score/Operations table shared by every
+;;;; - relation-table:    the Empire/Planets/Score/<last-column> table shared by every
 ;;;;                      relationship list (active treaties, incoming/outgoing proposals,
-;;;;                      and candidates)
-;;;; - active-treaty-row: an Active Treaties row — a Dissolve radio plus a boxed treaty-kind
-;;;;                      marker
+;;;;                      and candidates) — the last header reads "Operations" except for
+;;;;                      Active Treaties, which overrides it to "Change Treaty"
+;;;; - active-treaty-row: an Active Treaties row — a switch-kind radio per OTHER treaty kind,
+;;;;                      a Dissolve radio, and a boxed treaty-kind marker
 ;;;; - incoming-row:      an Incoming Proposals row — Accept and Decline radios, sharing one
 ;;;;                      radio group so picking one deselects the other
 ;;;; - outgoing-row:      an Outgoing Proposals row — a Withdraw radio
-;;;; - propose-row:       a candidate row — a Peace radio, or "No slots free"
+;;;; - propose-row:       a stranger-candidate row — one radio per treaty kind, or "No slots
+;;;;                      free"
 ;;;;
 
 (defn- decision-radio
@@ -109,7 +125,9 @@
   mutually exclusive, but a different alliance's radios never compete with these.
 
   opts (optional) passes straight through to ui/op-radio-btn — :checked? and :sticky? are
-  used by incoming-row to make Decline the forced, non-deselectable default.
+  used by incoming-row to make Decline the forced, non-deselectable default; :id and
+  :also-clear are used by active-treaty-row to make Dissolve mutually exclusive with a
+  switch-kind radio even though the two live in different radio-name groups.
 
   [player-id uuid, alliance-id uuid, op str, label str, opts map|nil] -> hiccup"
   [player-id alliance-id op label & [opts]]
@@ -123,37 +141,96 @@
 
 (def ^:private th-cls "text-green-400 text-[11px] tracking-[0.08em] uppercase")
 
-(defn- relation-table
-  "Render the shared Empire/Planets/Score/Operations table used by every relationship list.
-  op-cols is how many Operations columns this table's rows have — 1 for Active/Outgoing/
-  Propose, 2 for Incoming's Accept+Decline — used only for the header's colspan.
+;;; Cell padding for a kind-button column (Active Treaties' switch/Dissolve cells, Propose a
+;;; Treaty's Peace/Defence cells). The actual WIDTH is set once per table by relation-table's
+;;; <colgroup> below, not here — a width on the <td> itself is only ever a hint under the
+;;; browser's default table-layout: auto, which still redistributes a table's leftover space
+;;; across columns based on THAT table's own content, so an identical width can still render
+;;; at a different pixel size in two different tables (Active Treaties vs Propose a Treaty).
+;;; table-layout: fixed + an explicit <colgroup> is the one mechanism that pins every
+;;; column's width deterministically, independent of content and independent of which table
+;;; it's in.
+(def ^:private kind-col-cls "py-1 px-2")
 
-  [op-cols int, rows seq-of-hiccup-tr] -> hiccup"
-  [op-cols rows]
+;;; The four columns every relation-table shares — Empire/Planets/Score/Operations — at
+;;; approximately 40/15/15/30% of the table's width. Operations' 30% is split evenly across
+;;; op-cols sub-columns (so 15% each for every table today, since op-cols is 1 or 2 and 30
+;;; divides evenly by both); see relation-table's <colgroup>.
+(def ^:private empire-col-pct  40)
+(def ^:private planets-col-pct 15)
+(def ^:private score-col-pct   15)
+(def ^:private ops-col-pct     30)
+
+(defn- relation-table
+  "Render the shared Empire/Planets/Score/<last-column> table used by every relationship
+  list — same header/column layout as action.clj's target table, including the centered
+  last header. op-cols is how many columns this table's rows have under that last header —
+  1 for Active/Outgoing/Propose, 2 for Incoming's Accept+Decline — used for both the
+  header's colspan and the <colgroup> below, which is what actually pins Empire/Planets/
+  Score/Operations to the same ~40/15/15/30% split (see empire-col-pct and friends) across
+  every one of these tables, regardless of table-layout: auto's usual per-table
+  redistribution. last-col-label defaults to \"Operations\"; Active Treaties overrides it
+  to \"Change Treaty\", since that's exactly what its columns let the player do.
+
+  [op-cols int, rows seq-of-hiccup-tr, & [last-col-label str]] -> hiccup"
+  [op-cols rows & [last-col-label]]
   [:div.overflow-x-auto
-   [:table.w-full.text-sm {:class "border border-game-border border-collapse"}
+   [:table.text-sm {:class "w-full table-fixed border border-game-border border-collapse"}
+    [:colgroup
+     [:col {:style {:width (str empire-col-pct "%")}}]
+     [:col {:style {:width (str planets-col-pct "%")}}]
+     [:col {:style {:width (str score-col-pct "%")}}]
+     (for [_ (range op-cols)]
+       [:col {:style {:width (str (quot ops-col-pct op-cols) "%")}}])]
     [:thead
      [:tr.bg-game-header.border-b.border-game-border
       [:th.text-left.px-3.py-1  {:class th-cls} "Empire"]
       [:th.text-right.px-3.py-1 {:class th-cls} "Planets"]
       [:th.text-right.px-3.py-1 {:class th-cls} "Score"]
-      [:th.px-3.py-1 {:colspan op-cols :class th-cls} "Operations"]]]
+      [:th.px-3.py-1.text-center {:colspan op-cols :class th-cls} (or last-col-label "Operations")]]]
     [:tbody rows]]])
 
 (defn- active-treaty-row
-  "One row in the Active Treaties table — a Dissolve radio plus a boxed marker for the
-  treaty's kind, so the player can see at a glance what it is instead of inferring it from
-  the section header alone. Only :peace exists today, so this always shows
-  ui/treaty-indicator; once :defensive/:offensive alliances exist, this is where their own
-  markers would go.
+  "One row in the Active Treaties table — a boxed marker for the treaty's kind, a radio for
+  each OTHER kind offering to switch to it (sharing the page-wide 'treaty-proposal' group,
+  same composite 'partner-id:kind' value as propose-row), and a Dissolve radio. Switching
+  kind is a replacement (see diplomacy/replacement?): the partner must still accept it from
+  their own diplomacy phase, same as any proposal, but it needs no free slot and — once
+  accepted — replaces this treaty instead of claiming a new one. Because every option for
+  this partner lives here, they never also appear in Propose a Treaty (see diplomacy-page's
+  candidates, which excludes anyone diplomacy/has-relationship? is true for).
+
+  The switch radio(s) and Dissolve are two different radio-name groups — 'treaty-proposal'
+  is shared page-wide (so at most one new proposal/switch total can be queued per round),
+  while Dissolve's group is private to this one alliance — so plain HTML radio semantics
+  don't make them mutually exclusive on their own. Each one's :also-clear option (see
+  ui/op-radio-btn) closes that gap: selecting either one here un-checks the other, by :id,
+  so the two always resolve to a single choice for this relationship — switch, dissolve, or
+  neither — never both at once.
 
   [player-id uuid, alliance alliance-map, partner player-map] -> hiccup"
   [player-id alliance partner]
-  (ui/target-operation-row
-    partner
-    [(decision-radio player-id (:xt/id alliance) "dissolve" "Dissolve")]
-    "py-1 px-3"
-    {:name-suffix (when (= :peace (:alliance/kind alliance)) (ui/treaty-indicator))}))
+  (let [kind        (:alliance/kind alliance)
+        other-kinds (remove #{kind} (map :kind const/treaty-kinds))
+        dissolve-id (str "treaty-dissolve-" (:xt/id alliance))
+        switch-id   (fn [other-kind] (str "treaty-switch-" (:xt/id alliance) "-" (name other-kind)))
+        switch-sel  (str/join ", " (map #(str "#" (switch-id %)) other-kinds))
+        switch-btn  (fn [other-kind]
+                      (ui/op-radio-btn "treaty-proposal"
+                        (str (:xt/id partner) ":" (name other-kind))
+                        (kind-label other-kind)
+                        (str "/app/game/" player-id "/diplomacy-warning")
+                        "diplomacy-warning"
+                        {:id (switch-id other-kind) :also-clear (str "#" dissolve-id)}))]
+    (ui/target-operation-row
+      partner
+      (conj (mapv switch-btn other-kinds)
+            (decision-radio player-id (:xt/id alliance) "dissolve" "Dissolve"
+                             {:id dissolve-id :also-clear switch-sel}))
+      ;; kind-col-cls (padding only — the width is relation-table's <colgroup>, shared with
+      ;; Propose a Treaty's kind columns, so "Change Treaty" and "Operations" match exactly).
+      kind-col-cls
+      {:name-suffix (ui/treaty-indicator kind)})))
 
 (defn- incoming-row
   "One row in the Incoming Proposals table — Accept and Decline radios sharing one group,
@@ -163,14 +240,16 @@
   switch between Accept and Decline but can never get back to 'nothing selected' — see
   apply-diplomacy, which also enforces this server-side regardless of what the form sends.
   Accept is drawn disabled (ui/disabled-radio-btn), the same way Propose falls back to plain
-  text, when the player has no free slot at page-load time — Decline is still the only live
-  choice then. Carries the same boxed 'P' marker active treaties do (with a different
-  tooltip, since this one isn't active yet), so the recipient can see at a glance what kind
-  of treaty is being offered.
+  text, when the player has no free slot at page-load time AND this isn't a replacement
+  (see diplomacy/replacement?, whose whole point is to need no free slot) — Decline is still
+  the only live choice then. Carries the same boxed marker active treaties do (with a
+  different tooltip, since this one isn't active yet), so the recipient can see at a glance
+  what kind of treaty is being offered.
 
   [player-id uuid, alliance alliance-map, partner player-map, free? bool] -> hiccup"
   [player-id alliance partner free?]
-  (let [radio-name (str "treaty-" (:xt/id alliance))]
+  (let [radio-name (str "treaty-" (:xt/id alliance))
+        kind       (:alliance/kind alliance)]
     (ui/target-operation-row
       partner
       [(if free?
@@ -178,44 +257,50 @@
          (ui/disabled-radio-btn radio-name "Accept"))
        (decision-radio player-id (:xt/id alliance) "decline" "Decline" {:checked? true :sticky? true})]
       "py-1 px-3"
-      {:name-suffix (when (= :peace (:alliance/kind alliance))
-                      (ui/treaty-indicator "Peace treaty proposed"))})))
+      {:name-suffix (ui/treaty-indicator kind (str (kind-label kind) " treaty proposed"))})))
 
 (defn- outgoing-row
-  "One row in the Outgoing Proposals table — a Withdraw radio, plus the same boxed 'P'
-  marker incoming-row carries, so the proposer can see at a glance what kind of treaty is
-  pending.
+  "One row in the Outgoing Proposals table — a Withdraw radio, plus the same boxed marker
+  incoming-row carries, so the proposer can see at a glance what kind of treaty is pending.
 
   [player-id uuid, alliance alliance-map, partner player-map] -> hiccup"
   [player-id alliance partner]
-  (ui/target-operation-row
-    partner
-    [(decision-radio player-id (:xt/id alliance) "withdraw" "Withdraw")]
-    "py-1 px-3"
-    {:name-suffix (when (= :peace (:alliance/kind alliance))
-                    (ui/treaty-indicator "Peace treaty proposed"))}))
+  (let [kind (:alliance/kind alliance)]
+    (ui/target-operation-row
+      partner
+      [(decision-radio player-id (:xt/id alliance) "withdraw" "Withdraw")]
+      "py-1 px-3"
+      {:name-suffix (ui/treaty-indicator kind (str (kind-label kind) " treaty proposed"))})))
 
 (defn- propose-row
-  "One candidate row in the Propose a Treaty table — a Peace radio, or 'No slots free' when
-  the proposer has none left. Unlike the other rows, there's no existing alliance to key a
-  radio-name off yet, so this keeps its own shared 'treaty-proposal' group with a composite
-  'target-id:peace' value, mirroring action.clj's 'player-id:mode' — forward-compatible with
-  a future row offering more than one alliance kind to propose. Like every other decision
-  here, selecting it only highlights the choice; nothing is created until End Current Round
-  is submitted (see apply-diplomacy).
+  "One candidate row in the Propose a Treaty table — one radio per treaty kind, each its own
+  Operations column so they sit side by side (not stacked), sharing the page-wide
+  'treaty-proposal' group with a composite 'target-id:kind' value, mirroring action.clj's
+  'player-id:mode'. Every candidate here is a complete stranger (see diplomacy-page's
+  candidates) so always offers every kind, and always needs a free slot — an existing
+  partner's options live on their own Active Treaties row instead (see active-treaty-row).
+  When the proposer has no free slot, the first column shows 'No slots free' and the rest
+  render empty, keeping every row's column count consistent.
+
+  Like every other decision here, selecting it only highlights the choice; nothing is
+  created until End Current Round is submitted (see apply-diplomacy).
 
   [player-id uuid, free? bool, candidate player-map] -> hiccup"
   [player-id free? candidate]
   (ui/target-operation-row
     candidate
-    [(if free?
-       (ui/op-radio-btn "treaty-proposal"
-         (str (:xt/id candidate) ":peace")
-         "Peace"
-         (str "/app/game/" player-id "/diplomacy-warning")
-         "diplomacy-warning")
-       [:span.text-game-green-dim.text-xs "No slots free"])]
-    "py-1 px-3"))
+    (if free?
+      (for [kind (map :kind const/treaty-kinds)]
+        (ui/op-radio-btn "treaty-proposal"
+          (str (:xt/id candidate) ":" (name kind))
+          (kind-label kind)
+          (str "/app/game/" player-id "/diplomacy-warning")
+          "diplomacy-warning"))
+      (cons [:span.text-game-green-dim.text-xs "No slots free"]
+            (repeat (dec (count const/treaty-kinds)) nil)))
+    ;; kind-col-cls (padding only — the width is relation-table's <colgroup>, shared with
+    ;; active-treaty-row's switch/Dissolve columns).
+    kind-col-cls))
 
 ;;;;
 ;;;; Actions
@@ -224,27 +309,45 @@
 ;;; Every selected radio's value is one of these op strings; the matching label is what
 ;;; update-diplomacy-warning shows when exactly one decision is queued.
 (def ^:private op-labels
-  {"dissolve" "Peace treaty will be dissolved."
+  {"dissolve" "Treaty will be dissolved."
    "accept"   "Treaty proposal will be accepted."
    "decline"  "Treaty proposal will be declined."
    "withdraw" "Treaty proposal will be withdrawn."})
+
+(defn- alliance-kind-by-id
+  "A {alliance-id kind} map for every alliance in alliances — e.g. active treaties, so a
+  dissolve decision's warning text can name which kind is being dissolved without a second
+  DB round-trip per lookup.
+
+  [alliances seq-of-alliance-map] -> {uuid keyword}"
+  [alliances]
+  (into {} (map (juxt :xt/id :alliance/kind)) alliances))
 
 (defn- queued-decisions
   "Every diplomacy radio currently selected, read straight off a params map — one
   [op-str label-str] pair per selection, covering both the per-relationship 'treaty-<id>'
   groups and the separate 'treaty-proposal' group. An unchecked radio group simply has no
   key in params at all (standard HTML radio behavior), so presence alone means 'selected'.
+  kind-by-id (see alliance-kind-by-id) names the kind being dissolved, if any — a dissolve
+  decision's label is otherwise generic ('Treaty will be dissolved.', op-labels' fallback).
 
-  [params ring-params-map] -> seq-of-[op-str label-str]"
-  [params]
-  (let [[_target kind]  (utils/parse-choice-value (:treaty-proposal params))
+  [params ring-params-map, kind-by-id {uuid keyword}] -> seq-of-[op-str label-str]"
+  [params kind-by-id]
+  (let [[_target kind-str] (utils/parse-choice-value (:treaty-proposal params))
+        label (kind-label (keyword kind-str))
+        dissolve-label (fn [alliance-id-str]
+                         (if-let [dissolved-label (kind-label (get kind-by-id (parse-uuid alliance-id-str)))]
+                           (str dissolved-label " treaty will be dissolved.")
+                           (op-labels "dissolve")))
         per-relationship (for [[k v] params
                                 :when (and (not= k :treaty-proposal)
                                            (str/starts-with? (name k) "treaty-")
                                            (contains? op-labels v))]
-                            [v (op-labels v)])]
+                            [v (if (= v "dissolve")
+                                 (dissolve-label (subs (name k) (count "treaty-")))
+                                 (op-labels v))])]
     (cond-> (vec per-relationship)
-      (= kind "peace") (conj ["propose" "Peace treaty will be offered."]))))
+      label (conj ["propose" (str label " treaty will be offered.")]))))
 
 (defn- decisions-message
   "The warning text for a set of queued decisions — the specific label when exactly one is
@@ -277,11 +380,16 @@
   specific action only when there's exactly one, and otherwise just gives a count.
 
   [ctx ring-ctx] -> hiccup"
-  [{:keys [params]}]
-  (biff/render
-    (ui/phase-warning-div "diplomacy-warning"
-      (decisions-message (queued-decisions params))
-      {:color "text-yellow-400"})))
+  [{:keys [params] :as ctx}]
+  (utils/with-player-and-game [player _game _player-id] ctx
+    (let [db         (:biff/db ctx)
+          active     (diplomacy/active-treaties (:live (live-context db (:player/game player) player))
+                                                 (:xt/id player))
+          kind-by-id (alliance-kind-by-id active)]
+      (biff/render
+        (ui/phase-warning-div "diplomacy-warning"
+          (decisions-message (queued-decisions params kind-by-id))
+          {:color "text-yellow-400"})))))
 
 (defn apply-diplomacy
   "End the diplomacy window: resolve every queued decision — Accept/Decline/Withdraw/
@@ -322,13 +430,13 @@
                           [id (keyword (if (incoming-ids id)
                                          (if (= op "accept") "accept" "decline")
                                          op))])
-            [target-id-str _kind] (utils/parse-choice-value (:treaty-proposal params))
+            [target-id-str kind-str] (utils/parse-choice-value (:treaty-proposal params))
             target-id (when target-id-str (parse-uuid target-id-str))
             ;; Only a still-live candidate counts — live-ids already excludes eliminated
             ;; players, so this also covers the "target got eliminated" drop case.
-            propose-target (when (live-ids target-id) target-id)
+            propose-choice (when (live-ids target-id) [target-id (keyword kind-str)])
             resolved  (->> (diplomacy/resolve-decisions game live player-id decisions
-                                                         propose-target now)
+                                                         propose-choice now)
                            (map (fn [{:keys [op alliance] :as r}]
                                   (cond-> r
                                     (= op :propose) (assoc :alliance (assoc alliance :xt/id (random-uuid)))))))
@@ -339,11 +447,18 @@
             notifications (for [{:keys [op alliance]} resolved
                                 :let [[field other-id]
                                       (case op
-                                        :propose  [:player/incoming-treaty-proposed  (:alliance/recipient alliance)]
-                                        :accept   [:player/incoming-treaty-accepted  (:alliance/proposer alliance)]
-                                        :withdraw [:player/incoming-treaty-withdrawn (:alliance/recipient alliance)]
-                                        :dissolve [:player/incoming-treaty-dissolved (diplomacy/partner-id alliance player-id)]
-                                        :decline  [nil nil])]
+                                        :propose   [:player/incoming-treaty-proposed  (:alliance/recipient alliance)]
+                                        :accept    [:player/incoming-treaty-accepted  (:alliance/proposer alliance)]
+                                        :withdraw  [:player/incoming-treaty-withdrawn (:alliance/recipient alliance)]
+                                        :dissolve  [:player/incoming-treaty-dissolved (diplomacy/partner-id alliance player-id)]
+                                        ;; Notifies the proposer, not player-id (the
+                                        ;; recipient who declined, including the automatic
+                                        ;; no-free-slot fallback — see resolve-decisions).
+                                        :decline   [:player/incoming-treaty-declined (:alliance/proposer alliance)]
+                                        ;; A replacement's :accept above already notifies the
+                                        ;; other side about the NEW treaty — the superseded
+                                        ;; one needs no notification of its own.
+                                        :supersede [nil nil])]
                                 :when field]
                             {:field field :other-id other-id})
             ;; Two decisions in one submission (e.g. dissolving an active treaty with X while
@@ -377,6 +492,7 @@
                   :player/incoming-treaty-proposed  nil
                   :player/incoming-treaty-accepted  nil
                   :player/incoming-treaty-withdrawn nil
+                  :player/incoming-treaty-declined  nil
                   :player/incoming-treaty-dissolved nil}]
                 (concat alliance-tx notify-tx)))
         (events/record-events! ctx tx-events)
@@ -387,10 +503,12 @@
 ;;;;
 
 (defn diplomacy-page
-  "Show the diplomacy window: active treaties, pending proposals in both directions, and a
-  Propose a Treaty table of every other live empire with no current relationship. Every
-  relationship offers a deferred radio choice (see apply-diplomacy); the whole page is one
-  biff/form, same as action-page.
+  "Show the diplomacy window: active treaties (each with its own switch-kind and Dissolve
+  options — see active-treaty-row), pending proposals in both directions, and a Propose a
+  Treaty table of every other live empire with NO existing relationship at all — a partner
+  or pending-proposal counterpart always has their own options elsewhere on this page
+  instead, so they never show up twice. Every relationship offers a deferred radio choice
+  (see apply-diplomacy); the whole page is one biff/form, same as action-page.
 
   [{:keys [player game db flash]}] -> hiccup"
   [{:keys [player game db flash]}]
@@ -404,8 +522,11 @@
         used        (diplomacy/slots-used live player-id)
         total       (:game/alliance-slots game)
         free?       (pos? (diplomacy/free-slots game live player-id))
-        related-ids (set (map #(diplomacy/partner-id % player-id) live))
-        candidates  (remove #(related-ids (:xt/id %)) others)]
+        candidates  (remove #(diplomacy/has-relationship? live player-id (:xt/id %)) others)
+        ;; Shared by Active Treaties (one column per OTHER kind's switch option, plus one
+        ;; for Dissolve) and Propose a Treaty (one column per kind) — both equal exactly the
+        ;; total number of treaty kinds.
+        kind-cols   (count const/treaty-kinds)]
     (ui/phase-shell player game "Diplomacy Phase"
       (biff/form
         {:action (str "/app/game/" player-id "/apply-diplomacy") :method "post" :class "m-0"}
@@ -417,29 +538,35 @@
 
           (ui/section-label "Active Treaties")
           (if (seq active)
-            (relation-table 1
-              (for [a active] (active-treaty-row player-id a (partner a))))
+            (relation-table kind-cols
+              (for [a active] (active-treaty-row player-id a (partner a)))
+              "Change Treaty")
             [:p.text-xs.text-game-green-muted "No active treaties."])
 
           (ui/section-label "Propose a Treaty")
           (if (empty? candidates)
             [:p.text-xs.text-game-green-soft
              "There are no other empires in the galaxy to propose a treaty with."]
-            (relation-table 1
+            (relation-table kind-cols
               (for [c candidates] (propose-row player-id free? c))))
 
           (when (seq incoming)
             [:div
              (ui/section-label "Incoming Proposals")
              (relation-table 2
-               (for [a incoming] (incoming-row player-id a (partner a) free?)))])
+               (for [a incoming]
+                 ;; A replacement (see diplomacy/replacement?) needs no free slot, so Accept
+                 ;; is live for it even when free? is false.
+                 (incoming-row player-id a (partner a) (or free? (diplomacy/replacement? live a)))))])
 
           (when (seq outgoing)
             [:div
              (ui/section-label "Outgoing Proposals")
              (relation-table 1
                (for [a outgoing] (outgoing-row player-id a (partner a))))]))
-        (let [initial-message (decisions-message (queued-decisions (default-decision-params incoming)))]
+        (let [initial-message (decisions-message
+                                 (queued-decisions (default-decision-params incoming)
+                                                    (alliance-kind-by-id active)))]
           (ui/phase-warning-div "diplomacy-warning" initial-message
             {:color (if initial-message "text-yellow-400" "text-game-green-soft")}))
         (ui/phase-action-bar

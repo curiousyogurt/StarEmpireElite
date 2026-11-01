@@ -20,6 +20,7 @@
           [:game/rounds-per-day            :int]
           [:game/minutes-between-rounds    :int]
           [:game/alliance-slots            :int]
+          [:game/defence-treaty-contribution-rate :double]
 
           ;; Expense underpayment penalty
           [:game/expense-stability-penalty    :int]
@@ -313,7 +314,9 @@
             [:player/incoming-treaty-proposed           {:optional true} [:maybe [:vector :string]]]
             [:player/incoming-treaty-accepted          {:optional true} [:maybe [:vector :string]]]
             [:player/incoming-treaty-withdrawn         {:optional true} [:maybe [:vector :string]]]
+            [:player/incoming-treaty-declined          {:optional true} [:maybe [:vector :string]]]
             [:player/incoming-treaty-dissolved         {:optional true} [:maybe [:vector :string]]]
+            [:player/incoming-ally-battles             {:optional true} [:maybe [:vector :string]]]
 
             ;; Alert chip read-state (see com.star-empire-elite.alerts). incoming-seq is a
             ;; monotonic counter bumped once per incoming message, independent of the capped
@@ -326,19 +329,21 @@
             [:player/incoming-seen-groups   {:optional true} [:maybe :string]]]
 
    ;; A treaty between two players. Shared by both sides so the relationship can't drift —
-   ;; neither player's entity carries its own copy. Lifecycle: :proposed -> :active (accepted)
-   ;; | :declined | :withdrawn; :active -> :dissolved (ended by either side, from the
-   ;; diplomacy phase) | :broken (ended by an attack). Proposing/accepting/declining/
-   ;; withdrawing/dissolving only happen during the diplomacy phase (7); breaking happens
-   ;; during combat resolution (resolution.clj). See diplomacy.clj.
+   ;; neither player's entity carries its own copy. A pair holds at most one treaty at a
+   ;; time (see const/treaty-kinds). Lifecycle: :proposed -> :active (accepted) | :declined
+   ;; | :withdrawn; :active -> :dissolved (ended by either side, from the diplomacy phase)
+   ;; | :broken (ended by an attack) | :superseded (replaced by a different-kind treaty the
+   ;; same pair just accepted). Proposing/accepting/declining/withdrawing/dissolving only
+   ;; happen during the diplomacy phase (7); breaking happens during combat resolution
+   ;; (resolution.clj). See diplomacy.clj.
    :alliance/id :uuid
    :alliance [:map {:closed true}
               [:xt/id                 :alliance/id]
               [:alliance/game         :game/id]
-              [:alliance/kind         :keyword]  ; :peace (later :defensive / :offensive)
+              [:alliance/kind         :keyword]  ; :peace :defence (later :offence)
               [:alliance/proposer     :player/id]
               [:alliance/recipient    :player/id]
-              [:alliance/status       :keyword]  ; :proposed :active :declined :withdrawn :dissolved :broken
+              [:alliance/status       :keyword]  ; :proposed :active :declined :withdrawn :dissolved :broken :superseded
               [:alliance/proposed-at  inst?]
               [:alliance/formed-at {:optional true} [:maybe inst?]]
               [:alliance/ended-at  {:optional true} [:maybe inst?]]

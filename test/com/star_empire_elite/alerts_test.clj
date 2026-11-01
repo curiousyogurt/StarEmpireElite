@@ -35,6 +35,42 @@
       (is (= 2 (count rows)))
       (is (= [:action :diplomacy] (mapv :alert/category rows))))))
 
+(deftest test-incoming-messages-treaty-broken-names-the-kind
+  (testing "The combat-break row names whichever kind was actually broken"
+    (let [player {:player/incoming-attacks
+                  [(pr-str {:mode :raid :attacker-name "Foo" :treaty-broken? true
+                            :treaty-broken-kind :defence})]}
+          rows   (alerts/incoming-messages player)]
+      (is (= "broke a defence treaty with you." (:alert/text (second rows)))))))
+
+(deftest test-incoming-messages-treaty-broken-defaults-to-peace-for-legacy-records
+  (testing "A stored record from before :treaty-broken-kind existed defaults to peace"
+    (let [player {:player/incoming-attacks
+                  [(pr-str {:mode :raid :attacker-name "Foo" :treaty-broken? true})]}
+          rows   (alerts/incoming-messages player)]
+      (is (= "broke a peace treaty with you." (:alert/text (second rows)))))))
+
+(deftest test-incoming-messages-ally-battle-success
+  (testing "A defending ally-battle record where the attacker lost is a SUCCESS row"
+    (let [player {:player/incoming-ally-battles
+                  [(pr-str {:role :defending :kind :defence :mode :invade
+                            :attacker-name "Raider" :defender-name "Buddy"
+                            :attacker-wins? false})]}
+          [row]  (alerts/incoming-messages player)]
+      (is (= :action (:alert/category row)))
+      (is (= :invade (:alert/badge row)))
+      (is (= "Buddy" (:alert/sender row)))
+      (is (= "You joined Buddy's defence against Raider (SUCCESS)" (:alert/text row))))))
+
+(deftest test-incoming-messages-ally-battle-failure
+  (testing "A defending ally-battle record where the attacker won is a FAILURE row"
+    (let [player {:player/incoming-ally-battles
+                  [(pr-str {:role :defending :kind :defence :mode :invade
+                            :attacker-name "Raider" :defender-name "Buddy"
+                            :attacker-wins? true})]}
+          [row]  (alerts/incoming-messages player)]
+      (is (= "You joined Buddy's defence against Raider (FAILURE)" (:alert/text row))))))
+
 (deftest test-incoming-messages-bomb-success
   (testing "A bomb result with nonzero losses is a SUCCESS row"
     (let [player {:player/incoming-bomb-result (pr-str {:soldiers 3})}
@@ -62,14 +98,24 @@
     (let [player {:player/incoming-treaty-proposed  ["A"]
                   :player/incoming-treaty-accepted  ["B"]
                   :player/incoming-treaty-withdrawn ["C"]
-                  :player/incoming-treaty-dissolved ["D"]}
+                  :player/incoming-treaty-declined  ["D"]
+                  :player/incoming-treaty-dissolved ["E"]}
           rows   (alerts/incoming-messages player)]
       (is (every? #(= :diplomacy (:alert/category %)) rows))
-      (is (= ["A" "B" "C" "D"] (mapv :alert/sender rows))))))
+      (is (= ["A" "B" "C" "D" "E"] (mapv :alert/sender rows))))))
+
+(deftest test-incoming-messages-treaty-declined
+  (testing "A declined proposal is an instant message to the proposer, naming the decliner"
+    (let [player {:player/incoming-treaty-declined ["Decliner Empire"]}
+          [row]  (alerts/incoming-messages player)]
+      (is (= :diplomacy (:alert/category row)))
+      (is (= :treaty-dissolved (:alert/badge row)))
+      (is (= "Decliner Empire" (:alert/sender row)))
+      (is (= "declined your treaty proposal." (:alert/text row))))))
 
 (deftest test-incoming-messages-espionage-treaty-broken
   (testing "A treaty broken by someone else's espionage against you is its own DIPLOMACY
-            row, ordered right after espionage-fail rows and before the four treaty-
+            row, ordered right after espionage-fail rows and before the five treaty-
             lifecycle vectors — mirrors the ACTION+DIPLOMACY pairing attack-messages
             already does for a combat-broken treaty"
     (let [player {:player/incoming-espionage-treaty-broken ["Spymaster Empire"]
@@ -78,7 +124,9 @@
       (is (= [:diplomacy :diplomacy] (mapv :alert/category rows)))
       (is (= :treaty-broken (:alert/badge (first rows))))
       (is (= "Spymaster Empire" (:alert/sender (first rows))))
-      (is (= "broke a peace treaty with you (espionage)." (:alert/text (first rows))))
+      (is (= "broke a treaty with you (espionage)." (:alert/text (first rows)))
+          "no kind is shown here — :player/incoming-espionage-treaty-broken only ever
+           stored an empire name, never the kind")
       (is (= "Proposer" (:alert/sender (second rows)))
           "the espionage-broken row comes before the treaty-lifecycle vectors"))))
 

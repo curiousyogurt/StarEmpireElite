@@ -20,13 +20,19 @@
    :event/attacker-name "Ironwall"
    :event/defender      recipient-id
    :event/defender-name "Crimson Hand"
-   :event/payload-data  {}})
+   :event/payload-data  {:alliance/kind :peace}})
 
 (def treaty-dissolved-event
   (assoc treaty-formed-event :event/kind :treaty-dissolved))
 
 (def treaty-broken-event
   (assoc treaty-formed-event :event/kind :treaty-broken))
+
+(def treaty-formed-defence-event
+  (assoc treaty-formed-event :event/payload-data {:alliance/kind :defence}))
+
+(def treaty-formed-unknown-kind-event
+  (assoc treaty-formed-event :event/payload-data {:alliance/kind :made-up}))
 
 (deftest test-treaty-formed-is-not-unknown
   (testing "a :treaty-formed event renders real text, not the 'Unknown event' fallback"
@@ -45,6 +51,17 @@
     (let [text (pr-str (event-summary treaty-broken-event proposer-id))]
       (is (not (str/includes? text "Unknown event")))
       (is (str/includes? text "broke a peace treaty with")))))
+
+(deftest test-treaty-formed-names-the-defence-kind
+  (testing "a :defence treaty reads its own label from const/treaty-kinds, not peace's"
+    (let [text (pr-str (event-summary treaty-formed-defence-event proposer-id))]
+      (is (str/includes? text "signed a defence treaty with")))))
+
+(deftest test-treaty-formed-falls-back-to-kind-neutral-for-an-unrecognized-kind
+  (testing "a stale or unrecognized kind on an old stored event says just 'a treaty',
+            rather than guessing or crashing"
+    (let [text (pr-str (event-summary treaty-formed-unknown-kind-event proposer-id))]
+      (is (str/includes? text "signed a treaty with")))))
 
 (deftest test-treaty-formed-names-the-other-side
   (testing "each viewer sees themself as 'You' and the other empire named"

@@ -19,14 +19,16 @@
 
 (def game {:xt/id game-id :game/alliance-slots 3})
 
-(defn- alliance [status proposer recipient]
-  {:xt/id               (random-uuid)
-   :alliance/game       game-id
-   :alliance/kind       :peace
-   :alliance/proposer   proposer
-   :alliance/recipient  recipient
-   :alliance/status     status
-   :alliance/proposed-at now})
+(defn- alliance
+  ([status proposer recipient] (alliance status proposer recipient :peace))
+  ([status proposer recipient kind]
+   {:xt/id               (random-uuid)
+    :alliance/game       game-id
+    :alliance/kind       kind
+    :alliance/proposer   proposer
+    :alliance/recipient  recipient
+    :alliance/status     status
+    :alliance/proposed-at now}))
 
 ;;;;
 ;;;; partner-id / involves?
@@ -117,16 +119,91 @@
       (is (= 0 (diplomacy/free-slots tight-game al a-id))))))
 
 ;;;;
+;;;; proposable-kinds / replacement?
+;;;;
+
+(deftest test-proposable-kinds-no-relationship-offers-every-kind
+  (is (= #{:peace :defence} (set (diplomacy/proposable-kinds [] a-id b-id)))))
+
+(deftest test-proposable-kinds-active-partner-offers-only-the-other-kind
+  (let [al [(alliance :active a-id b-id :peace)]]
+    (is (= [:defence] (diplomacy/proposable-kinds al a-id b-id)))
+    (is (= [:defence] (diplomacy/proposable-kinds al b-id a-id))
+        "either side sees the same offer"))
+  (let [al [(alliance :active a-id b-id :defence)]]
+    (is (= [:peace] (diplomacy/proposable-kinds al a-id b-id)))))
+
+(deftest test-proposable-kinds-pending-proposal-offers-nothing
+  (let [al [(alliance :proposed a-id b-id :peace)]]
+    (is (empty? (diplomacy/proposable-kinds al a-id b-id))
+        "a pair holds at most one relationship at a time")))
+
+(deftest test-proposable-kinds-offers-nothing-while-a-replacement-is-pending
+  (testing "an active treaty plus its own pending replacement proposal (see replacement?)
+            must still offer nothing new — otherwise a second proposal of the replacement's
+            kind could be queued, duplicating it"
+    (let [existing    (alliance :active   a-id b-id :peace)
+          replacement (alliance :proposed a-id b-id :defence)]
+      (is (empty? (diplomacy/proposable-kinds [existing replacement] a-id b-id)))
+      (is (empty? (diplomacy/proposable-kinds [replacement existing] a-id b-id))
+          "order in the alliance seq must not matter"))))
+
+(deftest test-replacement?-true-for-different-kind-against-active-treaty
+  (let [existing (alliance :active a-id b-id :peace)
+        proposal (alliance :proposed a-id b-id :defence)]
+    (is (true? (diplomacy/replacement? [existing proposal] proposal)))))
+
+(deftest test-replacement?-false-with-no-existing-treaty
+  (let [proposal (alliance :proposed a-id b-id :peace)]
+    (is (false? (diplomacy/replacement? [proposal] proposal)))))
+
+(deftest test-replacement?-false-when-not-proposed
+  (let [existing (alliance :active a-id b-id :peace)
+        other    (alliance :active a-id b-id :defence)]
+    (is (false? (diplomacy/replacement? [existing other] other))
+        "only a :proposed alliance can be a pending replacement")))
+
+;;;;
+;;;; slots-used with a replacement pending
+;;;;
+
+(deftest test-slots-used-does-not-double-count-a-replacement
+  (testing "a replacement proposal rides on the slot its target active treaty already holds"
+    (let [existing    (alliance :active   a-id b-id :peace)
+          replacement (alliance :proposed a-id b-id :defence)
+          al          [existing replacement]]
+      (is (= 1 (diplomacy/slots-used al a-id))
+          "just the active treaty — the replacement proposal doesn't add a second slot"))))
+
+(deftest test-slots-used-counts-a-stale-replacement-once-its-target-ends
+  (testing "once the active treaty it would replace is gone, the proposal is an ordinary
+            outgoing proposal and counts on its own"
+    (let [ended       (alliance :dissolved a-id b-id :peace)
+          replacement (alliance :proposed  a-id b-id :defence)
+          al          [ended replacement]]
+      (is (= 1 (diplomacy/slots-used al a-id))))))
+
+;;;;
+;;;; partner-ids-of-kind
+;;;;
+
+(deftest test-partner-ids-of-kind
+  (let [al [(alliance :active a-id b-id :peace)
+            (alliance :active a-id c-id :defence)]]
+    (is (= #{c-id} (diplomacy/partner-ids-of-kind al a-id :defence)))
+    (is (= #{b-id} (diplomacy/partner-ids-of-kind al a-id :peace)))))
+
+;;;;
 ;;;; check-propose
 ;;;;
 
 (deftest test-check-propose-rejects-self
-  (is (false? (:ok? (diplomacy/check-propose game [] a-id a-id)))))
+  (is (false? (:ok? (diplomacy/check-propose game [] a-id a-id :peace)))))
 
 (deftest test-check-propose-rejects-existing-relationship
   (let [al [(alliance :proposed a-id b-id)]]
-    (is (false? (:ok? (diplomacy/check-propose game al a-id b-id))))
-    (is (false? (:ok? (diplomacy/check-propose game al b-id a-id)))
+    (is (false? (:ok? (diplomacy/check-propose game al a-id b-id :peace))))
+    (is (false? (:ok? (diplomacy/check-propose game al b-id a-id :peace)))
         "existing relationship blocks the reverse direction too")))
 
 (deftest test-check-propose-rejects-no-free-slots
@@ -134,10 +211,26 @@
             (alliance :active   a-id c-id)
             (alliance :proposed a-id (UUID/randomUUID))]]
     (is (= 0 (diplomacy/free-slots game al a-id)))
-    (is (false? (:ok? (diplomacy/check-propose game al a-id (UUID/randomUUID)))))))
+    (is (false? (:ok? (diplomacy/check-propose game al a-id (UUID/randomUUID) :peace))))))
 
 (deftest test-check-propose-ok
-  (is (true? (:ok? (diplomacy/check-propose game [] a-id b-id)))))
+  (is (true? (:ok? (diplomacy/check-propose game [] a-id b-id :peace)))))
+
+(deftest test-check-propose-rejects-same-kind-already-held
+  (let [al [(alliance :active a-id b-id :peace)]]
+    (is (false? (:ok? (diplomacy/check-propose game al a-id b-id :peace))))))
+
+(deftest test-check-propose-replacement-ok-with-zero-free-slots
+  (testing "proposing the other kind to an existing partner needs no free slot, in either
+            direction (peace->defence and defence->peace)"
+    (let [tight-game {:game/alliance-slots 1}]
+      (let [al [(alliance :active a-id b-id :peace)
+                (alliance :active a-id c-id :peace)]]
+        (is (= 0 (diplomacy/free-slots tight-game al a-id)))
+        (is (true? (:ok? (diplomacy/check-propose tight-game al a-id b-id :defence)))))
+      (let [al [(alliance :active a-id b-id :defence)
+                (alliance :active a-id c-id :peace)]]
+        (is (true? (:ok? (diplomacy/check-propose tight-game al a-id b-id :peace))))))))
 
 ;;;;
 ;;;; check-accept
@@ -161,13 +254,17 @@
 ;;;;
 
 (deftest test-propose-builds-pending-alliance
-  (let [al (diplomacy/propose a-id b-id game-id now)]
+  (let [al (diplomacy/propose a-id b-id :peace game-id now)]
     (is (= :proposed (:alliance/status al)))
     (is (= a-id (:alliance/proposer al)))
     (is (= b-id (:alliance/recipient al)))
     (is (= :peace (:alliance/kind al)))
     (is (not (contains? al :xt/id))
         "caller assigns the id at submit time, like events/record-events!")))
+
+(deftest test-propose-honors-kind
+  (let [al (diplomacy/propose a-id b-id :defence game-id now)]
+    (is (= :defence (:alliance/kind al)))))
 
 (deftest test-accept-activates
   (let [al (diplomacy/accept (alliance :proposed a-id b-id) now)]
@@ -188,6 +285,12 @@
   (let [al (diplomacy/dissolve (alliance :active a-id b-id) b-id now)]
     (is (= :dissolved (:alliance/status al)))
     (is (= b-id (:alliance/ended-by al)))))
+
+(deftest test-supersede
+  (let [al (diplomacy/supersede (alliance :active a-id b-id) b-id now)]
+    (is (= :superseded (:alliance/status al)))
+    (is (= b-id (:alliance/ended-by al)))
+    (is (= now (:alliance/ended-at al)))))
 
 ;;;;
 ;;;; resolve-decisions
@@ -278,21 +381,65 @@
           target-id  (random-uuid)
           resolved   (diplomacy/resolve-decisions tight-game [proposal] a-id
                                                    [[(:xt/id proposal) :accept]]
-                                                   target-id now)]
+                                                   [target-id :peace] now)]
       (is (= :active (:alliance/status (by-op resolved :accept))))
       (is (empty? (filter #(= :propose (:op %)) resolved))
           "the slot was already spent on the accept above"))))
 
 (deftest test-resolve-decisions-propose-ok-when-a-slot-is-free
   (let [target-id (random-uuid)
-        resolved  (diplomacy/resolve-decisions game [] a-id [] target-id now)]
+        resolved  (diplomacy/resolve-decisions game [] a-id [] [target-id :peace] now)]
     (is (= 1 (count resolved)))
     (is (= :propose (:op (first resolved))))
     (is (= a-id (:alliance/proposer (by-op resolved :propose))))
     (is (= target-id (:alliance/recipient (by-op resolved :propose))))
+    (is (= :peace (:alliance/kind (by-op resolved :propose))))
     (is (= game-id (:alliance/game (by-op resolved :propose))))
     (is (not (contains? (by-op resolved :propose) :xt/id))
         "caller assigns the id at submit time, same as diplomacy/propose alone")))
+
+(deftest test-resolve-decisions-propose-defence-to-existing-peace-partner-needs-no-slot
+  (testing "a replacement Propose succeeds even with zero free slots"
+    (let [tight-game {:game/alliance-slots 1}
+          existing   (alliance :active a-id b-id :peace)
+          resolved   (diplomacy/resolve-decisions tight-game [existing] a-id []
+                                                    [b-id :defence] now)]
+      (is (= 0 (diplomacy/free-slots tight-game [existing] a-id)))
+      (is (= :defence (:alliance/kind (by-op resolved :propose)))))))
+
+(deftest test-resolve-decisions-accept-replacement-supersedes-the-existing-treaty
+  (testing "accepting a replacement both activates the new treaty and supersedes the old one,
+            in the same pass, without needing a free slot"
+    (let [tight-game  {:game/alliance-slots 1}
+          existing    (alliance :active   a-id b-id :peace)
+          replacement (alliance :proposed a-id b-id :defence)  ; b-id is the recipient
+          resolved    (diplomacy/resolve-decisions tight-game [existing replacement] b-id
+                                                    [[(:xt/id replacement) :accept]] nil now)
+          accepted    (by-op resolved :accept)
+          superseded  (by-op resolved :supersede)]
+      (is (= 2 (count resolved)))
+      (is (= :active (:alliance/status accepted)))
+      (is (= :defence (:alliance/kind accepted)))
+      (is (= :superseded (:alliance/status superseded)))
+      (is (= :peace (:alliance/kind superseded)))
+      (is (= (:xt/id existing) (:xt/id superseded))))))
+
+(deftest test-resolve-decisions-decline-replacement-leaves-existing-treaty-active
+  (let [existing    (alliance :active   a-id b-id :peace)
+        replacement (alliance :proposed a-id b-id :defence)
+        resolved    (diplomacy/resolve-decisions game [existing replacement] b-id
+                                                  [[(:xt/id replacement) :decline]] nil now)]
+    (is (= :declined (:alliance/status (by-op resolved :decline))))
+    (is (empty? (filter #(= :supersede (:op %)) resolved))
+        "nothing is superseded unless the replacement is actually accepted")))
+
+(deftest test-resolve-decisions-withdraw-replacement-leaves-existing-treaty-active
+  (let [existing    (alliance :active   a-id b-id :peace)
+        replacement (alliance :proposed a-id b-id :defence)
+        resolved    (diplomacy/resolve-decisions game [existing replacement] a-id
+                                                  [[(:xt/id replacement) :withdraw]] nil now)]
+    (is (= :withdrawn (:alliance/status (by-op resolved :withdraw))))
+    (is (empty? (filter #(= :supersede (:op %)) resolved)))))
 
 (deftest test-resolve-decisions-ignores-a-decision-on-an-unknown-alliance
   (testing "a decision keyed to an alliance-id not in alliances at all (e.g. the player

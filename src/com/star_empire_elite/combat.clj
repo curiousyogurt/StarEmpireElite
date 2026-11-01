@@ -161,6 +161,114 @@
      :def-roll  def-roll}))
 
 ;;;;
+;;;; Treaty Ally Pooling
+;;;; A defence ally's forces don't fight as a separate party — a fraction of them folds into
+;;;; the side they're defending for the whole two-phase engagement below, then real losses
+;;;; are split back out afterward in the same proportion each contributed. Side-agnostic:
+;;;; resolve-combat calls these for the defender's side today; a future offence treaty would
+;;;; call the same functions for the attacker's side.
+;;;;
+
+(def contributable-units
+  "Unit types a treaty ally can contribute a fraction of. Cmd-ships and stations are too few
+  and valuable to split across empires, and agents aren't a combat unit (see the Espionage
+  Resolution section below) — none of the three are ever contributed."
+  [:soldiers :transports :generals :fighters :carriers :admirals])
+
+(defn ally-contribution
+  "The units ally commits at rate — floor(rate × count) for each contributable unit type.
+  Taking rate as a plain number (not game) keeps this reusable for any treaty kind with its
+  own contribution rate (defence today; a future offence treaty would call this the same way
+  with its own rate).
+
+  [rate double, ally player-map] -> unit-map (plain keys, e.g. :soldiers)"
+  [rate ally]
+  {:soldiers   (long (* rate (:player/soldiers   ally)))
+   :transports (long (* rate (:player/transports ally)))
+   :generals   (long (* rate (:player/generals   ally)))
+   :fighters   (long (* rate (:player/fighters   ally)))
+   :carriers   (long (* rate (:player/carriers   ally)))
+   :admirals   (long (* rate (:player/admirals   ally)))})
+
+(defn- add-contribution
+  "Add one ally's contribution onto player's :player/* unit counts.
+
+  [player player-map, contribution unit-map] -> player-map"
+  [player {:keys [soldiers transports generals fighters carriers admirals]}]
+  (-> player
+      (update :player/soldiers   + soldiers)
+      (update :player/transports + transports)
+      (update :player/generals   + generals)
+      (update :player/fighters   + fighters)
+      (update :player/carriers   + carriers)
+      (update :player/admirals   + admirals)))
+
+(defn pool-forces
+  "Add every ally's contribution onto base-player's :player/* unit counts, pooling them into
+  one combined fighting force. Only the six contributable unit counts change — planets,
+  resources, and every other field pass through unchanged, since captures and stability
+  still belong to base-player alone, not the pooled force that merely fought on their behalf.
+
+  [base-player player-map, contributions seq-of-unit-map] -> player-map"
+  [base-player contributions]
+  (reduce add-contribution base-player contributions))
+
+(defn split-losses
+  "Split pool-loss (the amount a pooled unit-type total just lost) back out across shares —
+  a seq of [id contributed] pairs, each contributed being how much of that unit type that
+  participant put into the pool — proportionally to each share's contribution, using the
+  largest-remainder method so the parts always sum to exactly pool-loss and no share loses
+  more than it contributed. The same technique as select-planets above and
+  resolution/distribute-breakaway-planets, generalized from a fixed three categories to any
+  number of shares.
+
+  [pool-loss int, shares seq-of-[id int]] -> {id int}"
+  [pool-loss shares]
+  (let [total (reduce + (map second shares))]
+    (if (zero? total)
+      (zipmap (map first shares) (repeat 0))
+      (let [fracs      (for [[id n] shares] [id (* pool-loss (/ (double n) total))])
+            bases      (for [[id frac] fracs] [id (long frac)])
+            base-sum   (reduce + (map second bases))
+            leftover   (- pool-loss base-sum)
+            remainders (map (fn [[id frac] [_ base]] [id (- frac base)]) fracs bases)
+            ;; Hand the leftover units, one each, to the shares with the biggest fractional
+            ;; remainder — same largest-remainder technique as select-planets.
+            extra-ids  (->> remainders (sort-by second >) (take leftover) (map first) set)
+            caps       (into {} shares)]
+        (into {}
+          (for [[id base] bases]
+            [id (min (caps id) (+ base (if (extra-ids id) 1 0)))]))))))
+
+(defn split-side-losses
+  "Divide side-losses (the pooled loss map a side just took, keyed exactly like resolve-
+  combat's :attacker-losses/:defender-losses) back out across own-player and the allies
+  whose forces were pooled into that side. For each contributable unit type, own-player's
+  share is weighted by their own full stock of that unit and each ally's by what they
+  contributed (see split-losses); every other key (cmd-ships, stations) goes entirely to
+  own-player, since allies never contribute those.
+
+  [side-losses loss-map, own-player player-map, allies seq-of-{:id :name :contribution}]
+  -> {:own loss-map, :allies seq-of-{:ally-id :ally-name :contributed :losses}}"
+  [side-losses own-player allies]
+  (let [own-stock (ally-contribution 1.0 own-player)
+        per-unit  (into {}
+                    (for [unit contributable-units]
+                      (let [shares (cons [:own (get own-stock unit 0)]
+                                          (for [a allies] [(:id a) (get-in a [:contribution unit] 0)]))]
+                        [unit (split-losses (get side-losses unit 0) shares)])))
+        own-losses  (merge (select-keys side-losses [:cmd-ships :stations])
+                            (into {} (for [unit contributable-units]
+                                       [unit (get-in per-unit [unit :own] 0)])))
+        ally-losses (for [a allies]
+                      {:ally-id     (:id a)
+                       :ally-name   (:name a)
+                       :contributed (:contribution a)
+                       :losses      (into {} (for [unit contributable-units]
+                                                [unit (get-in per-unit [unit (:id a)] 0)]))})]
+    {:own own-losses :allies ally-losses}))
+
+;;;;
 ;;;; Attack Resolution
 ;;;;
 
@@ -226,12 +334,36 @@
   The engagement multiplier (raid=0.1, invade=1.0) scales the defender's power
   participation AND loss exposure in both phases.
 
+  opts optionally carries :defender-allies — the defender's live defence-treaty allies
+  (player-maps) whose forces join the fight (see ally-contribution). Their contribution is
+  pooled into the defender's effective force for the whole engagement, so :defender-counts
+  and :defender-losses below are POOLED totals — what the attacker actually fought.
+  :defender-own-counts/:defender-own-losses are the real defender's share alone, and
+  :defender-allies lists each ally's contribution and losses (see split-side-losses). With
+  no allies, all of these match the plain defender fields exactly, same as before this
+  option existed.
+
   UUIDs stored as strings for safe pr-str round-trip.
 
-  [game game-map, attacker player-map, defender player-map, mode keyword] -> result-map"
-  [game attacker defender mode]
-  (let [att-forces  (effective-forces game attacker)
-        def-forces  (effective-defending-forces game defender)
+  ([game game-map, attacker player-map, defender player-map, mode keyword] -> result-map)
+  ([game game-map, attacker player-map, defender player-map, mode keyword,
+    opts {:defender-allies seq-of-player-map}] -> result-map)"
+  ([game attacker defender mode] (resolve-combat game attacker defender mode {}))
+  ([game attacker defender mode {:keys [defender-allies] :or {defender-allies []}}]
+  (let [;; Falls back to the constant for a game created before this field existed in
+        ;; game-config/field-specs — an older game's entity was never snapshotted with it,
+        ;; so (:game/... game) alone would be nil here (and nil * count NPEs below) for any
+        ;; pre-existing game, not just a freshly-created one.
+        rate            (or (:game/defence-treaty-contribution-rate game)
+                            const/defence-treaty-contribution-rate)
+        allies          (for [ally defender-allies]
+                          {:id           (:xt/id ally)
+                           :name         (:player/empire-name ally)
+                           :contribution (ally-contribution rate ally)})
+        pooled-defender (pool-forces defender (map :contribution allies))
+
+        att-forces  (effective-forces game attacker)
+        def-forces  (effective-defending-forces game pooled-defender)
 
         ;; Engagement fraction: governs defender power participation and loss exposure
         engagement  (case mode
@@ -324,7 +456,12 @@
         captured-total     (+ (:mil planets-transferred) (:erg planets-transferred) (:ore planets-transferred))
         penalty-per-planet (:game/capture-stability-penalty-per-planet game)
         penalty-cap        (:game/capture-stability-penalty-cap game)
-        capture-penalty    (min penalty-cap (* penalty-per-planet captured-total))]
+        capture-penalty    (min penalty-cap (* penalty-per-planet captured-total))
+
+        ;; Split the pooled defender-losses back out to the real defender and each ally, in
+        ;; proportion to what each put in — see split-side-losses. With no allies this just
+        ;; hands all of defender-losses back as :own.
+        split (split-side-losses defender-losses defender allies)]
 
     {:attacker-id     (str (:xt/id attacker))
      :attacker-name   (:player/empire-name attacker)
@@ -338,14 +475,24 @@
                        :carriers   (:player/carriers   attacker)
                        :admirals   (:player/admirals   attacker)
                        :cmd-ships  (:player/cmd-ships  attacker)}
-     :defender-counts {:soldiers   (:player/soldiers   defender)
-                       :transports (:player/transports defender)
-                       :generals   (:player/generals   defender)
-                       :fighters   (:player/fighters   defender)
-                       :carriers   (:player/carriers   defender)
-                       :admirals   (:player/admirals   defender)
-                       :cmd-ships  (:player/cmd-ships  defender)
-                       :stations   (:player/stations   defender)}
+     ;; POOLED totals — what the attacker actually fought against, defender plus every
+     ;; contributing ally. See :defender-own-counts below for the real defender alone.
+     :defender-counts {:soldiers   (:player/soldiers   pooled-defender)
+                       :transports (:player/transports pooled-defender)
+                       :generals   (:player/generals   pooled-defender)
+                       :fighters   (:player/fighters   pooled-defender)
+                       :carriers   (:player/carriers   pooled-defender)
+                       :admirals   (:player/admirals   pooled-defender)
+                       :cmd-ships  (:player/cmd-ships  pooled-defender)
+                       :stations   (:player/stations   pooled-defender)}
+     :defender-own-counts {:soldiers   (:player/soldiers   defender)
+                           :transports (:player/transports defender)
+                           :generals   (:player/generals   defender)
+                           :fighters   (:player/fighters   defender)
+                           :carriers   (:player/carriers   defender)
+                           :admirals   (:player/admirals   defender)
+                           :cmd-ships  (:player/cmd-ships  defender)
+                           :stations   (:player/stations   defender)}
      :attacker-forces att-forces
      :defender-forces def-forces
      ;; Top-level roll/margin keys map to ground phase for backward compatibility
@@ -354,7 +501,11 @@
      :attacker-wins?  att-wins?
      :margin          ground-margin
      :attacker-losses attacker-losses
+     ;; POOLED losses — see :defender-counts above. :defender-own-losses/:defender-allies
+     ;; split this back out to who actually lost what (see split-side-losses).
      :defender-losses defender-losses
+     :defender-own-losses (:own split)
+     :defender-allies      (:allies split)
      :planets-transferred planets-transferred
      :resources-captured  {:credits credits-captured
                            :food    food-captured
@@ -364,7 +515,7 @@
      ;; Phase sub-results for display
      :space-result    space-result
      :space-carryover carryover
-     :ground-result   ground-result}))
+     :ground-result   ground-result})))
 
 ;;;;
 ;;;; Strike Resolution

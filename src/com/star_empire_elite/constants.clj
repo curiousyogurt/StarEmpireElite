@@ -63,6 +63,25 @@
 (def alliance-slots 3)
 
 ;;;;
+;;;; Treaty Kinds
+;;;; Single source of truth for the treaty kinds a player can propose. diplomacy.clj's
+;;;; proposable-kinds, the diplomacy page's Propose-a-Treaty radios, ui/treaty-indicator,
+;;;; alerts, and news all derive their options and display text from this table, so adding a
+;;;; new kind (e.g. a future :offence treaty) means adding one row here, not editing every
+;;;; call site separately.
+;;;;
+
+(def treaty-kinds
+  [{:kind :peace   :label "Peace"   :marker "P"}
+   {:kind :defence :label "Defence" :marker "D"}])
+
+;;; The fraction of a defence ally's soldiers, transports, generals, fighters, carriers, and
+;;; admirals that join the fight when the defender (or another of their defence allies) is
+;;; invaded or raided — see combat/ally-contribution. Cmd-ships, stations, and agents are
+;;; never contributed.
+(def defence-treaty-contribution-rate 0.25)
+
+;;;;
 ;;;; Combat Modes
 ;;;; Raid is a limited engagement that targets a fraction of the defender's empire.
 ;;;; Invade is a full-scale assault. The engagement multiplier governs both the

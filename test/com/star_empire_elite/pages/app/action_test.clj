@@ -113,13 +113,17 @@
     (let [result (#'action/target-row test-target {:soldiers 100 :fighters 50} 1 "attacker-id")]
       (is (= 7 (count result)))))  ; :tr + 6 tds (no separate attrs map)
 
-  (testing "No treaty indicator when treaty? is omitted or false"
+  (testing "No treaty indicator when treaty-kind is omitted or nil"
     (let [result (#'action/target-row test-target {:soldiers 100 :fighters 50} 1 "attacker-id")]
       (is (not (clojure.string/includes? (pr-str result) "Active peace treaty")))))
 
-  (testing "Renders the treaty indicator next to the name when treaty? is true"
-    (let [result (#'action/target-row test-target {:soldiers 100 :fighters 50} 1 "attacker-id" true)]
+  (testing "Renders the peace marker when treaty-kind is :peace"
+    (let [result (#'action/target-row test-target {:soldiers 100 :fighters 50} 1 "attacker-id" :peace)]
       (is (clojure.string/includes? (pr-str result) "Active peace treaty"))))
+
+  (testing "Renders the defence marker when treaty-kind is :defence"
+    (let [result (#'action/target-row test-target {:soldiers 100 :fighters 50} 1 "attacker-id" :defence)]
+      (is (clojure.string/includes? (pr-str result) "Active defence treaty"))))
 
   (testing "Radio values contain composite player-id:mode format"
     (let [result   (#'action/target-row test-target {:soldiers 100 :fighters 50} 1 "attacker-id")

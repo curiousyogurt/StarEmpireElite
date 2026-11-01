@@ -30,7 +30,9 @@
 
 (defn- attack-messages
   "Turn a player's pr-str'd incoming-attacks history into alert rows, including a second
-  DIPLOMACY row for any attack that also broke an active peace treaty.
+  DIPLOMACY row for any attack that also broke an active treaty. :treaty-broken-kind names
+  which kind in that row's text; it defaults to :peace for a record stored before that field
+  existed.
 
   [player player-map] -> [alert-map]"
   [player]
@@ -50,8 +52,27 @@
                   :alert/sender attacker :alert/text (str verb " you" outcome)}]
           (:treaty-broken? r)
           (conj {:alert/category :diplomacy :alert/badge :treaty-broken
-                 :alert/sender attacker :alert/text "broke a peace treaty with you."}))))
+                 :alert/sender attacker
+                 :alert/text (str "broke a " (name (:treaty-broken-kind r :peace))
+                                   " treaty with you.")}))))
     (utils/take-recent (:player/incoming-attacks player))))
+
+(defn- ally-battle-messages
+  "Turn a player's pr-str'd incoming-ally-battles history (set when their defence-treaty
+  forces joined another empire's fight — see resolution/ally-update-tx) into alert rows.
+  role is always :defending today; a future offence treaty would add an :attacking row here.
+
+  [player player-map] -> [alert-map]"
+  [player]
+  (for [record-str (utils/take-recent (:player/incoming-ally-battles player))
+        :let [{:keys [role attacker-name defender-name mode attacker-wins?]}
+              (edn/read-string record-str)]
+        :when (= role :defending)]
+    ;; Joining the defence succeeds when the attacker loses.
+    {:alert/category :action :alert/badge mode
+     :alert/sender defender-name
+     :alert/text (str "You joined " defender-name "'s defence against " attacker-name
+                       (if attacker-wins? " (FAILURE)" " (SUCCESS)"))}))
 
 (defn- espionage-fail-messages
   "[player player-map] -> [alert-map]"
@@ -100,26 +121,37 @@
 (defn incoming-messages
   "Flatten a player's incoming-* history fields into alert rows, one per raw message —
   the same events shown in detail on the Outcomes phase page. Order: attacks (plus any
-  treaty-broken rows), espionage (plus any treaty-broken-by-espionage rows), then the four
-  treaty-lifecycle vectors.
+  treaty-broken rows) and ally-battle rows, espionage (plus any treaty-broken-by-espionage
+  rows), then the five treaty-lifecycle vectors.
+
+  The five treaty-lifecycle rows and the espionage-broken row are deliberately kind-neutral
+  ('a treaty', not 'a peace treaty') — those history fields only ever stored an empire name,
+  never the kind, so there's nothing truthful to say beyond 'a treaty' for them. Only the
+  combat-break row above can name the kind, since :player/incoming-attacks stores the whole
+  battle result, :treaty-broken-kind included.
 
   [player player-map] -> [alert-map]"
   [player]
   (vec
     (concat
       (attack-messages player)
+      (ally-battle-messages player)
       (keep identity [(bomb-message player) (incite-message player) (defect-message player)])
       (espionage-fail-messages player)
       (treaty-messages player :player/incoming-espionage-treaty-broken :treaty-broken
-                        "broke a peace treaty with you (espionage).")
+                        "broke a treaty with you (espionage).")
       (treaty-messages player :player/incoming-treaty-proposed  :treaty-formed
-                        "proposed a peace treaty with you.")
+                        "proposed a treaty with you.")
       (treaty-messages player :player/incoming-treaty-accepted  :treaty-formed
-                        "accepted your peace treaty proposal.")
+                        "accepted your treaty proposal.")
       (treaty-messages player :player/incoming-treaty-withdrawn :treaty-dissolved
-                        "withdrew their peace treaty proposal.")
+                        "withdrew their treaty proposal.")
+      ;; The recipient's decline, including the automatic no-free-slot fallback (see
+      ;; diplomacy/resolve-decisions) — the proposer finds out either way.
+      (treaty-messages player :player/incoming-treaty-declined  :treaty-dissolved
+                        "declined your treaty proposal.")
       (treaty-messages player :player/incoming-treaty-dissolved :treaty-dissolved
-                        "dissolved your peace treaty."))))
+                        "dissolved your treaty."))))
 
 ;;;;
 ;;;; Grouping, Summary, Chip State

@@ -47,9 +47,9 @@
 ;;; Each row shows empire name, planet count, score, and four radio-button operation
 ;;; modes (Spy, Incite, Bomb, Defect). A local `op-btn` fn renders each radio input
 ;;; with toggle-on-reclick behaviour and HTMX warning updates. A treaty partner's row
-;;; carries a "P" marker (ui/treaty-indicator) right after their name — a warning, since
+;;; carries a boxed marker (ui/treaty-indicator) right after their name — a warning, since
 ;;; running any espionage op against them breaks the treaty just like an Action-phase
-;;; attack does (see resolution/resolve-espionage).
+;;; attack does (see resolution/resolve-espionage), whatever kind it is.
 ;;;
 ;;; - target-row: one table row with four radio-button operation modes
 ;;;
@@ -60,10 +60,12 @@
   selection across the whole table can be made.
   Composite radio values 'op:player-id' are parsed in apply-espionage.
   attacker-id-str is the current player's id, used for the HTMX warning endpoint.
-  treaty? marks this target as a current peace-treaty partner; defaults to false.
+  treaty-kind, when given, marks this target as a current treaty partner of that kind
+  (:peace or :defence) and renders its marker; nil means no current treaty.
 
-  [player player-map, attacker-id-str string, has-agents? boolean, & [treaty? bool]] -> hiccup"
-  [player attacker-id-str has-agents? & [treaty?]]
+  [player player-map, attacker-id-str string, has-agents? boolean,
+   & [treaty-kind keyword|nil]] -> hiccup"
+  [player attacker-id-str has-agents? & [treaty-kind]]
   (let [target-id-str (str (:xt/id player))
         radio-name    "espionage-action"
         warning-ep    (str "/app/game/" attacker-id-str "/espionage-warning")
@@ -81,7 +83,7 @@
        (op-btn "bomb" "Bomb")
        (op-btn "defect" "Defect")]
       "py-1 px-3"
-      {:name-suffix (when treaty? (ui/treaty-indicator))})))
+      {:name-suffix (when treaty-kind (ui/treaty-indicator treaty-kind))})))
 
 ;;;;
 ;;;; Actions
@@ -142,10 +144,11 @@
         other-players  (utils/get-other-players db (:player/game player) player-id)
         ;; Active treaties only — a mere proposal hasn't "arrived" yet (see diplomacy.clj).
         ;; Marked so the player sees, before choosing a target, that any op against one of
-        ;; these breaks the treaty (see resolution/resolve-espionage).
+        ;; these breaks the treaty (see resolution/resolve-espionage). A pair holds at most
+        ;; one treaty, so this is a simple partner-id -> kind map.
         alliances      (diplomacy/alliances-for-player db (:player/game player) player-id)
-        treaty-ids     (set (map #(diplomacy/partner-id % player-id)
-                                 (diplomacy/active-treaties alliances player-id)))
+        treaty-kinds   (into {} (map (fn [a] [(diplomacy/partner-id a player-id) (:alliance/kind a)]))
+                              (diplomacy/active-treaties alliances player-id))
         disabled-hint  (when (and (seq other-players) (not has-agents?))
                          "Espionage operations require at least one agent.")
         th-cls         "text-green-400 text-[11px] tracking-[0.08em] uppercase"]
@@ -162,7 +165,7 @@
            (ui/section-label "Choose a Target")
            [:p.text-xs.mb-2.text-game-green-muted
             "Spy: Reveal military forces. Incite: Reduce stability. Bomb: Covertly destroy units. Defect: Turn enemy agents. "
-            "A “P” marker means you hold an active peace treaty with that empire — any operation against them breaks it."]
+            "A “P” marker means an active peace treaty; “D” an active defence treaty — any operation against either breaks it."]
            [:div.overflow-x-auto
             [:table.w-full.text-sm
              {:class "border border-game-border border-collapse"}
@@ -175,7 +178,7 @@
              [:tbody
               (for [target other-players]
                 (target-row target attacker-id has-agents?
-                            (contains? treaty-ids (:xt/id target))))]]]]))
+                            (treaty-kinds (:xt/id target))))]]]]))
        (when disabled-hint
          [:input {:type "hidden" :name "espionage-disabled-hint" :value disabled-hint}])
        (ui/phase-warning-div "espionage-warning" disabled-hint {:color "text-game-green-soft"})

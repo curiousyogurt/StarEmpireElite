@@ -42,6 +42,80 @@
     (when treaty
       (diplomacy/break-by-attack treaty attacker-id now))))
 
+;;; A defence ally sits out a fight against someone they separately hold an active treaty
+;;; with — of either kind, peace or defence — rather than fight their own treaty partner.
+;;; That treaty itself is untouched; sitting out isn't a hostile act, so nothing breaks.
+(defn- sits-out?
+  "True when ally-id holds an active treaty with enemy-id.
+
+  [db xtdb-db, game-id uuid, ally-id uuid, enemy-id uuid] -> bool"
+  [db game-id ally-id enemy-id]
+  (some? (diplomacy/active-treaty-between
+           (diplomacy/alliances-for-player db game-id ally-id) ally-id enemy-id)))
+
+(defn- treaty-allies
+  "player-id's active kind-treaty allies who are eligible to join a fight against enemy-id:
+  excludes enemy-id itself, any already-eliminated partner, and any partner who separately
+  holds an active treaty with enemy-id (see sits-out?). Help comes only from player-id's
+  direct partners — it doesn't chain to a partner's own partners.
+
+  [db xtdb-db, game-id uuid, kind keyword, player-id uuid, enemy-id uuid]
+  -> seq-of-player-map"
+  [db game-id kind player-id enemy-id]
+  (let [alliances   (diplomacy/alliances-for-player db game-id player-id)
+        partner-ids (disj (diplomacy/partner-ids-of-kind alliances player-id kind) enemy-id)]
+    (for [ally-id partner-ids
+          :let [ally (xt/entity db ally-id)]
+          :when (and ally
+                     (not= (:player/status ally) const/player-status-eliminated)
+                     (not (sits-out? db game-id ally-id enemy-id)))]
+      ally)))
+
+;;; One tx map per ally whose forces joined a fight — subtracts their losses, recomputes
+;;; score, and records an alert-ready summary. role/kind are carried in the summary (not just
+;;; implied) so a future offence treaty's attacking allies can reuse this same function and
+;;; the same :player/incoming-ally-battles field/alert/card.
+(defn- ally-update-tx
+  "[ally player-map, game game-map, role keyword, kind keyword, battle-result battle-result-map,
+   ally-result {:ally-id :ally-name :contributed :losses}] -> tx-map"
+  [ally game role kind battle-result ally-result]
+  (let [losses         (:losses ally-result)
+        new-soldiers   (max 0 (- (:player/soldiers   ally) (:soldiers   losses 0)))
+        new-transports (max 0 (- (:player/transports ally) (:transports losses 0)))
+        new-generals   (max 0 (- (:player/generals   ally) (:generals   losses 0)))
+        new-fighters   (max 0 (- (:player/fighters   ally) (:fighters   losses 0)))
+        new-carriers   (max 0 (- (:player/carriers   ally) (:carriers   losses 0)))
+        new-admirals   (max 0 (- (:player/admirals   ally) (:admirals   losses 0)))
+        summary        (pr-str {:role            role
+                                 :kind            kind
+                                 :attacker-name   (:attacker-name battle-result)
+                                 :defender-name   (:defender-name battle-result)
+                                 :mode            (:mode battle-result)
+                                 :attacker-wins?  (:attacker-wins? battle-result)
+                                 :contributed     (:contributed ally-result)
+                                 :losses          losses
+                                 ;; So the ally's own outcomes card can show the attacker's
+                                 ;; side of the fight too, same shape as the real attacker/
+                                 ;; defender's own combat card (see outcomes/ally-battle-card).
+                                 :attacker-losses (:attacker-losses battle-result)})]
+    {:db/doc-type        :player
+     :db/op              :update
+     :xt/id              (:xt/id ally)
+     :player/soldiers    new-soldiers
+     :player/transports  new-transports
+     :player/generals    new-generals
+     :player/fighters    new-fighters
+     :player/carriers    new-carriers
+     :player/admirals    new-admirals
+     :player/score       (utils/calculate-score
+                            game (assoc ally
+                                   :player/soldiers   new-soldiers :player/transports new-transports
+                                   :player/generals   new-generals :player/fighters   new-fighters
+                                   :player/carriers   new-carriers :player/admirals   new-admirals))
+     :player/incoming-ally-battles
+     (utils/capped-conj (:player/incoming-ally-battles ally) summary)
+     :player/incoming-seq (utils/next-incoming-seq ally 1)}))
+
 ;;;;
 ;;;; Stability Calculations
 ;;;;
@@ -177,7 +251,8 @@
                                     db (:player/game player) player-id
                                     (:xt/id defender) (java.util.Date.))
                   result        (cond-> raw-result
-                                  broken-alliance (assoc :treaty-broken? true))
+                                  broken-alliance (assoc :treaty-broken? true
+                                                          :treaty-broken-kind (:alliance/kind broken-alliance)))
                   dl            (:defender-losses result)
                   ships-lost    (:cmd-ships-lost result)
                   att-cmd-ships (max 0 (- (:player/cmd-ships player) ships-lost))
@@ -223,9 +298,19 @@
                   broken-alliance (conj (assoc broken-alliance :db/doc-type :alliance))))
               [result (assoc player :player/cmd-ships att-cmd-ships) broken-alliance])
             ;; --- Invade / Raid branch ---
-            (let [result  (combat/resolve-combat game player defender mode)
+            (let [;; The defender's active defence allies (if any) are pooled into their
+                  ;; fighting force for the whole engagement — see combat/resolve-combat's
+                  ;; :defender-allies option. Strike has no unit-vs-unit battle, so only
+                  ;; invade/raid ever gather allies.
+                  allies  (treaty-allies db (:player/game player) :defence
+                                         (:xt/id defender) player-id)
+                  result  (combat/resolve-combat game player defender mode
+                                                  {:defender-allies allies})
                   al      (:attacker-losses result)
-                  dl      (:defender-losses result)
+                  ;; The real defender's own share of the pooled loss — see :defender-own-
+                  ;; losses in combat/resolve-combat. Each ally's own share is applied
+                  ;; separately below (see ally-txs), never subtracted from defender here.
+                  dl      (:defender-own-losses result)
                   raw-pt  (or (:planets-transferred result) {:mil 0 :erg 0 :ore 0})
                   pt-mil  (min (:mil raw-pt) (:player/mil-planets defender))
                   pt-erg  (min (:erg raw-pt) (:player/erg-planets defender))
@@ -234,7 +319,8 @@
                                     db (:player/game player) player-id
                                     (:xt/id defender) (java.util.Date.))
                   capped       (cond-> (assoc result :planets-transferred {:mil pt-mil :erg pt-erg :ore pt-ore})
-                                 broken-alliance (assoc :treaty-broken? true))
+                                 broken-alliance (assoc :treaty-broken? true
+                                                         :treaty-broken-kind (:alliance/kind broken-alliance)))
                   rc           (or (:resources-captured capped) {:credits 0 :food 0 :fuel 0})
                   rc-credits   (:credits rc)
                   rc-food      (:food    rc)
@@ -265,9 +351,19 @@
                   def-ore-plts   (max 0 (- (:player/ore-planets defender) pt-ore))
                   def-credits    (max 0 (- (:player/credits     defender) rc-credits))
                   def-food       (max 0 (- (:player/food        defender) rc-food))
-                  def-fuel       (max 0 (- (:player/fuel        defender) rc-fuel))]
+                  def-fuel       (max 0 (- (:player/fuel        defender) rc-fuel))
+                  ;; One tx map per defence ally whose forces joined this fight (see
+                  ;; ally-update-tx) — matched back to the live player-maps in allies above
+                  ;; by :ally-id, since :defender-allies only carries each ally's
+                  ;; id/name/contribution/losses, not their full player map.
+                  ally-txs (for [ally-result (:defender-allies capped)
+                                 :let [ally (first (filter #(= (:xt/id %) (:ally-id ally-result))
+                                                            allies))]
+                                 :when ally]
+                             (ally-update-tx ally game :defending :defence capped ally-result))]
               (biff/submit-tx
                 ctx
+                (into
                 (cond->
                 [{:db/doc-type :player :db/op :update :xt/id player-id
                   :player/last-battle-result (pr-str capped)
@@ -332,7 +428,8 @@
                   ;; capped incoming-attacks vector.
                   :player/incoming-seq
                   (utils/next-incoming-seq defender (if broken-alliance 2 1))}]
-                  broken-alliance (conj (assoc broken-alliance :db/doc-type :alliance))))
+                  broken-alliance (conj (assoc broken-alliance :db/doc-type :alliance)))
+                ally-txs))
               [capped
                (merge player
                       {:player/soldiers     att-soldiers
@@ -380,7 +477,9 @@
                               bomb?    (combat/resolve-bomb      game player target)
                               defect?  (combat/resolve-defect    game player target)
                               :else    (combat/resolve-espionage game player target))
-                result      (cond-> raw-result broken-alliance (assoc :treaty-broken? true))
+                result      (cond-> raw-result
+                              broken-alliance (assoc :treaty-broken? true
+                                                      :treaty-broken-kind (:alliance/kind broken-alliance)))
                 att-wins?      (:attacker-wins? result)
                 agents-lost    (or (:agents-lost result) 0)
                 agents-captured (or (:agents-captured result) 0)

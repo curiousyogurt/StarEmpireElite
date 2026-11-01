@@ -431,19 +431,26 @@
       text])))
 
 (defn treaty-indicator
-  "Render a small square 'P' marker for a target-table row, meaning 'you hold an active
-  peace treaty with this empire' by default — pass title to say something else, e.g. a
-  diplomacy-page proposal that isn't active yet. Shared by the action and espionage target
-  tables — see target-operation-row's :name-suffix. Vertical centering against the empire
-  name is handled by the flex wrapper in target-info-tds, not here — a lone inline-flex box
-  has no text baseline of its own to line up against plain text.
+  "Render a small square marker for a target-table row, meaning 'you hold an active kind
+  treaty with this empire' by default — pass title to say something else, e.g. a
+  diplomacy-page proposal that isn't active yet. kind looks up its marker letter and label
+  from const/treaty-kinds ('P'/'Peace', 'D'/'Defence', …), so a new treaty kind only ever
+  needs a row added there. Shared by the action and espionage target tables — see
+  target-operation-row's :name-suffix. Vertical centering against the empire name is handled
+  by the flex wrapper in target-info-tds, not here — a lone inline-flex box has no text
+  baseline of its own to line up against plain text.
 
-  [& [title str]] -> hiccup"
-  [& [title]]
-  [:span.inline-flex.items-center.justify-center.font-bold.border.rounded-sm
-   {:class "w-4 h-4 text-[9px] border-[#60a5fa] text-[#60a5fa]"
-    :title (or title "Active peace treaty")}
-   "P"])
+  Returns nil (renders nothing) for an unrecognized kind — e.g. test data generated without
+  pinning :alliance/kind, or a future removed kind on an old stored document — rather than
+  crashing the page over a cosmetic marker.
+
+  [kind keyword, & [title str]] -> hiccup | nil"
+  [kind & [title]]
+  (when-let [{:keys [marker label]} (first (filter #(= kind (:kind %)) const/treaty-kinds))]
+    [:span.inline-flex.items-center.justify-center.font-bold.border.rounded-sm
+     {:class "w-4 h-4 text-[9px] border-[#60a5fa] text-[#60a5fa]"
+      :title (or title (str "Active " (str/lower-case label) " treaty"))}
+     marker]))
 
 (defn resource-pills
   "Render resource pills for a phase summary card: one pill per non-zero value in value-map.
@@ -1294,16 +1301,24 @@
   warning update.
 
   opts:
-    :checked? — render this radio pre-selected (e.g. a forced default choice).
-    :sticky?  — omit the toggle-off behavior, so once selected this radio can only be
-                replaced by picking another option in the same radio-name group, never
-                deselected back to nothing. Used where a choice must always be made (see
-                diplomacy.clj's incoming-row, where Decline is the default and Accept/Decline
-                must always resolve to one or the other).
+    :checked?    — render this radio pre-selected (e.g. a forced default choice).
+    :sticky?     — omit the toggle-off behavior, so once selected this radio can only be
+                   replaced by picking another option in the same radio-name group, never
+                   deselected back to nothing. Used where a choice must always be made (see
+                   diplomacy.clj's incoming-row, where Decline is the default and Accept/
+                   Decline must always resolve to one or the other).
+    :id          — set the rendered <input>'s id, so another radio's :also-clear can target
+                   it directly (see diplomacy.clj's active-treaty-row, where the switch-kind
+                   and Dissolve radios live in two different radio-name groups but must
+                   still behave as one mutually exclusive choice).
+    :also-clear  — a CSS selector (string); selecting this radio also unchecks every
+                   matching element. Needed because the toggle-off bookkeeping above only
+                   ever clears radios that already share this radio-name — two radios in
+                   different groups are otherwise free to both stay checked at once.
 
   [radio-name str, value str, label str, warning-endpoint str, warning-id str,
-   opts {:checked? bool, :sticky? bool}|nil] -> hiccup"
-  [radio-name value label warning-endpoint warning-id & [{:keys [checked? sticky?]}]]
+   opts {:checked? bool, :sticky? bool, :id str, :also-clear str}|nil] -> hiccup"
+  [radio-name value label warning-endpoint warning-id & [{:keys [checked? sticky? id also-clear]}]]
   [:label.block.cursor-pointer
    [:input.peer.sr-only
     (cond-> {:type       "radio"
@@ -1313,12 +1328,16 @@
              :hx-trigger "click"
              :hx-target  (str "#" warning-id)
              :hx-swap    "outerHTML"}
+      id       (assoc :id id)
       checked? (assoc :checked true :data-was "true")
       (not sticky?)
       (assoc :onclick
         (str "var p=this.dataset.was==='true';"
              "document.querySelectorAll('[name=" radio-name "]').forEach(function(r){r.dataset.was='false';});"
-             "if(p){this.checked=false;}else{this.dataset.was='true';}")))]
+             "if(p){this.checked=false;}else{this.dataset.was='true';"
+             (when also-clear
+               (str "document.querySelectorAll('" also-clear "').forEach(function(r){r.checked=false;r.dataset.was='false';});"))
+             "}")))]
    [:span.block.w-full.px-3.py-1.text-sm.font-bold.text-center.bg-black.border.transition-colors
     {:class "text-green-400 border-green-400 hover:text-yellow-400 hover:border-yellow-400 peer-checked:text-yellow-400 peer-checked:border-yellow-400 peer-checked:bg-yellow-400 peer-checked:bg-opacity-10"}
     label]])

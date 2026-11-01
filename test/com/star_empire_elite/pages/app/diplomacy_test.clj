@@ -49,8 +49,10 @@
                         :player/incoming-treaty-proposed  nil
                         :player/incoming-treaty-accepted  nil
                         :player/incoming-treaty-withdrawn nil
+                        :player/incoming-treaty-declined  nil
                         :player/incoming-treaty-dissolved nil
                         :player/incoming-attacks          nil
+                        :player/incoming-ally-battles     nil
                         :player/incoming-bomb-result      nil}
                        overrides)]
     (biff/submit-tx ctx [(assoc player :db/doc-type :player)])
@@ -72,6 +74,50 @@
 ;;; Builds the one param a decision-radio submits: {:treaty-<alliance-id> "accept"}, etc.
 (defn- decision-params [alliance-id op]
   {(keyword (str "treaty-" alliance-id)) op})
+
+;;;;
+;;;; update-diplomacy-warning — the dissolve message names the treaty's kind
+;;;;
+
+(deftest test-diplomacy-warning-names-the-peace-kind-being-dissolved
+  (with-open [node (test-xtdb-node [])]
+    (let [setup-ctx (ctx-for node nil)
+          game      (make-game! setup-ctx {})
+          a         (make-player! setup-ctx (:xt/id game) {})
+          b         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Ally"})
+          treaty    (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/kind :peace
+                                               :alliance/status :active
+                                               :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
+          result    (page/update-diplomacy-warning
+                      (ctx-for node (:xt/id a)
+                        {:params (decision-params (:xt/id treaty) "dissolve")}))]
+      (is (str/includes? (:body result) "Peace treaty will be dissolved.")))))
+
+(deftest test-diplomacy-warning-names-the-defence-kind-being-dissolved
+  (with-open [node (test-xtdb-node [])]
+    (let [setup-ctx (ctx-for node nil)
+          game      (make-game! setup-ctx {})
+          a         (make-player! setup-ctx (:xt/id game) {})
+          b         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Ally"})
+          treaty    (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/kind :defence
+                                               :alliance/status :active
+                                               :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
+          result    (page/update-diplomacy-warning
+                      (ctx-for node (:xt/id a)
+                        {:params (decision-params (:xt/id treaty) "dissolve")}))]
+      (is (str/includes? (:body result) "Defence treaty will be dissolved.")))))
+
+(deftest test-diplomacy-warning-dissolve-falls-back-to-generic-text-for-an-unknown-alliance
+  (testing "a stale/tampered alliance-id with no matching active treaty falls back to the
+            generic 'Treaty will be dissolved.' rather than erroring"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            result    (page/update-diplomacy-warning
+                        (ctx-for node (:xt/id a)
+                          {:params (decision-params (random-uuid) "dissolve")}))]
+        (is (str/includes? (:body result) "Treaty will be dissolved."))))))
 
 ;;;;
 ;;;; apply-diplomacy — ends the window, phase 7 -> 1
@@ -107,12 +153,14 @@
                         {:player/incoming-treaty-proposed  ["A"]
                          :player/incoming-treaty-accepted  ["B"]
                          :player/incoming-treaty-withdrawn ["C"]
-                         :player/incoming-treaty-dissolved ["D"]})
+                         :player/incoming-treaty-declined  ["D"]
+                         :player/incoming-treaty-dissolved ["E"]})
             _         (page/apply-diplomacy (ctx-for node (:xt/id player)))
             reloaded  (xt/entity (xt/db node) (:xt/id player))]
         (is (nil? (:player/incoming-treaty-proposed  reloaded)))
         (is (nil? (:player/incoming-treaty-accepted  reloaded)))
         (is (nil? (:player/incoming-treaty-withdrawn reloaded)))
+        (is (nil? (:player/incoming-treaty-declined  reloaded)))
         (is (nil? (:player/incoming-treaty-dissolved reloaded)))))))
 
 ;;;;
@@ -353,6 +401,48 @@
       (is (= :declined (:alliance/status (first (alliances-in db (:xt/id game))))))
       (is (empty? (events-in db (:xt/id game)))))))
 
+(deftest test-decline-decision-flags-the-proposers-alert-banner
+  (testing "declining an incoming proposal is an instant message to the proposer — same
+            pattern as accept/withdraw/dissolve's notifications"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {})
+            a         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Proposer"})
+            b         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Decliner"})
+            proposal  (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/status :proposed
+                                                 :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
+            result    (page/apply-diplomacy
+                        (ctx-for node (:xt/id b)
+                          {:params (decision-params (:xt/id proposal) "decline")}))
+            db        (xt/db node)]
+        (is (= 303 (:status result)))
+        ;; The proposer's alert banner picks this up even if they never revisit diplomacy.
+        (is (= ["Decliner"] (:player/incoming-treaty-declined (xt/entity db (:xt/id a)))))))))
+
+(deftest test-decline-fallback-from-a-full-slot-also-flags-the-proposers-alert-banner
+  (testing "an incoming proposal that falls back to decline because no slot was left (see
+            diplomacy/resolve-decisions) still notifies the proposer — the proposer doesn't
+            need to know WHY it was declined to be told that it was"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {:game/alliance-slots 1})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Decliner"})
+            c         (make-player! setup-ctx (:xt/id game) {})
+            _         (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/status :active
+                                                 :alliance/proposer (:xt/id b) :alliance/recipient (:xt/id c)})
+            proposal  (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/status :proposed
+                                                 :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
+            result    (page/apply-diplomacy
+                        (ctx-for node (:xt/id b)
+                          {:params (decision-params (:xt/id proposal) "accept")}))
+            db        (xt/db node)]
+        (is (= 303 (:status result)))
+        (is (= :declined (:alliance/status (first (filter #(= (:xt/id proposal) (:xt/id %))
+                                                            (alliances-in db (:xt/id game)))))))
+        (is (= ["Decliner"] (:player/incoming-treaty-declined (xt/entity db (:xt/id a))))
+            "the proposer is notified by b's name even though b tried to Accept, not Decline")))))
+
 (deftest test-decline-decision-by-non-recipient-is-silently-dropped
   (with-open [node (test-xtdb-node [])]
     (let [setup-ctx (ctx-for node nil)
@@ -498,6 +588,55 @@
         (is (str/includes? html "Crimson Hand"))
         (is (str/includes? html "Active peace treaty"))))))
 
+(deftest test-active-treaties-table-header-says-change-treaty-not-operations
+  (testing "the Active Treaties table's last header reads 'Change Treaty', not the generic
+            'Operations' every other relationship table uses"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Ally"})
+            _         (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/kind :peace
+                                                 :alliance/status :active
+                                                 :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
+            db        (xt/db node)
+            html      (pr-str (page/diplomacy-page {:player a :game game :db db}))]
+        (is (str/includes? html "Change Treaty")))))
+
+  (testing "every OTHER relationship table still says 'Operations'"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Stranger"})
+            db        (xt/db node)
+            html      (pr-str (page/diplomacy-page {:player a :game game :db db}))]
+        (is (str/includes? html "Operations"))))))
+
+(deftest test-active-treaty-row-switch-and-dissolve-are-mutually-exclusive
+  (testing "the switch-kind radio and Dissolve live in two different radio-name groups
+            ('treaty-proposal' is shared page-wide; Dissolve's group is private to this
+            alliance) but each clears the other by id via :also-clear, so selecting one
+            always deselects the other instead of letting both stay checked at once"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Ally"})
+            treaty    (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/kind :peace
+                                                 :alliance/status :active
+                                                 :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
+            db        (xt/db node)
+            html      (pr-str (page/diplomacy-page {:player a :game game :db db}))
+            dissolve-id (str "treaty-dissolve-" (:xt/id treaty))
+            switch-id   (str "treaty-switch-" (:xt/id treaty) "-defence")]
+        ;; Each radio carries the id the other one's also-clear selector targets.
+        (is (str/includes? html (str ":id \"" dissolve-id "\"")))
+        (is (str/includes? html (str ":id \"" switch-id "\"")))
+        ;; Dissolve's onclick clears the switch radio by id, and vice versa.
+        (is (str/includes? html (str "#" switch-id)))
+        (is (str/includes? html (str "#" dissolve-id)))))))
+
 (deftest test-incoming-proposals-table-has-no-peace-marker
   (testing "a mere proposal isn't a treaty yet, so its row carries no marker"
     (with-open [node (test-xtdb-node [])]
@@ -566,6 +705,143 @@
         (is (str/includes? html ":checked true"))
         (is (not (str/includes? html (str "document.querySelectorAll('[name=" radio-name "]')"))))
         (is (str/includes? html "ⓘ Treaty proposal will be declined."))))))
+
+;;;;
+;;;; diplomacy-page — an existing partner's switch-kind option lives on their Active
+;;;; Treaties row, never also in Propose a Treaty (no empire is ever listed twice)
+;;;;
+
+(deftest test-propose-table-offers-both-kinds-to-a-stranger
+  (testing "an empire with no current relationship gets both Peace and Defence radios"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Stranger"})
+            db        (xt/db node)
+            html      (pr-str (page/diplomacy-page {:player a :game game :db db}))]
+        (is (str/includes? html (str (:xt/id b) ":peace")))
+        (is (str/includes? html (str (:xt/id b) ":defence")))))))
+
+(deftest test-propose-row-side-by-side-with-no-free-slots-shows-no-slots-free-once
+  (testing "a stranger candidate with no free slots shows 'No slots free' exactly once —
+            not duplicated across both of propose-row's now-separate kind columns"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {:game/alliance-slots 1})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Used-Up"})
+            c         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Stranger"})
+            _         (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/status :active
+                                                 :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
+            db        (xt/db node)
+            html      (pr-str (page/diplomacy-page {:player a :game game :db db}))]
+        (is (str/includes? html "Stranger"))
+        (is (= 1 (count (re-seq #"No slots free" html))))
+        (is (not (str/includes? html (str (:xt/id c) ":peace"))))
+        (is (not (str/includes? html (str (:xt/id c) ":defence"))))))))
+
+(deftest test-active-peace-partner-offers-defence-switch-and-dissolve-only-on-their-row
+  (testing "an active :peace partner's switch-to-Defence option renders, but Propose a
+            Treaty has no candidates at all — the partner is the only other empire and
+            already has their own options on the Active Treaties row"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {:game/alliance-slots 1})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Ally"})
+            _         (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/kind :peace
+                                                 :alliance/status :active
+                                                 :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
+            db        (xt/db node)
+            html      (pr-str (page/diplomacy-page {:player a :game game :db db}))]
+        ;; No free slots left (alliance-slots is 1, already used by the active treaty), but
+        ;; a replacement never needs one, so the Defence switch radio still shows.
+        (is (str/includes? html (str (:xt/id b) ":defence")))
+        (is (not (str/includes? html (str (:xt/id b) ":peace"))))
+        (is (not (str/includes? html "No slots free")))
+        ;; b is the only other empire and already has a relationship, so Propose a Treaty
+        ;; has nothing to offer — b is never listed there too.
+        (is (str/includes? html "There are no other empires in the galaxy to propose a treaty with."))))))
+
+(deftest test-active-defence-partner-offers-peace-switch-only
+  (testing "the reverse: an active :defence partner's row offers only a switch to Peace"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Ally"})
+            _         (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/kind :defence
+                                                 :alliance/status :active
+                                                 :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
+            db        (xt/db node)
+            html      (pr-str (page/diplomacy-page {:player a :game game :db db}))]
+        (is (str/includes? html (str (:xt/id b) ":peace")))
+        (is (not (str/includes? html (str (:xt/id b) ":defence"))))))))
+
+(deftest test-active-partner-never-listed-twice-when-a-stranger-also-exists
+  (testing "with both an active partner and an unrelated stranger in the game, Propose a
+            Treaty lists only the stranger — the partner's switch/dissolve options are on
+            their Active Treaties row and nowhere else"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Ally"})
+            c         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Stranger"})
+            _         (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/kind :peace
+                                                 :alliance/status :active
+                                                 :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
+            db        (xt/db node)
+            html      (pr-str (page/diplomacy-page {:player a :game game :db db}))]
+        ;; b: switch-to-defence only, never peace (that's its current kind already).
+        (is (str/includes? html (str (:xt/id b) ":defence")))
+        (is (not (str/includes? html (str (:xt/id b) ":peace"))))
+        ;; c: a genuine stranger, offered both kinds in Propose a Treaty.
+        (is (str/includes? html (str (:xt/id c) ":peace")))
+        (is (str/includes? html (str (:xt/id c) ":defence")))
+        ;; Propose a Treaty has a real candidate (c), so the empty-state message is absent.
+        (is (not (str/includes? html "There are no other empires in the galaxy to propose a treaty with.")))))))
+
+(deftest test-propose-table-excludes-a-pending-proposal-partner
+  (testing "an empire with a proposal already pending in either direction offers neither
+            kind, and so doesn't appear as a Propose candidate at all"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Pending"})
+            _         (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/kind :peace
+                                                 :alliance/status :proposed
+                                                 :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
+            db        (xt/db node)
+            html      (pr-str (page/diplomacy-page {:player a :game game :db db}))]
+        (is (not (str/includes? html (str (:xt/id b) ":peace"))))
+        (is (not (str/includes? html (str (:xt/id b) ":defence"))))))))
+
+(deftest test-accept-a-defence-replacement-with-no-free-slots-supersedes-the-peace-treaty
+  (testing "accepting a replacement needs no free slot and ends the old treaty as
+            :superseded, not :dissolved"
+    (with-open [node (test-xtdb-node [])]
+      (let [setup-ctx (ctx-for node nil)
+            game      (make-game! setup-ctx {:game/alliance-slots 1})
+            a         (make-player! setup-ctx (:xt/id game) {})
+            b         (make-player! setup-ctx (:xt/id game) {:player/empire-name "Partner"})
+            existing  (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/kind :peace
+                                                 :alliance/status :active
+                                                 :alliance/proposer (:xt/id a) :alliance/recipient (:xt/id b)})
+            replacement (make-alliance! setup-ctx {:alliance/game (:xt/id game) :alliance/kind :defence
+                                                   :alliance/status :proposed
+                                                   :alliance/proposer (:xt/id b) :alliance/recipient (:xt/id a)})
+            result    (page/apply-diplomacy
+                        (ctx-for node (:xt/id a)
+                          {:params (decision-params (:xt/id replacement) "accept")}))
+            db        (xt/db node)
+            by-id     (into {} (map (juxt :xt/id identity)) (alliances-in db (:xt/id game)))]
+        (is (= 303 (:status result)))
+        (is (= :active (:alliance/status (by-id (:xt/id replacement)))))
+        (is (= :defence (:alliance/kind (by-id (:xt/id replacement)))))
+        (is (= :superseded (:alliance/status (by-id (:xt/id existing)))))))))
 
 (deftest test-cancel-diplomacy-never-touches-accept-or-decline
   (testing "Cancel Diplomacy only resets the optional treaty-* radios (dissolve/withdraw/

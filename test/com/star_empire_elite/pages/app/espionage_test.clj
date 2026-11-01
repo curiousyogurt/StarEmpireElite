@@ -83,13 +83,17 @@
     (let [planet-td (nth (#'espionage/target-row test-target "attacker-id" true) 2)]
       (is (= "6" (last planet-td)))))
 
-  (testing "No treaty indicator when treaty? is omitted or false — espionage never breaks one"
+  (testing "No treaty indicator when treaty-kind is omitted or nil"
     (let [result (#'espionage/target-row test-target "attacker-id" true)]
       (is (not (clojure.string/includes? (pr-str result) "Active peace treaty")))))
 
-  (testing "Renders the treaty indicator next to the name when treaty? is true"
-    (let [result (#'espionage/target-row test-target "attacker-id" true true)]
-      (is (clojure.string/includes? (pr-str result) "Active peace treaty")))))
+  (testing "Renders the peace marker when treaty-kind is :peace"
+    (let [result (#'espionage/target-row test-target "attacker-id" true :peace)]
+      (is (clojure.string/includes? (pr-str result) "Active peace treaty"))))
+
+  (testing "Renders the defence marker when treaty-kind is :defence"
+    (let [result (#'espionage/target-row test-target "attacker-id" true :defence)]
+      (is (clojure.string/includes? (pr-str result) "Active defence treaty")))))
 
 ;;;;
 ;;;; espionage-page Tests

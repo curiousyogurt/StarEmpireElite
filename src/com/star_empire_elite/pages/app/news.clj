@@ -9,7 +9,9 @@
 
 (ns com.star-empire-elite.pages.app.news
   (:require [clojure.edn :as edn]
+            [clojure.string :as str]
             [com.biffweb :refer [q]]
+            [com.star-empire-elite.constants :as const]
             [com.star-empire-elite.ui :as ui])
   (:import (java.time LocalDate ZoneId)
            (java.time.temporal ChronoUnit)))
@@ -117,20 +119,26 @@
 (defn- treaty-summary
   "Verb phrase for treaty-formed / treaty-dissolved / treaty-broken events.
 
-  Unlike the other summary renderers this reads straight off the event (not its payload) —
-  :event/attacker-name/:event/defender-name already carry whichever two empires are involved,
-  and there's no 'win/loss' outcome to show.
+  Unlike the other summary renderers this reads straight off the event — its payload is the
+  :alliance map itself (see events/event-of-treaty), so :alliance/kind names which treaty
+  kind this is, and :event/attacker-name/:event/defender-name already carry whichever two
+  empires are involved; there's no 'win/loss' outcome to show.
 
   [event event-map, kind keyword, player-id uuid] -> hiccup-fragment"
   [event kind player-id]
-  (let [att-name (:event/attacker-name event)
-        def-name (:event/defender-name event)
-        you-att? (= player-id (:event/attacker event))
-        you-def? (= player-id (:event/defender event))
-        verb     (case kind
-                   :treaty-formed    "signed a peace treaty with"
-                   :treaty-dissolved "dissolved the peace treaty with"
-                   :treaty-broken    "broke a peace treaty with")]
+  (let [att-name   (:event/attacker-name event)
+        def-name   (:event/defender-name event)
+        you-att?   (= player-id (:event/attacker event))
+        you-def?   (= player-id (:event/defender event))
+        kind-label (:label (first (filter #(= (:alliance/kind (:event/payload-data event)) (:kind %))
+                                           const/treaty-kinds)))
+        ;; Falls back to no kind word at all ("a treaty", not "a peace treaty") for a stale
+        ;; or unrecognized kind on an old stored event, rather than guessing.
+        kind-word  (if kind-label (str (str/lower-case kind-label) " ") "")
+        verb       (case kind
+                     :treaty-formed    (str "signed a " kind-word "treaty with")
+                     :treaty-dissolved (str "dissolved the " kind-word "treaty with")
+                     :treaty-broken    (str "broke a " kind-word "treaty with"))]
     (cond
       you-att? [:span "You " verb " " (empire-span def-name)]
       you-def? [:span (empire-span att-name) " " verb " you"]

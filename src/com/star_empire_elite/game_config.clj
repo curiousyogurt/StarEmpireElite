@@ -36,6 +36,8 @@
    ;; Diplomacy
    {:key :game/alliance-slots :label "Alliance slots" :category :diplomacy
     :type :int :min 0 :max 20 :step 1 :default const/alliance-slots}
+   {:key :game/defence-treaty-contribution-rate :label "Defence treaty contribution rate" :category :diplomacy
+    :type :double :min 0.0 :max 1.0 :step 0.05 :default const/defence-treaty-contribution-rate}
 
    ;; Combat Modes — raid/invade-reward-multiplier are NOT included here: constants.clj marks
    ;; them "superseded by combat-loss and capture-cap constants ... kept for reference," and no

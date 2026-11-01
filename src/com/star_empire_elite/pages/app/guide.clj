@@ -601,16 +601,17 @@
 ;;;;
 
 (defn- diplomacy-section [game]
-  (section "diplomacy" "DIPLOMACY" "peace treaties, negotiated once per round"
+  (section "diplomacy" "DIPLOMACY" "treaties, negotiated once per round"
     (prose
       "The diplomacy window opens once per round, right after you finish the Outcomes phase "
       "of the round's final turn — not every turn. From there you can propose, accept, "
-      "decline, withdraw, or dissolve peace treaties before continuing on to the next "
-      "round's Income phase.")
+      "decline, withdraw, or dissolve treaties before continuing on to the next round's "
+      "Income phase.")
     (prose
       "You have " (v (g game :game/alliance-slots const/alliance-slots))
       " treaty slots. Active treaties and proposals you've sent both count against this "
-      "limit; a proposal someone else has sent you does not, unless and until you accept it.")
+      "limit; a proposal someone else has sent you does not, unless and until you accept it. "
+      "A pair holds at most one treaty at a time, of exactly one kind — Peace or Defence.")
     (prose
       "A proposal is an envoy in transit: it doesn't “arrive” until the recipient "
       "reaches their own diplomacy phase, so nothing that happens to either side in the "
@@ -624,10 +625,31 @@
       "on more than one relationship at once; only Propose is limited to one new offer per "
       "round.")
     (prose
-      "Attacking an active treaty partner (Invade, Raid, or Strike) is still allowed, but it "
-      "automatically breaks the treaty the moment the attack resolves — covert espionage "
-      "operations don't. A small boxed “P” next to an empire's name on the Action and "
-      "Espionage target tables tells you who you currently hold a treaty with.")))
+      "Attacking an active treaty partner (Invade, Raid, or Strike), or running any "
+      "espionage operation against them, is still allowed — but it automatically breaks "
+      "the treaty the moment the attack or operation resolves. A small boxed “P” next to an "
+      "empire's name on the Action and Espionage target tables means an active peace treaty; "
+      "“D” means an active defence treaty.")
+    (prose
+      "An empire you already hold a treaty with never appears a second time in Propose a "
+      "Treaty — their Active Treaties row instead offers a radio to switch to the OTHER "
+      "kind, right next to Dissolve. Accepting a switch replaces your current treaty with "
+      "the new one, in either direction, without spending a fresh slot or passing through "
+      "Dissolve first.")
+    (prose
+      "A Defence treaty means help in a fight: whenever you (or one of your other defence "
+      "allies) are Invaded or Raided — Strike has no unit-vs-unit battle, so it never pulls "
+      "allies in — each active defence ally commits "
+      (v (str (long (* 100 (g game :game/defence-treaty-contribution-rate
+                              const/defence-treaty-contribution-rate))) "%"))
+      " of their soldiers, transports, generals, fighters, carriers, and admirals to the "
+      "fight, pooled with your own. Command ships, stations, and agents are never "
+      "committed. Any losses from that pooled force are split back out afterward in "
+      "proportion to what each of you put in, so an ally never loses more than they "
+      "contributed — see your Outcomes page for the full breakdown either way, as the "
+      "defender or as the ally. An ally who separately holds any active treaty with your "
+      "attacker sits out that fight entirely rather than fight their own treaty partner; "
+      "help only ever comes from your direct allies, not a chain of their allies in turn.")))
 
 ;;;;
 ;;;; Scoring

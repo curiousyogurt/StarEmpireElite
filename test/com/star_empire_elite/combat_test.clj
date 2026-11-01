@@ -808,6 +808,152 @@
             (is (= 0 (+ (:mil pt) (:erg pt) (:ore pt)))
                 "No captures when ground phase lost")))))))
 
+;;;;
+;;;; Treaty Ally Pooling Tests
+;;;;
+
+(def ^:private defence-ally
+  (merge helpers/player-defaults
+         {:xt/id              #uuid "00000000-0000-0000-0000-000000000070"
+          :player/empire-name "Defence Ally"
+          :player/soldiers    400
+          :player/transports  8
+          :player/generals    1
+          :player/fighters    80
+          :player/carriers    2
+          :player/admirals    1
+          :player/cmd-ships   3
+          :player/stations    7}))
+
+(deftest test-ally-contribution-floors-each-contributable-unit
+  (let [contribution (combat/ally-contribution 0.25 defence-ally)]
+    (is (= {:soldiers 100 :transports 2 :generals 0 :fighters 20 :carriers 0 :admirals 0}
+           contribution)
+        "floor(0.25 × count) for each of the six contributable types")))
+
+(deftest test-ally-contribution-never-includes-cmd-ships-stations-or-agents
+  (let [contribution (combat/ally-contribution 1.0 defence-ally)]
+    (is (not (contains? contribution :cmd-ships)))
+    (is (not (contains? contribution :stations)))
+    (is (not (contains? contribution :agents)))))
+
+(deftest test-pool-forces-adds-contributions-and-leaves-other-fields-alone
+  (let [contribution (combat/ally-contribution 0.25 defence-ally)
+        pooled       (combat/pool-forces strong-defender [contribution])]
+    (is (= (+ (:player/soldiers strong-defender) (:soldiers contribution))
+           (:player/soldiers pooled)))
+    (is (= (:player/mil-planets strong-defender) (:player/mil-planets pooled))
+        "planets are untouched by pooling")
+    (is (= (:player/stations strong-defender) (:player/stations pooled))
+        "stations are never contributed, so pooling leaves them unchanged")))
+
+(deftest test-pool-forces-with-no-contributions-is-identity
+  (is (= strong-defender (combat/pool-forces strong-defender []))))
+
+(deftest test-split-losses-sums-to-pool-loss
+  (testing "the parts of a split always sum to exactly the pooled loss"
+    (let [shares (map vector [:own :a :b] [70 20 10])]
+      (dotimes [_ 30]
+        (let [pool-loss (rand-int 100)
+              split     (combat/split-losses pool-loss shares)]
+          (is (= pool-loss (reduce + (vals split)))))))))
+
+(deftest test-split-losses-never-exceeds-a-shares-contribution
+  (let [shares (map vector [:own :a :b] [5 3 1])]
+    (dotimes [_ 30]
+      (let [split (combat/split-losses (rand-int 9) shares)]
+        (is (<= (:own split) 5))
+        (is (<= (:a   split) 3))
+        (is (<= (:b   split) 1))))))
+
+(deftest test-split-losses-zero-total-returns-all-zero
+  (is (= {:own 0 :a 0} (combat/split-losses 0 [[:own 0] [:a 0]]))))
+
+(deftest test-split-side-losses-own-gets-everything-with-no-allies
+  (testing "every value here must be <= strong-defender's own stock — with no allies, the
+            whole loss falls to :own, but split-losses still caps a share at what it
+            contributed (see test-split-side-losses-splits-proportionally below), so a
+            loss exceeding own's actual stock would be clamped and this equality would fail"
+    (let [side-losses {:soldiers 50 :transports 2 :generals 1 :fighters 10
+                       :carriers 1 :admirals 1 :cmd-ships 0 :stations 0}
+          result (combat/split-side-losses side-losses strong-defender [])]
+      (is (= side-losses (:own result)))
+      (is (empty? (:allies result))))))
+
+(deftest test-split-side-losses-splits-proportionally-and-keeps-cmd-ships-stations-with-own
+  (let [ally          {:id :ally-1 :name "Ally" :contribution {:soldiers 100 :transports 0
+                                                                :generals 0 :fighters 0
+                                                                :carriers 0 :admirals 0}}
+        side-losses   {:soldiers 100 :transports 0 :generals 0 :fighters 0
+                       :carriers 0 :admirals 0 :cmd-ships 5 :stations 5}
+        own-player    (assoc strong-defender :player/soldiers 100)  ; own==ally, so an even split
+        result        (combat/split-side-losses side-losses own-player [ally])
+        ally-result   (first (:allies result))]
+    (is (= 50 (get-in result [:own :soldiers])))
+    (is (= 50 (get-in ally-result [:losses :soldiers])))
+    (is (= 5 (get-in result [:own :cmd-ships])) "cmd-ships go entirely to own")
+    (is (= 5 (get-in result [:own :stations])) "stations go entirely to own")
+    (is (nil? (get-in ally-result [:losses :cmd-ships])))))
+
+(deftest test-resolve-combat-with-no-allies-matches-the-4-arity-shape
+  (testing "own counts/losses equal the pooled ones, and :defender-allies is empty"
+    (dotimes [_ 10]
+      (let [result (combat/resolve-combat game strong-attacker strong-defender :invade)]
+        (is (= (:defender-counts result) (:defender-own-counts result)))
+        (is (= (:defender-losses result) (:defender-own-losses result)))
+        (is (empty? (:defender-allies result)))))))
+
+(deftest test-resolve-combat-pools-ally-forces-into-defender-counts
+  (testing ":defender-counts reflects the defender plus the ally's contribution"
+    (let [result  (combat/resolve-combat game strong-attacker strong-defender :invade
+                                          {:defender-allies [defence-ally]})
+          rate    (:game/defence-treaty-contribution-rate game)
+          contrib (combat/ally-contribution rate defence-ally)]
+      (is (= (+ (:player/soldiers strong-defender) (:soldiers contrib))
+             (get-in result [:defender-counts :soldiers]))))))
+
+(deftest test-resolve-combat-splits-losses-between-defender-and-ally
+  (testing "no ally ever loses more than they contributed, and own+allies account for every
+            pooled loss"
+    (dotimes [_ 20]
+      (let [result  (combat/resolve-combat game strong-attacker strong-defender :invade
+                                            {:defender-allies [defence-ally]})
+            rate    (:game/defence-treaty-contribution-rate game)
+            contrib (combat/ally-contribution rate defence-ally)
+            ally    (first (:defender-allies result))
+            pooled  (:defender-losses result)
+            own     (:defender-own-losses result)]
+        (is (= 1 (count (:defender-allies result))))
+        (doseq [unit combat/contributable-units]
+          (is (<= (get-in ally [:losses unit] 0) (get contrib unit 0))
+              (str "ally lost more " unit " than they contributed"))
+          (is (= (get pooled unit 0)
+                 (+ (get own unit 0) (get-in ally [:losses unit] 0)))
+              (str "own + ally losses for " unit " should equal the pooled loss")))
+        ;; Non-contributable keys go entirely to the real defender.
+        (is (= (:cmd-ships pooled 0) (:cmd-ships own 0)))
+        (is (= (:stations  pooled 0) (:stations  own 0)))))))
+
+(deftest test-resolve-combat-does-not-pool-cmd-ships-or-stations
+  (testing "an ally's cmd-ships and stations never join the pooled defender"
+    (let [result (combat/resolve-combat game strong-attacker strong-defender :invade
+                                         {:defender-allies [defence-ally]})]
+      (is (= (:player/cmd-ships strong-defender) (get-in result [:defender-counts :cmd-ships])))
+      (is (= (:player/stations  strong-defender) (get-in result [:defender-counts :stations]))))))
+
+(deftest test-resolve-combat-with-defence-ally-falls-back-to-the-constant-rate-for-an-old-game
+  (testing "a game entity created before :game/defence-treaty-contribution-rate existed in
+            game-config/field-specs was never snapshotted with it, so (:game/... game) alone
+            is nil — regression for an NPE in ally-contribution's (* rate count) when a real
+            pre-existing game's defender had a defence ally"
+    (let [old-game (dissoc game :game/defence-treaty-contribution-rate)]
+      (is (not (contains? old-game :game/defence-treaty-contribution-rate)))
+      (let [result (combat/resolve-combat old-game strong-attacker strong-defender :invade
+                                           {:defender-allies [defence-ally]})
+            contrib (combat/ally-contribution const/defence-treaty-contribution-rate defence-ally)]
+        (is (= (+ (:player/soldiers strong-defender) (:soldiers contrib))
+               (get-in result [:defender-counts :soldiers])))))))
+
 (deftest empty-phase-no-errors
   (testing "Both sides with 0 units in a phase produces no errors and 0 losses"
     ;; Both have 0 space units (fighters, carriers, admirals, cmd-ships, stations all 0)
