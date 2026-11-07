@@ -173,7 +173,7 @@
       ["4"  "Action"    "Raid, invade, or strike an enemy empire"]
       ["5"  "Espionage" "Assign agents to spy on, destabilise, bomb, or infiltrate a rival"]
       ["6"  "Outcomes"  "Nothing — combat, population, stability, and fate resolve automatically"]
-      ["7*" "Diplomacy" "Propose, accept, decline, withdraw, or dissolve peace treaties"]])
+      ["7*" "Diplomacy" "Propose, accept, decline, withdraw, or end peace treaties"]])
     (prose
       "* Diplomacy only opens once per round, right after Outcomes on the round's final turn — "
       "not after every turn.")
@@ -605,21 +605,22 @@
     (prose
       "The diplomacy window opens once per round, right after you finish the Outcomes phase "
       "of the round's final turn — not every turn. From there you can propose, accept, "
-      "decline, withdraw, or dissolve treaties before continuing on to the next round's "
+      "decline, withdraw, or end treaties before continuing on to the next round's "
       "Income phase.")
     (prose
       "You have " (v (g game :game/alliance-slots const/alliance-slots))
       " treaty slots. Active treaties and proposals you've sent both count against this "
       "limit; a proposal someone else has sent you does not, unless and until you accept it. "
-      "A pair holds at most one treaty at a time, of exactly one kind — Peace or Defence.")
+      "A pair holds at most one treaty at a time, of exactly one kind — Peace, Defence, "
+      "or Offence.")
     (prose
       "A proposal is an envoy in transit: it doesn't “arrive” until the recipient "
       "reaches their own diplomacy phase, so nothing that happens to either side in the "
       "meantime affects it. The recipient can Accept or Decline it there; the sender can "
-      "Withdraw it any time before it's answered. Either side can Dissolve an active treaty "
+      "Withdraw it any time before it's answered. Either side can End an active treaty "
       "at any time from the diplomacy phase.")
     (prose
-      "Every choice on this page — Accept, Decline, Withdraw, Dissolve, and a new Propose — "
+      "Every choice on this page — Accept, Decline, Withdraw, End, and a new Propose — "
       "only highlights it. None of them take effect until you click End Current Round, and "
       "you can change your mind or cancel any of them before then. You can queue a decision "
       "on more than one relationship at once; only Propose is limited to one new offer per "
@@ -629,13 +630,12 @@
       "espionage operation against them, is still allowed — but it automatically breaks "
       "the treaty the moment the attack or operation resolves. A small boxed “P” next to an "
       "empire's name on the Action and Espionage target tables means an active peace treaty; "
-      "“D” means an active defence treaty.")
+      "“D” means an active defence treaty; “O” means an active offence treaty.")
     (prose
       "An empire you already hold a treaty with never appears a second time in Propose a "
-      "Treaty — their Active Treaties row instead offers a radio to switch to the OTHER "
-      "kind, right next to Dissolve. Accepting a switch replaces your current treaty with "
-      "the new one, in either direction, without spending a fresh slot or passing through "
-      "Dissolve first.")
+      "Treaty — their Active Treaties row instead offers a radio to switch to one of the "
+      "other kinds, right next to End. Accepting a switch replaces your current treaty "
+      "with the new one without spending a fresh slot or passing through End first.")
     (prose
       "A Defence treaty means help in a fight: whenever you (or one of your other defence "
       "allies) are Invaded or Raided — Strike has no unit-vs-unit battle, so it never pulls "
@@ -649,7 +649,16 @@
       "contributed — see your Outcomes page for the full breakdown either way, as the "
       "defender or as the ally. An ally who separately holds any active treaty with your "
       "attacker sits out that fight entirely rather than fight their own treaty partner; "
-      "help only ever comes from your direct allies, not a chain of their allies in turn.")))
+      "help only ever comes from your direct allies, not a chain of their allies in turn.")
+    (prose
+      "An Offence treaty is the same idea on the attack: whenever you Invade or Raid an "
+      "enemy, each active offence ally commits "
+      (v (str (long (* 100 (g game :game/offence-treaty-contribution-rate
+                              const/offence-treaty-contribution-rate))) "%"))
+      " of their soldiers, transports, generals, fighters, carriers, and admirals to your "
+      "attack, pooled with your own, with losses split back out the same way. An ally who "
+      "separately holds any active treaty with the empire you're attacking sits out that "
+      "fight too, just as for Defence.")))
 
 ;;;;
 ;;;; Scoring

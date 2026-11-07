@@ -117,7 +117,7 @@
     [:span subj " were eliminated"]))
 
 (defn- treaty-summary
-  "Verb phrase for treaty-formed / treaty-dissolved / treaty-broken events.
+  "Verb phrase for treaty-formed / treaty-ended / treaty-broken events.
 
   Unlike the other summary renderers this reads straight off the event — its payload is the
   :alliance map itself (see events/event-of-treaty), so :alliance/kind names which treaty
@@ -136,9 +136,9 @@
         ;; or unrecognized kind on an old stored event, rather than guessing.
         kind-word  (if kind-label (str (str/lower-case kind-label) " ") "")
         verb       (case kind
-                     :treaty-formed    (str "signed a " kind-word "treaty with")
-                     :treaty-dissolved (str "dissolved the " kind-word "treaty with")
-                     :treaty-broken    (str "broke a " kind-word "treaty with"))]
+                     :treaty-formed (str "signed a " kind-word "treaty with")
+                     :treaty-ended  (str "ended the " kind-word "treaty with")
+                     :treaty-broken (str "broke a " kind-word "treaty with"))]
     (cond
       you-att? [:span "You " verb " " (empire-span def-name)]
       you-def? [:span (empire-span att-name) " " verb " you"]
@@ -195,7 +195,7 @@
       :breakaway   (breakaway-summary payload def-name mine?)
       :elimination (elimination-summary def-name mine?)
       (:disaster :boon) (fate-summary payload def-name)
-      (:treaty-formed :treaty-dissolved :treaty-broken) (treaty-summary event kind player-id)
+      (:treaty-formed :treaty-ended :treaty-broken) (treaty-summary event kind player-id)
       [:span "Unknown event"])))
 
 ;;;;

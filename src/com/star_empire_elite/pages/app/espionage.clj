@@ -61,7 +61,7 @@
   Composite radio values 'op:player-id' are parsed in apply-espionage.
   attacker-id-str is the current player's id, used for the HTMX warning endpoint.
   treaty-kind, when given, marks this target as a current treaty partner of that kind
-  (:peace or :defence) and renders its marker; nil means no current treaty.
+  (:peace, :defence, :offence, …) and renders its marker; nil means no current treaty.
 
   [player player-map, attacker-id-str string, has-agents? boolean,
    & [treaty-kind keyword|nil]] -> hiccup"

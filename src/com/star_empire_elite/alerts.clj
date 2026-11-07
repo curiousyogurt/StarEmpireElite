@@ -58,21 +58,27 @@
     (utils/take-recent (:player/incoming-attacks player))))
 
 (defn- ally-battle-messages
-  "Turn a player's pr-str'd incoming-ally-battles history (set when their defence-treaty
-  forces joined another empire's fight — see resolution/ally-update-tx) into alert rows.
-  role is always :defending today; a future offence treaty would add an :attacking row here.
+  "Turn a player's pr-str'd incoming-ally-battles history (set when their treaty forces
+  joined another empire's fight — see resolution/ally-update-tx) into alert rows. role is
+  either :defending (a defence ally) or :attacking (an offence ally) — each has its own
+  wording and success condition.
 
   [player player-map] -> [alert-map]"
   [player]
   (for [record-str (utils/take-recent (:player/incoming-ally-battles player))
         :let [{:keys [role attacker-name defender-name mode attacker-wins?]}
-              (edn/read-string record-str)]
-        :when (= role :defending)]
-    ;; Joining the defence succeeds when the attacker loses.
-    {:alert/category :action :alert/badge mode
-     :alert/sender defender-name
-     :alert/text (str "You joined " defender-name "'s defence against " attacker-name
-                       (if attacker-wins? " (FAILURE)" " (SUCCESS)"))}))
+              (edn/read-string record-str)]]
+    (case role
+      ;; Joining the defence succeeds when the attacker loses.
+      :defending {:alert/category :action :alert/badge mode
+                  :alert/sender defender-name
+                  :alert/text (str "You joined " defender-name "'s defence against " attacker-name
+                                    (if attacker-wins? " (FAILURE)" " (SUCCESS)"))}
+      ;; Joining the offence succeeds when the attacker wins.
+      :attacking {:alert/category :action :alert/badge mode
+                  :alert/sender attacker-name
+                  :alert/text (str "You joined " attacker-name "'s offensive against " defender-name
+                                    (if attacker-wins? " (SUCCESS)" " (FAILURE)"))})))
 
 (defn- espionage-fail-messages
   "[player player-map] -> [alert-map]"
@@ -144,14 +150,14 @@
                         "proposed a treaty with you.")
       (treaty-messages player :player/incoming-treaty-accepted  :treaty-formed
                         "accepted your treaty proposal.")
-      (treaty-messages player :player/incoming-treaty-withdrawn :treaty-dissolved
+      (treaty-messages player :player/incoming-treaty-withdrawn :treaty-ended
                         "withdrew their treaty proposal.")
       ;; The recipient's decline, including the automatic no-free-slot fallback (see
       ;; diplomacy/resolve-decisions) — the proposer finds out either way.
-      (treaty-messages player :player/incoming-treaty-declined  :treaty-dissolved
+      (treaty-messages player :player/incoming-treaty-declined  :treaty-ended
                         "declined your treaty proposal.")
-      (treaty-messages player :player/incoming-treaty-dissolved :treaty-dissolved
-                        "dissolved your treaty."))))
+      (treaty-messages player :player/incoming-treaty-ended     :treaty-ended
+                        "ended your treaty."))))
 
 ;;;;
 ;;;; Grouping, Summary, Chip State

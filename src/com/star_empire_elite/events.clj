@@ -124,11 +124,11 @@
           :event/payload       (pr-str result)}))
 
 (defn event-of-treaty
-  "Construct a :public event for a treaty lifecycle moment (formed, dissolved, or broken).
+  "Construct a :public event for a treaty lifecycle moment (formed, ended, or broken).
 
-  kind is :treaty-formed, :treaty-dissolved, or :treaty-broken. :event/attacker is whichever
+  kind is :treaty-formed, :treaty-ended, or :treaty-broken. :event/attacker is whichever
   player caused the moment — the proposer for :treaty-formed, :alliance/ended-by otherwise
-  (the player who dissolved it, or whose attack/espionage broke it) — and :event/defender is
+  (the player who ended it, or whose attack/espionage broke it) — and :event/defender is
   their treaty partner; names is a {player-id empire-name} map covering both sides, used to
   look up the two display names.
 

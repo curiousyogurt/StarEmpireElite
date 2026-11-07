@@ -215,11 +215,11 @@
     (is (= defender-id      (:event/defender evt)))
     (is (= "Crimson Hand"   (:event/defender-name evt)))))
 
-(deftest test-event-of-treaty-dissolved-attributes-to-ended-by
-  (testing "whichever side dissolved the treaty is the attacker, regardless of who proposed it"
-    (let [dissolved (assoc treaty :alliance/status :dissolved :alliance/ended-by defender-id)
-          evt       (events/event-of-treaty dissolved :treaty-dissolved treaty-names meta-ctx)]
-      (is (= :treaty-dissolved (:event/kind evt)))
+(deftest test-event-of-treaty-ended-attributes-to-ended-by
+  (testing "whichever side ended the treaty is the attacker, regardless of who proposed it"
+    (let [ended (assoc treaty :alliance/status :ended :alliance/ended-by defender-id)
+          evt   (events/event-of-treaty ended :treaty-ended treaty-names meta-ctx)]
+      (is (= :treaty-ended (:event/kind evt)))
       (is (= defender-id        (:event/attacker evt)))
       (is (= "Crimson Hand"     (:event/attacker-name evt)))
       (is (= attacker-id        (:event/defender evt)))

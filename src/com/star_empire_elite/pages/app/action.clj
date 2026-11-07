@@ -144,7 +144,7 @@
   Strike requires command ships.
   attacker-id-str is the current player's id, used for the HTMX warning endpoint.
   treaty-kind, when given, marks this target as a current treaty partner of that kind
-  (:peace or :defence) and renders its marker; nil means no current treaty.
+  (:peace, :defence, :offence, …) and renders its marker; nil means no current treaty.
 
   [player player-map, ef {:soldiers int :fighters int}, cmd-ships int, attacker-id-str string,
    & [treaty-kind keyword|nil]] -> hiccup"

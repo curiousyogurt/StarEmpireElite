@@ -5,7 +5,7 @@
   (:import (java.util UUID)))
 
 ;;;;
-;;;; event-summary — treaty-formed / treaty-dissolved / treaty-broken dispatch
+;;;; event-summary — treaty-formed / treaty-ended / treaty-broken dispatch
 ;;;;
 
 (def ^:private event-summary #'news/event-summary)
@@ -22,8 +22,8 @@
    :event/defender-name "Crimson Hand"
    :event/payload-data  {:alliance/kind :peace}})
 
-(def treaty-dissolved-event
-  (assoc treaty-formed-event :event/kind :treaty-dissolved))
+(def treaty-ended-event
+  (assoc treaty-formed-event :event/kind :treaty-ended))
 
 (def treaty-broken-event
   (assoc treaty-formed-event :event/kind :treaty-broken))
@@ -40,11 +40,11 @@
       (is (not (str/includes? text "Unknown event")))
       (is (str/includes? text "signed a peace treaty with")))))
 
-(deftest test-treaty-dissolved-is-not-unknown
-  (testing "a :treaty-dissolved event renders real text, not the 'Unknown event' fallback"
-    (let [text (pr-str (event-summary treaty-dissolved-event proposer-id))]
+(deftest test-treaty-ended-is-not-unknown
+  (testing "a :treaty-ended event renders real text, not the 'Unknown event' fallback"
+    (let [text (pr-str (event-summary treaty-ended-event proposer-id))]
       (is (not (str/includes? text "Unknown event")))
-      (is (str/includes? text "dissolved the peace treaty with")))))
+      (is (str/includes? text "ended the peace treaty with")))))
 
 (deftest test-treaty-broken-is-not-unknown
   (testing "a :treaty-broken event renders real text, not the 'Unknown event' fallback"

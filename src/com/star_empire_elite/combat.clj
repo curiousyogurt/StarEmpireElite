@@ -162,11 +162,11 @@
 
 ;;;;
 ;;;; Treaty Ally Pooling
-;;;; A defence ally's forces don't fight as a separate party — a fraction of them folds into
-;;;; the side they're defending for the whole two-phase engagement below, then real losses
+;;;; A treaty ally's forces don't fight as a separate party — a fraction of them folds into
+;;;; the side they're reinforcing for the whole two-phase engagement below, then real losses
 ;;;; are split back out afterward in the same proportion each contributed. Side-agnostic:
-;;;; resolve-combat calls these for the defender's side today; a future offence treaty would
-;;;; call the same functions for the attacker's side.
+;;;; resolve-combat calls these once for the defender's side (defence allies) and once for
+;;;; the attacker's side (offence allies) using the exact same functions.
 ;;;;
 
 (def contributable-units
@@ -178,8 +178,7 @@
 (defn ally-contribution
   "The units ally commits at rate — floor(rate × count) for each contributable unit type.
   Taking rate as a plain number (not game) keeps this reusable for any treaty kind with its
-  own contribution rate (defence today; a future offence treaty would call this the same way
-  with its own rate).
+  own contribution rate (defence and offence today, each with its own rate).
 
   [rate double, ally player-map] -> unit-map (plain keys, e.g. :soldiers)"
   [rate ally]
@@ -334,35 +333,45 @@
   The engagement multiplier (raid=0.1, invade=1.0) scales the defender's power
   participation AND loss exposure in both phases.
 
-  opts optionally carries :defender-allies — the defender's live defence-treaty allies
-  (player-maps) whose forces join the fight (see ally-contribution). Their contribution is
-  pooled into the defender's effective force for the whole engagement, so :defender-counts
-  and :defender-losses below are POOLED totals — what the attacker actually fought.
-  :defender-own-counts/:defender-own-losses are the real defender's share alone, and
-  :defender-allies lists each ally's contribution and losses (see split-side-losses). With
-  no allies, all of these match the plain defender fields exactly, same as before this
-  option existed.
+  opts optionally carries :defender-allies and/or :attacker-allies — the defender's live
+  defence-treaty allies and the attacker's live offence-treaty allies (player-maps) whose
+  forces join the fight (see ally-contribution). Each side's allies are pooled into that
+  side's effective force for the whole engagement, so :attacker-counts/:attacker-losses and
+  :defender-counts/:defender-losses below are POOLED totals — what the OTHER side actually
+  fought. :attacker-own-counts/:attacker-own-losses and :defender-own-counts/:defender-own-
+  losses are each side's real share alone, and :attacker-allies/:defender-allies list each
+  ally's contribution and losses (see split-side-losses). With no allies on a side, its
+  pooled and own fields match exactly, same as before this option existed.
 
   UUIDs stored as strings for safe pr-str round-trip.
 
   ([game game-map, attacker player-map, defender player-map, mode keyword] -> result-map)
   ([game game-map, attacker player-map, defender player-map, mode keyword,
-    opts {:defender-allies seq-of-player-map}] -> result-map)"
+    opts {:defender-allies seq-of-player-map, :attacker-allies seq-of-player-map}]
+    -> result-map)"
   ([game attacker defender mode] (resolve-combat game attacker defender mode {}))
-  ([game attacker defender mode {:keys [defender-allies] :or {defender-allies []}}]
-  (let [;; Falls back to the constant for a game created before this field existed in
-        ;; game-config/field-specs — an older game's entity was never snapshotted with it,
+  ([game attacker defender mode {:keys [defender-allies attacker-allies]
+                                  :or   {defender-allies [] attacker-allies []}}]
+  (let [;; Falls back to the constant for a game created before these fields existed in
+        ;; game-config/field-specs — an older game's entity was never snapshotted with them,
         ;; so (:game/... game) alone would be nil here (and nil * count NPEs below) for any
         ;; pre-existing game, not just a freshly-created one.
-        rate            (or (:game/defence-treaty-contribution-rate game)
+        def-rate        (or (:game/defence-treaty-contribution-rate game)
                             const/defence-treaty-contribution-rate)
-        allies          (for [ally defender-allies]
+        att-rate        (or (:game/offence-treaty-contribution-rate game)
+                            const/offence-treaty-contribution-rate)
+        def-allies      (for [ally defender-allies]
                           {:id           (:xt/id ally)
                            :name         (:player/empire-name ally)
-                           :contribution (ally-contribution rate ally)})
-        pooled-defender (pool-forces defender (map :contribution allies))
+                           :contribution (ally-contribution def-rate ally)})
+        att-allies      (for [ally attacker-allies]
+                          {:id           (:xt/id ally)
+                           :name         (:player/empire-name ally)
+                           :contribution (ally-contribution att-rate ally)})
+        pooled-defender (pool-forces defender (map :contribution def-allies))
+        pooled-attacker (pool-forces attacker (map :contribution att-allies))
 
-        att-forces  (effective-forces game attacker)
+        att-forces  (effective-forces game pooled-attacker)
         def-forces  (effective-defending-forces game pooled-defender)
 
         ;; Engagement fraction: governs defender power participation and loss exposure
@@ -458,25 +467,35 @@
         penalty-cap        (:game/capture-stability-penalty-cap game)
         capture-penalty    (min penalty-cap (* penalty-per-planet captured-total))
 
-        ;; Split the pooled defender-losses back out to the real defender and each ally, in
+        ;; Split each side's pooled losses back out to the real player and each ally, in
         ;; proportion to what each put in — see split-side-losses. With no allies this just
-        ;; hands all of defender-losses back as :own.
-        split (split-side-losses defender-losses defender allies)]
+        ;; hands the whole loss back as :own.
+        att-split (split-side-losses attacker-losses attacker att-allies)
+        def-split (split-side-losses defender-losses defender def-allies)]
 
     {:attacker-id     (str (:xt/id attacker))
      :attacker-name   (:player/empire-name attacker)
      :defender-id     (str (:xt/id defender))
      :defender-name   (:player/empire-name defender)
      :mode            mode
-     :attacker-counts {:soldiers   (:player/soldiers   attacker)
-                       :transports (:player/transports attacker)
-                       :generals   (:player/generals   attacker)
-                       :fighters   (:player/fighters   attacker)
-                       :carriers   (:player/carriers   attacker)
-                       :admirals   (:player/admirals   attacker)
-                       :cmd-ships  (:player/cmd-ships  attacker)}
+     ;; POOLED totals — what the defender actually fought, attacker plus every contributing
+     ;; offence ally. See :attacker-own-counts below for the real attacker alone.
+     :attacker-counts {:soldiers   (:player/soldiers   pooled-attacker)
+                       :transports (:player/transports pooled-attacker)
+                       :generals   (:player/generals   pooled-attacker)
+                       :fighters   (:player/fighters   pooled-attacker)
+                       :carriers   (:player/carriers   pooled-attacker)
+                       :admirals   (:player/admirals   pooled-attacker)
+                       :cmd-ships  (:player/cmd-ships  pooled-attacker)}
+     :attacker-own-counts {:soldiers   (:player/soldiers   attacker)
+                           :transports (:player/transports attacker)
+                           :generals   (:player/generals   attacker)
+                           :fighters   (:player/fighters   attacker)
+                           :carriers   (:player/carriers   attacker)
+                           :admirals   (:player/admirals   attacker)
+                           :cmd-ships  (:player/cmd-ships  attacker)}
      ;; POOLED totals — what the attacker actually fought against, defender plus every
-     ;; contributing ally. See :defender-own-counts below for the real defender alone.
+     ;; contributing defence ally. See :defender-own-counts below for the real defender alone.
      :defender-counts {:soldiers   (:player/soldiers   pooled-defender)
                        :transports (:player/transports pooled-defender)
                        :generals   (:player/generals   pooled-defender)
@@ -500,12 +519,16 @@
      :defender-roll   (:def-roll ground-result)
      :attacker-wins?  att-wins?
      :margin          ground-margin
+     ;; POOLED losses — see :attacker-counts above. :attacker-own-losses/:attacker-allies
+     ;; split this back out to who actually lost what (see split-side-losses).
      :attacker-losses attacker-losses
+     :attacker-own-losses (:own att-split)
+     :attacker-allies      (:allies att-split)
      ;; POOLED losses — see :defender-counts above. :defender-own-losses/:defender-allies
      ;; split this back out to who actually lost what (see split-side-losses).
      :defender-losses defender-losses
-     :defender-own-losses (:own split)
-     :defender-allies      (:allies split)
+     :defender-own-losses (:own def-split)
+     :defender-allies      (:allies def-split)
      :planets-transferred planets-transferred
      :resources-captured  {:credits credits-captured
                            :food    food-captured

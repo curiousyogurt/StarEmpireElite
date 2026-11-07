@@ -67,19 +67,45 @@
 ;;;; Single source of truth for the treaty kinds a player can propose. diplomacy.clj's
 ;;;; proposable-kinds, the diplomacy page's Propose-a-Treaty radios, ui/treaty-indicator,
 ;;;; alerts, and news all derive their options and display text from this table, so adding a
-;;;; new kind (e.g. a future :offence treaty) means adding one row here, not editing every
-;;;; call site separately.
+;;;; new kind (e.g. a future :full treaty, offence+defence combined) means adding one row
+;;;; here, not editing every call site separately.
+;;;;
+;;;; :label is the full word, used in prose (the guide, alerts, news) and tooltips, where
+;;;; space isn't tight. :button is the short form shown ON the deferred radio buttons
+;;;; themselves (Propose a Treaty, switch-kind) — those sit in narrow table columns
+;;;; alongside Accept/Decline/Withdraw/End, so every kind's button is kept to a similar
+;;;; short width rather than wrapping or squeezing its column — see diplomacy.clj's
+;;;; button-label.
+;;;;
+;;;; :defends?/:attacks? mark which side of a fight a kind's allies join (see kinds-where) —
+;;;; resolution.clj asks "which kinds defend" / "which kinds attack" rather than naming
+;;;; :defence or :offence directly, so a future kind with both flags true (a "full" treaty)
+;;;; needs no call-site changes, just a new row.
 ;;;;
 
 (def treaty-kinds
-  [{:kind :peace   :label "Peace"   :marker "P"}
-   {:kind :defence :label "Defence" :marker "D"}])
+  [{:kind :peace   :label "Peace"   :button "Peace" :marker "P" :defends? false :attacks? false}
+   {:kind :defence :label "Defence" :button "Def"   :marker "D" :defends? true  :attacks? false}
+   {:kind :offence :label "Offence" :button "Off"   :marker "O" :defends? false :attacks? true}])
+
+(defn kinds-where
+  "The set of treaty kinds whose treaty-kinds row has flag set to true — e.g.
+  (kinds-where :defends?) => #{:defence}. Centralizes the kind -> capability lookup so
+  callers ask for a capability rather than hard-coding a kind's name.
+
+  [flag keyword] -> set-of-keyword"
+  [flag]
+  (set (map :kind (filter flag treaty-kinds))))
 
 ;;; The fraction of a defence ally's soldiers, transports, generals, fighters, carriers, and
 ;;; admirals that join the fight when the defender (or another of their defence allies) is
 ;;; invaded or raided — see combat/ally-contribution. Cmd-ships, stations, and agents are
 ;;; never contributed.
 (def defence-treaty-contribution-rate 0.25)
+
+;;; Same as defence-treaty-contribution-rate, but for an offence ally's forces joining the
+;;; attacker's side when the attacker (or another of their offence allies) invades or raids.
+(def offence-treaty-contribution-rate 0.25)
 
 ;;;;
 ;;;; Combat Modes

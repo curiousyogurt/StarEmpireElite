@@ -71,6 +71,27 @@
           [row]  (alerts/incoming-messages player)]
       (is (= "You joined Buddy's defence against Raider (FAILURE)" (:alert/text row))))))
 
+(deftest test-incoming-messages-ally-battle-attacking-success
+  (testing "An attacking ally-battle record where the attacker won is a SUCCESS row"
+    (let [player {:player/incoming-ally-battles
+                  [(pr-str {:role :attacking :kind :offence :mode :invade
+                            :attacker-name "Raider" :defender-name "Buddy"
+                            :attacker-wins? true})]}
+          [row]  (alerts/incoming-messages player)]
+      (is (= :action (:alert/category row)))
+      (is (= :invade (:alert/badge row)))
+      (is (= "Raider" (:alert/sender row)))
+      (is (= "You joined Raider's offensive against Buddy (SUCCESS)" (:alert/text row))))))
+
+(deftest test-incoming-messages-ally-battle-attacking-failure
+  (testing "An attacking ally-battle record where the attacker lost is a FAILURE row"
+    (let [player {:player/incoming-ally-battles
+                  [(pr-str {:role :attacking :kind :offence :mode :invade
+                            :attacker-name "Raider" :defender-name "Buddy"
+                            :attacker-wins? false})]}
+          [row]  (alerts/incoming-messages player)]
+      (is (= "You joined Raider's offensive against Buddy (FAILURE)" (:alert/text row))))))
+
 (deftest test-incoming-messages-bomb-success
   (testing "A bomb result with nonzero losses is a SUCCESS row"
     (let [player {:player/incoming-bomb-result (pr-str {:soldiers 3})}
@@ -99,7 +120,7 @@
                   :player/incoming-treaty-accepted  ["B"]
                   :player/incoming-treaty-withdrawn ["C"]
                   :player/incoming-treaty-declined  ["D"]
-                  :player/incoming-treaty-dissolved ["E"]}
+                  :player/incoming-treaty-ended      ["E"]}
           rows   (alerts/incoming-messages player)]
       (is (every? #(= :diplomacy (:alert/category %)) rows))
       (is (= ["A" "B" "C" "D" "E"] (mapv :alert/sender rows))))))
@@ -109,7 +130,7 @@
     (let [player {:player/incoming-treaty-declined ["Decliner Empire"]}
           [row]  (alerts/incoming-messages player)]
       (is (= :diplomacy (:alert/category row)))
-      (is (= :treaty-dissolved (:alert/badge row)))
+      (is (= :treaty-ended (:alert/badge row)))
       (is (= "Decliner Empire" (:alert/sender row)))
       (is (= "declined your treaty proposal." (:alert/text row))))))
 

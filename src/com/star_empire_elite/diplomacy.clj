@@ -7,12 +7,12 @@
 ;;;;; truth for whether a treaty exists.
 ;;;;;
 ;;;;; A pair holds at most one treaty at a time, of exactly one kind (see const/treaty-kinds —
-;;;;; :peace or :defence today). Proposing a different kind to an existing active partner is a
-;;;;; *replacement*: accepting it supersedes the old treaty in the same move, rather than
-;;;;; claiming a fresh slot (see replacement?, proposable-kinds).
+;;;;; :peace, :defence, or :offence today). Proposing a different kind to an existing active
+;;;;; partner is a *replacement*: accepting it supersedes the old treaty in the same move,
+;;;;; rather than claiming a fresh slot (see replacement?, proposable-kinds).
 ;;;;;
 ;;;;; Lifecycle: :proposed -> :active (accepted) | :declined | :withdrawn;
-;;;;;            :active   -> :dissolved (ended by either side, from the diplomacy phase)
+;;;;;            :active   -> :ended (ended by either side, from the diplomacy phase)
 ;;;;;                       | :broken (ended by an attack or an espionage attempt)
 ;;;;;                       | :superseded (replaced by a different-kind treaty the same pair
 ;;;;;                         just accepted).
@@ -26,9 +26,10 @@
 ;;;;;
 ;;;;; Public API: partner-id, involves?, for-player, only-live-partners, active-treaty-between,
 ;;;;;             has-relationship?, outgoing-proposals, incoming-proposals, active-treaties,
-;;;;;             proposable-kinds, replacement?, partner-ids-of-kind, slots-used, free-slots,
-;;;;;             check-propose, check-accept, propose, accept, decline, withdraw, dissolve,
-;;;;;             supersede, break-by-attack, resolve-decisions, alliances-for-player
+;;;;;             proposable-kinds, replacement?, partner-ids-of-kind, partner-ids-of-kinds,
+;;;;;             slots-used, free-slots, check-propose, check-accept, propose, accept,
+;;;;;             decline, withdraw, end, supersede, break-by-attack, resolve-decisions,
+;;;;;             alliances-for-player
 ;;;;;
 
 (ns com.star-empire-elite.diplomacy
@@ -41,7 +42,7 @@
 
 ;;; A "live" relationship is one that still occupies a slot or still has a chance of being
 ;;; acted on — a proposal awaiting a reply, or an accepted treaty. Everything past that
-;;; (:declined, :withdrawn, :dissolved, :broken) is history.
+;;; (:declined, :withdrawn, :ended, :broken) is history.
 (def ^:private live-statuses #{:proposed :active})
 
 ;;;;
@@ -152,12 +153,24 @@
 
 (defn partner-ids-of-kind
   "The partners in player-id's active treaties of exactly kind — e.g. :defence for defence
-  allies, or (later) :offence for offence allies.
+  allies, or :offence for offence allies.
 
   [alliances seq-of-alliance-map, player-id uuid, kind keyword] -> set-of-uuid"
   [alliances player-id kind]
   (set (map #(partner-id % player-id)
             (filter #(= kind (:alliance/kind %)) (active-treaties alliances player-id)))))
+
+(defn partner-ids-of-kinds
+  "The partners in player-id's active treaties of any kind in kinds — e.g. (const/kinds-where
+  :defends?) for every kind whose allies defend. Generalizes partner-ids-of-kind from one
+  kind to a set, for callers (resolution/treaty-allies) that want allies by capability
+  rather than by a single named kind — a future kind with more than one capability (e.g. a
+  :full treaty) is then picked up automatically, with no call-site change.
+
+  [alliances seq-of-alliance-map, player-id uuid, kinds set-of-keyword] -> set-of-uuid"
+  [alliances player-id kinds]
+  (set (map #(partner-id % player-id)
+            (filter #(kinds (:alliance/kind %)) (active-treaties alliances player-id)))))
 
 (defn- active-treaty-to-replace
   "The active treaty (of a different kind) that accepting proposal would replace, or nil —
@@ -307,13 +320,13 @@
          :alliance/ended-at now
          :alliance/ended-by (:alliance/proposer alliance)))
 
-(defn dissolve
+(defn end
   "End an active treaty peacefully. player-id is whichever side ended it.
 
   [alliance alliance-map, player-id uuid, now inst] -> alliance-map"
   [alliance player-id now]
   (assoc alliance
-         :alliance/status :dissolved
+         :alliance/status :ended
          :alliance/ended-at now
          :alliance/ended-by player-id))
 
@@ -348,13 +361,13 @@
 ;;;;
 
 (defn resolve-decisions
-  "Apply every per-relationship decision (:accept/:decline/:withdraw/:dissolve), plus an
+  "Apply every per-relationship decision (:accept/:decline/:withdraw/:end), plus an
   optional new Propose choice, against alliances in one pass. decisions is a seq of
   [alliance-id op] pairs — order matters when two decisions would compete for the same
   slot (see below), so callers pass them in a stable, meaningful order (e.g. page order).
   This function is pure; see apply-diplomacy for how its result gets persisted.
 
-  Releases (:decline/:withdraw/:dissolve) are applied first, since each only ever frees a
+  Releases (:decline/:withdraw/:end) are applied first, since each only ever frees a
   slot or needs none — they never compete with each other. Accepts are applied next, each
   re-checked with check-accept against the slots freed by the releases above and by any
   earlier accept in this same list — so if two incoming proposals are both accepted but
@@ -384,16 +397,16 @@
                     :withdraw (when (and (= (:alliance/proposer a) player-id)
                                          (= (:alliance/status a) :proposed))
                                 (withdraw a now))
-                    :dissolve (when (and (involves? a player-id)
+                    :end      (when (and (involves? a player-id)
                                          (= (:alliance/status a) :active))
-                                (dissolve a player-id now))
+                                (end a player-id now))
                     nil))
         ;; Pass 1: releases. Each one only ever needs its own current state, so order among
         ;; them doesn't matter.
         step1   (reduce
                   (fn [{:keys [by-id results]} [id op]]
                     (let [a (by-id id)
-                          updated (and (#{:decline :withdraw :dissolve} op) a (release op a))]
+                          updated (and (#{:decline :withdraw :end} op) a (release op a))]
                       (if updated
                         {:by-id (assoc by-id id updated) :results (conj results {:op op :alliance updated})}
                         {:by-id by-id :results results})))

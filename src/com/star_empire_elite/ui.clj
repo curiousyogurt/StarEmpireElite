@@ -422,8 +422,8 @@
                        (:elimination :event)        ["EVENT"     "border-[#9ca3af] text-[#9ca3af]"]
                        ;; Both polarities share one badge; summary text and color carry the good/bad signal.
                        (:disaster :boon)            ["FATE"      "border-[#a78bfa] text-[#a78bfa]"]
-                       ;; All three treaty lifecycle moments (formed/dissolved/broken) share one badge.
-                       (:treaty-formed :treaty-dissolved :treaty-broken)
+                       ;; All three treaty lifecycle moments (formed/ended/broken) share one badge.
+                       (:treaty-formed :treaty-ended :treaty-broken)
                                                      ["DIPLOMACY" "border-[#60a5fa] text-[#60a5fa]"]
                                                     ["ACTION"    "border-[#f87171] text-[#f87171]"])
          size-cls (if (= size :sm) "px-[5px] text-[10px]" "px-[7px] py-[2px] text-[11px]")]
@@ -1309,7 +1309,7 @@
                    Decline must always resolve to one or the other).
     :id          — set the rendered <input>'s id, so another radio's :also-clear can target
                    it directly (see diplomacy.clj's active-treaty-row, where the switch-kind
-                   and Dissolve radios live in two different radio-name groups but must
+                   and End radios live in two different radio-name groups but must
                    still behave as one mutually exclusive choice).
     :also-clear  — a CSS selector (string); selecting this radio also unchecks every
                    matching element. Needed because the toggle-off bookkeeping above only

@@ -1,5 +1,6 @@
 (ns com.star-empire-elite.resolution-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.edn :as edn]
+            [clojure.test :refer :all]
             [com.biffweb :as biff :refer [test-xtdb-node]]
             [com.star-empire-elite :as main]
             [com.star-empire-elite.resolution :as resolution]
@@ -388,6 +389,173 @@
             "the ally isn't debited a second time on a cache-hit refresh")
         (is (= 1 (:player/incoming-seq ally-after-second))
             "still just the one alert row from the fresh resolve")))))
+
+;;;;
+;;;; resolve-combat — offence treaty allies (DB-backed)
+;;;;
+;;;; Mirrors the defence-ally tests above, on the attacker's side instead: the defender here
+;;;; is always wildly overwhelming, so the attacker loses the ground phase (a loser-rate
+;;;; blowout, never zero), guaranteeing the attacker's pooled side actually takes losses.
+;;;;
+
+(def massive-defender-overrides
+  {:player/soldiers 100000 :player/transports 10000 :player/generals 1000
+   :player/fighters 100000 :player/carriers 10000 :player/admirals 1000
+   :player/cmd-ships 0})
+
+(deftest test-resolve-combat-pools-offence-ally-and-splits-losses
+  (testing "an active offence ally's forces join the attack; the real attacker is only ever
+            debited their own share (:attacker-own-losses), and the ally is debited
+            separately, in its own tx"
+    (with-open [node (test-xtdb-node [])]
+      (let [ctx0    (get-ctx node)
+            game-id (random-uuid)
+            att-id  (random-uuid)
+            def-id  (random-uuid)
+            ally-id (random-uuid)
+            game    (submit! ctx0 (merge helpers/game-defaults
+                                        {:xt/id game-id :game/combat-variance 0.0}))
+            attacker (submit! ctx0 (merge helpers/player-defaults
+                                         {:xt/id att-id :player/game game-id
+                                          :player/empire-name "Attacker"
+                                          :player/soldiers 1000 :player/transports 100
+                                          :player/generals 100 :player/fighters 0
+                                          :player/carriers 0 :player/admirals 0
+                                          :player/cmd-ships 0
+                                          :player/pending-attack def-id
+                                          :player/pending-attack-mode :invade}))
+            _        (submit! ctx0 (merge helpers/player-defaults massive-defender-overrides
+                                         {:xt/id def-id :player/game game-id
+                                          :player/empire-name "Defender"}))
+            _        (submit! ctx0 (merge helpers/player-defaults
+                                         {:xt/id ally-id :player/game game-id
+                                          :player/empire-name "Ally"
+                                          :player/soldiers 400 :player/transports 40
+                                          :player/generals 40 :player/fighters 0
+                                          :player/carriers 0 :player/admirals 0}))
+            _        (submit! ctx0 (alliance-fixture
+                                     {:alliance/game game-id :alliance/kind :offence
+                                      :alliance/proposer att-id :alliance/recipient ally-id
+                                      :alliance/status :active :alliance/formed-at (java.util.Date.)}))
+            ctx1     (assoc ctx0 :biff/db (xt/db node))
+            [result _ _] (#'resolution/resolve-combat ctx1 att-id attacker game)
+            ally2    (xt/entity (xt/db node) ally-id)
+            att2     (xt/entity (xt/db node) att-id)
+            ally-result (first (:attacker-allies result))
+            own         (:attacker-own-losses result)
+            ally-loss   (get-in ally-result [:losses :soldiers] 0)]
+        (is (false? (:attacker-wins? result)) "overwhelming defender always wins")
+        (is (= 1 (count (:attacker-allies result))))
+        (is (pos? ally-loss) "the ally actually took ground losses")
+        (is (<= ally-loss 100) "never more than the 25% contribution (100 of 400 soldiers)")
+        ;; Each side was debited exactly what the result says it lost — not the pooled total.
+        (is (= (- 400  ally-loss)        (:player/soldiers ally2)))
+        (is (= (- 1000 (:soldiers own))  (:player/soldiers att2)))
+        ;; The ally gets its own alert row and battle summary.
+        (is (= 1 (:player/incoming-seq ally2)))
+        (is (= 1 (count (:player/incoming-ally-battles ally2))))
+        (is (= (:player/score ally2) (utils/calculate-score game ally2))
+            "stored score matches a fresh recompute off the ally's actual persisted counts")))))
+
+(deftest test-resolve-combat-offence-ally-with-a-treaty-against-the-defender-sits-out
+  (testing "an offence ally who separately holds an active treaty with the defender stays
+            out of the fight entirely — their forces never join and they take no losses"
+    (with-open [node (test-xtdb-node [])]
+      (let [ctx0    (get-ctx node)
+            game-id (random-uuid)
+            att-id  (random-uuid)
+            def-id  (random-uuid)
+            ally-id (random-uuid)
+            game    (submit! ctx0 (merge helpers/game-defaults {:xt/id game-id}))
+            attacker (submit! ctx0 (merge helpers/player-defaults
+                                         {:xt/id att-id :player/game game-id
+                                          :player/empire-name "Attacker"
+                                          :player/soldiers 1000
+                                          :player/pending-attack def-id
+                                          :player/pending-attack-mode :invade}))
+            _        (submit! ctx0 (merge helpers/player-defaults massive-defender-overrides
+                                         {:xt/id def-id :player/game game-id
+                                          :player/empire-name "Defender"}))
+            _        (submit! ctx0 (merge helpers/player-defaults
+                                         {:xt/id ally-id :player/game game-id
+                                          :player/empire-name "Ally"
+                                          :player/soldiers 400}))
+            ;; Ally is in an offence treaty with the attacker...
+            _        (submit! ctx0 (alliance-fixture
+                                     {:alliance/game game-id :alliance/kind :offence
+                                      :alliance/proposer att-id :alliance/recipient ally-id
+                                      :alliance/status :active :alliance/formed-at (java.util.Date.)}))
+            ;; ...but also holds an active PEACE treaty with the defender — any kind of
+            ;; treaty with the enemy is enough to sit out, not just the same kind.
+            _        (submit! ctx0 (alliance-fixture
+                                     {:alliance/game game-id :alliance/kind :peace
+                                      :alliance/proposer ally-id :alliance/recipient def-id
+                                      :alliance/status :active :alliance/formed-at (java.util.Date.)}))
+            ctx1     (assoc ctx0 :biff/db (xt/db node))
+            [result _ _] (#'resolution/resolve-combat ctx1 att-id attacker game)
+            ally2    (xt/entity (xt/db node) ally-id)]
+        (is (empty? (:attacker-allies result)))
+        (is (= 400 (:player/soldiers ally2)) "the ally's forces never joined")
+        (is (nil? (:player/incoming-ally-battles ally2)))))))
+
+(deftest test-resolve-combat-pools-offence-and-defence-allies-independently
+  (testing "an offence ally on the attacker's side and a defence ally on the defender's side
+            in the same battle are each debited only their own losses"
+    (with-open [node (test-xtdb-node [])]
+      (let [ctx0     (get-ctx node)
+            game-id  (random-uuid)
+            att-id   (random-uuid)
+            def-id   (random-uuid)
+            att-ally-id (random-uuid)
+            def-ally-id (random-uuid)
+            game     (submit! ctx0 (merge helpers/game-defaults
+                                         {:xt/id game-id :game/combat-variance 0.0}))
+            attacker (submit! ctx0 (merge helpers/player-defaults
+                                         {:xt/id att-id :player/game game-id
+                                          :player/empire-name "Attacker"
+                                          :player/soldiers 1000 :player/transports 100
+                                          :player/generals 100 :player/fighters 0
+                                          :player/carriers 0 :player/admirals 0
+                                          :player/cmd-ships 0
+                                          :player/pending-attack def-id
+                                          :player/pending-attack-mode :invade}))
+            _        (submit! ctx0 (merge helpers/player-defaults
+                                         {:xt/id def-id :player/game game-id
+                                          :player/empire-name "Defender"
+                                          :player/soldiers 1000 :player/transports 100
+                                          :player/generals 100 :player/fighters 0
+                                          :player/carriers 0 :player/admirals 0
+                                          :player/cmd-ships 0 :player/stations 0}))
+            _        (submit! ctx0 (merge helpers/player-defaults
+                                         {:xt/id att-ally-id :player/game game-id
+                                          :player/empire-name "Att Ally"
+                                          :player/soldiers 400 :player/transports 40
+                                          :player/generals 40}))
+            _        (submit! ctx0 (merge helpers/player-defaults
+                                         {:xt/id def-ally-id :player/game game-id
+                                          :player/empire-name "Def Ally"
+                                          :player/soldiers 400 :player/transports 40
+                                          :player/generals 40}))
+            _        (submit! ctx0 (alliance-fixture
+                                     {:alliance/game game-id :alliance/kind :offence
+                                      :alliance/proposer att-id :alliance/recipient att-ally-id
+                                      :alliance/status :active :alliance/formed-at (java.util.Date.)}))
+            _        (submit! ctx0 (alliance-fixture
+                                     {:alliance/game game-id :alliance/kind :defence
+                                      :alliance/proposer def-id :alliance/recipient def-ally-id
+                                      :alliance/status :active :alliance/formed-at (java.util.Date.)}))
+            ctx1     (assoc ctx0 :biff/db (xt/db node))
+            [result _ _] (#'resolution/resolve-combat ctx1 att-id attacker game)
+            att-ally2 (xt/entity (xt/db node) att-ally-id)
+            def-ally2 (xt/entity (xt/db node) def-ally-id)]
+        (is (= 1 (count (:attacker-allies result))))
+        (is (= 1 (count (:defender-allies result))))
+        (is (= 1 (:player/incoming-seq att-ally2)))
+        (is (= 1 (:player/incoming-seq def-ally2)))
+        (is (= :attacking (:role (edn/read-string
+                                   (first (:player/incoming-ally-battles att-ally2))))))
+        (is (= :defending (:role (edn/read-string
+                                   (first (:player/incoming-ally-battles def-ally2))))))))))
 
 ;;;;
 ;;;; resolve-espionage — breaking a peace treaty by espionage (DB-backed)

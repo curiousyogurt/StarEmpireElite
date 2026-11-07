@@ -21,6 +21,7 @@
           [:game/minutes-between-rounds    :int]
           [:game/alliance-slots            :int]
           [:game/defence-treaty-contribution-rate :double]
+          [:game/offence-treaty-contribution-rate :double]
 
           ;; Expense underpayment penalty
           [:game/expense-stability-penalty    :int]
@@ -315,7 +316,7 @@
             [:player/incoming-treaty-accepted          {:optional true} [:maybe [:vector :string]]]
             [:player/incoming-treaty-withdrawn         {:optional true} [:maybe [:vector :string]]]
             [:player/incoming-treaty-declined          {:optional true} [:maybe [:vector :string]]]
-            [:player/incoming-treaty-dissolved         {:optional true} [:maybe [:vector :string]]]
+            [:player/incoming-treaty-ended             {:optional true} [:maybe [:vector :string]]]
             [:player/incoming-ally-battles             {:optional true} [:maybe [:vector :string]]]
 
             ;; Alert chip read-state (see com.star-empire-elite.alerts). incoming-seq is a
@@ -331,19 +332,19 @@
    ;; A treaty between two players. Shared by both sides so the relationship can't drift —
    ;; neither player's entity carries its own copy. A pair holds at most one treaty at a
    ;; time (see const/treaty-kinds). Lifecycle: :proposed -> :active (accepted) | :declined
-   ;; | :withdrawn; :active -> :dissolved (ended by either side, from the diplomacy phase)
+   ;; | :withdrawn; :active -> :ended (ended by either side, from the diplomacy phase)
    ;; | :broken (ended by an attack) | :superseded (replaced by a different-kind treaty the
-   ;; same pair just accepted). Proposing/accepting/declining/withdrawing/dissolving only
+   ;; same pair just accepted). Proposing/accepting/declining/withdrawing/ending only
    ;; happen during the diplomacy phase (7); breaking happens during combat resolution
    ;; (resolution.clj). See diplomacy.clj.
    :alliance/id :uuid
    :alliance [:map {:closed true}
               [:xt/id                 :alliance/id]
               [:alliance/game         :game/id]
-              [:alliance/kind         :keyword]  ; :peace :defence (later :offence)
+              [:alliance/kind         :keyword]  ; :peace :defence :offence (later :full)
               [:alliance/proposer     :player/id]
               [:alliance/recipient    :player/id]
-              [:alliance/status       :keyword]  ; :proposed :active :declined :withdrawn :dissolved :broken :superseded
+              [:alliance/status       :keyword]  ; :proposed :active :declined :withdrawn :ended :broken :superseded
               [:alliance/proposed-at  inst?]
               [:alliance/formed-at {:optional true} [:maybe inst?]]
               [:alliance/ended-at  {:optional true} [:maybe inst?]]

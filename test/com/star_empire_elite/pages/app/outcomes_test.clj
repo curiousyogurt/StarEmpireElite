@@ -66,7 +66,7 @@
    :player/incoming-treaty-accepted  ["Acceptor Empire"]
    :player/incoming-treaty-withdrawn ["Withdrawer Empire"]
    :player/incoming-treaty-declined  ["Decliner Empire"]
-   :player/incoming-treaty-dissolved ["Dissolver Empire"]})
+   :player/incoming-treaty-ended     ["Ender Empire"]})
 
 ;;;;
 ;;;; calculate-score Tests
@@ -202,7 +202,7 @@
           (is (not (contains? tx :player/incoming-treaty-accepted)))
           (is (not (contains? tx :player/incoming-treaty-withdrawn)))
           (is (not (contains? tx :player/incoming-treaty-declined)))
-          (is (not (contains? tx :player/incoming-treaty-dissolved))))))))
+          (is (not (contains? tx :player/incoming-treaty-ended))))))))
 
 (deftest test-apply-outcomes-records-score
   (testing "Writes a computed score to the transaction"
@@ -380,6 +380,27 @@
       (is (vector? (outcomes/outcomes-page {:player player :game test-game
                                             :battle-result nil :espionage-result nil}))))))
 
+(deftest test-ally-battle-card-renders-an-attacking-ally-against-the-defender
+  (testing "An :attacking ally-battle record names the attacker they joined and the
+            defender they fought, with the defender's own losses as the opponent column"
+    (let [record {:role :attacking :kind :offence :mode :raid
+                  :attacker-name "Raider" :defender-name "Victim" :attacker-wins? true
+                  :contributed {:soldiers 100 :transports 10 :generals 0
+                               :fighters 0 :carriers 0 :admirals 0}
+                  :losses {:soldiers 5 :transports 0 :generals 0
+                          :fighters 0 :carriers 0 :admirals 0}
+                  :defender-losses {:soldiers 200 :transports 3 :generals 0
+                                    :fighters 0 :carriers 0 :admirals 0 :cmd-ships 0}}
+          player (assoc test-player :player/incoming-ally-battles [(pr-str record)]
+                        :player/incoming-attacks nil :player/incoming-espionage-fails nil)
+          html   (str (outcomes/outcomes-page {:player player :game test-game
+                                               :battle-result nil :espionage-result nil}))]
+      (is (clojure.string/includes? html "You joined Raider's offensive against Victim"))
+      (is (clojure.string/includes? html "SUCCESS"))
+      (is (clojure.string/includes? html "VICTIM"))  ; combat-table-header upper-cases it
+      (is (clojure.string/includes? html "100"))
+      (is (clojure.string/includes? html "200")))))
+
 (deftest test-outgoing-battle-card-shows-reinforced-by-when-allies-helped
   (testing "The attacker's own outgoing battle card names the defence allies who joined the
             defender's side, when there were any"
@@ -397,6 +418,55 @@
                                              :battle-result battle-result
                                              :espionage-result nil}))]
       (is (clojure.string/includes? html "» DEFENCE: Joined by Ally One.")))))
+
+(deftest test-outgoing-battle-card-shows-offence-allies-too
+  (testing "The attacker's own outgoing battle card can show BOTH an offence-ally line (who
+            joined the attacker) and a defence-ally line (who joined the defender) at once"
+    (let [battle-result {:mode :invade :attacker-wins? true :defender-name "Defender"
+                         :attacker-counts {:soldiers 110 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :attacker-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :defender-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :attacker-allies [{:ally-id (random-uuid) :ally-name "Offence Buddy"
+                                            :contributed {:soldiers 10} :losses {:soldiers 0}}]
+                         :defender-allies [{:ally-id (random-uuid) :ally-name "Defence Buddy"
+                                            :contributed {:soldiers 10} :losses {:soldiers 1}}]
+                         :planets-transferred {:mil 0 :erg 0 :ore 0}}
+          html (str (outcomes/outcomes-page {:player test-player :game test-game
+                                             :battle-result battle-result
+                                             :espionage-result nil}))]
+      (is (clojure.string/includes? html "» OFFENCE: Joined by Offence Buddy."))
+      (is (clojure.string/includes? html "» DEFENCE: Joined by Defence Buddy.")))))
+
+(deftest test-outgoing-battle-card-prefers-attacker-own-counts-and-losses-over-pooled
+  (testing "The attacker's own outgoing battle card (with an offence ally) shows the real
+            attacker's own counts/losses, not the pooled totals the defender actually
+            fought — see combat/resolve-combat's :attacker-own-counts/-losses"
+    (let [battle-result {:mode :invade :attacker-wins? true :defender-name "Defender"
+                         ;; Pooled — what the defender fought (attacker + offence ally).
+                         :attacker-counts {:soldiers 1100 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :attacker-losses {:soldiers 55 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         ;; Own — just the real attacker's share.
+                         :attacker-own-counts {:soldiers 1000 :fighters 0 :cmd-ships 0
+                                               :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :attacker-own-losses {:soldiers 50 :fighters 0 :cmd-ships 0
+                                               :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :attacker-allies [{:ally-id (random-uuid) :ally-name "Buddy"
+                                            :contributed {:soldiers 100} :losses {:soldiers 5}}]
+                         :defender-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :planets-transferred {:mil 0 :erg 0 :ore 0}}
+          html (str (outcomes/outcomes-page {:player test-player :game test-game
+                                             :battle-result battle-result
+                                             :espionage-result nil}))]
+      ;; 1000 (own) with a −50 loss shown — not 1100/−55 (the pooled totals).
+      (is (clojure.string/includes? html "\"1000\""))
+      (is (clojure.string/includes? html "50"))
+      (is (not (clojure.string/includes? html "\"1100\""))))))
 
 (deftest test-combat-card-alliance-line-follows-orbit-and-ground
   (testing "the Alliance line is the combat card's own third result line, reading after
@@ -423,8 +493,8 @@
       (is (< orbit-at ground-at alliance-at)
           "Orbit, then Ground, then Alliance, in that order within the same card"))))
 
-(deftest test-outcomes-page-never-shows-proposed-accepted-withdrawn-declined-dissolved-notices
-  (testing "A proposed/accepted/withdrawn/declined/dissolved treaty is never shown on
+(deftest test-outcomes-page-never-shows-proposed-accepted-withdrawn-declined-ended-notices
+  (testing "A proposed/accepted/withdrawn/declined/ended treaty is never shown on
             Outcomes — that's handled exclusively by the status-line alert chip's instant
             messages (alerts.clj). test-player carries all five incoming-treaty-* fields
             (see fixture above) so this genuinely exercises the omission, not an
@@ -441,8 +511,8 @@
       (is (not (clojure.string/includes? html "withdrew their peace treaty proposal")))
       (is (not (clojure.string/includes? html "Decliner Empire")))
       (is (not (clojure.string/includes? html "declined your treaty proposal")))
-      (is (not (clojure.string/includes? html "Dissolver Empire")))
-      (is (not (clojure.string/includes? html "dissolved your peace treaty"))))))
+      (is (not (clojure.string/includes? html "Ender Empire")))
+      (is (not (clojure.string/includes? html "ended your peace treaty"))))))
 
 (deftest test-outcomes-page-shows-incoming-espionage-treaty-broken
   (testing "A treaty broken by someone else's espionage against this player IS shown — it's a

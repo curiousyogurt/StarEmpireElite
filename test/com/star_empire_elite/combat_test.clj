@@ -954,6 +954,96 @@
         (is (= (+ (:player/soldiers strong-defender) (:soldiers contrib))
                (get-in result [:defender-counts :soldiers])))))))
 
+;;;;
+;;;; Offence Treaty Ally Pooling Tests — mirrors the defence-ally tests above, on the
+;;;; attacker's side instead.
+;;;;
+
+(def ^:private offence-ally
+  (merge helpers/player-defaults
+         {:xt/id              #uuid "00000000-0000-0000-0000-000000000071"
+          :player/empire-name "Offence Ally"
+          :player/soldiers    800
+          :player/transports  16
+          :player/generals    1
+          :player/fighters    40
+          :player/carriers    1
+          :player/admirals    1
+          :player/cmd-ships   2
+          :player/stations    0}))
+
+(deftest test-resolve-combat-with-no-allies-on-either-side-matches-the-4-arity-shape
+  (testing "own counts/losses equal the pooled ones on BOTH sides, and both -allies lists
+            are empty"
+    (dotimes [_ 10]
+      (let [result (combat/resolve-combat game strong-attacker strong-defender :invade)]
+        (is (= (:attacker-counts result) (:attacker-own-counts result)))
+        (is (= (:attacker-losses result) (:attacker-own-losses result)))
+        (is (empty? (:attacker-allies result)))
+        (is (= (:defender-counts result) (:defender-own-counts result)))
+        (is (= (:defender-losses result) (:defender-own-losses result)))
+        (is (empty? (:defender-allies result)))))))
+
+(deftest test-resolve-combat-pools-offence-ally-forces-into-attacker-counts
+  (testing ":attacker-counts reflects the attacker plus the offence ally's contribution"
+    (let [result  (combat/resolve-combat game strong-attacker strong-defender :invade
+                                          {:attacker-allies [offence-ally]})
+          rate    (:game/offence-treaty-contribution-rate game)
+          contrib (combat/ally-contribution rate offence-ally)]
+      (is (= (+ (:player/soldiers strong-attacker) (:soldiers contrib))
+             (get-in result [:attacker-counts :soldiers]))))))
+
+(deftest test-resolve-combat-splits-losses-between-attacker-and-offence-ally
+  (testing "no offence ally ever loses more than they contributed, and own+allies account
+            for every pooled loss"
+    (dotimes [_ 20]
+      (let [result  (combat/resolve-combat game strong-attacker strong-defender :invade
+                                            {:attacker-allies [offence-ally]})
+            rate    (:game/offence-treaty-contribution-rate game)
+            contrib (combat/ally-contribution rate offence-ally)
+            ally    (first (:attacker-allies result))
+            pooled  (:attacker-losses result)
+            own     (:attacker-own-losses result)]
+        (is (= 1 (count (:attacker-allies result))))
+        (doseq [unit combat/contributable-units]
+          (is (<= (get-in ally [:losses unit] 0) (get contrib unit 0))
+              (str "ally lost more " unit " than they contributed"))
+          (is (= (get pooled unit 0)
+                 (+ (get own unit 0) (get-in ally [:losses unit] 0)))
+              (str "own + ally losses for " unit " should equal the pooled loss")))
+        ;; cmd-ships never pools (no :stations key on the attacker side at all).
+        (is (= (:cmd-ships pooled 0) (:cmd-ships own 0)))))))
+
+(deftest test-resolve-combat-does-not-pool-offence-allys-cmd-ships
+  (testing "an offence ally's cmd-ships never join the pooled attacker"
+    (let [result (combat/resolve-combat game strong-attacker strong-defender :invade
+                                         {:attacker-allies [offence-ally]})]
+      (is (= (:player/cmd-ships strong-attacker) (get-in result [:attacker-counts :cmd-ships]))))))
+
+(deftest test-resolve-combat-with-offence-ally-falls-back-to-the-constant-rate-for-an-old-game
+  (testing "a game entity created before :game/offence-treaty-contribution-rate existed in
+            game-config/field-specs was never snapshotted with it, so (:game/... game) alone
+            is nil — regression for an NPE in ally-contribution's (* rate count) when a real
+            pre-existing game's attacker had an offence ally"
+    (let [old-game (dissoc game :game/offence-treaty-contribution-rate)]
+      (is (not (contains? old-game :game/offence-treaty-contribution-rate)))
+      (let [result (combat/resolve-combat old-game strong-attacker strong-defender :invade
+                                           {:attacker-allies [offence-ally]})
+            contrib (combat/ally-contribution const/offence-treaty-contribution-rate offence-ally)]
+        (is (= (+ (:player/soldiers strong-attacker) (:soldiers contrib))
+               (get-in result [:attacker-counts :soldiers])))))))
+
+(deftest test-resolve-combat-pools-allies-on-both-sides-independently
+  (testing "an offence ally and a defence ally in the same battle are pooled and split
+            independently — neither side's split is affected by the other side having help"
+    (let [result (combat/resolve-combat game strong-attacker strong-defender :invade
+                                         {:attacker-allies [offence-ally]
+                                          :defender-allies [defence-ally]})]
+      (is (= 1 (count (:attacker-allies result))))
+      (is (= 1 (count (:defender-allies result))))
+      (is (= "Offence Ally" (:ally-name (first (:attacker-allies result)))))
+      (is (= "Defence Ally" (:ally-name (first (:defender-allies result))))))))
+
 (deftest empty-phase-no-errors
   (testing "Both sides with 0 units in a phase produces no errors and 0 losses"
     ;; Both have 0 space units (fighters, carriers, admirals, cmd-ships, stations all 0)

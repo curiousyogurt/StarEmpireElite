@@ -451,7 +451,7 @@
 
 (defn diplomacy-handler
   "Phase 7 — diplomacy. Opens only once per round, after the last turn's outcomes — see
-  outcomes/apply-outcomes. Every move (propose, accept, decline, withdraw, dissolve) is a
+  outcomes/apply-outcomes. Every move (propose, accept, decline, withdraw, end) is a
   deferred radio choice resolved all at once by apply-diplomacy on End Current Round."
   [{:keys [session] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx

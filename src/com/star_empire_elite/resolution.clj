@@ -54,16 +54,19 @@
            (diplomacy/alliances-for-player db game-id ally-id) ally-id enemy-id)))
 
 (defn- treaty-allies
-  "player-id's active kind-treaty allies who are eligible to join a fight against enemy-id:
-  excludes enemy-id itself, any already-eliminated partner, and any partner who separately
-  holds an active treaty with enemy-id (see sits-out?). Help comes only from player-id's
-  direct partners — it doesn't chain to a partner's own partners.
+  "player-id's active allies, of any kind in kinds, who are eligible to join a fight against
+  enemy-id: excludes enemy-id itself, any already-eliminated partner, and any partner who
+  separately holds an active treaty with enemy-id (see sits-out?). Help comes only from
+  player-id's direct partners — it doesn't chain to a partner's own partners. kinds is a set
+  (see const/kinds-where) rather than one named kind, so the defending side pulls in every
+  kind whose allies defend and the attacking side every kind whose allies attack — a future
+  kind with both capabilities needs no change here.
 
-  [db xtdb-db, game-id uuid, kind keyword, player-id uuid, enemy-id uuid]
+  [db xtdb-db, game-id uuid, kinds set-of-keyword, player-id uuid, enemy-id uuid]
   -> seq-of-player-map"
-  [db game-id kind player-id enemy-id]
+  [db game-id kinds player-id enemy-id]
   (let [alliances   (diplomacy/alliances-for-player db game-id player-id)
-        partner-ids (disj (diplomacy/partner-ids-of-kind alliances player-id kind) enemy-id)]
+        partner-ids (disj (diplomacy/partner-ids-of-kinds alliances player-id kinds) enemy-id)]
     (for [ally-id partner-ids
           :let [ally (xt/entity db ally-id)]
           :when (and ally
@@ -73,8 +76,8 @@
 
 ;;; One tx map per ally whose forces joined a fight — subtracts their losses, recomputes
 ;;; score, and records an alert-ready summary. role/kind are carried in the summary (not just
-;;; implied) so a future offence treaty's attacking allies can reuse this same function and
-;;; the same :player/incoming-ally-battles field/alert/card.
+;;; implied) so a future :full treaty's allies can reuse this same function and the same
+;;; :player/incoming-ally-battles field/alert/card regardless of which side they joined.
 (defn- ally-update-tx
   "[ally player-map, game game-map, role keyword, kind keyword, battle-result battle-result-map,
    ally-result {:ally-id :ally-name :contributed :losses}] -> tx-map"
@@ -94,10 +97,13 @@
                                  :attacker-wins?  (:attacker-wins? battle-result)
                                  :contributed     (:contributed ally-result)
                                  :losses          losses
-                                 ;; So the ally's own outcomes card can show the attacker's
-                                 ;; side of the fight too, same shape as the real attacker/
-                                 ;; defender's own combat card (see outcomes/ally-battle-card).
-                                 :attacker-losses (:attacker-losses battle-result)})]
+                                 ;; So the ally's own outcomes card can show the OTHER side's
+                                 ;; losses too, same shape as the real attacker/defender's own
+                                 ;; combat card (see outcomes/ally-battle-card) — a defending
+                                 ;; ally's opponent is the attacker, an attacking ally's
+                                 ;; opponent is the defender.
+                                 :attacker-losses (:attacker-losses battle-result)
+                                 :defender-losses (:defender-losses battle-result)})]
     {:db/doc-type        :player
      :db/op              :update
      :xt/id              (:xt/id ally)
@@ -298,18 +304,24 @@
                   broken-alliance (conj (assoc broken-alliance :db/doc-type :alliance))))
               [result (assoc player :player/cmd-ships att-cmd-ships) broken-alliance])
             ;; --- Invade / Raid branch ---
-            (let [;; The defender's active defence allies (if any) are pooled into their
-                  ;; fighting force for the whole engagement — see combat/resolve-combat's
-                  ;; :defender-allies option. Strike has no unit-vs-unit battle, so only
-                  ;; invade/raid ever gather allies.
-                  allies  (treaty-allies db (:player/game player) :defence
-                                         (:xt/id defender) player-id)
+            (let [;; Both sides' active treaty allies (if any) are pooled into their
+                  ;; respective fighting force for the whole engagement — see
+                  ;; combat/resolve-combat's :defender-allies/:attacker-allies options.
+                  ;; Strike has no unit-vs-unit battle, so only invade/raid ever gather
+                  ;; allies. kinds are picked by capability (const/kinds-where), not by name,
+                  ;; so a future :full treaty's allies join either side automatically.
+                  def-allies (treaty-allies db (:player/game player) (const/kinds-where :defends?)
+                                            (:xt/id defender) player-id)
+                  att-allies (treaty-allies db (:player/game player) (const/kinds-where :attacks?)
+                                            player-id (:xt/id defender))
                   result  (combat/resolve-combat game player defender mode
-                                                  {:defender-allies allies})
-                  al      (:attacker-losses result)
-                  ;; The real defender's own share of the pooled loss — see :defender-own-
-                  ;; losses in combat/resolve-combat. Each ally's own share is applied
-                  ;; separately below (see ally-txs), never subtracted from defender here.
+                                                  {:defender-allies def-allies
+                                                   :attacker-allies att-allies})
+                  ;; Each side's own share of its pooled loss — see :attacker-own-losses/
+                  ;; :defender-own-losses in combat/resolve-combat. Each ally's own share is
+                  ;; applied separately below (see ally-txs), never subtracted from the real
+                  ;; attacker/defender here.
+                  al      (:attacker-own-losses result)
                   dl      (:defender-own-losses result)
                   raw-pt  (or (:planets-transferred result) {:mil 0 :erg 0 :ore 0})
                   pt-mil  (min (:mil raw-pt) (:player/mil-planets defender))
@@ -352,15 +364,21 @@
                   def-credits    (max 0 (- (:player/credits     defender) rc-credits))
                   def-food       (max 0 (- (:player/food        defender) rc-food))
                   def-fuel       (max 0 (- (:player/fuel        defender) rc-fuel))
-                  ;; One tx map per defence ally whose forces joined this fight (see
-                  ;; ally-update-tx) — matched back to the live player-maps in allies above
-                  ;; by :ally-id, since :defender-allies only carries each ally's
-                  ;; id/name/contribution/losses, not their full player map.
-                  ally-txs (for [ally-result (:defender-allies capped)
-                                 :let [ally (first (filter #(= (:xt/id %) (:ally-id ally-result))
-                                                            allies))]
-                                 :when ally]
-                             (ally-update-tx ally game :defending :defence capped ally-result))]
+                  ;; One tx map per treaty ally whose forces joined this fight (see
+                  ;; ally-update-tx) — matched back to the live player-maps in def-allies/
+                  ;; att-allies above by :ally-id, since :defender-allies/:attacker-allies
+                  ;; only carry each ally's id/name/contribution/losses, not their full
+                  ;; player map.
+                  def-ally-txs (for [ally-result (:defender-allies capped)
+                                     :let [ally (first (filter #(= (:xt/id %) (:ally-id ally-result))
+                                                                def-allies))]
+                                     :when ally]
+                                 (ally-update-tx ally game :defending :defence capped ally-result))
+                  att-ally-txs (for [ally-result (:attacker-allies capped)
+                                     :let [ally (first (filter #(= (:xt/id %) (:ally-id ally-result))
+                                                                att-allies))]
+                                     :when ally]
+                                 (ally-update-tx ally game :attacking :offence capped ally-result))]
               (biff/submit-tx
                 ctx
                 (into
@@ -429,7 +447,7 @@
                   :player/incoming-seq
                   (utils/next-incoming-seq defender (if broken-alliance 2 1))}]
                   broken-alliance (conj (assoc broken-alliance :db/doc-type :alliance)))
-                ally-txs))
+                (concat def-ally-txs att-ally-txs)))
               [capped
                (merge player
                       {:player/soldiers     att-soldiers

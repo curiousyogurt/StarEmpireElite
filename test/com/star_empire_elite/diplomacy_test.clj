@@ -14,6 +14,7 @@
 (def a-id    (UUID/fromString "00000000-0000-0000-0000-00000000000a"))
 (def b-id    (UUID/fromString "00000000-0000-0000-0000-00000000000b"))
 (def c-id    (UUID/fromString "00000000-0000-0000-0000-00000000000c"))
+(def d-id    (UUID/fromString "00000000-0000-0000-0000-00000000000d"))
 (def game-id (UUID/fromString "00000000-0000-0000-0000-000000000099"))
 (def now     (Date.))
 
@@ -61,8 +62,8 @@
       (is (nil? (diplomacy/active-treaty-between al a-id b-id))))))
 
 (deftest test-active-treaty-between-ignores-ended
-  (testing "a broken/dissolved/declined/withdrawn alliance is not an active treaty"
-    (doseq [status [:broken :dissolved :declined :withdrawn]]
+  (testing "a broken/ended/declined/withdrawn alliance is not an active treaty"
+    (doseq [status [:broken :ended :declined :withdrawn]]
       (let [al [(alliance status a-id b-id)]]
         (is (nil? (diplomacy/active-treaty-between al a-id b-id))
             (str status " should not count as active"))))))
@@ -123,15 +124,15 @@
 ;;;;
 
 (deftest test-proposable-kinds-no-relationship-offers-every-kind
-  (is (= #{:peace :defence} (set (diplomacy/proposable-kinds [] a-id b-id)))))
+  (is (= #{:peace :defence :offence} (set (diplomacy/proposable-kinds [] a-id b-id)))))
 
-(deftest test-proposable-kinds-active-partner-offers-only-the-other-kind
+(deftest test-proposable-kinds-active-partner-offers-only-the-other-kinds
   (let [al [(alliance :active a-id b-id :peace)]]
-    (is (= [:defence] (diplomacy/proposable-kinds al a-id b-id)))
-    (is (= [:defence] (diplomacy/proposable-kinds al b-id a-id))
+    (is (= #{:defence :offence} (set (diplomacy/proposable-kinds al a-id b-id))))
+    (is (= #{:defence :offence} (set (diplomacy/proposable-kinds al b-id a-id)))
         "either side sees the same offer"))
   (let [al [(alliance :active a-id b-id :defence)]]
-    (is (= [:peace] (diplomacy/proposable-kinds al a-id b-id)))))
+    (is (= #{:peace :offence} (set (diplomacy/proposable-kinds al a-id b-id))))))
 
 (deftest test-proposable-kinds-pending-proposal-offers-nothing
   (let [al [(alliance :proposed a-id b-id :peace)]]
@@ -178,7 +179,7 @@
 (deftest test-slots-used-counts-a-stale-replacement-once-its-target-ends
   (testing "once the active treaty it would replace is gone, the proposal is an ordinary
             outgoing proposal and counts on its own"
-    (let [ended       (alliance :dissolved a-id b-id :peace)
+    (let [ended       (alliance :ended a-id b-id :peace)
           replacement (alliance :proposed  a-id b-id :defence)
           al          [ended replacement]]
       (is (= 1 (diplomacy/slots-used al a-id))))))
@@ -192,6 +193,15 @@
             (alliance :active a-id c-id :defence)]]
     (is (= #{c-id} (diplomacy/partner-ids-of-kind al a-id :defence)))
     (is (= #{b-id} (diplomacy/partner-ids-of-kind al a-id :peace)))))
+
+(deftest test-partner-ids-of-kinds-unions-every-matching-kind
+  (let [al [(alliance :active a-id b-id :peace)
+            (alliance :active a-id c-id :defence)
+            (alliance :active a-id d-id :offence)]]
+    (is (= #{c-id d-id} (diplomacy/partner-ids-of-kinds al a-id #{:defence :offence})))
+    (is (= #{c-id} (diplomacy/partner-ids-of-kinds al a-id #{:defence})))
+    (is (= #{} (diplomacy/partner-ids-of-kinds al a-id #{}))
+        "an empty kind set matches no treaty")))
 
 ;;;;
 ;;;; check-propose
@@ -281,9 +291,9 @@
     (is (= :withdrawn (:alliance/status al)))
     (is (= a-id (:alliance/ended-by al)))))
 
-(deftest test-dissolve
-  (let [al (diplomacy/dissolve (alliance :active a-id b-id) b-id now)]
-    (is (= :dissolved (:alliance/status al)))
+(deftest test-end
+  (let [al (diplomacy/end (alliance :active a-id b-id) b-id now)]
+    (is (= :ended (:alliance/status al)))
     (is (= b-id (:alliance/ended-by al)))))
 
 (deftest test-supersede
@@ -299,13 +309,13 @@
 (defn- by-op [resolved op]
   (:alliance (first (filter #(= op (:op %)) resolved))))
 
-(deftest test-resolve-decisions-dissolve
+(deftest test-resolve-decisions-end
   (let [treaty   (alliance :active a-id b-id)
         resolved (diplomacy/resolve-decisions game [treaty] a-id
-                                               [[(:xt/id treaty) :dissolve]] nil now)]
+                                               [[(:xt/id treaty) :end]] nil now)]
     (is (= 1 (count resolved)))
-    (is (= :dissolve (:op (first resolved))))
-    (is (= :dissolved (:alliance/status (by-op resolved :dissolve))))))
+    (is (= :end (:op (first resolved))))
+    (is (= :ended (:alliance/status (by-op resolved :end))))))
 
 (deftest test-resolve-decisions-decline-and-withdraw
   (let [incoming (alliance :proposed b-id a-id)
@@ -330,19 +340,19 @@
       (is (empty? (diplomacy/resolve-decisions game [proposal] a-id
                                                 [[(:xt/id proposal) :accept]] nil now))))))
 
-(deftest test-resolve-decisions-dissolve-frees-a-slot-for-an-accept-in-the-same-batch
-  (testing "releases are applied before accepts, so a same-round dissolve can free the slot
+(deftest test-resolve-decisions-end-frees-a-slot-for-an-accept-in-the-same-batch
+  (testing "releases are applied before accepts, so a same-round end can free the slot
             an accept needs"
     (let [tight-game {:game/alliance-slots 1}
           active     (alliance :active a-id c-id)  ; a-id's one slot, already used
           proposal   (alliance :proposed b-id a-id)
           resolved   (diplomacy/resolve-decisions tight-game [active proposal] a-id
-                                                   [[(:xt/id active) :dissolve]
+                                                   [[(:xt/id active) :end]
                                                     [(:xt/id proposal) :accept]]
                                                    nil now)]
-      (is (= :dissolved (:alliance/status (by-op resolved :dissolve))))
+      (is (= :ended (:alliance/status (by-op resolved :end))))
       (is (= :active (:alliance/status (by-op resolved :accept)))
-          "freed by the dissolve above, in the same submission"))))
+          "freed by the end above, in the same submission"))))
 
 (deftest test-resolve-decisions-two-accepts-one-free-slot-keeps-the-first
   (testing "ties for the last slot break by decisions' order, not by chance. The loser falls
@@ -444,7 +454,7 @@
 (deftest test-resolve-decisions-ignores-a-decision-on-an-unknown-alliance
   (testing "a decision keyed to an alliance-id not in alliances at all (e.g. the player
             isn't actually a party to it) is dropped, not an error"
-    (is (empty? (diplomacy/resolve-decisions game [] a-id [[(random-uuid) :dissolve]] nil now)))))
+    (is (empty? (diplomacy/resolve-decisions game [] a-id [[(random-uuid) :end]] nil now)))))
 
 ;;;;
 ;;;; alliances-for-player (database-backed)

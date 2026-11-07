@@ -4,22 +4,22 @@
 ;;;;; The diplomacy phase (7) opens once per round, right after the last turn's Outcomes
 ;;;;; phase (see outcomes/apply-outcomes, which routes here instead of back to Income only
 ;;;;; when a round just ended). It is the only place a treaty can be proposed, accepted,
-;;;;; declined, withdrawn, or dissolved — see diplomacy.clj for why: a proposal is an envoy
+;;;;; declined, withdrawn, or ended — see diplomacy.clj for why: a proposal is an envoy
 ;;;;; that hasn't "arrived" until the recipient reaches this phase, so it survives any
 ;;;;; attacks made while it's in transit. Breaking an already-active treaty happens
 ;;;;; elsewhere, during combat resolution (resolution.clj), not here.
 ;;;;;
 ;;;;; Every move here is deferred, exactly like Invade/Raid/Strike in the Action phase:
-;;;;; Accept, Decline, Withdraw, Dissolve, and Propose are all radio buttons that only
+;;;;; Accept, Decline, Withdraw, End, and Propose are all radio buttons that only
 ;;;;; highlight a choice. Nothing is written to the database until the player clicks "End
 ;;;;; Current Round" — see apply-diplomacy, which is the one place any of them take effect.
 ;;;;; Multiple choices across different relationships can be queued at once (e.g. accept one
-;;;;; proposal and dissolve an unrelated treaty in the same visit); only Propose is limited to
+;;;;; proposal and end an unrelated treaty in the same visit); only Propose is limited to
 ;;;;; one new offer per round, by there being a single candidate to choose from.
 ;;;;;
 ;;;;; A pair holds at most one treaty, of exactly one kind (see diplomacy/proposable-kinds).
 ;;;;; An existing active partner's switch-to-the-other-kind option lives on their Active
-;;;;; Treaties row, next to Dissolve — accepting it replaces their current treaty
+;;;;; Treaties row, next to End — accepting it replaces their current treaty
 ;;;;; (diplomacy/replacement?) rather than claim a new slot. Propose a Treaty therefore only
 ;;;;; ever lists complete strangers — an empire with an existing treaty or a pending proposal
 ;;;;; never appears there too, which would otherwise show the same partner twice.
@@ -34,7 +34,7 @@
 ;;;;;           │  ├─ ui/snapshot-section
 ;;;;;           │  ├─ ui/flash-notice
 ;;;;;           │  ├─ slot-counter
-;;;;;           │  ├─ relation-table  (Active Treaties → active-treaty-row → switch-kind radio(s) + decision-radio "Dissolve")
+;;;;;           │  ├─ relation-table  (Active Treaties → active-treaty-row → switch-kind radio(s) + decision-radio "End", op "end")
 ;;;;;           │  ├─ relation-table  (Propose a Treaty, strangers only → propose-row → ui/op-radio-btn per kind)
 ;;;;;           │  ├─ relation-table  (Incoming Proposals → incoming-row → decision-radio "Accept"/"Decline")
 ;;;;;           │  └─ relation-table  (Outgoing Proposals → outgoing-row → decision-radio "Withdraw")
@@ -61,9 +61,14 @@
 
 ;;; Display label for a treaty kind ("Peace", "Defence", …), or nil for an unrecognized
 ;;; kind — see const/treaty-kinds, the single source of truth every treaty-kind-aware piece
-;;; of UI here draws from.
+;;; of UI here draws from. Used in prose (warning text, tooltips) where space isn't tight.
 (defn- kind-label [kind]
   (:label (first (filter #(= kind (:kind %)) const/treaty-kinds))))
+
+;;; Short form of kind-label ("Peace", "Defnc", "Offnc", …) for text ON a deferred radio
+;;; button itself — see const/treaty-kinds' doc comment for why this differs from kind-label.
+(defn- button-label [kind]
+  (:button (first (filter #(= kind (:kind %)) const/treaty-kinds))))
 
 ;;;;
 ;;;; Shared Data Loading
@@ -103,13 +108,13 @@
 ;;;;
 ;;;; UI Components
 ;;;; - decision-radio:    a deferred radio for one relationship's Accept/Decline/Withdraw/
-;;;;                      Dissolve choice — same ui/op-radio-btn Invade/Raid/Strike use
+;;;;                      End choice — same ui/op-radio-btn Invade/Raid/Strike use
 ;;;; - relation-table:    the Empire/Planets/Score/<last-column> table shared by every
 ;;;;                      relationship list (active treaties, incoming/outgoing proposals,
 ;;;;                      and candidates) — the last header reads "Operations" except for
 ;;;;                      Active Treaties, which overrides it to "Change Treaty"
 ;;;; - active-treaty-row: an Active Treaties row — a switch-kind radio per OTHER treaty kind,
-;;;;                      a Dissolve radio, and a boxed treaty-kind marker
+;;;;                      an End radio, and a boxed treaty-kind marker
 ;;;; - incoming-row:      an Incoming Proposals row — Accept and Decline radios, sharing one
 ;;;;                      radio group so picking one deselects the other
 ;;;; - outgoing-row:      an Outgoing Proposals row — a Withdraw radio
@@ -119,14 +124,14 @@
 
 (defn- decision-radio
   "One radio for a deferred per-relationship decision (Accept, Decline, Withdraw, or
-  Dissolve) — selecting it only highlights the choice; nothing happens to alliance until
+  End) — selecting it only highlights the choice; nothing happens to alliance until
   End Current Round is submitted (see apply-diplomacy). Every option offered for the SAME
   alliance shares a radio-name, so e.g. Accept and Decline on one incoming proposal are
   mutually exclusive, but a different alliance's radios never compete with these.
 
   opts (optional) passes straight through to ui/op-radio-btn — :checked? and :sticky? are
   used by incoming-row to make Decline the forced, non-deselectable default; :id and
-  :also-clear are used by active-treaty-row to make Dissolve mutually exclusive with a
+  :also-clear are used by active-treaty-row to make End mutually exclusive with a
   switch-kind radio even though the two live in different radio-name groups.
 
   [player-id uuid, alliance-id uuid, op str, label str, opts map|nil] -> hiccup"
@@ -141,7 +146,7 @@
 
 (def ^:private th-cls "text-green-400 text-[11px] tracking-[0.08em] uppercase")
 
-;;; Cell padding for a kind-button column (Active Treaties' switch/Dissolve cells, Propose a
+;;; Cell padding for a kind-button column (Active Treaties' switch/End cells, Propose a
 ;;; Treaty's Peace/Defence cells). The actual WIDTH is set once per table by relation-table's
 ;;; <colgroup> below, not here — a width on the <td> itself is only ever a hint under the
 ;;; browser's default table-layout: auto, which still redistributes a table's leftover space
@@ -193,40 +198,40 @@
 (defn- active-treaty-row
   "One row in the Active Treaties table — a boxed marker for the treaty's kind, a radio for
   each OTHER kind offering to switch to it (sharing the page-wide 'treaty-proposal' group,
-  same composite 'partner-id:kind' value as propose-row), and a Dissolve radio. Switching
-  kind is a replacement (see diplomacy/replacement?): the partner must still accept it from
-  their own diplomacy phase, same as any proposal, but it needs no free slot and — once
-  accepted — replaces this treaty instead of claiming a new one. Because every option for
-  this partner lives here, they never also appear in Propose a Treaty (see diplomacy-page's
-  candidates, which excludes anyone diplomacy/has-relationship? is true for).
+  same composite 'partner-id:kind' value as propose-row), and an End radio. Switching kind
+  is a replacement (see diplomacy/replacement?): the partner must still accept it from their
+  own diplomacy phase, same as any proposal, but it needs no free slot and — once accepted —
+  replaces this treaty instead of claiming a new one. Because every option for this partner
+  lives here, they never also appear in Propose a Treaty (see diplomacy-page's candidates,
+  which excludes anyone diplomacy/has-relationship? is true for).
 
-  The switch radio(s) and Dissolve are two different radio-name groups — 'treaty-proposal'
+  The switch radio(s) and End are two different radio-name groups — 'treaty-proposal'
   is shared page-wide (so at most one new proposal/switch total can be queued per round),
-  while Dissolve's group is private to this one alliance — so plain HTML radio semantics
+  while End's group is private to this one alliance — so plain HTML radio semantics
   don't make them mutually exclusive on their own. Each one's :also-clear option (see
   ui/op-radio-btn) closes that gap: selecting either one here un-checks the other, by :id,
-  so the two always resolve to a single choice for this relationship — switch, dissolve, or
+  so the two always resolve to a single choice for this relationship — switch, end, or
   neither — never both at once.
 
   [player-id uuid, alliance alliance-map, partner player-map] -> hiccup"
   [player-id alliance partner]
   (let [kind        (:alliance/kind alliance)
         other-kinds (remove #{kind} (map :kind const/treaty-kinds))
-        dissolve-id (str "treaty-dissolve-" (:xt/id alliance))
+        end-id      (str "treaty-end-" (:xt/id alliance))
         switch-id   (fn [other-kind] (str "treaty-switch-" (:xt/id alliance) "-" (name other-kind)))
         switch-sel  (str/join ", " (map #(str "#" (switch-id %)) other-kinds))
         switch-btn  (fn [other-kind]
                       (ui/op-radio-btn "treaty-proposal"
                         (str (:xt/id partner) ":" (name other-kind))
-                        (kind-label other-kind)
+                        (button-label other-kind)
                         (str "/app/game/" player-id "/diplomacy-warning")
                         "diplomacy-warning"
-                        {:id (switch-id other-kind) :also-clear (str "#" dissolve-id)}))]
+                        {:id (switch-id other-kind) :also-clear (str "#" end-id)}))]
     (ui/target-operation-row
       partner
       (conj (mapv switch-btn other-kinds)
-            (decision-radio player-id (:xt/id alliance) "dissolve" "Dissolve"
-                             {:id dissolve-id :also-clear switch-sel}))
+            (decision-radio player-id (:xt/id alliance) "end" "End"
+                             {:id end-id :also-clear switch-sel}))
       ;; kind-col-cls (padding only — the width is relation-table's <colgroup>, shared with
       ;; Propose a Treaty's kind columns, so "Change Treaty" and "Operations" match exactly).
       kind-col-cls
@@ -293,13 +298,13 @@
       (for [kind (map :kind const/treaty-kinds)]
         (ui/op-radio-btn "treaty-proposal"
           (str (:xt/id candidate) ":" (name kind))
-          (kind-label kind)
+          (button-label kind)
           (str "/app/game/" player-id "/diplomacy-warning")
           "diplomacy-warning"))
       (cons [:span.text-game-green-dim.text-xs "No slots free"]
             (repeat (dec (count const/treaty-kinds)) nil)))
     ;; kind-col-cls (padding only — the width is relation-table's <colgroup>, shared with
-    ;; active-treaty-row's switch/Dissolve columns).
+    ;; active-treaty-row's switch/End columns).
     kind-col-cls))
 
 ;;;;
@@ -309,14 +314,14 @@
 ;;; Every selected radio's value is one of these op strings; the matching label is what
 ;;; update-diplomacy-warning shows when exactly one decision is queued.
 (def ^:private op-labels
-  {"dissolve" "Treaty will be dissolved."
+  {"end"      "Treaty will be ended."
    "accept"   "Treaty proposal will be accepted."
    "decline"  "Treaty proposal will be declined."
    "withdraw" "Treaty proposal will be withdrawn."})
 
 (defn- alliance-kind-by-id
-  "A {alliance-id kind} map for every alliance in alliances — e.g. active treaties, so a
-  dissolve decision's warning text can name which kind is being dissolved without a second
+  "A {alliance-id kind} map for every alliance in alliances — e.g. active treaties, so an
+  end decision's warning text can name which kind is being ended without a second
   DB round-trip per lookup.
 
   [alliances seq-of-alliance-map] -> {uuid keyword}"
@@ -328,23 +333,23 @@
   [op-str label-str] pair per selection, covering both the per-relationship 'treaty-<id>'
   groups and the separate 'treaty-proposal' group. An unchecked radio group simply has no
   key in params at all (standard HTML radio behavior), so presence alone means 'selected'.
-  kind-by-id (see alliance-kind-by-id) names the kind being dissolved, if any — a dissolve
-  decision's label is otherwise generic ('Treaty will be dissolved.', op-labels' fallback).
+  kind-by-id (see alliance-kind-by-id) names the kind being ended, if any — an end
+  decision's label is otherwise generic ('Treaty will be ended.', op-labels' fallback).
 
   [params ring-params-map, kind-by-id {uuid keyword}] -> seq-of-[op-str label-str]"
   [params kind-by-id]
   (let [[_target kind-str] (utils/parse-choice-value (:treaty-proposal params))
         label (kind-label (keyword kind-str))
-        dissolve-label (fn [alliance-id-str]
-                         (if-let [dissolved-label (kind-label (get kind-by-id (parse-uuid alliance-id-str)))]
-                           (str dissolved-label " treaty will be dissolved.")
-                           (op-labels "dissolve")))
+        end-label (fn [alliance-id-str]
+                    (if-let [ended-label (kind-label (get kind-by-id (parse-uuid alliance-id-str)))]
+                      (str ended-label " treaty will be ended.")
+                      (op-labels "end")))
         per-relationship (for [[k v] params
                                 :when (and (not= k :treaty-proposal)
                                            (str/starts-with? (name k) "treaty-")
                                            (contains? op-labels v))]
-                            [v (if (= v "dissolve")
-                                 (dissolve-label (subs (name k) (count "treaty-")))
+                            [v (if (= v "end")
+                                 (end-label (subs (name k) (count "treaty-")))
                                  (op-labels v))])]
     (cond-> (vec per-relationship)
       label (conj ["propose" (str label " treaty will be offered.")]))))
@@ -393,7 +398,7 @@
 
 (defn apply-diplomacy
   "End the diplomacy window: resolve every queued decision — Accept/Decline/Withdraw/
-  Dissolve on an existing relationship, plus a Propose a Treaty selection — then advance to
+  End on an existing relationship, plus a Propose a Treaty selection — then advance to
   the next round's income phase. None of these were committed when clicked; each was only
   ever highlighted on screen (see diplomacy-page), exactly like Invade/Raid/Strike at
   apply-action. This is the one place any of them actually takes effect.
@@ -405,7 +410,7 @@
   only when that param is exactly \"accept\", Decline for anything else (missing, stale,
   tampered) — capped here at the source, not just in the UI (see incoming-row), so a
   stripped form field can't be used to dodge the choice. diplomacy/resolve-decisions — a pure
-  function — applies them in order: releases (decline/withdraw/dissolve) first, since they
+  function — applies them in order: releases (decline/withdraw/end) first, since they
   can free a slot; then accepts, each re-checked against the slots freed so far, in the
   order their alliances were loaded (which filter preserves through to the order each list
   is rendered in — see live-context/diplomacy-page — so ties among several accepts break in
@@ -450,7 +455,7 @@
                                         :propose   [:player/incoming-treaty-proposed  (:alliance/recipient alliance)]
                                         :accept    [:player/incoming-treaty-accepted  (:alliance/proposer alliance)]
                                         :withdraw  [:player/incoming-treaty-withdrawn (:alliance/recipient alliance)]
-                                        :dissolve  [:player/incoming-treaty-dissolved (diplomacy/partner-id alliance player-id)]
+                                        :end       [:player/incoming-treaty-ended (diplomacy/partner-id alliance player-id)]
                                         ;; Notifies the proposer, not player-id (the
                                         ;; recipient who declined, including the automatic
                                         ;; no-free-slot fallback — see resolve-decisions).
@@ -461,7 +466,7 @@
                                         :supersede [nil nil])]
                                 :when field]
                             {:field field :other-id other-id})
-            ;; Two decisions in one submission (e.g. dissolving an active treaty with X while
+            ;; Two decisions in one submission (e.g. ending an active treaty with X while
             ;; also accepting a separate pending proposal from X) can both notify the same
             ;; opponent — group by recipient so each gets exactly one :db/op :update per
             ;; submit-tx. biff's :db/op :update builds one match+put pair per map; two separate
@@ -479,21 +484,21 @@
                                                        (get other field) field-entries)]))
                                 (group-by :field entries))))
             tx-events (for [{:keys [op alliance]} resolved
-                            :when (#{:accept :dissolve} op)]
+                            :when (#{:accept :end} op)]
                         (events/event-of-treaty alliance
-                          (if (= op :accept) :treaty-formed :treaty-dissolved)
+                          (if (= op :accept) :treaty-formed :treaty-ended)
                           names (event-meta player game now)))]
         (biff/submit-tx ctx
           (into [{:db/doc-type :player :db/op :update :xt/id player-id :player/current-phase 1
                   ;; Diplomacy notifications are cleared here, not at apply-outcomes — see the
                   ;; comment there. By now the player has seen and acted on every incoming
-                  ;; proposal/accept/withdraw/dissolve (they're the same relationships just
+                  ;; proposal/accept/withdraw/end (they're the same relationships just
                   ;; resolved above), so it's safe to clear them.
                   :player/incoming-treaty-proposed  nil
                   :player/incoming-treaty-accepted  nil
                   :player/incoming-treaty-withdrawn nil
                   :player/incoming-treaty-declined  nil
-                  :player/incoming-treaty-dissolved nil}]
+                  :player/incoming-treaty-ended     nil}]
                 (concat alliance-tx notify-tx)))
         (events/record-events! ctx tx-events)
         {:status 303 :headers {"location" (str "/app/game/" player-id "/income")}}))))
@@ -503,7 +508,7 @@
 ;;;;
 
 (defn diplomacy-page
-  "Show the diplomacy window: active treaties (each with its own switch-kind and Dissolve
+  "Show the diplomacy window: active treaties (each with its own switch-kind and End
   options — see active-treaty-row), pending proposals in both directions, and a Propose a
   Treaty table of every other live empire with NO existing relationship at all — a partner
   or pending-proposal counterpart always has their own options elsewhere on this page
@@ -524,7 +529,7 @@
         free?       (pos? (diplomacy/free-slots game live player-id))
         candidates  (remove #(diplomacy/has-relationship? live player-id (:xt/id %)) others)
         ;; Shared by Active Treaties (one column per OTHER kind's switch option, plus one
-        ;; for Dissolve) and Propose a Treaty (one column per kind) — both equal exactly the
+        ;; for End) and Propose a Treaty (one column per kind) — both equal exactly the
         ;; total number of treaty kinds.
         kind-cols   (count const/treaty-kinds)]
     (ui/phase-shell player game "Diplomacy Phase"
@@ -576,7 +581,7 @@
              :hx-post    (str "/app/game/" player-id "/diplomacy-warning")
              :hx-target  "#diplomacy-warning"
              :hx-swap    "outerHTML"
-             ;; Cancel only clears the OPTIONAL treaty-* radios — dissolve/withdraw/propose,
+             ;; Cancel only clears the OPTIONAL treaty-* radios — end/withdraw/propose,
              ;; the only ones the cancel-target CSS rule ever shows this button for (see
              ;; tailwind.css). It must never touch an incoming proposal's Accept/Decline:
              ;; that's a forced choice, not a queued action, so whatever the player picked

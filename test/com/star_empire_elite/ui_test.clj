@@ -544,6 +544,11 @@
     (is (= "D" (last el)))
     (is (= "Active defence treaty" (:title (second el))))))
 
+(deftest test-treaty-indicator-offence-marker-and-default-title
+  (let [el (ui/treaty-indicator :offence)]
+    (is (= "O" (last el)))
+    (is (= "Active offence treaty" (:title (second el))))))
+
 (deftest test-treaty-indicator-custom-title-overrides-default
   (let [el (ui/treaty-indicator :peace "Peace treaty proposed")]
     (is (= "Peace treaty proposed" (:title (second el))))))
@@ -558,7 +563,7 @@
 ;;;;
 ;;;; These let two radios in DIFFERENT radio-name groups behave as one mutually exclusive
 ;;;; choice — see diplomacy.clj's active-treaty-row, where a switch-kind radio (shared
-;;;; page-wide 'treaty-proposal' group) and Dissolve (a group private to that one alliance)
+;;;; page-wide 'treaty-proposal' group) and End (a group private to that one alliance)
 ;;;; must still resolve to at most one selection for the same relationship.
 ;;;;
 
