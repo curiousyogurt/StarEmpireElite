@@ -9,6 +9,7 @@
 (ns com.star-empire-elite.pages.app.game
   (:require [com.biffweb :as biff :refer [q]]
             [com.star-empire-elite.constants :as const]
+            [com.star-empire-elite.diplomacy :as diplomacy]
             [com.star-empire-elite.ui :as ui]
             [com.star-empire-elite.utils :as utils]
             [xtdb.api :as xt]))
@@ -74,14 +75,16 @@
     "×"]))
 
 (defn players-table
-  "Render the leaderboard showing all players in the game ranked by score.
-  Admin users also see a remove button per player.
+  "Render the leaderboard showing all players in the game ranked by score. Each other
+  empire's name carries a small treaty marker when the viewing player holds an active
+  treaty with them — same marker as the action/espionage target tables (see
+  ui/treaty-indicator); treaty-kinds has no entry for the viewer's own id, so their own
+  row never gets a marker. Admin users also see a remove button per player.
 
-  [{:keys [players admin?]}] -> hiccup"
-  [{:keys [players admin?]}]
-  (let [th-cls       "text-green-400 text-[11px] tracking-[0.08em] uppercase"
-        td-cls       "border-r border-game-border py-1 px-3 text-game-green-soft"
-        td-right-cls "border-r border-game-border py-1 px-3 text-game-green-soft text-right"]
+  [{:keys [players player-id treaty-kinds admin?]}] -> hiccup"
+  [{:keys [players player-id treaty-kinds admin?]}]
+  (let [th-cls "text-green-400 text-[11px] tracking-[0.08em] uppercase"
+        td-cls "border-r border-game-border py-1 px-3 text-game-green-soft"]
     [:div.mt-2
      (ui/section-label "Players")
      [:div.overflow-x-auto
@@ -97,15 +100,14 @@
            [:th.w-px.whitespace-nowrap.px-1.py-1 {:class th-cls} ""])]]
        [:tbody
         (for [player players]
-          [:tr.bg-game-row.border-b.border-game-divider
-           [:td {:class td-cls} (:rank player)]
-           [:td {:class td-cls} (:player/empire-name player)]
-           [:td {:class td-right-cls}
-            (ui/format-number (utils/total-planets player))]
-           [:td {:class td-right-cls} (ui/format-number (:player/score player))]
-           (when admin?
-             [:td.w-px.whitespace-nowrap.text-right.px-1
-              (remove-player-button (:xt/id player))])])]]]]))
+          (into [:tr.bg-game-row.border-b.border-game-divider
+                 [:td {:class td-cls} (:rank player)]]
+                (concat
+                  (ui/target-info-tds player
+                    {:name-suffix (ui/treaty-indicator (get treaty-kinds (:xt/id player)))})
+                  (when admin?
+                    [[:td.w-px.whitespace-nowrap.text-right.px-1
+                      (remove-player-button (:xt/id player))]]))))]]]]))
 
 ;;;;
 ;;;; Page
@@ -141,18 +143,26 @@
   [ctx ring-ctx] -> hiccup | ring-response"
   [{:keys [session path-params biff/db] :as ctx}]
   (utils/with-player-and-game [player game player-id] ctx
-    (let [players     (get-game-players (:biff/db ctx) (:xt/id game))
-          user        (xt/entity db (:uid session))
-          admin?      (boolean (const/admin-emails (:user/email user)))
+    (let [players      (get-game-players (:biff/db ctx) (:xt/id game))
+          user         (xt/entity db (:uid session))
+          admin?       (boolean (const/admin-emails (:user/email user)))
+          ;; Active treaties only — a mere proposal hasn't "arrived" yet (see diplomacy.clj).
+          ;; A pair holds at most one treaty, so this is a simple partner-id -> kind map.
+          alliances    (diplomacy/alliances-for-player db (:player/game player) player-id)
+          treaty-kinds (into {} (map (fn [a] [(diplomacy/partner-id a player-id) (:alliance/kind a)]))
+                             (diplomacy/active-treaties alliances player-id))
           ;; Mid-turn players (past income) have already committed to their turn
           ;; and must be allowed to finish it regardless of cooldown state.
-          mid-turn?   (> (:player/current-phase player) 1)
-          cooldown-ms (when-not mid-turn? (utils/round-cooldown-ms player game))]
+          mid-turn?    (> (:player/current-phase player) 1)
+          cooldown-ms  (when-not mid-turn? (utils/round-cooldown-ms player game))]
       (ui/phase-shell player game "GAME OVERVIEW"
         [:div.flex.flex-col.gap-2
          {:class "py-2.5 px-3.5"}
          (ui/snapshot-section player)
-         (players-table {:players players :admin? admin?})]
+         (players-table {:players      players
+                         :player-id    player-id
+                         :treaty-kinds treaty-kinds
+                         :admin?       admin?})]
         (ui/phase-action-bar
           (ui/action-bar-link "/app" "Back to Games")
           (ui/action-bar-link (str "/app/game/" (:xt/id player) "/news") "News")

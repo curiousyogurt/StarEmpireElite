@@ -1,7 +1,11 @@
 (ns com.star-empire-elite.pages.app.dashboard-test
   (:require [clojure.test :refer :all]
+            [com.biffweb :as biff :refer [test-xtdb-node]]
+            [com.star-empire-elite :as main]
             [com.star-empire-elite.constants :as const]
-            [com.star-empire-elite.pages.app.dashboard :as dashboard]))
+            [com.star-empire-elite.pages.app.dashboard :as dashboard]
+            [malli.generator :as mg]
+            [xtdb.api :as xt]))
 
 ;;
 ;; Test fixtures
@@ -275,3 +279,63 @@
                                                           :player-count 1
                                                           :admin?       false}))]
       (is (not (clojure.string/includes? result "delete-game"))))))
+
+;;
+;; get-available-games
+;;
+;; Regression coverage for a bug where :find [game-id] (a vector) made biff's q
+;; return [game-id] tuples instead of bare ids, so frequencies keyed on tuples and
+;; the (:xt/id game) lookup never matched — player-count was always 0.
+;;
+
+(defn- get-ctx [node]
+  {:biff.xtdb/node  node
+   :biff/db         (xt/db node)
+   :biff/malli-opts #'main/malli-opts})
+
+(defn- make-user! [ctx]
+  (let [user (merge (mg/generate :user main/malli-opts) {:xt/id (random-uuid)})]
+    (biff/submit-tx ctx [(assoc user :db/doc-type :user)])
+    user))
+
+(defn- make-game! [ctx overrides]
+  (let [game (merge (mg/generate :game main/malli-opts) {:xt/id (random-uuid)} overrides)]
+    (biff/submit-tx ctx [(assoc game :db/doc-type :game)])
+    game))
+
+(defn- make-player! [ctx game-id user-id overrides]
+  (let [player (merge (mg/generate :player main/malli-opts)
+                      {:xt/id       (random-uuid)
+                       :player/game game-id
+                       :player/user user-id}
+                      overrides)]
+    (biff/submit-tx ctx [(assoc player :db/doc-type :player)])
+    player))
+
+(deftest test-get-available-games-counts-players-correctly
+  (testing "player-count reflects the real number of players in each unjoined game"
+    (with-open [node (test-xtdb-node [])]
+      (let [ctx       (get-ctx node)
+            me        (make-user! ctx)
+            other     (make-user! ctx)
+            game      (make-game! ctx {:game/name "Open Game"})
+            game-id   (:xt/id game)]
+        (make-player! ctx game-id (:xt/id other) nil)
+        (make-player! ctx game-id (:xt/id other) nil)
+        (let [db        (xt/db node)
+              available (dashboard/get-available-games db (:xt/id me))
+              entry     (first (filter #(= game-id (:xt/id (:game %))) available))]
+          (is (some? entry))
+          (is (= 2 (:player-count entry))))))))
+
+(deftest test-get-available-games-excludes-already-joined-games
+  (testing "A game the user already has a player in is not listed as available"
+    (with-open [node (test-xtdb-node [])]
+      (let [ctx     (get-ctx node)
+            me      (make-user! ctx)
+            game    (make-game! ctx {:game/name "Already Joined"})
+            game-id (:xt/id game)]
+        (make-player! ctx game-id (:xt/id me) nil)
+        (let [db        (xt/db node)
+              available (dashboard/get-available-games db (:xt/id me))]
+          (is (not (some #(= game-id (:xt/id (:game %))) available))))))))

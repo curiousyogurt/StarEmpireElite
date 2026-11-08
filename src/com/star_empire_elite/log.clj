@@ -126,17 +126,22 @@
 
 (defn- combat-summary
   "Structured summary of a resolve-combat result map.
-  Attacker identity omitted — always the logging player (top-level :empire/:player-id)."
+  Attacker identity omitted — always the logging player (top-level :empire/:player-id).
+  :forces are each side's full effective force for the engagement (POOLED with any treaty
+  allies, same as resolve-combat's :attacker-forces/:defender-forces); :losses are each
+  side's OWN share alone (:attacker-own-losses/:defender-own-losses), never an ally's — an
+  admin reviewing this log to adjudicate \"how many units did X actually lose\" wants X's
+  own answer, not inflated or deflated by whatever an ally absorbed instead."
   [result]
   (when result
     {:winner          (if (:attacker-wins? result) :attacker :defender)
      :margin          (:margin result)
      :attacker        {:forces (:attacker-forces result)
-                       :losses (:attacker-losses result)}
+                       :losses (:attacker-own-losses result)}
      :defender        {:name   (:defender-name result)
                        :id     (:defender-id   result)
                        :forces (:defender-forces result)
-                       :losses (:defender-losses result)}
+                       :losses (:defender-own-losses result)}
      :planets-captured (:planets-transferred result)}))
 
 (defn- espionage-summary

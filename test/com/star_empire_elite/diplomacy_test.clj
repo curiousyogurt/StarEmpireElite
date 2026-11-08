@@ -185,14 +185,8 @@
       (is (= 1 (diplomacy/slots-used al a-id))))))
 
 ;;;;
-;;;; partner-ids-of-kind
+;;;; partner-ids-of-kinds
 ;;;;
-
-(deftest test-partner-ids-of-kind
-  (let [al [(alliance :active a-id b-id :peace)
-            (alliance :active a-id c-id :defence)]]
-    (is (= #{c-id} (diplomacy/partner-ids-of-kind al a-id :defence)))
-    (is (= #{b-id} (diplomacy/partner-ids-of-kind al a-id :peace)))))
 
 (deftest test-partner-ids-of-kinds-unions-every-matching-kind
   (let [al [(alliance :active a-id b-id :peace)
@@ -498,3 +492,32 @@
         (is (= 2 (count results)))
         (is (contains? ids (:xt/id as-proposer)))
         (is (contains? ids (:xt/id as-recipient)))))))
+
+;;;;
+;;;; alliances-for-players (database-backed)
+;;;;
+
+(deftest test-alliances-for-players-batches-several-players-in-one-call
+  (testing "returns every alliance touching ANY of the given player-ids — proposer or
+            recipient, either side — same as calling alliances-for-player once per id and
+            concatenating, but in one query pair instead of N"
+    (with-open [node (test-xtdb-node [])]
+      (let [ctx (get-ctx node)
+            b-as-proposer  (make-alliance! ctx {:alliance/game game-id
+                                                :alliance/proposer b-id
+                                                :alliance/recipient a-id
+                                                :alliance/status :active})
+            c-as-recipient (make-alliance! ctx {:alliance/game game-id
+                                                :alliance/proposer a-id
+                                                :alliance/recipient c-id
+                                                :alliance/status :proposed})
+            _unrelated     (make-alliance! ctx {:alliance/game game-id
+                                                :alliance/proposer a-id
+                                                :alliance/recipient d-id
+                                                :alliance/status :proposed})
+            db      (xt/db node)
+            results (diplomacy/alliances-for-players db game-id #{b-id c-id})
+            ids     (set (map :xt/id results))]
+        (is (= 2 (count results)))
+        (is (contains? ids (:xt/id b-as-proposer)))
+        (is (contains? ids (:xt/id c-as-recipient)))))))

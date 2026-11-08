@@ -850,6 +850,16 @@
 (deftest test-pool-forces-with-no-contributions-is-identity
   (is (= strong-defender (combat/pool-forces strong-defender []))))
 
+(deftest test-pool-forces-lumps-together-any-number-of-allies
+  (testing "two or more allies' contributions all sum into the one pooled total — the
+            outcomes card displays this single lumped figure regardless of ally count"
+    (let [c1     (combat/ally-contribution 0.25 defence-ally)
+          c2     (combat/ally-contribution 0.5  defence-ally)
+          pooled (combat/pool-forces strong-defender [c1 c2])]
+      (is (= (+ (:player/soldiers strong-defender) (:soldiers c1) (:soldiers c2))
+             (:player/soldiers pooled))
+          "both allies' contributions are summed into one total, not just the first"))))
+
 (deftest test-split-losses-sums-to-pool-loss
   (testing "the parts of a split always sum to exactly the pooled loss"
     (let [shares (map vector [:own :a :b] [70 20 10])]

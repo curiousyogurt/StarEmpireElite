@@ -61,24 +61,29 @@
   "Turn a player's pr-str'd incoming-ally-battles history (set when their treaty forces
   joined another empire's fight — see resolution/ally-update-tx) into alert rows. role is
   either :defending (a defence ally) or :attacking (an offence ally) — each has its own
-  wording and success condition.
+  wording and success condition. A record with any other role (nil, or anything from
+  before :role was ever stored) is silently skipped — same as every record this history
+  ever held before offence treaties existed — rather than crashing the whole alert chip.
 
   [player player-map] -> [alert-map]"
   [player]
-  (for [record-str (utils/take-recent (:player/incoming-ally-battles player))
-        :let [{:keys [role attacker-name defender-name mode attacker-wins?]}
-              (edn/read-string record-str)]]
-    (case role
-      ;; Joining the defence succeeds when the attacker loses.
-      :defending {:alert/category :action :alert/badge mode
-                  :alert/sender defender-name
-                  :alert/text (str "You joined " defender-name "'s defence against " attacker-name
-                                    (if attacker-wins? " (FAILURE)" " (SUCCESS)"))}
-      ;; Joining the offence succeeds when the attacker wins.
-      :attacking {:alert/category :action :alert/badge mode
-                  :alert/sender attacker-name
-                  :alert/text (str "You joined " attacker-name "'s offensive against " defender-name
-                                    (if attacker-wins? " (SUCCESS)" " (FAILURE)"))})))
+  (keep
+    (fn [record-str]
+      (let [{:keys [role attacker-name defender-name mode attacker-wins?]}
+            (edn/read-string record-str)]
+        (case role
+          ;; Joining the defence succeeds when the attacker loses.
+          :defending {:alert/category :action :alert/badge mode
+                      :alert/sender defender-name
+                      :alert/text (str "You joined " defender-name "'s defence against " attacker-name
+                                        (if attacker-wins? " (FAILURE)" " (SUCCESS)"))}
+          ;; Joining the offence succeeds when the attacker wins.
+          :attacking {:alert/category :action :alert/badge mode
+                      :alert/sender attacker-name
+                      :alert/text (str "You joined " attacker-name "'s offensive against " defender-name
+                                    (if attacker-wins? " (SUCCESS)" " (FAILURE)"))}
+          nil)))
+    (utils/take-recent (:player/incoming-ally-battles player))))
 
 (defn- espionage-fail-messages
   "[player player-map] -> [alert-map]"

@@ -317,6 +317,12 @@
             [:player/incoming-treaty-withdrawn         {:optional true} [:maybe [:vector :string]]]
             [:player/incoming-treaty-declined          {:optional true} [:maybe [:vector :string]]]
             [:player/incoming-treaty-ended             {:optional true} [:maybe [:vector :string]]]
+            ;; Renamed to incoming-treaty-ended above; kept declared (never read or written
+            ;; by current code — see diplomacy.clj) so a live player doc from before the
+            ;; rename, which may still carry this key, doesn't fail :closed-map validation
+            ;; on its next :db/op :update. Same pattern as the "superseded" raid/invade-
+            ;; reward-multiplier fields above.
+            [:player/incoming-treaty-dissolved         {:optional true} [:maybe [:vector :string]]]
             [:player/incoming-ally-battles             {:optional true} [:maybe [:vector :string]]]
 
             ;; Alert chip read-state (see com.star-empire-elite.alerts). incoming-seq is a

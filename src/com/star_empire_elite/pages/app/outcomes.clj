@@ -122,13 +122,21 @@
    [:td.text-left.py-1.px-3 right]])
 
 (defn- combat-table-header
-  "Render the 3-column table header for combat and strike cards."
-  [opp-name]
+  "Render the 3-column table header for combat and strike cards. you-label overrides the
+  left header's text (default \"YOU\") — e.g. \"YOU (ALLIES)\" when this player had treaty
+  allies whose own lumped contribution/loss the row below also reports, alongside (not
+  instead of) this player's own figure. opp-allied? appends the same \" (ALLIES)\" suffix to
+  the right header, when the OPPONENT had treaty allies of their own — the two are
+  independent: either side, both, or neither may have brought allies to this fight.
+
+  [opp-name string, you-label string|nil, opp-allied? bool|nil] -> hiccup"
+  [opp-name & [you-label opp-allied?]]
   [:thead
    [:tr.bg-game-header.border-t.border-game-border.border-b.border-game-border
-    [:th {:class (str col-header-cls " text-right")}  "◄ YOU"]
+    [:th {:class (str col-header-cls " text-right")}  (str "◄ " (or you-label "YOU"))]
     [:th {:class (str col-header-cls " text-center")} "UNIT"]
-    [:th {:class (str col-header-cls " text-left")}   (str (str/upper-case opp-name) " ►")]]])
+    [:th {:class (str col-header-cls " text-left")}
+     (str (str/upper-case opp-name) (when opp-allied? " (ALLIES)") " ►")]]])
 
 ;;;;
 ;;;; Summary Text Helpers
@@ -344,8 +352,8 @@
           buff-text      (if significant?
                            (str " (" pct "% to ground power)")
                            " (marginal edge)")]
-      [:div.text-xs.py-1.5.px-3.border-t.border-game-divider
-       {:class (if you-won-space? "text-green-400" "text-yellow-400")}
+      [:div.text-xs.px-3.border-t.border-game-divider
+       {:class (str "py-1.5 " (if you-won-space? "text-green-400" "text-yellow-400"))}
        (if you-are-attacker?
          (if you-won-space?
            (str "» ORBIT: Your fleet achieved a secure orbit" buff-text)
@@ -363,8 +371,8 @@
   [space-att-wins? attacker-wins? you-are-attacker?]
   (when (some? space-att-wins?)
     (let [you-won-ground? (if you-are-attacker? attacker-wins? (not attacker-wins?))]
-      [:div.text-xs.py-1.5.px-3.border-t.border-game-divider
-       {:class (if you-won-ground? "text-green-400" "text-yellow-400")}
+      [:div.text-xs.px-3.border-t.border-game-divider
+       {:class (str "py-1.5 " (if you-won-ground? "text-green-400" "text-yellow-400"))}
        (if you-are-attacker?
          (if you-won-ground?
            "» GROUND: Your ground forces overcame planetary defences"
@@ -384,9 +392,8 @@
   [label str, allies seq-of-{:ally-name str, ...}] -> hiccup|nil"
   [label allies]
   (when (seq allies)
-    [:div.text-xs.py-1.5.px-3.border-t.border-game-divider
-     ;; Same green as a won Orbit/Ground line — reinforcement is never the bad outcome.
-     {:class "text-green-400"}
+    ;; Same green as a won Orbit/Ground line — reinforcement is never the bad outcome.
+    [:div.text-xs.px-3.border-t.border-game-divider {:class "py-1.5 text-green-400"}
      (str "» " label ": Joined by " (str/join ", " (map :ally-name allies)) ".")]))
 
 (defn- combat-card
@@ -398,25 +405,76 @@
   the defending/attacking side respectively (see alliance-line) — both are present
   identically on the attacker's outgoing card (who they really fought, and who helped them)
   and the defender's incoming card (same fight, same allies, from the other side).
-  :open? controls the initial expansion state."
+  :you-label, when given, overrides the left header's \"YOU\" text (see combat-table-header)
+  — the caller passes this when their side had treaty allies, so the header reads \"YOU
+  (ALLIES)\" even though my-counts/my-losses themselves stay this player's own stock alone
+  (never pooled with allies — see combat/resolve-combat's :attacker-own-counts/-losses and
+  :defender-own-counts/-losses). Whenever :you-label is set, each row also appends the
+  allies' own lumped contribution/loss, in muted-green parentheses, after this player's own
+  figure — e.g. \"375.5K−42.3K (500.1K−256.1K)\" — summed across however many allies joined
+  (see defender-allies/attacker-allies above), not broken out per ally. Independently of
+  :you-label, whenever the OPPONENT's side had treaty allies, the right header gets its own
+  \" (ALLIES)\" suffix, and each row appends the opponent allies' own lumped loss the same
+  way — e.g. \"−189K (−35.6K)\" — mirroring the left column: opp-losses itself stays the
+  opponent's OWN loss alone, never pooled with their allies, same principle as my-counts/
+  my-losses; the right column never shows a count, so there's no contributed figure to pair
+  with the loss there. Either side, both, or neither may have brought help.
+  :open? controls the initial expansion state.
+
+  [opts {:keys [mode opp-name attacker-wins? my-counts my-losses opp-losses stations-mine?
+                resources-taken planets-transferred space-att-wins? space-buff
+                defender-allies attacker-allies you-label open?]}] -> hiccup"
   [{:keys [mode opp-name attacker-wins? my-counts my-losses opp-losses
            stations-mine? resources-taken planets-transferred
-           space-att-wins? space-buff defender-allies attacker-allies open?]}]
+           space-att-wins? space-buff defender-allies attacker-allies you-label open?]}]
   (let [dash           [:span.text-game-green-dim "—"]
+        ;; The allies folded into my-counts/my-losses above — only set when the caller
+        ;; signaled a pooled "(ALLIES)" display (see you-label), and only the allies that
+        ;; actually joined MY side on this card, not the opponent's.
+        my-allies      (when you-label (if stations-mine? defender-allies attacker-allies))
+        ;; The opponent's own allies — the other side of the same coin. Drives both the
+        ;; right header's "(ALLIES)" suffix and the right column's own ally-loss breakdown
+        ;; below (opp-losses is already pooled regardless of either).
+        opp-allies     (if stations-mine? attacker-allies defender-allies)
+        ally-sum       (fn [allies unit-key k] (reduce + 0 (map #(get-in % [k unit-key] 0) allies)))
         make-left      (fn [unit-key defender-only?]
                          (if (and defender-only? (not stations-mine?))
                            dash
-                           [:<>
-                            [:span.text-game-green-soft
-                             (ui/format-number (get my-counts unit-key 0))]
-                            (let [loss (get my-losses unit-key 0)]
-                              (when (pos? loss)
-                                [:span.text-red-400.ml-1.5
-                                 "−" (ui/format-number loss)]))]))
+                           (let [ally-contrib (ally-sum my-allies unit-key :contributed)
+                                 ally-loss    (ally-sum my-allies unit-key :losses)]
+                             [:<>
+                              [:span.text-game-green-soft
+                               (ui/format-number (get my-counts unit-key 0))]
+                              (let [loss (get my-losses unit-key 0)]
+                                (when (pos? loss)
+                                  [:span.text-red-400 {:class "ml-1.5"}
+                                   "−" (ui/format-number loss)]))
+                              ;; Allies' own lumped share, muted so it reads as secondary
+                              ;; to the pooled total above — contribution and loss both the
+                              ;; same muted green, not red, since this isn't a loss *to you*.
+                              ;; Only shown for a unit type the allies actually contributed —
+                              ;; cmd-ships/stations never appear here, since allies never
+                              ;; contribute those.
+                              (when (pos? ally-contrib)
+                                [:span.text-game-green-muted {:class "ml-1.5"}
+                                 " (" (ui/format-number ally-contrib)
+                                 (when (pos? ally-loss)
+                                   [:<> "−" (ui/format-number ally-loss)])
+                                 ")"])])))
         make-right     (fn [unit-key defender-only?]
                          (if (and defender-only? stations-mine?)
                            dash
-                           (opp-loss-cell (get opp-losses unit-key 0))))
+                           (let [opp-ally-loss (ally-sum opp-allies unit-key :losses)]
+                             [:<>
+                              (opp-loss-cell (get opp-losses unit-key 0))
+                              ;; How much of the opponent's pooled loss their own allies
+                              ;; absorbed — same muted-green parenthetical as the left
+                              ;; column, mirrored. The right column never shows a count (see
+                              ;; opp-loss-cell), so there's no "contributed" figure to pair
+                              ;; it with here, only the loss share.
+                              (when (pos? opp-ally-loss)
+                                [:span.text-game-green-muted {:class "ml-1.5"}
+                                 " (" "−" (ui/format-number opp-ally-loss) ")"])])))
         credits        (:credits resources-taken 0)
         food           (:food    resources-taken 0)
         fuel           (:fuel    resources-taken 0)
@@ -439,7 +497,7 @@
       (alliance-line "OFFENCE" attacker-allies)
       [:div.overflow-x-auto
        [:table.w-full.text-xs.table-fixed
-        (combat-table-header opp-name)
+        (combat-table-header opp-name you-label (seq opp-allies))
         [:tbody
          (for [{:keys [label unit-key defender-only?]} battle-unit-specs]
            (combat-row (make-left  unit-key defender-only?)
@@ -460,7 +518,7 @@
         att-cmd        [:<>
                         [:span.text-game-green-soft (ui/format-number dispatched)]
                         (when (pos? intercepted)
-                          [:span.text-red-400.ml-1.5
+                          [:span.text-red-400 {:class "ml-1.5"}
                            "−" (ui/format-number intercepted)])]
         dl             (or defender-losses {})
         unit-pairs     [["soldiers" (:soldiers dl)] ["transports" (:transports dl)]
@@ -512,10 +570,10 @@
       {:badge   (ui/mode-badge :spy)
        :summary (result-summary verb opp-name won? true)
        :open?   open?}
-      [:div.py-1.5.px-3.border-t.border-game-divider
+      [:div.px-3.border-t.border-game-divider {:class "py-1.5"}
        (cond
          (and won? (= op "spy"))
-         [:div.grid.grid-cols-3.gap-x-4.gap-y-0.5
+         [:div.grid.grid-cols-3.gap-x-4 {:class "gap-y-0.5"}
           (for [[label val] [["Soldiers"  (:soldiers  spy 0)] ["Transports" (:transports spy 0)]
                              ["Generals"  (:generals  spy 0)] ["Fighters"   (:fighters   spy 0)]
                              ["Carriers"  (:carriers  spy 0)] ["Admirals"   (:admirals   spy 0)]
@@ -560,13 +618,13 @@
        :summary-extra (when summary-text [:span.text-xs.text-game-green-dim (str "— " summary-text)])
        :open?         open?}
       (if attacker-wins?
-        [:div.grid.grid-cols-4.py-1.5.px-3.border-t.border-game-divider
+        [:div.grid.grid-cols-4.px-3.border-t.border-game-divider {:class "py-1.5"}
          (for [[label val] units]
            [:div.flex.justify-between.items-center.pr-4
             [:span.text-game-green-muted.text-xs label]
             [:span.text-game-green-soft (ui/format-number val)]])]
         (when (and you-are-attacker? agents-lost (pos? agents-lost))
-          [:div.py-1.5.px-3.border-t.border-game-divider
+          [:div.px-3.border-t.border-game-divider {:class "py-1.5"}
            [:p.text-xs.text-game-green-soft
             (str agents-lost " agent(s) were lost in the operation.")]])))))
 
@@ -621,9 +679,8 @@
             {:badge   (ui/mode-badge polarity)
              :summary summary
              :open?   disaster?}
-            [:div.py-1.5.px-3.border-t.border-game-divider
-             [:div.grid.gap-x-4.gap-y-0.5
-              {:class "grid-cols-2"}
+            [:div.px-3.border-t.border-game-divider {:class "py-1.5"}
+             [:div.grid.gap-x-4 {:class "grid-cols-2 gap-y-0.5"}
               (for [[k delta] effect
                     :when (not (zero? delta))]
                 (let [res (name k)  ; strip :player/ namespace for display
@@ -702,7 +759,7 @@
                [:span {:class cls} text]))
            [:span.text-game-green-soft "No stability changes"])]]
        (when has-breakaway?
-         [:div.py-1.5.px-3.border-t.border-game-divider
+         [:div.px-3.border-t.border-game-divider {:class "py-1.5"}
           [:p.text-xs.text-red-400
            ;; Same :fraction that sized the planet loss also drained population, stockpiles,
            ;; and forces (:resources-lost) — both appear in one combined "Lost:" list.
@@ -735,12 +792,10 @@
   "Render a single incoming attack card (combat or strike), plus a treaty-broken notice
   when this attack broke an active treaty between the two empires. A treaty ally's forces
   joining the fight, on either side, shows up as the card's own Alliance line(s) (see
-  alliance-line), not a separate notice. :defender-own-counts/:defender-own-losses fall back
-  to the plain :defender-counts/:defender-losses keys for a result stored before defence
-  treaties existed, which never pooled anyone else in — the two pairs were identical then
-  anyway. :opp-losses is deliberately the POOLED :attacker-losses (the whole attacking
-  side's losses, including any offence allies), matching the outgoing card's own
-  :opp-losses below — what you did to the opposing side as a whole, not just its namesake."
+  alliance-line), not a separate notice. :opp-losses is the attacker's OWN loss alone — never
+  pooled with their offence allies — matching :my-counts/:my-losses below; the attacker's
+  allies' own lumped loss is shown separately, in combat-card's own right-column
+  parenthetical."
   [r]
   (let [result (edn/read-string r)
         card   (if (= (:mode result) :strike)
@@ -750,15 +805,24 @@
                                :intercepted       (:cmd-ships-lost result)
                                :defender-losses   (:defender-losses result)
                                :open?             true})
-                 (let [space-r (:space-result result)]
+                 (let [space-r (:space-result result)
+                       ;; "YOU" is always this player's own stock alone — never pooled with
+                       ;; allies (see combat/resolve-combat's :defender-own-counts/-losses) —
+                       ;; the allies' own lumped contribution/loss is shown separately, in
+                       ;; the parenthetical combat-card adds next to each row (see my-allies
+                       ;; there). Falls back to the plain :defender-counts/-losses keys for a
+                       ;; result stored before defence treaties existed, when the two were
+                       ;; always identical anyway.
+                       allied?   (seq (:defender-allies result))
+                       my-counts (or (:defender-own-counts result) (:defender-counts result))
+                       my-losses (or (:defender-own-losses result) (:defender-losses result))]
                    (combat-card {:mode                (get result :mode :invade)
                                  :opp-name            (:attacker-name result)
                                  :attacker-wins?      (:attacker-wins? result)
-                                 :my-counts           (or (:defender-own-counts result)
-                                                           (:defender-counts result))
-                                 :my-losses           (or (:defender-own-losses result)
-                                                           (:defender-losses result))
-                                 :opp-losses          (:attacker-losses result)
+                                 :my-counts           my-counts
+                                 :my-losses           my-losses
+                                 :opp-losses          (or (:attacker-own-losses result)
+                                                           (:attacker-losses result))
                                  :stations-mine?      true
                                  :resources-taken     (:resources-captured result)
                                  :planets-transferred (:planets-transferred result)
@@ -766,6 +830,7 @@
                                  :space-buff          (:space-carryover result)
                                  :defender-allies     (:defender-allies result)
                                  :attacker-allies     (:attacker-allies result)
+                                 :you-label           (when allied? "YOU (ALLIES)")
                                  :open?               true})))]
     [:<> card
      (when (:treaty-broken? result)
@@ -775,19 +840,33 @@
   "Render a card for a battle this player's own treaty forces joined on someone else's
   behalf (see resolution/ally-update-tx) — who they helped, who they fought, the outcome,
   and a 3-column table in the same shape as the real attacker/defender's own combat card
-  (see combat-table-header/combat-row): '◄ YOU' is this player's contributed units with any
-  loss shown inline, same as combat-card's make-left; the right column is the OPPONENT's own
-  losses for that unit, via the same opp-loss-cell every other card uses. role is :defending
-  (joined the defender against the attacker) or :attacking (joined the attacker against the
-  defender) — each has its own wording, success condition, and opponent. :attacker-losses/
-  :defender-losses each fall back to {} for a record stored before this table existed, which
-  renders every opponent-side cell as 0 rather than erroring.
+  (see combat-table-header/combat-row). role is :defending (joined the defender against the
+  attacker) or :attacking (joined the attacker against the defender) — each has its own
+  wording, success condition, and opponent.
+
+  Left col ('◄ YOU (ALLIES)'): this player's own contributed units with any loss shown
+  inline, same as combat-card's make-left, followed by a muted-green parenthetical for the
+  player's TEAMMATES — the real combatant they joined, plus any co-allies, all lumped
+  together — found by subtracting this player's own :contributed/:losses from the whole
+  side's pooled :attacker-counts/:attacker-losses (or :defender-counts/:defender-losses for
+  a defending ally).
+  Right col: the OPPONENT's own loss alone for that unit (:attacker-own-losses/
+  :defender-own-losses — never pooled with the opponent's own allies, same own-vs-pooled
+  principle as combat-card), with its own muted-green parenthetical for the opponent's
+  allies' lumped loss share, found the same way — subtracting their own loss from their
+  side's pooled :attacker-losses/:defender-losses — and the header gets its own '(ALLIES)'
+  suffix when that opponent-ally share is non-zero, exactly mirroring combat-card's
+  opp-allied?.
+  Every pooled/own field above falls back to nil when absent (a record stored before it
+  existed), which omits the corresponding parenthetical — or, for -own-losses specifically,
+  falls back to the pooled figure so the right column still shows a number — rather than
+  showing a bogus or missing one.
 
   [r string (pr-str'd summary)] -> hiccup"
   [r]
   (let [{:keys [role attacker-name defender-name mode attacker-wins? contributed losses
-                attacker-losses defender-losses]
-         :or   {attacker-losses {} defender-losses {}}}
+                attacker-losses defender-losses attacker-own-losses defender-own-losses
+                attacker-counts defender-counts]}
         (edn/read-string r)
         defending?  (= role :defending)
         ;; Joining the defence succeeds when the attacker loses; joining the offence
@@ -796,8 +875,22 @@
         ;; The opponent is whichever side this ally didn't join — the attacker for a
         ;; defending ally, the defender for an attacking one — and the table header/right
         ;; column follow suit.
-        opp-name    (if defending? attacker-name defender-name)
-        opp-losses  (if defending? attacker-losses defender-losses)
+        opp-name          (if defending? attacker-name defender-name)
+        opp-own-losses    (if defending? attacker-own-losses defender-own-losses)
+        opp-pooled-losses (if defending? attacker-losses defender-losses)
+        opp-losses        (or opp-own-losses opp-pooled-losses {})
+        ;; MY side's pooled totals (nil, not {}, when absent — see docstring).
+        my-counts   (if defending? defender-counts attacker-counts)
+        my-losses   (if defending? defender-losses  attacker-losses)
+        ;; "Everyone else on a side's" lumped share for one unit — pooled minus this one
+        ;; member's own share — nil (no parenthetical) unless BOTH are known, so a record
+        ;; missing either half never shows a fabricated number (e.g. treating an absent
+        ;; "own" as zero, which would wrongly attribute the whole pooled total to the rest
+        ;; of the side).
+        team-sum    (fn [pooled own unit-key]
+                      (when (and pooled own) (- (get pooled unit-key 0) (get own unit-key 0))))
+        opp-allied? (some #(some-> (team-sum opp-pooled-losses opp-own-losses %) pos?)
+                          (map :unit-key ally-unit-specs))
         joined-desc (if defending?
                       (str "You joined " defender-name "'s defence against " attacker-name)
                       (str "You joined " attacker-name "'s offensive against " defender-name))]
@@ -809,15 +902,31 @@
        :open?   (not won?)}
       [:div.overflow-x-auto
        [:table.w-full.text-xs.table-fixed
-        (combat-table-header opp-name)
+        (combat-table-header opp-name "YOU (ALLIES)" opp-allied?)
         [:tbody
-         (for [{:keys [label unit-key]} ally-unit-specs]
+         (for [{:keys [label unit-key]} ally-unit-specs
+               :let [team-contrib (team-sum my-counts contributed unit-key)
+                     team-loss    (team-sum my-losses losses unit-key)
+                     opp-ally-loss (team-sum opp-pooled-losses opp-own-losses unit-key)]]
            (combat-row
              [:<> [:span.text-game-green-soft (ui/format-number (get contributed unit-key 0))]
                   (let [lost (get losses unit-key 0)]
-                    (when (pos? lost) [:span.text-red-400.ml-1.5 "−" (ui/format-number lost)]))]
+                    (when (pos? lost) [:span.text-red-400 {:class "ml-1.5"} "−" (ui/format-number lost)]))
+                  ;; Teammates' lumped contribution/loss — same muted-green parenthetical
+                  ;; convention as combat-card's own ally breakdown.
+                  (when (some-> team-contrib pos?)
+                    [:span.text-game-green-muted {:class "ml-1.5"}
+                     " (" (ui/format-number team-contrib)
+                     (when (some-> team-loss pos?)
+                       [:<> "−" (ui/format-number team-loss)])
+                     ")"])]
              label
-             (opp-loss-cell (get opp-losses unit-key 0))))]]])))
+             [:<> (opp-loss-cell (get opp-losses unit-key 0))
+                  ;; The opponent's own allies' lumped loss share — mirrors combat-card's
+                  ;; make-right.
+                  (when (some-> opp-ally-loss pos?)
+                    [:span.text-game-green-muted {:class "ml-1.5"}
+                     " (" "−" (ui/format-number opp-ally-loss) ")"])]))]]])))
 
 (defn- incoming-espionage-card
   "Render a collapsible card for a successful incoming espionage operation (incite or defect).
@@ -1026,15 +1135,27 @@
                                           :defender-losses (:defender-losses      battle-result)
                                           :open?           (and (pos? committed)
                                                                 (> (/ (double lost) committed) 0.05))}))
-                          (let [space-r (:space-result battle-result)]
+                          (let [space-r (:space-result battle-result)
+                                ;; "YOU" is always this player's own stock alone — never
+                                ;; pooled with allies (see combat/resolve-combat's
+                                ;; :attacker-own-counts/-losses) — the allies' own lumped
+                                ;; contribution/loss is shown separately, in the parenthetical
+                                ;; combat-card adds next to each row (see my-allies there).
+                                ;; Falls back to the plain :attacker-counts/-losses keys for a
+                                ;; result stored before offence treaties existed, when the two
+                                ;; were always identical anyway.
+                                allied?  (seq (:attacker-allies battle-result))
+                                my-counts (or (:attacker-own-counts battle-result)
+                                              (:attacker-counts battle-result))
+                                my-losses (or (:attacker-own-losses battle-result)
+                                              (:attacker-losses battle-result))]
                             (combat-card {:mode                mode
                                           :opp-name            def-name
                                           :attacker-wins?      (:attacker-wins? battle-result)
-                                          :my-counts           (or (:attacker-own-counts battle-result)
-                                                                    (:attacker-counts battle-result))
-                                          :my-losses           (or (:attacker-own-losses battle-result)
-                                                                    (:attacker-losses battle-result))
-                                          :opp-losses          (:defender-losses battle-result)
+                                          :my-counts           my-counts
+                                          :my-losses           my-losses
+                                          :opp-losses          (or (:defender-own-losses battle-result)
+                                                                    (:defender-losses battle-result))
                                           :stations-mine?      false
                                           :resources-taken     (:resources-captured battle-result)
                                           :planets-transferred (:planets-transferred battle-result)
@@ -1042,13 +1163,10 @@
                                           :space-buff          (:space-carryover battle-result)
                                           :defender-allies     (:defender-allies battle-result)
                                           :attacker-allies     (:attacker-allies battle-result)
+                                          :you-label           (when allied? "YOU (ALLIES)")
                                           :open?               (or (not (:attacker-wins? battle-result))
                                                                        (and space-r (not (:att-wins? space-r)))
-                                                                       (non-trivial-losses?
-                                                                         (or (:attacker-own-counts battle-result)
-                                                                             (:attacker-counts battle-result))
-                                                                         (or (:attacker-own-losses battle-result)
-                                                                             (:attacker-losses battle-result))))})))]
+                                                                       (non-trivial-losses? my-counts my-losses))})))]
            [:<> card
             (when (:treaty-broken? battle-result)
               (treaty-broken-card def-name true (:treaty-broken-kind battle-result)))]))

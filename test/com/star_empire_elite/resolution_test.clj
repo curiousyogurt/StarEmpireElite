@@ -3,6 +3,7 @@
             [clojure.test :refer :all]
             [com.biffweb :as biff :refer [test-xtdb-node]]
             [com.star-empire-elite :as main]
+            [com.star-empire-elite.diplomacy :as diplomacy]
             [com.star-empire-elite.resolution :as resolution]
             [com.star-empire-elite.test-helpers :as helpers]
             [com.star-empire-elite.utils :as utils]
@@ -555,7 +556,38 @@
         (is (= :attacking (:role (edn/read-string
                                    (first (:player/incoming-ally-battles att-ally2))))))
         (is (= :defending (:role (edn/read-string
-                                   (first (:player/incoming-ally-battles def-ally2))))))))))
+                                   (first (:player/incoming-ally-battles def-ally2))))))
+        ;; Each ally's stored :kind is read off their OWN real :alliance/kind — not
+        ;; assumed from role — so a mix of kinds in the same battle is never mislabeled.
+        (is (= :offence (:kind (edn/read-string
+                                 (first (:player/incoming-ally-battles att-ally2))))))
+        (is (= :defence (:kind (edn/read-string
+                                 (first (:player/incoming-ally-battles def-ally2))))))))))
+
+(deftest test-treaty-allies-reads-each-allys-real-alliance-kind
+  (testing "treaty-allies' returned :kind comes from the actual :alliance/kind of each
+            ally's own treaty, not an assumption from which capability set (kinds) was
+            searched for — directly exercises the mechanism ally-update-tx relies on to
+            avoid hard-coding :defence/:offence by name"
+    (with-open [node (test-xtdb-node [])]
+      (let [ctx0    (get-ctx node)
+            game-id (random-uuid)
+            player-id (random-uuid)
+            ally-id   (random-uuid)
+            enemy-id  (random-uuid)
+            _ (submit! ctx0 (merge helpers/player-defaults
+                              {:xt/id ally-id :player/game game-id :player/empire-name "Ally"}))
+            _ (submit! ctx0 (alliance-fixture
+                              {:alliance/game game-id :alliance/kind :defence
+                               :alliance/proposer player-id :alliance/recipient ally-id
+                               :alliance/status :active :alliance/formed-at (java.util.Date.)}))
+            db        (xt/db node)
+            alliances (diplomacy/alliances-for-player db game-id player-id)
+            allies    (#'resolution/treaty-allies db game-id alliances #{:defence :offence}
+                                                   player-id enemy-id)]
+        (is (= 1 (count allies)))
+        (is (= :defence (:kind (first allies))))
+        (is (= ally-id (:xt/id (:player (first allies)))))))))
 
 ;;;;
 ;;;; resolve-espionage — breaking a peace treaty by espionage (DB-backed)

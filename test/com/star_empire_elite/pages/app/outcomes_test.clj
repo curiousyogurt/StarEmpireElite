@@ -289,19 +289,22 @@
       (is (vector? (outcomes/outcomes-page {:player player-with-attacks :game test-game
                                             :battle-result nil :espionage-result nil}))))))
 
-(deftest test-incoming-card-prefers-defender-own-counts-and-losses-over-pooled
-  (testing "A fresh incoming-attack result (with a defence ally) shows the real defender's
-            own counts/losses on their incoming card, not the pooled totals the attacker
-            actually fought — see combat/resolve-combat's :defender-own-counts/-losses"
+(deftest test-incoming-card-shows-the-defenders-own-counts-and-losses-when-allied
+  (testing "A fresh incoming-attack result, with a defence ally, still reports THIS
+            player's own counts/losses as the main figure on their incoming card — never
+            pooled with the ally — labeling the column 'YOU (ALLIES)' only so the reader
+            knows an ally's own lumped contribution/loss follows in parentheses (see the
+            separate allies-breakdown test), not because the main number itself changed."
     (let [attacker-result {:mode :invade :attacker-wins? true :attacker-name "Aggressor"
-                           ;; Pooled — what the attacker fought (defender + ally).
+                           ;; Pooled — what the attacker actually fought (defender + ally);
+                           ;; no longer what's shown as the main figure here.
                            :defender-counts {:soldiers 1100 :fighters 0 :cmd-ships 0
                                              :transports 0 :carriers 0 :generals 0
                                              :admirals 0 :stations 0}
                            :defender-losses {:soldiers 770 :fighters 0 :cmd-ships 0
                                              :transports 0 :carriers 0 :generals 0
                                              :admirals 0 :stations 0}
-                           ;; Own — just the real defender's share.
+                           ;; Own — this player's real share; the main figure shown.
                            :defender-own-counts {:soldiers 1000 :fighters 0 :cmd-ships 0
                                                  :transports 0 :carriers 0 :generals 0
                                                  :admirals 0 :stations 0}
@@ -318,12 +321,171 @@
                         :player/incoming-ally-battles nil :player/incoming-espionage-fails nil)
           html   (str (outcomes/outcomes-page {:player player :game test-game
                                                :battle-result nil :espionage-result nil}))]
+      (is (clojure.string/includes? html "YOU (ALLIES)"))
       ;; 1000 (own) with a −700 loss shown — not 1100/−770 (the pooled totals).
       (is (clojure.string/includes? html "\"1000\""))
-      (is (clojure.string/includes? html "700"))
-      (is (not (clojure.string/includes? html "\"1100\"")))
+      (is (clojure.string/includes? html "\"700\""))
+      (is (not (clojure.string/includes? html "\"1100\""))))))
+
+(deftest test-incoming-card-shows-the-allies-own-lumped-contribution-and-loss
+  (testing "Beyond the pooled total and the ally's name, the defender's incoming card also
+            reports how many units the defence allies themselves contributed and lost, in
+            muted-green parentheses, same as the attacker's outgoing card."
+    (let [attacker-result {:mode :invade :attacker-wins? true :attacker-name "Aggressor"
+                           :defender-counts {:soldiers 1100 :fighters 0 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 0}
+                           :defender-losses {:soldiers 770 :fighters 0 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 0}
+                           :defender-allies [{:ally-id (random-uuid) :ally-name "Buddy"
+                                              :contributed {:soldiers 100} :losses {:soldiers 70}}]
+                           :attacker-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 0}
+                           :planets-transferred {:mil 0 :erg 0 :ore 0}}
+          player (assoc test-player :player/incoming-attacks [(pr-str attacker-result)]
+                        :player/incoming-ally-battles nil :player/incoming-espionage-fails nil)
+          html   (str (outcomes/outcomes-page {:player player :game test-game
+                                               :battle-result nil :espionage-result nil}))]
+      ;; The ally's own 100 contributed / 70 lost, with a space before the opening paren.
+      (is (clojure.string/includes? html "\" (\""))
+      (is (clojure.string/includes? html "\"100\""))
+      (is (clojure.string/includes? html "\")\""))
+      ;; A deliberate :class attribute, not Hiccup's dot-shorthand — "ml-1.5" as a tag-dot
+      ;; class would silently split into "ml-1" + a bogus "5" class (see this user's own
+      ;; memory note on the Hiccup dot-class decimal trap).
+      (is (clojure.string/includes? html "text-game-green-muted"))
+      (is (clojure.string/includes? html "\"ml-1.5\""))
       ;; The Alliance line is part of the combat card's own report, not a separate notice.
       (is (clojure.string/includes? html "» DEFENCE: Joined by Buddy.")))))
+
+(deftest test-incoming-card-plain-you-header-with-no-defence-allies
+  (testing "With no defence allies, the defender's incoming card header stays the plain
+            'YOU' — no '(ALLIES)' suffix"
+    (let [attacker-result {:mode :invade :attacker-wins? true :attacker-name "Aggressor"
+                           :defender-counts {:soldiers 1000 :fighters 0 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 0}
+                           :defender-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 0}
+                           :attacker-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 0}
+                           :planets-transferred {:mil 0 :erg 0 :ore 0}}
+          player (assoc test-player :player/incoming-attacks [(pr-str attacker-result)]
+                        :player/incoming-ally-battles nil :player/incoming-espionage-fails nil)
+          html   (str (outcomes/outcomes-page {:player player :game test-game
+                                               :battle-result nil :espionage-result nil}))]
+      (is (not (clojure.string/includes? html "(ALLIES)"))))))
+
+(deftest test-incoming-card-labels-the-attacker-column-when-the-attacker-is-allied
+  (testing "On the DEFENDER's own incoming card, the right header names the attacker with
+            its own '(ALLIES)' suffix when the ATTACKER brought offence allies — independent
+            of whether the defender has allies of their own"
+    (let [attacker-result {:mode :invade :attacker-wins? true :attacker-name "Orion's Belt"
+                           :defender-counts {:soldiers 1000 :fighters 0 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 0}
+                           :defender-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 0}
+                           :attacker-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 0}
+                           :attacker-allies [{:ally-id (random-uuid) :ally-name "Raider Pals"
+                                              :contributed {:soldiers 50} :losses {:soldiers 0}}]
+                           :planets-transferred {:mil 0 :erg 0 :ore 0}}
+          player (assoc test-player :player/incoming-attacks [(pr-str attacker-result)]
+                        :player/incoming-ally-battles nil :player/incoming-espionage-fails nil)
+          html   (str (outcomes/outcomes-page {:player player :game test-game
+                                               :battle-result nil :espionage-result nil}))]
+      (is (clojure.string/includes? html "ORION'S BELT (ALLIES) ►"))
+      ;; The defender's own column has no allies here, so it stays plain "YOU".
+      (is (not (clojure.string/includes? html "◄ YOU (ALLIES)"))))))
+
+(deftest test-outgoing-card-labels-the-defender-column-when-the-defender-is-allied
+  (testing "On the ATTACKER's own outgoing card, the right header names the defender with
+            its own '(ALLIES)' suffix when the DEFENDER brought defence allies"
+    (let [battle-result {:mode :invade :attacker-wins? true :defender-name "Crimson Hand"
+                         :attacker-counts {:soldiers 1000 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :attacker-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :defender-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :defender-allies [{:ally-id (random-uuid) :ally-name "Shield Buddies"
+                                            :contributed {:soldiers 50} :losses {:soldiers 0}}]
+                         :planets-transferred {:mil 0 :erg 0 :ore 0}}
+          ;; test-player's default fixture carries its own ally-battle-card record, which
+          ;; always shows "YOU (ALLIES)" now too — excluded here so the assertion below is
+          ;; about THIS combat-card's left header, not an unrelated card on the same page.
+          player (assoc test-player :player/incoming-ally-battles nil)
+          html (str (outcomes/outcomes-page {:player player :game test-game
+                                             :battle-result battle-result
+                                             :espionage-result nil}))]
+      (is (clojure.string/includes? html "CRIMSON HAND (ALLIES) ►"))
+      (is (not (clojure.string/includes? html "◄ YOU (ALLIES)"))))))
+
+(deftest test-incoming-card-shows-the-attackers-allies-own-loss-share-in-the-right-column
+  (testing "Not just the header — the right column's own cells also show how much the
+            attacker's allies themselves lost, in muted-green parentheses, alongside the
+            attacker's OWN loss (never pooled with their allies) as the main figure — same
+            principle as the left column's own-figure-plus-allies-parenthetical"
+    (let [attacker-result {:mode :invade :attacker-wins? true :attacker-name "Orion's Belt"
+                           :defender-counts {:soldiers 1000 :fighters 0 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 0}
+                           :defender-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 0}
+                           ;; Pooled — not what's shown as the main figure here.
+                           :attacker-losses {:soldiers 300 :fighters 0 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 0}
+                           ;; Own — the real attacker's share alone; the main figure shown.
+                           :attacker-own-losses {:soldiers 50 :fighters 0 :cmd-ships 0
+                                                 :transports 0 :carriers 0 :generals 0
+                                                 :admirals 0 :stations 0}
+                           :attacker-allies [{:ally-id (random-uuid) :ally-name "Raider Pals"
+                                              :contributed {:soldiers 500} :losses {:soldiers 250}}]
+                           :planets-transferred {:mil 0 :erg 0 :ore 0}}
+          player (assoc test-player :player/incoming-attacks [(pr-str attacker-result)]
+                        :player/incoming-ally-battles nil :player/incoming-espionage-fails nil)
+          html   (str (outcomes/outcomes-page {:player player :game test-game
+                                               :battle-result nil :espionage-result nil}))]
+      (is (clojure.string/includes? html "ORION'S BELT (ALLIES) ►"))
+      ;; 50 (the attacker's own loss) shown — not 300 (the pooled total).
+      (is (clojure.string/includes? html "\"50\""))
+      (is (not (clojure.string/includes? html "\"300\""))))))
+
+(deftest test-incoming-card-labels-the-ally-breakdown-does-not-pool-opp-losses
+  (testing "The ally's own 250-loss share is shown separately, parenthesized with a leading
+            '−' — it is not added into the attacker's own main loss figure"
+    (let [attacker-result {:mode :invade :attacker-wins? true :attacker-name "Orion's Belt"
+                           :defender-counts {:soldiers 1000 :fighters 0 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 0}
+                           :defender-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 0}
+                           :attacker-losses {:soldiers 300 :fighters 0 :cmd-ships 0
+                                             :transports 0 :carriers 0 :generals 0
+                                             :admirals 0 :stations 0}
+                           :attacker-own-losses {:soldiers 50 :fighters 0 :cmd-ships 0
+                                                 :transports 0 :carriers 0 :generals 0
+                                                 :admirals 0 :stations 0}
+                           :attacker-allies [{:ally-id (random-uuid) :ally-name "Raider Pals"
+                                              :contributed {:soldiers 500} :losses {:soldiers 250}}]
+                           :planets-transferred {:mil 0 :erg 0 :ore 0}}
+          player (assoc test-player :player/incoming-attacks [(pr-str attacker-result)]
+                        :player/incoming-ally-battles nil :player/incoming-espionage-fails nil)
+          html   (str (outcomes/outcomes-page {:player player :game test-game
+                                               :battle-result nil :espionage-result nil}))]
+      (is (clojure.string/includes? html "\" (\""))
+      (is (clojure.string/includes? html "\"−\" \"250\""))
+      (is (clojure.string/includes? html "\"250\"")))))
 
 (deftest test-ally-battle-card-renders-contribution-and-losses
   (testing "This player's own incoming-ally-battles history renders a card naming who they
@@ -401,6 +563,112 @@
       (is (clojure.string/includes? html "100"))
       (is (clojure.string/includes? html "200")))))
 
+(deftest test-ally-battle-card-header-and-teammates-breakdown
+  (testing "Rachel's Raiders joins Orion's Belt in attacking Polaris: the header reads
+            'YOU (ALLIES)', the main figure is Rachel's Raiders' own contribution/loss, and
+            a muted-green parenthetical lumps together everyone ELSE on the attacking side
+            (Orion's Belt plus any co-allies) — found by subtracting Rachel's Raiders' own
+            share from the whole side's pooled totals"
+    (let [record {:role :attacking :kind :offence :mode :invade
+                  :attacker-name "Orion's Belt" :defender-name "Polaris" :attacker-wins? true
+                  ;; Rachel's Raiders' own contribution/loss.
+                  :contributed {:soldiers 100 :transports 0 :generals 0
+                               :fighters 0 :carriers 0 :admirals 0}
+                  :losses {:soldiers 10 :transports 0 :generals 0
+                          :fighters 0 :carriers 0 :admirals 0}
+                  ;; The whole attacking side's pooled totals — Orion's Belt's full stock
+                  ;; plus Rachel's Raiders' 100 contributed; 60 total lost, 10 of it Rachel's.
+                  :attacker-counts {:soldiers 1000 :transports 0 :generals 0
+                                    :fighters 0 :carriers 0 :admirals 0 :cmd-ships 0}
+                  :attacker-losses {:soldiers 60 :transports 0 :generals 0
+                                    :fighters 0 :carriers 0 :admirals 0 :cmd-ships 0}
+                  :defender-losses {:soldiers 0 :transports 0 :generals 0
+                                    :fighters 0 :carriers 0 :admirals 0 :cmd-ships 0}}
+          player (assoc test-player :player/incoming-ally-battles [(pr-str record)]
+                        :player/incoming-attacks nil :player/incoming-espionage-fails nil)
+          html   (str (outcomes/outcomes-page {:player player :game test-game
+                                               :battle-result nil :espionage-result nil}))]
+      (is (clojure.string/includes? html "◄ YOU (ALLIES)"))
+      ;; Rachel's Raiders' own 100/−10 shown as the main figure.
+      (is (clojure.string/includes? html "\"100\""))
+      (is (clojure.string/includes? html "\"10\""))
+      ;; Teammates (1000−100=900 contributed, 60−10=50 lost) lumped in muted-green parens.
+      (is (clojure.string/includes? html "\" (\""))
+      (is (clojure.string/includes? html "\"900\""))
+      (is (clojure.string/includes? html "\"50\""))
+      (is (clojure.string/includes? html "text-game-green-muted"))
+      (is (clojure.string/includes? html "\"ml-1.5\"")))))
+
+(deftest test-ally-battle-card-omits-teammates-breakdown-for-an-old-record
+  (testing "a record stored before :attacker-counts/:defender-counts existed omits the
+            teammates parenthetical rather than showing a bogus (negative) number — the
+            main contribution/loss figure still renders fine"
+    (let [record {:role :attacking :kind :offence :mode :invade
+                  :attacker-name "Orion's Belt" :defender-name "Polaris" :attacker-wins? true
+                  :contributed {:soldiers 100 :transports 0 :generals 0
+                               :fighters 0 :carriers 0 :admirals 0}
+                  :losses {:soldiers 10 :transports 0 :generals 0
+                          :fighters 0 :carriers 0 :admirals 0}
+                  :defender-losses {:soldiers 0 :transports 0 :generals 0
+                                    :fighters 0 :carriers 0 :admirals 0 :cmd-ships 0}}
+          player (assoc test-player :player/incoming-ally-battles [(pr-str record)]
+                        :player/incoming-attacks nil :player/incoming-espionage-fails nil)
+          html   (str (outcomes/outcomes-page {:player player :game test-game
+                                               :battle-result nil :espionage-result nil}))]
+      (is (clojure.string/includes? html "\"100\""))
+      (is (not (clojure.string/includes? html "\" (\""))))))
+
+(deftest test-ally-battle-card-shows-opponents-own-loss-and-their-allies-share
+  (testing "Rachel's Raiders joins Orion's Belt in attacking Polaris, and Polaris itself has
+            a defence ally: the right column reports Polaris's OWN loss (never pooled with
+            Polaris's own ally) as the main figure, the opponent header gets its own
+            '(ALLIES)' suffix, and Polaris's ally's lumped loss share follows in its own
+            muted-green parenthetical — mirroring combat-card's make-right exactly"
+    (let [record {:role :attacking :kind :offence :mode :invade
+                  :attacker-name "Orion's Belt" :defender-name "Polaris" :attacker-wins? true
+                  :contributed {:soldiers 100 :transports 0 :generals 0
+                               :fighters 0 :carriers 0 :admirals 0}
+                  :losses {:soldiers 10 :transports 0 :generals 0
+                          :fighters 0 :carriers 0 :admirals 0}
+                  ;; Polaris's side: pooled (Polaris + their own defence ally) 300, Polaris's
+                  ;; own share 200 — their ally absorbed the other 100.
+                  :defender-losses {:soldiers 300 :transports 0 :generals 0
+                                    :fighters 0 :carriers 0 :admirals 0 :cmd-ships 0}
+                  :defender-own-losses {:soldiers 200 :transports 0 :generals 0
+                                        :fighters 0 :carriers 0 :admirals 0}}
+          player (assoc test-player :player/incoming-ally-battles [(pr-str record)]
+                        :player/incoming-attacks nil :player/incoming-espionage-fails nil)
+          html   (str (outcomes/outcomes-page {:player player :game test-game
+                                               :battle-result nil :espionage-result nil}))]
+      (is (clojure.string/includes? html "POLARIS (ALLIES) ►"))
+      ;; 200 (Polaris's own loss) shown as the main figure — not 300 (the pooled total).
+      (is (clojure.string/includes? html "\"200\""))
+      (is (not (clojure.string/includes? html "\"300\"")))
+      ;; Polaris's ally's own 100-loss share, parenthesized with a leading "−".
+      (is (clojure.string/includes? html "\" (\""))
+      (is (clojure.string/includes? html "\"−\" \"100\"")))))
+
+(deftest test-ally-battle-card-opponent-header-stays-plain-with-no-opponent-allies
+  (testing "When the opponent has no treaty allies of their own, the right header stays
+            plain (no '(ALLIES)' suffix), even though :defender-losses is technically
+            still present — own equals pooled here, same as combat-card's own-vs-pooled
+            no-op case"
+    (let [record {:role :attacking :kind :offence :mode :invade
+                  :attacker-name "Orion's Belt" :defender-name "Polaris" :attacker-wins? true
+                  :contributed {:soldiers 100 :transports 0 :generals 0
+                               :fighters 0 :carriers 0 :admirals 0}
+                  :losses {:soldiers 10 :transports 0 :generals 0
+                          :fighters 0 :carriers 0 :admirals 0}
+                  :defender-losses {:soldiers 200 :transports 0 :generals 0
+                                    :fighters 0 :carriers 0 :admirals 0 :cmd-ships 0}
+                  :defender-own-losses {:soldiers 200 :transports 0 :generals 0
+                                        :fighters 0 :carriers 0 :admirals 0}}
+          player (assoc test-player :player/incoming-ally-battles [(pr-str record)]
+                        :player/incoming-attacks nil :player/incoming-espionage-fails nil)
+          html   (str (outcomes/outcomes-page {:player player :game test-game
+                                               :battle-result nil :espionage-result nil}))]
+      (is (not (clojure.string/includes? html "POLARIS (ALLIES)"))))))
+
 (deftest test-outgoing-battle-card-shows-reinforced-by-when-allies-helped
   (testing "The attacker's own outgoing battle card names the defence allies who joined the
             defender's side, when there were any"
@@ -440,17 +708,20 @@
       (is (clojure.string/includes? html "» OFFENCE: Joined by Offence Buddy."))
       (is (clojure.string/includes? html "» DEFENCE: Joined by Defence Buddy.")))))
 
-(deftest test-outgoing-battle-card-prefers-attacker-own-counts-and-losses-over-pooled
-  (testing "The attacker's own outgoing battle card (with an offence ally) shows the real
-            attacker's own counts/losses, not the pooled totals the defender actually
-            fought — see combat/resolve-combat's :attacker-own-counts/-losses"
+(deftest test-outgoing-battle-card-shows-pooled-counts-and-losses-when-allied
+  (testing "The attacker's own outgoing battle card, with an offence ally, still reports
+            THIS player's own counts/losses as the main figure — never pooled with the
+            ally — labeling the column 'YOU (ALLIES)' only so the reader knows an ally's
+            own lumped contribution/loss follows in parentheses (see the separate
+            allies-breakdown test), not because the main number itself changed."
     (let [battle-result {:mode :invade :attacker-wins? true :defender-name "Defender"
-                         ;; Pooled — what the defender fought (attacker + offence ally).
+                         ;; Pooled — what the defender actually fought (attacker + ally);
+                         ;; no longer what's shown as the main figure here.
                          :attacker-counts {:soldiers 1100 :fighters 0 :cmd-ships 0
                                            :transports 0 :carriers 0 :generals 0 :admirals 0}
                          :attacker-losses {:soldiers 55 :fighters 0 :cmd-ships 0
                                            :transports 0 :carriers 0 :generals 0 :admirals 0}
-                         ;; Own — just the real attacker's share.
+                         ;; Own — this player's real share; the main figure shown.
                          :attacker-own-counts {:soldiers 1000 :fighters 0 :cmd-ships 0
                                                :transports 0 :carriers 0 :generals 0 :admirals 0}
                          :attacker-own-losses {:soldiers 50 :fighters 0 :cmd-ships 0
@@ -463,10 +734,116 @@
           html (str (outcomes/outcomes-page {:player test-player :game test-game
                                              :battle-result battle-result
                                              :espionage-result nil}))]
+      (is (clojure.string/includes? html "YOU (ALLIES)"))
       ;; 1000 (own) with a −50 loss shown — not 1100/−55 (the pooled totals).
       (is (clojure.string/includes? html "\"1000\""))
-      (is (clojure.string/includes? html "50"))
+      (is (clojure.string/includes? html "\"50\""))
       (is (not (clojure.string/includes? html "\"1100\""))))))
+
+(deftest test-outgoing-battle-card-shows-the-allies-own-lumped-contribution-and-loss
+  (testing "Beyond this player's own figure and the ally's name, the row also reports how
+            many units the allies themselves contributed and lost, in parentheses"
+    (let [battle-result {:mode :invade :attacker-wins? true :defender-name "Defender"
+                         :attacker-counts {:soldiers 1100 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :attacker-losses {:soldiers 55 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :attacker-allies [{:ally-id (random-uuid) :ally-name "Buddy"
+                                            :contributed {:soldiers 100} :losses {:soldiers 5}}]
+                         :defender-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :planets-transferred {:mil 0 :erg 0 :ore 0}}
+          html (str (outcomes/outcomes-page {:player test-player :game test-game
+                                             :battle-result battle-result
+                                             :espionage-result nil}))]
+      ;; The ally's own 100 contributed / 5 lost, shown alongside this player's own figure,
+      ;; with a space before the opening parenthesis.
+      (is (clojure.string/includes? html "\" (\""))
+      (is (clojure.string/includes? html "\"100\""))
+      (is (clojure.string/includes? html "\")\""))
+      ;; Both the ally's contribution and loss are muted green, not red — a loss the ally
+      ;; absorbed is not a loss to the viewer.
+      (is (clojure.string/includes? html "text-game-green-muted"))
+      (is (clojure.string/includes? html "\"ml-1.5\""))
+      (is (not (clojure.string/includes? html "[:span.text-red-400 \"−\" \"5\"]"))
+          "the ally's loss is no longer wrapped in its own red span"))))
+
+(deftest test-outgoing-battle-card-omits-ally-breakdown-for-a-unit-allies-never-contribute
+  (testing "cmd-ships are never contributed by a treaty ally (see combat/contributable-
+            units), so that row shows no parenthetical even when there are offence allies —
+            only the one soldiers row (what the ally actually contributed) gets one"
+    (let [paren-count (fn [s] (count (re-seq (re-pattern (java.util.regex.Pattern/quote "\" (\"")) s)))
+          battle-result {:mode :invade :attacker-wins? true :defender-name "Defender"
+                         :attacker-counts {:soldiers 1100 :fighters 0 :cmd-ships 3
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :attacker-losses {:soldiers 55 :fighters 0 :cmd-ships 1
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :attacker-allies [{:ally-id (random-uuid) :ally-name "Buddy"
+                                            :contributed {:soldiers 100} :losses {:soldiers 5}}]
+                         :defender-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :planets-transferred {:mil 0 :erg 0 :ore 0}}
+          html (str (outcomes/outcomes-page {:player test-player :game test-game
+                                             :battle-result battle-result
+                                             :espionage-result nil}))]
+      ;; cmd-ships: pooled 3 with a −1 loss shown, same as any other row.
+      (is (clojure.string/includes? html "\"3\""))
+      (is (= 1 (paren-count html))
+          "exactly one ally parenthetical on the whole card — soldiers, not cmd-ships"))))
+
+(deftest test-outgoing-battle-card-lumps-two-or-more-allies-into-one-figure
+  (testing "with two offence allies, the main figure stays this player's own, and their
+            TWO allies' contributions/losses are lumped into ONE combined parenthetical,
+            not broken out per ally"
+    (let [battle-result {:mode :invade :attacker-wins? true :defender-name "Defender"
+                         ;; Pooled — not what's shown as the main figure here.
+                         :attacker-counts {:soldiers 1300 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :attacker-losses {:soldiers 65 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         ;; Own — this player's real share; the main figure shown.
+                         :attacker-own-counts {:soldiers 1000 :fighters 0 :cmd-ships 0
+                                               :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :attacker-own-losses {:soldiers 50 :fighters 0 :cmd-ships 0
+                                               :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         ;; TWO allies' contributions (100+200) and losses (5+10).
+                         :attacker-allies [{:ally-id (random-uuid) :ally-name "Buddy One"
+                                            :contributed {:soldiers 100} :losses {:soldiers 5}}
+                                           {:ally-id (random-uuid) :ally-name "Buddy Two"
+                                            :contributed {:soldiers 200} :losses {:soldiers 10}}]
+                         :defender-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :planets-transferred {:mil 0 :erg 0 :ore 0}}
+          html (str (outcomes/outcomes-page {:player test-player :game test-game
+                                             :battle-result battle-result
+                                             :espionage-result nil}))]
+      (is (clojure.string/includes? html "YOU (ALLIES)"))
+      (is (clojure.string/includes? html "\"1000\""))
+      ;; The two allies' own contributions (100+200) and losses (5+10) are lumped into
+      ;; one combined parenthetical — 300/15 — not shown as two separate ally figures.
+      ;; Exactly one occurrence of that combined figure — it isn't broken out per ally.
+      (is (= 1 (count (re-seq #"\"300\"" html))))
+      (is (clojure.string/includes? html "» OFFENCE: Joined by Buddy One, Buddy Two.")))))
+
+(deftest test-outgoing-battle-card-plain-you-header-with-no-offence-allies
+  (testing "With no offence allies, the header stays the plain 'YOU' — no '(ALLIES)' suffix,
+            even though :attacker-counts/-losses are technically still the 'pooled' keys
+            (pool-forces of an empty seq is the identity, so pooled == own here anyway)"
+    (let [battle-result {:mode :invade :attacker-wins? true :defender-name "Defender"
+                         :attacker-counts {:soldiers 1000 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :attacker-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :defender-losses {:soldiers 0 :fighters 0 :cmd-ships 0
+                                           :transports 0 :carriers 0 :generals 0 :admirals 0}
+                         :planets-transferred {:mil 0 :erg 0 :ore 0}}
+          ;; Excluded for the same reason as above — the default fixture's own ally-battle
+          ;; record would otherwise leak its own "(ALLIES)" text onto this page too.
+          player (assoc test-player :player/incoming-ally-battles nil)
+          html (str (outcomes/outcomes-page {:player player :game test-game
+                                             :battle-result battle-result
+                                             :espionage-result nil}))]
+      (is (not (clojure.string/includes? html "(ALLIES)"))))))
 
 (deftest test-combat-card-alliance-line-follows-orbit-and-ground
   (testing "the Alliance line is the combat card's own third result line, reading after

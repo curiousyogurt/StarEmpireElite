@@ -155,3 +155,36 @@
               :player/score 1000 :player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0}
           rendered (pr-str (game/players-table {:players [p1 p2]}))]
       (is (< (.indexOf rendered "Alpha") (.indexOf rendered "Beta"))))))
+
+;;
+;; players-table — treaty markers
+;;
+;; treaty-kinds is a partner-id -> kind map (same shape action/espionage build); the viewer's
+;; own id is never a key in it, so their row gets no marker even when passed through.
+;;
+
+(deftest test-players-table-shows-treaty-marker-for-ally
+  (testing "An empire the viewer holds a defence treaty with gets the boxed D marker"
+    (let [ally     {:xt/id (helpers/uuid) :rank 1 :player/empire-name "Orion's Belt"
+                     :player/score 500 :player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0}
+          rendered (pr-str (game/players-table {:players      [ally]
+                                                 :treaty-kinds {(:xt/id ally) :defence}}))]
+      (is (clojure.string/includes? rendered "Active defence treaty")))))
+
+(deftest test-players-table-no-marker-for-untreated-empire
+  (testing "An empire with no entry in treaty-kinds gets no marker"
+    (let [other (:xt/id (helpers/uuid))
+          player {:xt/id (helpers/uuid) :rank 1 :player/empire-name "Neutral"
+                   :player/score 100 :player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0}
+          rendered (pr-str (game/players-table {:players      [player]
+                                                 :treaty-kinds {other :peace}}))]
+      (is (not (clojure.string/includes? rendered "Active"))))))
+
+(deftest test-players-table-no-marker-for-viewer-own-row
+  (testing "The viewer's own row never shows a marker, even if treaty-kinds somehow had an entry"
+    (let [me {:xt/id (helpers/uuid) :rank 1 :player/empire-name "Me"
+              :player/score 100 :player/mil-planets 0 :player/erg-planets 0 :player/ore-planets 0}
+          rendered (pr-str (game/players-table {:players      [me]
+                                                 :player-id    (:xt/id me)
+                                                 :treaty-kinds {}}))]
+      (is (not (clojure.string/includes? rendered "Active"))))))

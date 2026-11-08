@@ -59,16 +59,20 @@
             [com.star-empire-elite.utils :as utils]
             [xtdb.api :as xt]))
 
-;;; Display label for a treaty kind ("Peace", "Defence", …), or nil for an unrecognized
-;;; kind — see const/treaty-kinds, the single source of truth every treaty-kind-aware piece
-;;; of UI here draws from. Used in prose (warning text, tooltips) where space isn't tight.
-(defn- kind-label [kind]
-  (:label (first (filter #(= kind (:kind %)) const/treaty-kinds))))
+;;; Look up one field of a treaty kind's const/treaty-kinds row, or nil for an unrecognized
+;;; kind — the single source of truth every treaty-kind-aware piece of UI here draws from.
+(defn- kind-field [field kind]
+  (field (first (filter #(= kind (:kind %)) const/treaty-kinds))))
 
-;;; Short form of kind-label ("Peace", "Defnc", "Offnc", …) for text ON a deferred radio
+;;; Display label for a treaty kind ("Peace", "Defence", …). Used in prose (warning text,
+;;; tooltips) where space isn't tight.
+(defn- kind-label [kind]
+  (kind-field :label kind))
+
+;;; Short form of kind-label ("Peace", "Def", "Off", …) for text ON a deferred radio
 ;;; button itself — see const/treaty-kinds' doc comment for why this differs from kind-label.
 (defn- button-label [kind]
-  (:button (first (filter #(= kind (:kind %)) const/treaty-kinds))))
+  (kind-field :button kind))
 
 ;;;;
 ;;;; Shared Data Loading

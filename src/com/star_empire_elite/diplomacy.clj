@@ -26,10 +26,10 @@
 ;;;;;
 ;;;;; Public API: partner-id, involves?, for-player, only-live-partners, active-treaty-between,
 ;;;;;             has-relationship?, outgoing-proposals, incoming-proposals, active-treaties,
-;;;;;             proposable-kinds, replacement?, partner-ids-of-kind, partner-ids-of-kinds,
-;;;;;             slots-used, free-slots, check-propose, check-accept, propose, accept,
-;;;;;             decline, withdraw, end, supersede, break-by-attack, resolve-decisions,
-;;;;;             alliances-for-player
+;;;;;             proposable-kinds, replacement?, partner-ids-of-kinds, slots-used, free-slots,
+;;;;;             check-propose, check-accept, propose, accept, decline, withdraw, end,
+;;;;;             supersede, break-by-attack, resolve-decisions, alliances-for-player,
+;;;;;             alliances-for-players
 ;;;;;
 
 (ns com.star-empire-elite.diplomacy
@@ -151,21 +151,12 @@
   [alliances player-id]
   (filter #(and (= (:alliance/status %) :active) (involves? % player-id)) alliances))
 
-(defn partner-ids-of-kind
-  "The partners in player-id's active treaties of exactly kind — e.g. :defence for defence
-  allies, or :offence for offence allies.
-
-  [alliances seq-of-alliance-map, player-id uuid, kind keyword] -> set-of-uuid"
-  [alliances player-id kind]
-  (set (map #(partner-id % player-id)
-            (filter #(= kind (:alliance/kind %)) (active-treaties alliances player-id)))))
-
 (defn partner-ids-of-kinds
   "The partners in player-id's active treaties of any kind in kinds — e.g. (const/kinds-where
-  :defends?) for every kind whose allies defend. Generalizes partner-ids-of-kind from one
-  kind to a set, for callers (resolution/treaty-allies) that want allies by capability
-  rather than by a single named kind — a future kind with more than one capability (e.g. a
-  :full treaty) is then picked up automatically, with no call-site change.
+  :defends?) for every kind whose allies defend. Takes a set rather than one named kind, so
+  callers (resolution/treaty-allies) that want allies by capability rather than a single
+  named kind pick up a future kind with more than one capability (e.g. a :full treaty)
+  automatically, with no call-site change.
 
   [alliances seq-of-alliance-map, player-id uuid, kinds set-of-keyword] -> set-of-uuid"
   [alliances player-id kinds]
@@ -452,7 +443,7 @@
 
 ;;;;
 ;;;; Persistence
-;;;; The only database-touching function in this namespace.
+;;;; The only database-touching functions in this namespace.
 ;;;;
 
 (defn alliances-for-player
@@ -474,3 +465,25 @@
               :where [[alliance :alliance/game game-id]
                       [alliance :alliance/recipient player-id]]}
          game-id player-id))))
+
+(defn alliances-for-players
+  "Every alliance document (any status) that involves ANY of player-ids in game-id, as
+  proposer or recipient. Same shape as alliances-for-player, generalized from one player to
+  a set — lets a caller checking several different players' own treaties (e.g. resolution/
+  treaty-allies checking whether each of a handful of allies separately holds a treaty with
+  the enemy) do it in one query instead of one alliances-for-player round-trip per player.
+
+  [db xtdb-db, game-id uuid, player-ids set-of-uuid] -> seq-of-alliance-map"
+  [db game-id player-ids]
+  (distinct
+    (concat
+      (q db '{:find (pull alliance [*])
+              :in [game-id [player-ids ...]]
+              :where [[alliance :alliance/game game-id]
+                      [alliance :alliance/proposer player-ids]]}
+         game-id player-ids)
+      (q db '{:find (pull alliance [*])
+              :in [game-id [player-ids ...]]
+              :where [[alliance :alliance/game game-id]
+                      [alliance :alliance/recipient player-ids]]}
+         game-id player-ids))))

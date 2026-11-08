@@ -82,9 +82,12 @@
                              [player :player/game game]
                              [player :player/user user-id])]}
                  uid)
-        player-counts (frequencies
+        ;; (count player) with game-id as the only other :find var groups by game-id;
+        ;; without it, XTDB's set semantics would dedup several players in the same
+        ;; game down to a single game-id row, undercounting.
+        player-counts (into {}
                         (q db
-                           '{:find [game-id]
+                           '{:find [game-id (count player)]
                              :where [[player :player/game game-id]]}))]
     (for [game games]
       {:game game
